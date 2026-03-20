@@ -1,0 +1,18 @@
+# MacOS related
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Vim
+*~
+*.swp
+*.swo
+
+# Node modules
+node_modules/
+npm-debug.log*
+
+# IDE user config
+.vscode/
+.idea/
+.vs/

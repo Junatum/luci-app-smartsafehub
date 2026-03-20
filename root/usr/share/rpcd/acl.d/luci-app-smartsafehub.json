@@ -1,0 +1,12 @@
+{
+  "luci-app-smartsafehub": {
+    "description": "Grant access to SmartSafeHub UI",
+    "read": {
+      "ubus": {
+        "network.interface": [ "status" ],
+        "system": [ "board" ]
+      },
+      "uci": [ "wireless", "network", "dhcp", "safeshield" ]
+    }
+  }
+}
