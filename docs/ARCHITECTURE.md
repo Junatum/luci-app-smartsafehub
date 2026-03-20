@@ -1,0 +1,635 @@
+# SmartSafeHub 아키텍처
+
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r4`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+
+## 1. 설계 목표
+
+SmartSafeHub는 일반 사용자가 OpenWrt의 복잡한 설정 전체를 직접 다루지 않고도 자주 사용하는 기능을 안전하게 관리할 수 있도록 설계되었습니다.
+
+핵심 목표:
+
+- 저사양 OpenWrt 장치에서도 동작하는 작은 Preact 프런트엔드
+- LuCI 인증과 rpcd ACL을 그대로 사용하는 권한 모델
+- 기능별로 분리된 ucode 백엔드
+- Wi-Fi와 SafeShield 변경 작업의 입력 검증과 실패 복구
+- 일부 데이터 소스 실패를 전체 기능 실패로 확대하지 않는 best-effort 조회
+- 데스크톱과 모바일에서 동일한 핵심 기능 제공
+- 중복 RPC, 겹치는 폴링과 불필요한 hostapd 조회 최소화
+- 빌드 단계에서 소스·배포 산출물·RPC 계약 오류 차단
+
+SmartSafeHub는 OpenWrt의 모든 고급 설정을 대체하지 않습니다. 게스트 Wi-Fi, VLAN, mesh, 방화벽, 패키지와 세부 시스템 설정은 기존 LuCI 화면으로 연결합니다.
+
+## 2. 전체 구성
+
+```text
+브라우저
+  │
+  │ LuCI 인증 세션
+  ▼
+LuCI view loader
+htdocs/luci-static/resources/view/smartsafehub/app.js
+  │
+  ├─ 전체 폭 제품 화면 활성화
+  ├─ bootstrap(sessionId, rpcUrl, assetVersion) 주입
+  ├─ 버전이 포함된 app.js 로드
+  └─ 화면 종료 시 LuCI chrome 복원
+       │
+       ▼
+Preact 애플리케이션 · Shadow DOM
+root/www/luci-static/smartsafehub/app.js + app.css
+       │
+       │ JSON-RPC /admin/ubus
+       ├─────────────────────────────┐
+       ▼                             ▼
+rpcd ucode: smartsafehub       기존 safeshield.status
+       │
+       ├─ system / network.interface.wan
+       ├─ network.wireless / hostapd
+       ├─ UCI wireless / safeshield
+       ├─ DHCP leases / ARP
+       ├─ SafeShield 규칙 파일과 init script
+       └─ reboot / wifi reload
+```
+
+## 3. LuCI 통합 계층
+
+### 3.1 메뉴
+
+메뉴 정의:
+
+```text
+root/usr/share/luci/menu.d/luci-app-smartsafehub.json
+```
+
+등록 경로는 `admin/smartsafehub`이며 LuCI view `smartsafehub/app`을 실행합니다.
+
+### 3.2 ACL
+
+ACL 정의:
+
+```text
+root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
+```
+
+읽기 권한:
+
+- `smartsafehub.status`
+- `smartsafehub.connected_devices`
+- `smartsafehub.wifi_summary`
+- `smartsafehub.safeshield_rules_list`
+- `safeshield.status`
+
+쓰기 권한:
+
+- `smartsafehub.wifi_update`
+- `smartsafehub.system_reboot`
+- `smartsafehub.safeshield_set_enabled`
+- `smartsafehub.safeshield_refresh`
+- `smartsafehub.safeshield_rule_add`
+- `smartsafehub.safeshield_rule_delete`
+
+진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
+
+### 3.3 LuCI view loader
+
+`htdocs/luci-static/resources/view/smartsafehub/app.js`는 제품 UI 자체가 아니라 LuCI와 프런트엔드를 연결하는 로더입니다.
+
+주요 책임:
+
+1. `viewport-fit=cover`가 포함된 모바일 viewport 설정
+2. SmartSafeHub 화면에서 기존 LuCI header와 footer 숨김
+3. LuCI 콘텐츠 컨테이너의 최대 폭과 카드 스타일 해제
+4. `window.__SMARTHUB_BOOTSTRAP__` 생성
+5. 버전이 포함된 JavaScript URL 생성
+6. 이전 버전 module script와 mount 전역 제거
+7. DOM 변경 감시를 `requestAnimationFrame()` 단위로 합침
+8. SmartSafeHub 화면을 떠날 때 observer 해제와 LuCI 레이아웃 복원
+
+현재 자산 버전:
+
+```js
+const ASSET_VERSION = '0.2.0-r4';
+```
+
+별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
+
+## 4. 프런트엔드 아키텍처
+
+### 4.1 기술 구성
+
+- Preact 10
+- TypeScript
+- Vite
+- Tailwind CSS
+- 브라우저 `fetch()` 기반 JSON-RPC
+- hash route 기반 단일 페이지 애플리케이션
+
+Vite 출력:
+
+```text
+root/www/luci-static/smartsafehub/app.js
+root/www/luci-static/smartsafehub/app.css
+```
+
+### 4.2 Shadow DOM
+
+`frontend/src/main.tsx`는 LuCI가 만든 `#smartsafehub-root`에 open Shadow DOM을 생성합니다.
+
+사용 목적:
+
+- LuCI 테마 CSS가 SmartSafeHub 컴포넌트에 미치는 영향 최소화
+- SmartSafeHub 스타일이 다른 LuCI 화면으로 새는 현상 방지
+- 제품 UI의 반응형 레이아웃 독립 유지
+
+Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다.
+
+### 4.3 화면과 route
+
+| route | hash | 화면 |
+|---|---|---|
+| `home` | `#home` | 장치 대시보드 |
+| `wifi` | `#wifi` | Wi-Fi |
+| `devices` | `#devices` | 연결된 기기 |
+| `safeshield` | `#safeshield` | SafeShield |
+| `rules` | `#rules` | 사용자 규칙 |
+| `system` | `#system` | 업데이트 및 시스템 |
+
+`App.tsx`는 route와 데이터 hook을 조합하는 composition root입니다.
+
+```text
+AppShell.tsx
+├── ProductHeader.tsx
+└── ProductNavigation.tsx
+```
+
+- `ProductHeader`: 제품명, 화면 제목, 설명, 새로고침 버튼
+- `ProductNavigation`: 데스크톱·모바일 메뉴, 고급 설정, 로그아웃
+- `AppShell`: 공통 제품 chrome과 페이지 콘텐츠 조합
+
+### 4.4 데이터 계층
+
+```text
+페이지 컴포넌트
+  ↓
+hooks/use*.ts
+  ↓
+api/smartsafehub.ts 또는 api/safeshield.ts
+  ↓
+api/rpc.ts
+  ↓
+/admin/ubus JSON-RPC
+```
+
+`api/rpc.ts`의 책임:
+
+- LuCI bootstrap에서 session ID와 RPC URL 읽기
+- JSON-RPC 요청 ID 관리
+- HTTP 오류, JSON 파싱 오류, ubus 상태 코드와 애플리케이션 오류 통합
+- 사용자에게 표시할 한국어 오류 메시지 생성
+
+SmartSafeHub 백엔드 공통 응답:
+
+```json
+{
+  "ok": true,
+  "data": {},
+  "error": null
+}
+```
+
+오류 응답:
+
+```json
+{
+  "ok": false,
+  "data": null,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "사용자 메시지"
+  }
+}
+```
+
+SafeShield 상세 상태는 기존 `safeshield.status`의 원시 응답을 프런트엔드에서 화면용 모델로 정규화합니다. 객체 없음과 일부 ubus 오류는 `available: false` 상태로 변환합니다.
+
+### 4.5 비동기 리소스와 폴링
+
+공통 훅 `useAsyncResource()`는 읽기 화면의 로딩, 새로고침, 오류와 폴링을 관리합니다.
+
+핵심 계약:
+
+- `inFlight` Promise가 있으면 같은 loader를 다시 실행하지 않고 기존 Promise 반환
+- 초기 로드는 active 상태에서 한 번만 실행
+- `setInterval()`을 사용하지 않음
+- 이전 요청이 완료된 뒤 다음 `setTimeout()` 예약
+- `document.visibilityState === 'hidden'`이면 타이머 중단
+- 탭이 다시 표시되면 즉시 한 번 갱신한 뒤 폴링 재개
+- unmount 후 상태 변경 방지
+
+이 구조는 CPU와 네트워크가 느린 공유기에서 요청이 누적되는 문제를 방지합니다.
+
+### 4.6 진단 정보 생성
+
+진단은 프런트엔드 `useSystemActions()`에서 생성합니다.
+
+```text
+SystemPage에 이미 로드된 smartsafehub.status
+        │
+        ├─ Promise.allSettled(smartsafehub.wifi_summary)
+        └─ Promise.allSettled(safeshield.status)
+                    │
+                    ▼
+        브라우저에서 SystemDiagnostics 조합
+                    │
+                    ▼
+             JSON Blob 다운로드
+```
+
+설계 이유:
+
+- 시스템 상태를 중복 조회하지 않음
+- 독립적인 두 상세 요청을 병렬 실행
+- 선택적 서비스 한쪽이 실패해도 전체 다운로드 유지
+- rpcd 안에서 다시 ubus를 중첩 호출하는 복합 진단 RPC 제거
+- Wi-Fi 비밀번호와 라이선스 키를 수집하지 않음
+
+### 4.7 반응형 UI
+
+- `md` 이상에서는 가로 제품 메뉴
+- 768px 미만에서는 sticky 모바일 메뉴
+- route 변경과 `Escape` 입력 시 메뉴 닫힘
+- 주요 버튼과 링크에 최소 44px 터치 영역
+- LuCI 경고 배너도 모바일에서 전체 폭 버튼 사용
+- 긴 문자열은 화면 폭 안에서 줄바꿈
+
+## 5. rpcd 백엔드 아키텍처
+
+### 5.1 composition root
+
+```text
+root/usr/share/rpcd/ucode/smartsafehub.uc
+```
+
+진입점은 기능 구현을 포함하지 않고 하위 모듈의 public function을 RPC 메서드에 연결합니다.
+
+```ucode
+return { smartsafehub: methods };
+```
+
+rpcd는 이 반환값으로 `smartsafehub` ubus 객체를 등록합니다.
+
+### 5.2 모듈 구성
+
+```text
+root/usr/share/rpcd/ucode/smartsafehub/
+├── core.uc
+├── devices.uc
+├── safeshield.uc
+├── system.uc
+├── wifi.uc
+└── wifi-management.uc
+```
+
+#### `core.uc`
+
+공통 런타임 기능:
+
+- 공유 ubus 연결
+- 동기 안전 호출과 deferred 호출
+- 공통 성공·실패 응답
+- 문자열·숫자·메모리 값 정규화
+- JSON 파일 읽기
+- UCI cursor 생성
+- 제한 시간이 있는 시스템 명령 실행
+
+ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus 연결을 공유합니다.
+
+#### `wifi.uc`
+
+읽기 전용 Wi-Fi 도메인 로직:
+
+- 주파수 대역 판별
+- 보안 방식 정규화
+- 비밀번호 필요 여부 판별
+- 무선 장치별 기본 AP 선택
+- `network.wireless`와 hostapd 상태 결합
+- 클라이언트 수, 채널과 런타임 상태 계산
+- 변경 대상 section이 SmartSafeHub 관리 대상인지 UCI 기준 검증
+
+각 radio에서는 LAN 네트워크에 연결된 AP를 우선하고 활성 상태와 격리 여부를 점수화해 하나의 기본 AP를 선택합니다.
+
+#### `wifi-management.uc`
+
+Wi-Fi 조회 RPC와 변경 작업:
+
+- SSID UTF-8 1~32바이트 검증
+- 지원 보안 방식 검증
+- 비밀번호 8~63자 또는 64자리 16진수 검증
+- 관리 대상 기본 AP만 변경 허용
+- 변경 전 UCI snapshot 저장
+- UCI commit
+- `/sbin/wifi reload`
+- 적용 실패 시 snapshot 복원과 reload 재시도
+
+지원 보안 값:
+
+- `keep`
+- `none`
+- `psk2`
+- `sae-mixed`
+- `sae`
+
+변경 대상 검증에서는 무선 런타임 전체를 다시 조회하지 않고 UCI 설정을 사용합니다. 고급 또는 알 수 없는 보안 방식은 조회할 수 있지만, 해당 방식을 변경하려면 기존 LuCI를 사용합니다.
+
+#### `devices.uc`
+
+연결 기기 정보를 다음 소스에서 결합합니다.
+
+1. dnsmasq DHCP lease 파일
+2. `/proc/net/arp`
+3. `network.wireless.status`
+4. station 정보가 없는 인터페이스에 한해 `hostapd.<ifname>.get_clients`
+
+MAC 주소를 기본 키로 병합해 다음 값을 생성합니다.
+
+- hostname
+- IPv4 address
+- connection: `wifi`, `ethernet`, `unknown`
+- online / leaseActive
+- lease 만료 시각
+- interface
+- SSID, radio, band
+- signal dBm, inactive time, connected time
+
+개별 데이터 소스 실패는 빈 결과로 처리하고 다른 소스의 정보는 계속 반환합니다.
+
+#### `safeshield.uc`
+
+SafeShield 설정, 갱신과 사용자 규칙을 담당합니다.
+
+주요 경로:
+
+```text
+/dev/shm/safeshield.status.json
+/tmp/dnsmasq.d/safeshield.blocklist
+/etc/safeshield/allowlist
+/etc/safeshield/blocklist
+/tmp/smartsafehub-safeshield-refresh.lock
+/tmp/smartsafehub-safeshield-rules.lock
+```
+
+정책:
+
+- SafeShield 비활성 상태에서는 수동 갱신 거부
+- 이미 갱신 중이면 중복 실행 거부
+- 사용자 규칙 변경 시 파일 잠금
+- allow와 block 사이의 충돌 방지
+- 목록별 최대 500개, 전체 최대 1,000개
+- 규칙 파일 최대 128KiB
+- 변경 성공 후 가능한 경우 SafeShield 갱신 시작
+
+#### `system.uc`
+
+시스템 상태와 재부팅을 담당합니다.
+
+상태 수집 객체:
+
+- `system.board`
+- `system.info`
+- `network.interface.wan.status`
+
+rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가 막힐 수 있으므로 `ubus.defer()`로 순차 호출하고 마지막 콜백에서 `request.reply()`를 실행합니다. WAN 조회 실패는 장치·런타임 정보 전체 실패로 처리하지 않습니다.
+
+재부팅은 요청 인자 `confirm: "reboot"`를 확인한 뒤 2초 후 실행합니다.
+
+## 6. 공개 RPC 계약
+
+SmartSafeHub가 등록하는 메서드는 총 **10개**입니다.
+
+| 메서드 | 유형 | 인자 | 설명 |
+|---|---|---|---|
+| `status` | 읽기 | 없음 | 장치, 소프트웨어, 런타임과 WAN 상태 |
+| `connected_devices` | 읽기 | 없음 | 연결 기기 목록과 집계 |
+| `wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
+| `wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
+| `system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
+| `safeshield_set_enabled` | 쓰기 | `enabled` | SafeShield 사용 여부 변경 |
+| `safeshield_refresh` | 쓰기 | 없음 | 차단 목록 갱신 시작 |
+| `safeshield_rules_list` | 읽기 | 없음 | 사용자 허용·차단 규칙 조회 |
+| `safeshield_rule_add` | 쓰기 | `action`, `domain` | 사용자 규칙 추가 |
+| `safeshield_rule_delete` | 쓰기 | `action`, `domain` | 사용자 규칙 삭제 |
+
+SafeShield 상세 상태는 SmartSafeHub 객체가 아니라 기존 `safeshield.status`에서 직접 읽습니다.
+
+## 7. 주요 데이터 흐름
+
+### 7.1 장치 상태
+
+```text
+HomePage 또는 SystemPage
+  → useStatus
+  → fetchStatus
+  → smartsafehub.status
+  → system.uc read_status
+  → system.board
+  → system.info
+  → network.interface.wan.status
+  → request.reply(ApiResponse)
+```
+
+### 7.2 Wi-Fi 변경
+
+```text
+WifiPage form
+  → useWifi.update
+  → smartsafehub.wifi_update
+  → 입력 검증
+  → UCI 기반 관리 대상 검증
+  → 현재 UCI snapshot 저장
+  → UCI 변경 및 commit
+  → /sbin/wifi reload
+      ├─ 성공: 새 summary 반환
+      └─ 실패: snapshot 복원 후 reload 재시도
+```
+
+### 7.3 연결 기기
+
+```text
+ConnectedDevicesPage
+  → smartsafehub.connected_devices
+  → DHCP leases + ARP + network.wireless
+  → station 누락 인터페이스만 hostapd fallback
+  → MAC 기준 병합·분류·집계
+```
+
+### 7.4 SafeShield 사용자 규칙
+
+```text
+SafeShieldRulesPage
+  → add/delete API
+  → 규칙 lock 획득
+  → allowlist/blocklist 읽기
+  → 정규화·중복·충돌·제한 검사
+  → 임시 파일 작성 및 원자적 교체
+  → lock 해제
+  → SafeShield 갱신 요청
+```
+
+### 7.5 진단 파일
+
+```text
+SystemPage의 기존 system snapshot
+  → wifi_summary와 safeshield.status 병렬 호출
+  → fulfilled 결과만 사용
+  → 실패 섹션은 unavailable 기본값
+  → 비밀 정보가 없는 JSON 다운로드
+```
+
+### 7.6 프런트엔드 자산 갱신
+
+```text
+PKG_VERSION + PKG_RELEASE
+  → ASSET_VERSION = 0.2.0-r4
+  → app.js?v=0.2.0-r4
+  → app.css?v=0.2.0-r4
+```
+
+LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더는 버전이 다르면 이전 script, mount 전역과 오래된 CSS URL을 교체합니다.
+
+## 8. 보안과 안정성
+
+### 8.1 권한 경계
+
+- 브라우저는 LuCI session ID를 사용합니다.
+- 모든 원격 호출은 `/admin/ubus`를 통과합니다.
+- ACL에 등록하지 않은 메서드는 호출할 수 없습니다.
+- 읽기와 쓰기 메서드를 분리합니다.
+- 진단 파일은 비밀번호와 라이선스 키를 요청하거나 저장하지 않습니다.
+
+### 8.2 입력 검증
+
+- Wi-Fi section과 device가 실제 AP인지 확인
+- SmartSafeHub 관리 대상 AP만 변경
+- SSID, 보안 방식, 비밀번호와 bool 타입 검증
+- 재부팅 확인 문자열 검증
+- SafeShield action과 domain 검증
+- 규칙 파일 크기와 개수 제한
+
+### 8.3 실패 격리
+
+- 연결 기기 데이터 소스 하나가 실패해도 전체 목록 조회 유지
+- WAN 인터페이스를 읽지 못해도 장치와 런타임 상태 반환
+- SafeShield API가 없으면 사용 불가 상태로 정규화
+- 진단 상세 조회 하나가 실패해도 JSON 다운로드 유지
+- Wi-Fi 적용 실패 시 원래 UCI 설정 복원 시도
+- SafeShield 갱신과 규칙 변경에 별도 lock 사용
+
+### 8.4 요청량 제어
+
+- 동일 loader 중복 실행 방지
+- 완료 기반 폴링으로 요청 중첩 방지
+- 숨겨진 탭에서 폴링 중단
+- station 정보가 있을 때 hostapd 중복 조회 생략
+- 시스템 진단에서 이미 로드된 상태 재사용
+- DOM observer 콜백을 animation frame으로 병합
+
+## 9. 빌드와 계약 검사
+
+### 9.1 rpcd 검사
+
+```bash
+sh scripts/check-rpcd-imports.sh \
+  root/usr/share/rpcd/ucode/smartsafehub.uc \
+  root/usr/share/rpcd/ucode/smartsafehub
+```
+
+검사 항목:
+
+- 필수 ucode 파일 존재
+- named import trailing comma 금지
+- exported function이 `};`로 종료되는지 확인
+- `wifi_band` import/export 연결
+- `wifi_is_managed_section` 연결
+- 필수 기능 모듈 import
+- 최종 rpcd signature 반환
+- 10개 공개 메서드 등록
+- 제거된 `system_diagnostics` 메서드 미등록
+
+### 9.2 프런트엔드 소스 검사
+
+`frontend/scripts/check-source.mjs` 검사 항목:
+
+- `smartsafehub.uc`가 작은 composition root인지 확인
+- 기능 모듈이 필요한 public function을 export하는지 확인
+- `App.tsx`와 `AppShell.tsx` 책임 분리
+- 모바일 메뉴, 고급 설정과 로그아웃 계약
+- 공통 `callApi()` wrapper 사용
+- 진단이 `Promise.allSettled()`와 기존 상세 API를 사용하는지 확인
+- 공통 비동기 훅이 `setInterval()`을 사용하지 않는지 확인
+- 숨겨진 탭 폴링 중단 계약
+- LuCI 제품 화면 chrome 처리
+
+### 9.3 배포 산출물 검사
+
+`frontend/scripts/check-dist.mjs` 검사 항목:
+
+- `app.js`, `app.css` 존재 및 비어 있지 않음
+- Shadow DOM mount 코드
+- 모바일 메뉴와 로그아웃
+- 전체 폭 제품 shell
+- 필수 RPC API 문자열
+- 제거된 `system_diagnostics`와 SafeShield 프록시 미포함
+- `Promise.allSettled()` 기반 진단 번들 포함
+- Shadow DOM stylesheet selector
+
+### 9.4 OpenWrt 패키지 준비 검사
+
+Makefile의 `Build/Prepare` hook은 다음을 추가로 확인합니다.
+
+- rpcd 검사 스크립트 성공
+- 프런트엔드 배포 파일 존재
+- 번들에 제거된 `system_diagnostics` 문자열이 없는지 확인
+- LuCI loader, ACL과 메뉴 존재
+- `ASSET_VERSION`과 `PKG_VERSION-rPKG_RELEASE` 일치
+
+### 9.5 실제 장치 검사
+
+정적 검사는 ucode parser와 실제 rpcd 런타임 전체를 대신하지 않습니다.
+
+```bash
+ucode -c \
+  -o /tmp/smartsafehub.ucb \
+  /usr/share/rpcd/ucode/smartsafehub.uc
+
+/etc/init.d/rpcd restart
+ubus -v list smartsafehub
+ubus call smartsafehub status '{}'
+ubus call smartsafehub wifi_summary '{}'
+ubus call smartsafehub connected_devices '{}'
+```
+
+브라우저에서는 진단 JSON 다운로드를 포함한 각 화면의 동작을 별도로 확인합니다.
+
+## 10. 확장 원칙
+
+1. `smartsafehub.uc`에는 기능 구현을 넣지 않고 RPC 등록만 추가합니다.
+2. 여러 기능에서 실제로 공유하는 처리만 `core.uc`에 배치합니다.
+3. 읽기 전용 도메인 로직과 변경 작업을 가능한 한 분리합니다.
+4. ucode named import 마지막 항목에는 쉼표를 넣지 않습니다.
+5. exported function은 반드시 `};`로 종료합니다.
+6. 새 RPC를 추가하면 ACL, 프런트엔드 API, 타입과 검사 스크립트를 함께 수정합니다.
+7. 프런트엔드 페이지는 직접 JSON-RPC를 호출하지 않고 hook과 API 계층을 사용합니다.
+8. 독립된 선택적 조회는 병렬 실행하되 부분 실패를 명시적으로 처리합니다.
+9. 폴링 기능은 중복 요청과 숨겨진 탭을 고려해야 합니다.
+10. 프런트엔드 소스를 변경하면 `npm run build`로 배포 산출물을 갱신합니다.
+11. 패키지 릴리스를 변경하면 LuCI loader의 `ASSET_VERSION`도 함께 변경합니다.
+12. 배포 전 TypeScript, 소스·dist 검사, OpenWrt 패키지 빌드와 실제 ubus 호출을 모두 확인합니다.
+
+## 11. 현재 제약
+
+- Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
+- WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
+- SafeShield 기능은 별도 `safeshield` 패키지와 해당 API·파일·init script에 의존합니다.
+- 진단 파일은 현재 시점의 상태 snapshot이며 장기간의 로그 수집 기능은 아닙니다.
+- 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
+- ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.

@@ -16,3 +16,7 @@ npm-debug.log*
 .vscode/
 .idea/
 .vs/
+
+# Project specific
+frontend/node_modules/
+frontend/.vite/

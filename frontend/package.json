@@ -1,0 +1,28 @@
+{
+  "name": "luci-app-smartsafehub-frontend",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "check:rpcd": "sh ../scripts/check-rpcd-imports.sh ../root/usr/share/rpcd/ucode/smartsafehub.uc ../root/usr/share/rpcd/ucode/smartsafehub",
+    "check:source": "node ./scripts/check-source.mjs",
+    "typecheck": "npm run check:source && tsc --noEmit",
+    "build": "npm run typecheck && vite build && node ./scripts/check-dist.mjs",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.1.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.2.0"
+  }
+}

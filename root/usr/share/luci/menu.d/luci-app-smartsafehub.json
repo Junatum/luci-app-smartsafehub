@@ -1,49 +1,13 @@
 {
-  "admin/smart": {
-    "title": "Smart",
-    "order": 10,
-    "action": {
-      "type": "firstchild"
-    }
-  },
-  "admin/smart/dashboard": {
-    "title": "홈",
-    "order": 1,
+  "admin/smartsafehub": {
+    "title": "SmartSafeHub",
+    "order": 5,
     "action": {
       "type": "view",
-      "path": "smartsafehub/dashboard"
-    }
-  },
-  "admin/smart/devices": {
-    "title": "기기",
-    "order": 2,
-    "action": {
-      "type": "view",
-      "path": "smartsafehub/devices"
-    }
-  },
-  "admin/smart/safeshield": {
-    "title": "SafeShield",
-    "order": 3,
-    "action": {
-      "type": "view",
-      "path": "smartsafehub/safeshield"
-    }
-  },
-  "admin/smart/stats": {
-    "title": "통계",
-    "order": 4,
-    "action": {
-      "type": "view",
-      "path": "smartsafehub/stats"
-    }
-  },
-  "admin/smart/advanced": {
-    "title": "고급 설정",
-    "order": 99,
-    "action": {
-      "type": "alias",
-      "path": "admin/network/network"
+      "path": "smartsafehub/app"
+    },
+    "depends": {
+      "acl": ["luci-app-smartsafehub"]
     }
   }
 }

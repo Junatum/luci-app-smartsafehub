@@ -1,12 +1,30 @@
 {
   "luci-app-smartsafehub": {
-    "description": "Grant access to SmartSafeHub UI",
+    "description": "Grant access to the SmartSafeHub device application",
     "read": {
       "ubus": {
-        "network.interface": [ "status" ],
-        "system": [ "board" ]
-      },
-      "uci": [ "wireless", "network", "dhcp", "safeshield" ]
+        "smartsafehub": [
+          "status",
+          "connected_devices",
+          "safeshield_rules_list",
+          "wifi_summary"
+        ],
+        "safeshield": [
+          "status"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "smartsafehub": [
+          "wifi_update",
+          "safeshield_set_enabled",
+          "safeshield_refresh",
+          "safeshield_rule_add",
+          "safeshield_rule_delete",
+          "system_reboot"
+        ]
+      }
     }
   }
 }
