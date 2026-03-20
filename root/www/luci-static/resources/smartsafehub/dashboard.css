@@ -83,6 +83,31 @@
   gap: 10px;
 }
 
+.smart-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.smart-card-header-row h2 {
+  margin: 0;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.smart-empty {
+  padding: 20px 0 4px;
+  color: #6b7280;
+}
+
+.smart-empty p {
+  margin: 0;
+}
+
 @media (max-width: 1024px) {
   .smart-card {
     grid-column: span 6;

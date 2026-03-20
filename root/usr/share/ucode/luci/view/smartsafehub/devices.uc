@@ -2,6 +2,12 @@
 
 return view.extend({
 	render: function() {
-		return E('div', { id: 'app-devices' });
+		return E([
+			E('link', {
+				rel: 'stylesheet',
+				href: L.resource('smartsafehub/dashboard.css')
+			}),
+			E('div', { id: 'app-devices' })
+		]);
 	}
 });
