@@ -18,7 +18,7 @@ import { WifiPage } from '../pages/WifiPage';
 
 export function App() {
   const route = useHashRoute();
-  const status = useStatus();
+  const status = useStatus(route === 'home' || route === 'system');
   const wifi = useWifi(route === 'wifi');
   const devices = useConnectedDevices(route === 'devices');
   const safeshield = useSafeShieldStatus(route === 'safeshield');

@@ -83,7 +83,7 @@ function collect_system_status(done) {
 	// OpenWrt's rpcd ucode API requires nested ubus requests to be deferred.
 	// Returning this first deferred request keeps the original rpcd request
 	// alive until done() eventually calls request.reply().
-	return defer_call('system', 'board', {}, function(board_code, board) {
+	const board_request = defer_call('system', 'board', {}, function(board_code, board) {
 		if (
 			board_code != 0 ||
 			type(board) != 'object' ||
@@ -132,6 +132,15 @@ function collect_system_status(done) {
 			));
 		}
 	});
+
+	if (board_request == null) {
+		return failure(
+			'SYSTEM_BOARD_REQUEST_FAILED',
+			'OpenWrt board information request could not be started'
+		);
+	}
+
+	return board_request;
 }
 
 export function read_status(request) {

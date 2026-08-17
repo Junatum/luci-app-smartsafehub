@@ -30,6 +30,26 @@ if (!javascript.includes('attachShadow')) {
   throw new Error('app.js does not mount SmartSafeHub in a shadow root');
 }
 
+if (!javascript.includes('__SMARTHUB_APP_UNMOUNT__')) {
+  throw new Error('app.js does not expose the Preact unmount lifecycle');
+}
+
+for (const loginContract of [
+  'smartsafehub-login-root',
+  'luci_username',
+  'luci_password',
+  'X-LuCI-Login-Required',
+  '다시 오신 것을 환영합니다',
+]) {
+  if (!javascript.includes(loginContract)) {
+    throw new Error(`app.js does not contain the Preact login contract: ${loginContract}`);
+  }
+}
+
+if (!javascript.includes('RPC_TIMEOUT') || !javascript.includes('AbortController')) {
+  throw new Error('app.js does not contain RPC timeout handling');
+}
+
 if (!javascript.includes('admin/logout') || !javascript.includes('로그아웃')) {
   throw new Error('app.js does not contain the product logout action');
 }
@@ -49,14 +69,26 @@ for (const method of [
   'wifi_summary',
   'wifi_update',
   'system_reboot',
+  'set_enabled',
+  'refresh',
+  'rules_list',
+  'rule_add',
+  'rule_delete',
+]) {
+  if (!javascript.includes(method)) {
+    throw new Error(`app.js does not contain the ${method} API call`);
+  }
+}
+
+for (const obsoleteMethod of [
   'safeshield_set_enabled',
   'safeshield_refresh',
   'safeshield_rules_list',
   'safeshield_rule_add',
   'safeshield_rule_delete',
 ]) {
-  if (!javascript.includes(method)) {
-    throw new Error(`app.js does not contain the ${method} API call`);
+  if (javascript.includes(obsoleteMethod)) {
+    throw new Error(`app.js still contains obsolete SmartSafeHub proxy ${obsoleteMethod}`);
   }
 }
 
@@ -72,6 +104,10 @@ if (!javascript.includes('safeshield') || !javascript.includes('status')) {
   throw new Error('app.js does not contain the direct SafeShield status API call');
 }
 
+if (!javascript.includes('로컬 규칙을 DNS에 적용하고 있습니다')) {
+  throw new Error('app.js does not contain the SafeShield local-rule fast apply integration');
+}
+
 if (javascript.includes('safeshield_status')) {
   throw new Error('app.js still contains the deadlocking SafeShield proxy method');
 }
@@ -81,6 +117,16 @@ if (!stylesheet.includes(':host')) {
 }
 if (!stylesheet.includes('.smartsafehub-shadow-root')) {
   throw new Error('app.css does not define the Shadow DOM mount root');
+}
+
+for (const loginStyle of [
+  '.smartsafehub-login-shadow-root',
+  '.ssh-login-page',
+  '.ssh-login-card',
+]) {
+  if (!stylesheet.includes(loginStyle)) {
+    throw new Error(`app.css does not contain the Preact login style: ${loginStyle}`);
+  }
 }
 
 console.log(`Verified frontend output: ${fileURLToPath(outputDirectory)}`);

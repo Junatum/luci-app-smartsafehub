@@ -4,7 +4,7 @@ set -eu
 entrypoint=${1:?missing rpcd entrypoint}
 module_dir=${2:?missing rpcd module directory}
 
-files="${entrypoint} ${module_dir}/core.uc ${module_dir}/devices.uc ${module_dir}/safeshield.uc ${module_dir}/system.uc ${module_dir}/wifi.uc ${module_dir}/wifi-management.uc"
+files="${entrypoint} ${module_dir}/core.uc ${module_dir}/devices.uc ${module_dir}/system.uc ${module_dir}/wifi.uc ${module_dir}/wifi-management.uc"
 
 for file in ${files}; do
 	if [ ! -s "${file}" ]; then
@@ -12,6 +12,11 @@ for file in ${files}; do
 		exit 1
 	fi
 done
+
+if [ -e "${module_dir}/safeshield.uc" ]; then
+	echo "ERROR: SmartSafeHub must not own SafeShield controller logic; remove smartsafehub/safeshield.uc" >&2
+	exit 1
+fi
 
 awk '
 	FNR == 1 {
@@ -87,12 +92,17 @@ grep -Fq 'export function wifi_is_managed_section(' "${module_dir}/wifi.uc" || {
 	exit 1
 }
 
-for module in devices safeshield system wifi-management; do
+for module in devices system wifi-management; do
 	grep -Fq "from './smartsafehub/${module}.uc'" "${entrypoint}" || {
 		echo "ERROR: smartsafehub.uc does not import ${module}.uc" >&2
 		exit 1
 	}
 done
+
+if grep -Fq "from './smartsafehub/safeshield.uc'" "${entrypoint}"; then
+	echo "ERROR: smartsafehub.uc must use the official safeshield ubus object instead of a proxy module" >&2
+	exit 1
+fi
 
 grep -Fq 'return { smartsafehub: methods };' "${entrypoint}" || {
 	echo "ERROR: smartsafehub.uc does not return the rpcd signature" >&2
@@ -104,18 +114,18 @@ for method in \
 	connected_devices \
 	wifi_summary \
 	wifi_update \
-	system_reboot \
-	safeshield_set_enabled \
-	safeshield_refresh \
-	safeshield_rules_list \
-	safeshield_rule_add \
-	safeshield_rule_delete
+	system_reboot
 do
 	grep -Fq "${method}:" "${entrypoint}" || {
 		echo "ERROR: smartsafehub.uc does not register ${method}" >&2
 		exit 1
 	}
 done
+
+if grep -Eq 'safeshield_(set_enabled|refresh|rules_list|rule_add|rule_delete):' "${entrypoint}"; then
+	echo "ERROR: SmartSafeHub still exposes obsolete SafeShield proxy RPC methods" >&2
+	exit 1
+fi
 
 if grep -Fq 'system_diagnostics:' "${entrypoint}"; then
 	echo "ERROR: smartsafehub.uc still registers the removed system_diagnostics method" >&2

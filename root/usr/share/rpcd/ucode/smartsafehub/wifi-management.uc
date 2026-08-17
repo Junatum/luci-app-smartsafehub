@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
+import * as fs from 'fs';
 import {
 	failure,
 	new_uci_cursor,
+	number_value,
 	run_command,
 	string_value,
 	success
@@ -14,6 +16,9 @@ import {
 	wifi_security_requires_key,
 	wifi_summary_payload
 } from './wifi.uc';
+
+const WIFI_UPDATE_LOCK = '/tmp/smartsafehub-wifi-update.lock';
+const WIFI_UPDATE_LOCK_STALE_SECONDS = 120;
 
 export function read_wifi_summary() {
 	const payload = wifi_summary_payload();
@@ -57,6 +62,24 @@ function valid_wifi_security(value) {
 	);
 }
 
+function acquire_wifi_update_lock() {
+	const lock = fs.stat(WIFI_UPDATE_LOCK);
+
+	if (lock) {
+		if (time() - number_value(lock.mtime) < WIFI_UPDATE_LOCK_STALE_SECONDS) {
+			return false;
+		}
+
+		fs.rmdir(WIFI_UPDATE_LOCK);
+	}
+
+	return fs.mkdir(WIFI_UPDATE_LOCK) == true;
+}
+
+function release_wifi_update_lock() {
+	fs.rmdir(WIFI_UPDATE_LOCK);
+}
+
 function restore_wifi_option(ctx, section, option, value) {
 	if (value == null) {
 		return ctx.get('wireless', section, option) == null ||
@@ -82,7 +105,7 @@ function restore_wifi_snapshot(snapshot) {
 	return restored && ctx.commit('wireless') == true;
 }
 
-export function update_wifi(request) {
+function apply_wifi_update(request) {
 	const section_name = request.args.section;
 	const ssid = valid_wifi_ssid(request.args.ssid);
 	const security = request.args.security;
@@ -140,8 +163,11 @@ export function update_wifi(request) {
 			'현재 고급 보안 방식의 비밀번호는 기존 LuCI에서 변경해 주세요.'
 		);
 	}
-	if (target_requires_key && !length(password) && !length(current_key)) {
-		return failure('WIFI_PASSWORD_REQUIRED', '보안 Wi-Fi를 사용하려면 비밀번호가 필요합니다.');
+	if (target_requires_key && !length(password) && !valid_wifi_password(current_key)) {
+		return failure(
+			'WIFI_PASSWORD_REQUIRED',
+			'현재 저장된 비밀번호를 사용할 수 없습니다. 새 비밀번호를 입력해 주세요.'
+		);
 	}
 	if (target_requires_key && length(password) && !valid_wifi_password(password)) {
 		return failure(
@@ -219,4 +245,28 @@ export function update_wifi(request) {
 		reloaded: true,
 		summary: wifi_summary_payload() ?? { networks: [], totalClients: 0 },
 	});
+};
+
+export function update_wifi(request) {
+	if (!acquire_wifi_update_lock()) {
+		return failure(
+			'WIFI_UPDATE_RUNNING',
+			'다른 Wi-Fi 설정 변경이 진행 중입니다. 잠시 후 다시 시도해 주세요.'
+		);
+	}
+
+	let result;
+
+	try {
+		result = apply_wifi_update(request);
+	}
+	catch (e) {
+		result = failure(
+			'WIFI_UPDATE_FAILED',
+			'Wi-Fi 설정을 처리하는 중 예기치 않은 오류가 발생했습니다.'
+		);
+	}
+
+	release_wifi_update_lock();
+	return result;
 };

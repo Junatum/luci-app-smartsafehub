@@ -1,7 +1,12 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 
-import { formatBytes, formatLoadAverage, formatUptime } from '../app/format';
+import {
+  formatBytes,
+  formatLoadAverage,
+  formatUptime,
+  getMemoryUsage,
+} from '../app/format';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { SmartSafeHubStatus } from '../types/status';
 import { luciAdminUrl } from '../utils/luci';
@@ -100,13 +105,9 @@ export function SystemPage({
 
   const memory = data?.runtime.memory;
   const totalMemory = memory?.total ?? 0;
-  const availableMemory = memory
-    ? memory.available || memory.free + memory.buffered + memory.cached
-    : 0;
-  const usedMemory = Math.max(0, totalMemory - availableMemory);
-  const memoryPercent = totalMemory > 0
-    ? Math.round((usedMemory / totalMemory) * 100)
-    : 0;
+  const memoryUsage = memory ? getMemoryUsage(memory) : null;
+  const usedMemory = memoryUsage?.used ?? 0;
+  const memoryPercent = Math.round(memoryUsage?.percent ?? 0);
   const firmwareUrl = luciAdminUrl('/admin/system/flash');
   const advancedSystemUrl = luciAdminUrl('/admin/system/system');
   const logsUrl = luciAdminUrl('/admin/status/logs');
@@ -177,7 +178,7 @@ export function SystemPage({
 
         <ActionCard
           title="진단 정보"
-          description="장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않습니다."
+          description="장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않지만 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보는 포함됩니다."
         >
           <button
             class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white sm:w-auto px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
@@ -187,6 +188,9 @@ export function SystemPage({
           >
             {action === 'diagnostics' ? '진단 정보 생성 중' : '진단 정보 다운로드'}
           </button>
+          <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+            지원 담당자에게 전달하기 전에 파일에 포함된 네트워크 식별 정보를 확인해 주세요.
+          </p>
         </ActionCard>
 
         <ActionCard

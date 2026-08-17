@@ -1,4 +1,13 @@
 {
+  "smartsafehub": {
+    "title": "SmartSafeHub",
+    "order": 1,
+    "action": {
+      "type": "template",
+      "path": "smartsafehub/login"
+    },
+    "auth": {}
+  },
   "admin/smartsafehub": {
     "title": "SmartSafeHub",
     "order": 5,
@@ -7,7 +16,9 @@
       "path": "smartsafehub/app"
     },
     "depends": {
-      "acl": ["luci-app-smartsafehub"]
+      "acl": [
+        "luci-app-smartsafehub"
+      ]
     }
   }
 }

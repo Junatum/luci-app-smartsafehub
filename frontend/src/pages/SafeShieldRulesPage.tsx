@@ -35,7 +35,6 @@ interface SafeShieldRulesPageProps {
 interface RuleListCardProps {
   action: SafeShieldRulesAction | null;
   kind: SafeShieldRuleAction;
-  limit: number;
   onAddRule: (
     action: SafeShieldRuleAction,
     domain: string,
@@ -71,7 +70,6 @@ function isValidDomain(value: string): boolean {
 function RuleListCard({
   action,
   kind,
-  limit,
   onAddRule,
   onDeleteRule,
   rules,
@@ -148,7 +146,7 @@ function RuleListCard({
                   {theme.label}
                 </h2>
                 <span class={`rounded-full px-2.5 py-1 text-xs font-extrabold ${theme.badge}`}>
-                  {rules.length}/{limit}
+                  {rules.length}
                 </span>
               </div>
               <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">
@@ -168,7 +166,7 @@ function RuleListCard({
               aria-invalid={validationError ? true : undefined}
               autocomplete="off"
               class="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
-              disabled={busy || rules.length >= limit}
+              disabled={busy}
               id={`${kind}-domain`}
               onInput={(event: JSX.TargetedEvent<HTMLInputElement, InputEvent>) =>
                 setInput(event.currentTarget.value)
@@ -180,7 +178,7 @@ function RuleListCard({
             />
             <button
               class={`inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 sm:w-auto rounded-xl border px-4 py-2.5 text-sm font-extrabold transition focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${theme.button}`}
-              disabled={busy || rules.length >= limit || input.trim().length === 0}
+              disabled={busy || input.trim().length === 0}
               type="submit"
             >
               <PlusIcon class="size-4" />
@@ -280,8 +278,6 @@ export function SafeShieldRulesPage({
     return <ErrorPanel message="사용자 규칙 응답이 비어 있습니다." onRetry={onRetry} />;
   }
 
-  const ignored = data.ignored.allow + data.ignored.block;
-
   return (
     <>
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
@@ -343,15 +339,6 @@ export function SafeShieldRulesPage({
         </section>
       ) : null}
 
-      {ignored > 0 ? (
-        <section class="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4" role="alert">
-          <AlertIcon class="mt-0.5 size-5 shrink-0 text-amber-700" />
-          <p class="m-0 text-sm leading-6 text-amber-900">
-            기존 규칙 파일에서 유효하지 않은 항목 {ignored}개를 화면에서 제외했습니다. 다음 저장 시 파일은 정규화된 도메인 목록으로 다시 작성됩니다.
-          </p>
-        </section>
-      ) : null}
-
       {feedback ? (
         <section aria-live="polite" class="mt-4 flex flex-col items-start gap-3 rounded-2xl border border-teal-200 bg-teal-50 sm:flex-row sm:justify-between p-4">
           <div class="flex min-w-0 items-start gap-3">
@@ -379,7 +366,6 @@ export function SafeShieldRulesPage({
         <RuleListCard
           action={action}
           kind="allow"
-          limit={data.limits.perList}
           onAddRule={onAddRule}
           onDeleteRule={onDeleteRule}
           rules={data.allow}
@@ -387,7 +373,6 @@ export function SafeShieldRulesPage({
         <RuleListCard
           action={action}
           kind="block"
-          limit={data.limits.perList}
           onAddRule={onAddRule}
           onDeleteRule={onDeleteRule}
           rules={data.block}
@@ -395,7 +380,7 @@ export function SafeShieldRulesPage({
       </section>
 
       <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-        한 목록에는 최대 {data.limits.perList}개, 전체 최대 {data.limits.total}개의 규칙을 저장할 수 있습니다. 도메인은 소문자로 정규화되고 중복 항목은 하나로 유지됩니다.
+        규칙 저장과 유효성 검사는 SafeShield API가 관리합니다. 도메인은 소문자로 정규화되고 중복 항목은 하나로 유지됩니다.
       </p>
     </>
   );

@@ -2,14 +2,16 @@
 'require view';
 
 const ASSET_BASE = '/luci-static/smartsafehub/';
-const ASSET_VERSION = '0.2.0-r4';
+const ASSET_VERSION = '0.2.0-r8';
 const ROOT_ID = 'smartsafehub-root';
 const PRODUCT_VIEW_CLASS = 'smartsafehub-product-view';
 const PRODUCT_CHROME_STYLE_ID = 'smartsafehub-product-chrome-style';
 const PRODUCT_VIEW_OBSERVER_KEY = '__SMARTHUB_PRODUCT_VIEW_OBSERVER__';
 const PRODUCT_ANCESTOR_CLASS = 'smartsafehub-product-ancestor';
+const SCRIPT_LOADING_KEY = '__SMARTHUB_APP_SCRIPT_LOADING__';
 const VIEWPORT_META_ID = 'smartsafehub-mobile-viewport';
 
+let applicationFrame = null;
 let productAncestors = [];
 let productViewActive = false;
 let productViewFrame = null;
@@ -36,7 +38,6 @@ function removeLegacyStylesheet() {
 		.querySelectorAll('link[data-smartsafehub-asset="css"]')
 		.forEach((node) => node.remove());
 }
-
 
 function ensureProductChromeStyle() {
 	let style = document.getElementById(PRODUCT_CHROME_STYLE_ID);
@@ -190,9 +191,82 @@ function stopObservingProductView() {
 	}
 }
 
-function ensureApplication() {
+function unmountApplication() {
+	if (typeof window.__SMARTHUB_APP_UNMOUNT__ !== 'function') {
+		return;
+	}
+
+	try {
+		window.__SMARTHUB_APP_UNMOUNT__();
+	}
+	catch (error) {
+		console.error('SmartSafeHub application unmount failed', error);
+	}
+}
+
+function clearApplicationGlobals() {
+	delete window.__SMARTHUB_APP_MOUNT__;
+	delete window.__SMARTHUB_APP_UNMOUNT__;
+	delete window.__SMARTHUB_APP_ASSET_VERSION__;
+}
+
+function renderApplicationLoadError() {
+	const host = document.getElementById(ROOT_ID);
+
+	if (!host) {
+		return;
+	}
+
+	host.replaceChildren();
+
+	const panel = document.createElement('div');
+	panel.setAttribute('role', 'alert');
+	panel.style.cssText = [
+		'max-width:720px',
+		'margin:32px auto',
+		'padding:24px',
+		'border:1px solid #fecdd3',
+		'border-radius:16px',
+		'background:#fff1f2',
+		'color:#881337',
+		'font-family:system-ui,sans-serif',
+	].join(';');
+
+	const title = document.createElement('strong');
+	title.textContent = 'SmartSafeHub 화면을 불러오지 못했습니다.';
+	title.style.display = 'block';
+	title.style.marginBottom = '8px';
+
+	const description = document.createElement('p');
+	description.textContent = '정적 자산이 누락되었거나 브라우저 캐시가 오래된 상태일 수 있습니다.';
+	description.style.margin = '0 0 16px';
+
+	const retry = document.createElement('button');
+	retry.type = 'button';
+	retry.textContent = '다시 불러오기';
+	retry.style.cssText = [
+		'min-height:44px',
+		'padding:10px 16px',
+		'border:0',
+		'border-radius:10px',
+		'background:#be123c',
+		'color:#fff',
+		'font-weight:700',
+		'cursor:pointer',
+	].join(';');
+	retry.addEventListener('click', function() {
+		host.replaceChildren();
+		ensureApplication(true);
+	});
+
+	panel.append(title, description, retry);
+	host.appendChild(panel);
+}
+
+function ensureApplication(forceReload) {
 	const activeVersion = window.__SMARTHUB_APP_ASSET_VERSION__;
 	if (
+		forceReload !== true &&
 		typeof window.__SMARTHUB_APP_MOUNT__ === 'function' &&
 		activeVersion === ASSET_VERSION
 	) {
@@ -200,21 +274,44 @@ function ensureApplication() {
 		return;
 	}
 
+	if (window[SCRIPT_LOADING_KEY] === ASSET_VERSION) {
+		return;
+	}
+
 	// LuCI keeps the current JavaScript context while navigating between views.
 	// After a package upgrade an older SmartSafeHub mount function can therefore
-	// remain in memory even though ASSET_VERSION changed. Remove the stale script
-	// and globals so the versioned module URL is loaded again.
+	// remain in memory even though ASSET_VERSION changed. Unmount the old tree
+	// before replacing its module script and global lifecycle functions.
+	unmountApplication();
 	document
 		.querySelectorAll('script[data-smartsafehub-asset="js"]')
 		.forEach((node) => node.remove());
-	delete window.__SMARTHUB_APP_MOUNT__;
-	delete window.__SMARTHUB_APP_ASSET_VERSION__;
+	clearApplicationGlobals();
 
 	const script = document.createElement('script');
 	script.type = 'module';
 	script.src = assetUrl('app.js');
 	script.dataset.smartsafehubAsset = 'js';
 	script.dataset.smartsafehubVersion = ASSET_VERSION;
+	window[SCRIPT_LOADING_KEY] = ASSET_VERSION;
+
+	script.addEventListener('load', function() {
+		if (window[SCRIPT_LOADING_KEY] === ASSET_VERSION) {
+			delete window[SCRIPT_LOADING_KEY];
+		}
+
+		if (typeof window.__SMARTHUB_APP_MOUNT__ !== 'function') {
+			renderApplicationLoadError();
+		}
+	});
+	script.addEventListener('error', function() {
+		if (window[SCRIPT_LOADING_KEY] === ASSET_VERSION) {
+			delete window[SCRIPT_LOADING_KEY];
+		}
+
+		script.remove();
+		renderApplicationLoadError();
+	});
 	document.head.appendChild(script);
 }
 
@@ -233,7 +330,10 @@ return view.extend({
 		});
 
 		removeLegacyStylesheet();
-		window.requestAnimationFrame(ensureApplication);
+		applicationFrame = window.requestAnimationFrame(function() {
+			applicationFrame = null;
+			ensureApplication(false);
+		});
 
 		return E('div', {
 			'id': ROOT_ID,
@@ -244,8 +344,15 @@ return view.extend({
 	},
 
 	remove: function() {
+		if (applicationFrame != null) {
+			window.cancelAnimationFrame(applicationFrame);
+			applicationFrame = null;
+		}
+
+		unmountApplication();
 		stopObservingProductView();
 		setProductViewActive(false);
+		delete window.__SMARTHUB_BOOTSTRAP__;
 	},
 
 	handleSaveApply: null,

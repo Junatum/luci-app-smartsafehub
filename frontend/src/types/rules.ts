@@ -6,40 +6,32 @@ export interface SafeShieldRuleCounts {
   total: number;
 }
 
-export interface SafeShieldRuleIgnoredCounts {
-  allow: number;
-  block: number;
-}
-
-export interface SafeShieldRuleLimits {
-  perList: number;
-  total: number;
-}
-
 export interface SafeShieldRules {
   allow: string[];
   block: string[];
   counts: SafeShieldRuleCounts;
-  ignored: SafeShieldRuleIgnoredCounts;
   safeshieldEnabled: boolean;
   applyLocalOverrides: boolean;
-  limits: SafeShieldRuleLimits;
 }
 
 export type SafeShieldRuleRefreshReason =
-  | 'started'
+  | ''
   | 'already_running'
-  | 'safeshield_disabled'
+  | 'disabled'
   | 'local_overrides_disabled'
-  | 'start_failed'
-  | 'unchanged';
+  | 'not_requested'
+  | 'service_stopped'
+  | 'spawn_failed'
+  | 'unchanged'
+  | string;
 
 export interface SafeShieldRuleMutationResult {
   action: SafeShieldRuleAction;
   domain: string;
   changed: boolean;
   refresh: {
-    started: boolean;
+    requested: boolean;
+    accepted: boolean;
     reason: SafeShieldRuleRefreshReason;
   };
   rules: SafeShieldRules;

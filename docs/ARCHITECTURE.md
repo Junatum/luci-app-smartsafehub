@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r4`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r5`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -11,7 +11,7 @@ SmartSafeHub는 일반 사용자가 OpenWrt의 복잡한 설정 전체를 직접
 - 저사양 OpenWrt 장치에서도 동작하는 작은 Preact 프런트엔드
 - LuCI 인증과 rpcd ACL을 그대로 사용하는 권한 모델
 - 기능별로 분리된 ucode 백엔드
-- Wi-Fi와 SafeShield 변경 작업의 입력 검증과 실패 복구
+- Wi-Fi 변경 작업의 입력 검증과 실패 복구, SafeShield는 공식 API 계약 사용
 - 일부 데이터 소스 실패를 전체 기능 실패로 확대하지 않는 best-effort 조회
 - 데스크톱과 모바일에서 동일한 핵심 기능 제공
 - 중복 RPC, 겹치는 폴링과 불필요한 hostapd 조회 최소화
@@ -41,14 +41,15 @@ root/www/luci-static/smartsafehub/app.js + app.css
        │ JSON-RPC /admin/ubus
        ├─────────────────────────────┐
        ▼                             ▼
-rpcd ucode: smartsafehub       기존 safeshield.status
-       │
-       ├─ system / network.interface.wan
-       ├─ network.wireless / hostapd
-       ├─ UCI wireless / safeshield
-       ├─ DHCP leases / ARP
-       ├─ SafeShield 규칙 파일과 init script
-       └─ reboot / wifi reload
+rpcd ucode: smartsafehub       rpcd ucode: safeshield
+       │                             │
+       ├─ system / network           ├─ status / config
+       ├─ wireless / hostapd         ├─ enable / refresh
+       ├─ DHCP leases / ARP          ├─ local rules
+       └─ reboot / wifi reload       └─ license
+
+SmartSafeHub backend는 SafeShield의 UCI, 규칙 파일, init script를 직접 다루지 않습니다.
+SafeShield 관련 읽기·변경은 `safeshield` 패키지가 제공하는 공식 ubus API만 호출합니다.
 ```
 
 ## 3. LuCI 통합 계층
@@ -76,17 +77,20 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.status`
 - `smartsafehub.connected_devices`
 - `smartsafehub.wifi_summary`
-- `smartsafehub.safeshield_rules_list`
 - `safeshield.status`
+- `safeshield.config`
+- `safeshield.rules_list`
 
 쓰기 권한:
 
 - `smartsafehub.wifi_update`
 - `smartsafehub.system_reboot`
-- `smartsafehub.safeshield_set_enabled`
-- `smartsafehub.safeshield_refresh`
-- `smartsafehub.safeshield_rule_add`
-- `smartsafehub.safeshield_rule_delete`
+- `safeshield.config_update`
+- `safeshield.set_enabled`
+- `safeshield.refresh`
+- `safeshield.rule_add`
+- `safeshield.rule_delete`
+- `safeshield.license_update`
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
@@ -101,14 +105,15 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 3. LuCI 콘텐츠 컨테이너의 최대 폭과 카드 스타일 해제
 4. `window.__SMARTHUB_BOOTSTRAP__` 생성
 5. 버전이 포함된 JavaScript URL 생성
-6. 이전 버전 module script와 mount 전역 제거
-7. DOM 변경 감시를 `requestAnimationFrame()` 단위로 합침
-8. SmartSafeHub 화면을 떠날 때 observer 해제와 LuCI 레이아웃 복원
+6. 이전 버전 Preact 트리 unmount, module script와 전역 제거
+7. module script 중복 로드 방지와 로드 실패 화면·재시도 제공
+8. DOM 변경 감시를 `requestAnimationFrame()` 단위로 합침
+9. SmartSafeHub 화면을 떠날 때 Preact unmount, observer 해제와 LuCI 레이아웃 복원
 
 현재 자산 버전:
 
 ```js
-const ASSET_VERSION = '0.2.0-r4';
+const ASSET_VERSION = '0.2.0-r5';
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -141,7 +146,7 @@ root/www/luci-static/smartsafehub/app.css
 - SmartSafeHub 스타일이 다른 LuCI 화면으로 새는 현상 방지
 - 제품 UI의 반응형 레이아웃 독립 유지
 
-Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다.
+Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다. `main.tsx`는 현재 mount point를 보관하고 `__SMARTHUB_APP_UNMOUNT__`를 제공해 LuCI 화면 이탈과 자산 교체 시 Preact 트리를 명시적으로 정리합니다.
 
 ### 4.3 화면과 route
 
@@ -185,6 +190,8 @@ api/rpc.ts
 - LuCI bootstrap에서 session ID와 RPC URL 읽기
 - JSON-RPC 요청 ID 관리
 - HTTP 오류, JSON 파싱 오류, ubus 상태 코드와 애플리케이션 오류 통합
+- JSON-RPC 버전, 요청 ID, error 객체, result 배열과 정수 상태 코드 검증
+- 기본 20초 타임아웃과 호출별 제한 지원; Wi-Fi 변경은 35초 사용
 - 사용자에게 표시할 한국어 오류 메시지 생성
 
 SmartSafeHub 백엔드 공통 응답:
@@ -219,12 +226,13 @@ SafeShield 상세 상태는 기존 `safeshield.status`의 원시 응답을 프�
 핵심 계약:
 
 - `inFlight` Promise가 있으면 같은 loader를 다시 실행하지 않고 기존 Promise 반환
-- 초기 로드는 active 상태에서 한 번만 실행
+- active 상태에 진입할 때 초기 로드 실행; 비활성화 뒤 재진입하면 다시 조회
 - `setInterval()`을 사용하지 않음
 - 이전 요청이 완료된 뒤 다음 `setTimeout()` 예약
 - `document.visibilityState === 'hidden'`이면 타이머 중단
 - 탭이 다시 표시되면 즉시 한 번 갱신한 뒤 폴링 재개
 - unmount 후 상태 변경 방지
+- 홈·시스템 상태는 활성 상태에서 60초 간격으로 갱신
 
 이 구조는 CPU와 네트워크가 느린 공유기에서 요청이 누적되는 문제를 방지합니다.
 
@@ -252,6 +260,7 @@ SystemPage에 이미 로드된 smartsafehub.status
 - 선택적 서비스 한쪽이 실패해도 전체 다운로드 유지
 - rpcd 안에서 다시 ubus를 중첩 호출하는 복합 진단 RPC 제거
 - Wi-Fi 비밀번호와 라이선스 키를 수집하지 않음
+- 호스트명, WAN IPv4와 Wi-Fi SSID는 진단 목적의 식별 정보로 포함될 수 있음을 화면에 안내
 
 ### 4.7 반응형 UI
 
@@ -284,7 +293,6 @@ rpcd는 이 반환값으로 `smartsafehub` ubus 객체를 등록합니다.
 root/usr/share/rpcd/ucode/smartsafehub/
 ├── core.uc
 ├── devices.uc
-├── safeshield.uc
 ├── system.uc
 ├── wifi.uc
 └── wifi-management.uc
@@ -298,7 +306,6 @@ root/usr/share/rpcd/ucode/smartsafehub/
 - 동기 안전 호출과 deferred 호출
 - 공통 성공·실패 응답
 - 문자열·숫자·메모리 값 정규화
-- JSON 파일 읽기
 - UCI cursor 생성
 - 제한 시간이 있는 시스템 명령 실행
 
@@ -330,6 +337,9 @@ Wi-Fi 조회 RPC와 변경 작업:
 - UCI commit
 - `/sbin/wifi reload`
 - 적용 실패 시 snapshot 복원과 reload 재시도
+- `/tmp/smartsafehub-wifi-update.lock`으로 동시 변경 직렬화
+- 잠금은 120초 뒤 stale 상태로 판단해 복구 가능
+- 기존 키 재사용 시 WPA2/WPA3 비밀번호 형식 재검증
 
 지원 보안 값:
 
@@ -363,30 +373,21 @@ MAC 주소를 기본 키로 병합해 다음 값을 생성합니다.
 
 개별 데이터 소스 실패는 빈 결과로 처리하고 다른 소스의 정보는 계속 반환합니다.
 
-#### `safeshield.uc`
+#### SafeShield 공식 API 소비
 
-SafeShield 설정, 갱신과 사용자 규칙을 담당합니다.
+`smartsafehub/safeshield.uc` 같은 프록시·컨트롤러 모듈은 두지 않습니다. 프런트엔드의 `src/api/safeshield.ts`가 LuCI 세션으로 공식 `safeshield` ubus 객체를 직접 호출합니다.
 
-주요 경로:
+SafeShield가 소유하는 기능:
 
-```text
-/dev/shm/safeshield.status.json
-/tmp/dnsmasq.d/safeshield.blocklist
-/etc/safeshield/allowlist
-/etc/safeshield/blocklist
-/tmp/smartsafehub-safeshield-refresh.lock
-/tmp/smartsafehub-safeshield-rules.lock
-```
+- 상태와 health
+- UCI 공개 설정 조회·변경
+- enable/disable lifecycle
+- 수동 refresh
+- local allow/block 규칙
+- 라이선스 키 변경
+- 규칙 파일, dnsmasq, procd와 refresh scheduling
 
-정책:
-
-- SafeShield 비활성 상태에서는 수동 갱신 거부
-- 이미 갱신 중이면 중복 실행 거부
-- 사용자 규칙 변경 시 파일 잠금
-- allow와 block 사이의 충돌 방지
-- 목록별 최대 500개, 전체 최대 1,000개
-- 규칙 파일 최대 128KiB
-- 변경 성공 후 가능한 경우 SafeShield 갱신 시작
+SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
 
 #### `system.uc`
 
@@ -398,13 +399,13 @@ SafeShield 설정, 갱신과 사용자 규칙을 담당합니다.
 - `system.info`
 - `network.interface.wan.status`
 
-rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가 막힐 수 있으므로 `ubus.defer()`로 순차 호출하고 마지막 콜백에서 `request.reply()`를 실행합니다. WAN 조회 실패는 장치·런타임 정보 전체 실패로 처리하지 않습니다.
+rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가 막힐 수 있으므로 `ubus.defer()`로 순차 호출하고 마지막 콜백에서 `request.reply()`를 실행합니다. 최초 `system.board` 요청을 시작하지 못하면 `SYSTEM_BOARD_REQUEST_FAILED` 오류를 즉시 반환하며, WAN 조회 실패는 장치·런타임 정보 전체 실패로 처리하지 않습니다.
 
 재부팅은 요청 인자 `confirm: "reboot"`를 확인한 뒤 2초 후 실행합니다.
 
 ## 6. 공개 RPC 계약
 
-SmartSafeHub가 등록하는 메서드는 총 **10개**입니다.
+SmartSafeHub 자체가 등록하는 메서드는 총 **5개**입니다.
 
 | 메서드 | 유형 | 인자 | 설명 |
 |---|---|---|---|
@@ -413,13 +414,20 @@ SmartSafeHub가 등록하는 메서드는 총 **10개**입니다.
 | `wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
 | `wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
 | `system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
-| `safeshield_set_enabled` | 쓰기 | `enabled` | SafeShield 사용 여부 변경 |
-| `safeshield_refresh` | 쓰기 | 없음 | 차단 목록 갱신 시작 |
-| `safeshield_rules_list` | 읽기 | 없음 | 사용자 허용·차단 규칙 조회 |
-| `safeshield_rule_add` | 쓰기 | `action`, `domain` | 사용자 규칙 추가 |
-| `safeshield_rule_delete` | 쓰기 | `action`, `domain` | 사용자 규칙 삭제 |
 
-SafeShield 상세 상태는 SmartSafeHub 객체가 아니라 기존 `safeshield.status`에서 직접 읽습니다.
+SafeShield 기능은 아래 공식 API를 직접 소비합니다.
+
+| SafeShield API | 유형 | 설명 |
+|---|---|---|
+| `safeshield.status` | 읽기 | 상태, runtime, artifact, health |
+| `safeshield.config` | 읽기 | 공개 설정과 마스킹된 라이선스 상태 |
+| `safeshield.config_update` | 쓰기 | 공개 설정 변경 |
+| `safeshield.set_enabled` | 쓰기 | 비동기 enable/disable lifecycle 요청 |
+| `safeshield.refresh` | 쓰기 | 비동기 refresh 요청 |
+| `safeshield.rules_list` | 읽기 | 사용자 허용·차단 규칙 조회 |
+| `safeshield.rule_add` | 쓰기 | 사용자 규칙 추가 |
+| `safeshield.rule_delete` | 쓰기 | 사용자 규칙 삭제 |
+| `safeshield.license_update` | 쓰기 | 라이선스 키 변경·해제 |
 
 ## 7. 주요 데이터 흐름
 
@@ -447,9 +455,11 @@ WifiPage form
   → UCI 기반 관리 대상 검증
   → 현재 UCI snapshot 저장
   → UCI 변경 및 commit
+  → Wi-Fi 변경 lock 획득
   → /sbin/wifi reload
-      ├─ 성공: 새 summary 반환
+      ├─ 성공: 새 summary 반환 및 2초·5초 지연 재조회
       └─ 실패: snapshot 복원 후 reload 재시도
+  → lock 해제
 ```
 
 ### 7.3 연결 기기
@@ -489,12 +499,12 @@ SystemPage의 기존 system snapshot
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → ASSET_VERSION = 0.2.0-r4
-  → app.js?v=0.2.0-r4
-  → app.css?v=0.2.0-r4
+  → ASSET_VERSION = 0.2.0-r5
+  → app.js?v=0.2.0-r5
+  → app.css?v=0.2.0-r5
 ```
 
-LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더는 버전이 다르면 이전 script, mount 전역과 오래된 CSS URL을 교체합니다.
+LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더는 이전 Preact 트리를 unmount한 뒤 버전이 다른 script, mount 전역과 오래된 CSS URL을 교체합니다. 동일 script가 로딩 중이면 중복 삽입하지 않으며 로드 실패 시 재시도 화면을 표시합니다.
 
 ## 8. 보안과 안정성
 
@@ -505,10 +515,12 @@ LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더�
 - ACL에 등록하지 않은 메서드는 호출할 수 없습니다.
 - 읽기와 쓰기 메서드를 분리합니다.
 - 진단 파일은 비밀번호와 라이선스 키를 요청하거나 저장하지 않습니다.
+- 진단 파일에 포함될 수 있는 호스트명, WAN IPv4와 Wi-Fi SSID를 사용자에게 사전 안내합니다.
 
 ### 8.2 입력 검증
 
 - Wi-Fi section과 device가 실제 AP인지 확인
+- 새 비밀번호뿐 아니라 재사용할 기존 키도 대상 WPA 보안 방식에 맞는지 확인
 - SmartSafeHub 관리 대상 AP만 변경
 - SSID, 보안 방식, 비밀번호와 bool 타입 검증
 - 재부팅 확인 문자열 검증
@@ -523,6 +535,8 @@ LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더�
 - 진단 상세 조회 하나가 실패해도 JSON 다운로드 유지
 - Wi-Fi 적용 실패 시 원래 UCI 설정 복원 시도
 - SafeShield 갱신과 규칙 변경에 별도 lock 사용
+- Wi-Fi 변경에도 별도 lock을 사용해 여러 탭의 동시 commit과 reload 방지
+- deferred ubus 요청 시작 실패를 명시적인 애플리케이션 오류로 변환
 
 ### 8.4 요청량 제어
 
@@ -531,6 +545,8 @@ LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더�
 - 숨겨진 탭에서 폴링 중단
 - station 정보가 있을 때 hostapd 중복 조회 생략
 - 시스템 진단에서 이미 로드된 상태 재사용
+- 비활성 화면은 폴링하지 않고 재진입 시 최신 상태 조회
+- 모든 RPC에 제한 시간을 둬 영구 대기와 single-flight 고착 방지
 - DOM observer 콜백을 animation frame으로 병합
 
 ## 9. 빌드와 계약 검사
@@ -564,6 +580,9 @@ sh scripts/check-rpcd-imports.sh \
 - `App.tsx`와 `AppShell.tsx` 책임 분리
 - 모바일 메뉴, 고급 설정과 로그아웃 계약
 - 공통 `callApi()` wrapper 사용
+- RPC timeout, AbortController와 JSON-RPC 응답 검증 계약
+- route 재진입 시 리소스 재조회 계약
+- Preact mount/unmount 생명주기 계약
 - 진단이 `Promise.allSettled()`와 기존 상세 API를 사용하는지 확인
 - 공통 비동기 훅이 `setInterval()`을 사용하지 않는지 확인
 - 숨겨진 탭 폴링 중단 계약
@@ -574,12 +593,13 @@ sh scripts/check-rpcd-imports.sh \
 `frontend/scripts/check-dist.mjs` 검사 항목:
 
 - `app.js`, `app.css` 존재 및 비어 있지 않음
-- Shadow DOM mount 코드
+- Shadow DOM mount와 명시적 unmount 코드
 - 모바일 메뉴와 로그아웃
 - 전체 폭 제품 shell
 - 필수 RPC API 문자열
 - 제거된 `system_diagnostics`와 SafeShield 프록시 미포함
 - `Promise.allSettled()` 기반 진단 번들 포함
+- `AbortController`와 `RPC_TIMEOUT` 포함
 - Shadow DOM stylesheet selector
 
 ### 9.4 OpenWrt 패키지 준비 검사
@@ -590,9 +610,14 @@ Makefile의 `Build/Prepare` hook은 다음을 추가로 확인합니다.
 - 프런트엔드 배포 파일 존재
 - 번들에 제거된 `system_diagnostics` 문자열이 없는지 확인
 - LuCI loader, ACL과 메뉴 존재
+- 제거된 0바이트 `entry.uc`가 존재하지 않음
 - `ASSET_VERSION`과 `PKG_VERSION-rPKG_RELEASE` 일치
 
-### 9.5 실제 장치 검사
+### 9.5 GitHub Actions
+
+`.github/workflows/ci.yml`은 Node.js 24에서 의존성을 고정 설치한 뒤 rpcd 계약 검사와 전체 프런트엔드 빌드를 수행하고 생성된 `app.js`·`app.css`의 필수 계약을 검사합니다. `entry.uc` 재등장과 whitespace 오류도 함께 검사합니다. 프런트엔드 변경 시 로컬 빌드 산출물도 같은 커밋에 포함하는 것을 배포 규칙으로 둡니다.
+
+### 9.6 실제 장치 검사
 
 정적 검사는 ucode parser와 실제 rpcd 런타임 전체를 대신하지 않습니다.
 

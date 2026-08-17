@@ -1,23 +1,6 @@
 import type { SmartSafeHubBootstrap } from '../types/bootstrap';
 import type { ApiResponse } from '../types/status';
 
-interface JsonRpcSuccess<T> {
-  jsonrpc: '2.0';
-  id: number;
-  result: [number, T?];
-}
-
-interface JsonRpcFailure {
-  jsonrpc: '2.0';
-  id: number | null;
-  error: {
-    code: number;
-    message: string;
-  };
-}
-
-type JsonRpcResponse<T> = JsonRpcSuccess<T> | JsonRpcFailure;
-
 const UBUS_STATUS_TEXT: Readonly<Record<number, string>> = {
   1: '잘못된 명령입니다.',
   2: '요청 인자가 올바르지 않습니다.',
@@ -31,7 +14,15 @@ const UBUS_STATUS_TEXT: Readonly<Record<number, string>> = {
   10: '장치 연결이 끊어졌습니다.',
 };
 
+const DEFAULT_TIMEOUT_MS = 20_000;
+const MIN_TIMEOUT_MS = 1_000;
+const MAX_TIMEOUT_MS = 60_000;
+
 let requestId = 1;
+
+export interface RpcCallOptions {
+  timeoutMs?: number;
+}
 
 export class RpcError extends Error {
   readonly code: string;
@@ -56,18 +47,94 @@ function getBootstrap(): SmartSafeHubBootstrap {
   return bootstrap;
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function invalidResponse(): RpcError {
+  return new RpcError(
+    'INVALID_RESPONSE',
+    '장치 API가 올바르지 않은 응답을 반환했습니다.',
+  );
+}
+
+function normalizedTimeout(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_TIMEOUT_MS;
+  }
+
+  return Math.min(
+    MAX_TIMEOUT_MS,
+    Math.max(MIN_TIMEOUT_MS, Math.trunc(value)),
+  );
+}
+
+function parseJsonRpcResponse<T>(payload: unknown, requestIdentifier: number): T {
+  if (
+    !isObject(payload) ||
+    payload.jsonrpc !== '2.0' ||
+    payload.id !== requestIdentifier
+  ) {
+    throw invalidResponse();
+  }
+
+  if ('error' in payload) {
+    const error = payload.error;
+
+    if (!isObject(error) || typeof error.code !== 'number') {
+      throw invalidResponse();
+    }
+
+    throw new RpcError(
+      `JSON_RPC_${error.code}`,
+      typeof error.message === 'string' && error.message.length > 0
+        ? error.message
+        : 'JSON-RPC 요청에 실패했습니다.',
+    );
+  }
+
+  const result = payload.result;
+
+  if (!Array.isArray(result) || result.length < 1 || result.length > 2) {
+    throw invalidResponse();
+  }
+
+  const status = result[0];
+
+  if (typeof status !== 'number' || !Number.isInteger(status)) {
+    throw invalidResponse();
+  }
+
+  if (status !== 0) {
+    throw new RpcError(
+      `UBUS_${status}`,
+      UBUS_STATUS_TEXT[status] ?? `ubus 오류 코드 ${status}가 반환되었습니다.`,
+    );
+  }
+
+  if (result.length < 2 || result[1] === undefined) {
+    throw new RpcError('EMPTY_RESPONSE', '장치 API 응답이 비어 있습니다.');
+  }
+
+  return result[1] as T;
+}
+
 export async function callRpc<T>(
   object: string,
   method: string,
   params: Record<string, unknown> = {},
+  options: RpcCallOptions = {},
 ): Promise<T> {
   const bootstrap = getBootstrap();
   const id = requestId++;
-
-  let response: Response;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    normalizedTimeout(options.timeoutMs),
+  );
 
   try {
-    response = await fetch(bootstrap.rpcUrl, {
+    const response = await fetch(bootstrap.rpcUrl, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -79,61 +146,53 @@ export async function callRpc<T>(
         method: 'call',
         params: [bootstrap.sessionId, object, method, params],
       }),
+      signal: controller.signal,
     });
-  } catch {
+
+    if (!response.ok) {
+      throw new RpcError(
+        'HTTP_ERROR',
+        `장치 API가 HTTP ${response.status} 오류를 반환했습니다.`,
+      );
+    }
+
+    let payload: unknown;
+
+    try {
+      payload = await response.json();
+    } catch {
+      throw invalidResponse();
+    }
+
+    return parseJsonRpcResponse<T>(payload, id);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new RpcError(
+        'RPC_TIMEOUT',
+        '장치 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    }
+
+    if (error instanceof RpcError) {
+      throw error;
+    }
+
     throw new RpcError(
       'NETWORK_ERROR',
       '공유기와 통신할 수 없습니다. 네트워크 연결을 확인해 주세요.',
     );
+  } finally {
+    window.clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    throw new RpcError(
-      'HTTP_ERROR',
-      `장치 API가 HTTP ${response.status} 오류를 반환했습니다.`,
-    );
-  }
-
-  let payload: JsonRpcResponse<T>;
-
-  try {
-    payload = (await response.json()) as JsonRpcResponse<T>;
-  } catch {
-    throw new RpcError(
-      'INVALID_RESPONSE',
-      '장치 API가 올바르지 않은 응답을 반환했습니다.',
-    );
-  }
-
-  if ('error' in payload) {
-    throw new RpcError(
-      `JSON_RPC_${payload.error.code}`,
-      payload.error.message || 'JSON-RPC 요청에 실패했습니다.',
-    );
-  }
-
-  const [status, result] = payload.result;
-
-  if (status !== 0) {
-    throw new RpcError(
-      `UBUS_${status}`,
-      UBUS_STATUS_TEXT[status] ?? `ubus 오류 코드 ${status}가 반환되었습니다.`,
-    );
-  }
-
-  if (result === undefined) {
-    throw new RpcError('EMPTY_RESPONSE', '장치 API 응답이 비어 있습니다.');
-  }
-
-  return result;
 }
 
 export async function callApi<T>(
   object: string,
   method: string,
   params: Record<string, unknown> = {},
+  options: RpcCallOptions = {},
 ): Promise<T> {
-  const response = await callRpc<ApiResponse<T>>(object, method, params);
+  const response = await callRpc<ApiResponse<T>>(object, method, params, options);
 
   if (!response.ok) {
     throw new RpcError(response.error.code, response.error.message);

@@ -86,7 +86,12 @@ export function useAsyncResource<T>({
   );
 
   useEffect(() => {
-    if (!active || requested.current) {
+    if (!active) {
+      requested.current = false;
+      return;
+    }
+
+    if (requested.current) {
       return;
     }
 

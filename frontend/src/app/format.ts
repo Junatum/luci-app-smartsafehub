@@ -92,7 +92,11 @@ export function getMemoryUsage(memory: RuntimeMemory): {
   percent: number;
 } {
   const total = Math.max(0, memory.total);
-  const available = Math.max(0, memory.available || memory.free);
+  const fallbackAvailable = memory.free + memory.buffered + memory.cached;
+  const available = Math.min(
+    total,
+    Math.max(0, memory.available > 0 ? memory.available : fallbackAvailable),
+  );
   const used = Math.max(0, total - available);
   const percent = total > 0 ? (used / total) * 100 : 0;
 

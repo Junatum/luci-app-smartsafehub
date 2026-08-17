@@ -1,10 +1,12 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 import { fetchWifiSummary, updateWifiNetwork } from '../api/smartsafehub';
 import { RpcError } from '../api/rpc';
 import type { WifiUpdateInput } from '../types/wifi';
 import { errorMessage } from '../utils/errors';
 import { useAsyncResource } from './useAsyncResource';
+
+const RUNTIME_REFRESH_DELAYS_MS = [2_000, 3_000] as const;
 
 export type WifiFeedback =
   | { kind: 'success' | 'warning' | 'error'; message: string }
@@ -15,16 +17,46 @@ interface WifiMutationState {
   feedback: WifiFeedback;
 }
 
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 export function useWifi(active: boolean) {
   const resource = useAsyncResource({
     active,
     fallbackError: 'Wi-Fi 설정을 처리하지 못했습니다.',
     loader: fetchWifiSummary,
   });
+  const mounted = useRef(true);
+  const activeRef = useRef(active);
   const [mutation, setMutation] = useState<WifiMutationState>({
     updatingSection: null,
     feedback: null,
   });
+
+  useEffect(() => {
+    mounted.current = true;
+
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  const refreshRuntimeAfterReload = useCallback(async () => {
+    for (const waitMs of RUNTIME_REFRESH_DELAYS_MS) {
+      await delay(waitMs);
+
+      if (!mounted.current || !activeRef.current) {
+        return;
+      }
+
+      await resource.refresh();
+    }
+  }, [resource.refresh]);
 
   const update = useCallback(
     async (input: WifiUpdateInput): Promise<boolean> => {
@@ -45,10 +77,16 @@ export function useWifi(active: boolean) {
               : '변경된 Wi-Fi 설정이 없습니다.',
           },
         });
+
+        if (result.reloaded) {
+          void refreshRuntimeAfterReload();
+        }
+
         return true;
       } catch (error) {
         const connectionMayHaveChanged =
-          error instanceof RpcError && error.code === 'NETWORK_ERROR';
+          error instanceof RpcError &&
+          ['NETWORK_ERROR', 'RPC_TIMEOUT'].includes(error.code);
 
         setMutation({
           updatingSection: null,
@@ -62,7 +100,7 @@ export function useWifi(active: boolean) {
         return false;
       }
     },
-    [resource.replaceData],
+    [refreshRuntimeAfterReload, resource.replaceData],
   );
 
   const dismissFeedback = useCallback(() => {

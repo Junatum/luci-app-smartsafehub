@@ -98,7 +98,7 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
         />
       </section>
 
-      <section class="mt-5 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+      <section class="mt-5">
         <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
           <div class="flex items-start justify-between gap-4">
             <div>

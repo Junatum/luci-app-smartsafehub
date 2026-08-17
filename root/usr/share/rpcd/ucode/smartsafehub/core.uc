@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
-import * as fs from 'fs';
 import { connect } from 'ubus';
 import { cursor } from 'uci';
 
@@ -29,7 +28,12 @@ export function safe_call(object, method, args) {
 };
 
 export function defer_call(object, method, args, callback) {
-	return ubus.defer(object, method, args ?? {}, callback);
+	try {
+		return ubus.defer(object, method, args ?? {}, callback);
+	}
+	catch (e) {
+		return null;
+	}
 };
 
 export function success(data) {
@@ -63,21 +67,6 @@ export function number_value(value) {
 
 export function memory_value(memory, key) {
 	return number_value(memory?.[key]);
-};
-
-export function read_json_file(path) {
-	const raw = fs.readfile(path);
-
-	if (!raw) {
-		return {};
-	}
-
-	try {
-		return json(raw);
-	}
-	catch (e) {
-		return {};
-	}
 };
 
 export function new_uci_cursor() {

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import {
   requestSafeShieldRefresh,
   setSafeShieldEnabled,
-} from '../api/smartsafehub';
+} from '../api/safeshield';
 import { errorMessage } from '../utils/errors';
 
 export type SafeShieldAction = 'enable' | 'disable' | 'refresh';
@@ -59,14 +59,14 @@ export function useSafeShieldActions(
           error: null,
           message: result.changed
             ? enabled
-              ? 'SafeShield 보호를 활성화했습니다.'
-              : 'SafeShield 보호를 비활성화하고 차단 목록을 제거했습니다.'
+              ? 'SafeShield 보호 활성화 요청을 적용했습니다.'
+              : 'SafeShield 보호 비활성화 요청을 적용했습니다.'
             : enabled
-              ? 'SafeShield 보호가 이미 활성화되어 있습니다.'
-              : 'SafeShield 보호가 이미 비활성화되어 있습니다.',
+              ? 'SafeShield 보호가 이미 활성화 상태입니다.'
+              : 'SafeShield 보호가 이미 비활성화 상태입니다.',
         });
         await refreshStatus();
-        scheduleRefreshes([1500, 4000]);
+        scheduleRefreshes([800, 2000, 5000]);
       } catch (error) {
         setState({
           action: null,
@@ -82,11 +82,15 @@ export function useSafeShieldActions(
     setState({ action: 'refresh', error: null, message: null });
 
     try {
-      await requestSafeShieldRefresh();
+      const result = await requestSafeShieldRefresh();
       setState({
         action: null,
         error: null,
-        message: '차단 목록 갱신 작업을 시작했습니다.',
+        message: result.accepted
+          ? '차단 목록 갱신 작업을 시작했습니다.'
+          : result.reason === 'already_running'
+            ? '차단 목록을 이미 갱신하고 있습니다.'
+            : '차단 목록 갱신 요청을 처리했습니다.',
       });
       scheduleRefreshes([700, 2500, 6000, 12000]);
     } catch (error) {

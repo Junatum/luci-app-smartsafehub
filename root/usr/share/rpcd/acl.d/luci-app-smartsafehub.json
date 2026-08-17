@@ -6,11 +6,12 @@
         "smartsafehub": [
           "status",
           "connected_devices",
-          "safeshield_rules_list",
           "wifi_summary"
         ],
         "safeshield": [
-          "status"
+          "status",
+          "config",
+          "rules_list"
         ]
       }
     },
@@ -18,11 +19,15 @@
       "ubus": {
         "smartsafehub": [
           "wifi_update",
-          "safeshield_set_enabled",
-          "safeshield_refresh",
-          "safeshield_rule_add",
-          "safeshield_rule_delete",
           "system_reboot"
+        ],
+        "safeshield": [
+          "config_update",
+          "set_enabled",
+          "refresh",
+          "rule_add",
+          "rule_delete",
+          "license_update"
         ]
       }
     }
