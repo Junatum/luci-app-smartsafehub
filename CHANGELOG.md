@@ -9,6 +9,7 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 ### Added
 
 - SafeShield 라이선스 키 등록/변경 UI와 `safeshield.license_update` 연동을 추가했습니다.
+- `safeshield.license_get`을 사용해 현재 키를 명시적으로 보기/숨기기 할 수 있고, 빈 키 업데이트 계약으로 라이선스를 제거할 수 있게 했습니다.
 
 ### Removed
 

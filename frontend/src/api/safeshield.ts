@@ -5,6 +5,7 @@ import type {
 } from '../types/rules';
 import type {
   SafeShieldEnabledResult,
+  SafeShieldLicenseReadResult,
   SafeShieldLicenseUpdateResult,
   SafeShieldRefreshResult,
   SafeShieldStatus,
@@ -390,6 +391,16 @@ export function deleteSafeShieldRule(
   refresh = true,
 ): Promise<SafeShieldRuleMutationResult> {
   return mutateSafeShieldRule('rule_delete', action, domain, refresh);
+}
+
+export async function fetchSafeShieldLicense(): Promise<SafeShieldLicenseReadResult> {
+  const response = await callSafeShield<RawSafeShieldMutation>('license_get');
+  const license = objectValue(response.license);
+
+  return {
+    configured: boolValue(license.configured),
+    key: plainString(license.key),
+  };
 }
 
 export async function updateSafeShieldLicense(

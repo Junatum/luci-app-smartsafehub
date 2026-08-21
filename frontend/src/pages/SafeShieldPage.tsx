@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 import {
   AlertIcon,
@@ -29,7 +29,9 @@ interface SafeShieldPageProps {
   error: string | null;
   loading: boolean;
   onDismissFeedback: () => void;
+  onReadLicense: () => Promise<string | null>;
   onRefreshBlocklist: () => void;
+  onRemoveLicense: () => Promise<boolean>;
   onRetry: () => void;
   onSetEnabled: (enabled: boolean) => void;
   onUpdateLicense: (licenseKey: string) => Promise<boolean>;
@@ -269,12 +271,22 @@ export function SafeShieldPage({
   error,
   loading,
   onDismissFeedback,
+  onReadLicense,
   onRefreshBlocklist,
+  onRemoveLicense,
   onRetry,
   onSetEnabled,
   onUpdateLicense,
 }: SafeShieldPageProps) {
   const [licenseKey, setLicenseKey] = useState('');
+  const [licenseKeyLoaded, setLicenseKeyLoaded] = useState(false);
+
+  useEffect(() => {
+    if (data?.license.configured === false) {
+      setLicenseKey('');
+      setLicenseKeyLoaded(false);
+    }
+  }, [data?.license.configured]);
   if (loading) {
     return <LoadingPanel />;
   }
@@ -313,6 +325,42 @@ export function SafeShieldPage({
     : action === 'enable'
       ? '켜는 중…'
       : '보호 켜기';
+
+  async function handleLoadCurrentLicense(): Promise<void> {
+    if (licenseKey.length > 0) {
+      return;
+    }
+
+    const currentKey = await onReadLicense();
+
+    if (currentKey === null) {
+      return;
+    }
+
+    setLicenseKey(currentKey);
+    setLicenseKeyLoaded(true);
+  }
+
+  function resetLicenseEditor(): void {
+    setLicenseKey('');
+    setLicenseKeyLoaded(false);
+  }
+
+  function handleRemoveLicense(): void {
+    const confirmed = window.confirm(
+      '라이선스 키를 제거하면 SafeShield가 라이선스 없는 상태로 다시 확인하고 차단 목록을 갱신합니다. 계속하시겠습니까?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    void onRemoveLicense().then((removed) => {
+      if (removed) {
+        resetLicenseEditor();
+      }
+    });
+  }
 
   function handleToggle(): void {
     if (enabled) {
@@ -440,36 +488,69 @@ export function SafeShieldPage({
               event.preventDefault();
               void onUpdateLicense(licenseKey).then((updated) => {
                 if (updated) {
-                  setLicenseKey('');
+                  resetLicenseEditor();
                 }
               });
             }}
           >
             <label class="text-xs font-bold text-slate-600" for="safeshield-license-key">
-              {data.license.configured ? '라이선스 키 변경' : '라이선스 키 등록'}
+              {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
             </label>
-            <input
-              autocomplete="new-password"
-              class="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
-              disabled={actionBusy}
-              id="safeshield-license-key"
-              onInput={(event) => setLicenseKey(event.currentTarget.value)}
-              placeholder="새 라이선스 키 입력"
-              spellcheck={false}
-              type="password"
-              value={licenseKey}
-            />
-            <button
-              class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={actionBusy || licenseKey.trim().length === 0}
-              type="submit"
-            >
-              {action === 'license'
-                ? '저장 중…'
-                : data.license.configured
-                  ? '라이선스 변경'
-                  : '라이선스 등록'}
-            </button>
+            <div class="flex gap-2">
+              <input
+                autocomplete="off"
+                autocapitalize="none"
+                class="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+                data-1p-ignore
+                data-bwignore="true"
+                data-lpignore="true"
+                disabled={actionBusy}
+                id="safeshield-license-key"
+                onInput={(event) => {
+                  setLicenseKey(event.currentTarget.value);
+                  setLicenseKeyLoaded(false);
+                }}
+                placeholder={data.license.configured ? '새 라이선스 키 입력' : '라이선스 키 입력'}
+                spellcheck={false}
+                type="text"
+                value={licenseKey}
+              />
+              <button
+                class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={actionBusy || licenseKey.length > 0 || !data.license.configured}
+                onClick={() => void handleLoadCurrentLicense()}
+                type="button"
+              >
+                {action === 'license-read'
+                  ? '불러오는 중…'
+                  : licenseKeyLoaded
+                    ? '현재 키 불러옴'
+                    : '현재 키 불러오기'}
+              </button>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <button
+                class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={actionBusy || licenseKey.trim().length === 0}
+                type="submit"
+              >
+                {action === 'license-update'
+                  ? '저장 중…'
+                  : data.license.configured
+                    ? '라이선스 변경'
+                    : '라이선스 등록'}
+              </button>
+              {data.license.configured ? (
+                <button
+                  class="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-extrabold text-red-700 transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={actionBusy}
+                  onClick={handleRemoveLicense}
+                  type="button"
+                >
+                  {action === 'license-remove' ? '제거 중…' : '라이선스 제거'}
+                </button>
+              ) : null}
+            </div>
           </form>
         </InfoCard>
 

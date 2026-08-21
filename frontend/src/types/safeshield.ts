@@ -76,6 +76,11 @@ export interface SafeShieldRefreshResult {
   status: SafeShieldStatus;
 }
 
+export interface SafeShieldLicenseReadResult {
+  configured: boolean;
+  key: string;
+}
+
 export interface SafeShieldLicenseUpdateResult {
   changed: boolean;
   license: {

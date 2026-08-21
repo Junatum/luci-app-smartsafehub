@@ -94,7 +94,9 @@ export function App() {
           error={safeshield.error}
           loading={safeshield.loading}
           onDismissFeedback={safeshieldActions.dismissFeedback}
+          onReadLicense={safeshieldActions.readLicense}
           onRefreshBlocklist={() => void safeshieldActions.refreshBlocklist()}
+          onRemoveLicense={safeshieldActions.removeLicense}
           onRetry={() => void safeshield.refresh()}
           onSetEnabled={(enabled) => void safeshieldActions.setEnabled(enabled)}
           onUpdateLicense={safeshieldActions.updateLicense}

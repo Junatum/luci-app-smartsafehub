@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 
 import {
+  fetchSafeShieldLicense,
   requestSafeShieldRefresh,
   setSafeShieldEnabled,
   updateSafeShieldLicense,
 } from '../api/safeshield';
 import { errorMessage } from '../utils/errors';
 
-export type SafeShieldAction = 'enable' | 'disable' | 'refresh' | 'license';
+export type SafeShieldAction =
+  | 'enable'
+  | 'disable'
+  | 'refresh'
+  | 'license-read'
+  | 'license-update'
+  | 'license-remove';
 
 interface SafeShieldActionState {
   action: SafeShieldAction | null;
@@ -116,7 +123,7 @@ export function useSafeShieldActions(
         return false;
       }
 
-      setState({ action: 'license', error: null, message: null });
+      setState({ action: 'license-update', error: null, message: null });
 
       try {
         const result = await updateSafeShieldLicense(normalizedKey);
@@ -146,6 +153,52 @@ export function useSafeShieldActions(
     [refreshStatus, scheduleRefreshes],
   );
 
+  const readLicense = useCallback(async (): Promise<string | null> => {
+    setState({ action: 'license-read', error: null, message: null });
+
+    try {
+      const result = await fetchSafeShieldLicense();
+      setState({ action: null, error: null, message: null });
+      return result.key;
+    } catch (error) {
+      setState({
+        action: null,
+        error: errorMessage(error, '라이선스 키를 불러오지 못했습니다.'),
+        message: null,
+      });
+      return null;
+    }
+  }, []);
+
+  const removeLicense = useCallback(async (): Promise<boolean> => {
+    setState({ action: 'license-remove', error: null, message: null });
+
+    try {
+      const result = await updateSafeShieldLicense('');
+      setState({
+        action: null,
+        error: null,
+        message: result.changed
+          ? '라이선스 키를 제거했습니다.'
+          : '설정된 라이선스 키가 없습니다.',
+      });
+      await refreshStatus();
+
+      if (result.refresh.requested) {
+        scheduleRefreshes([800, 2500, 6000, 12000]);
+      }
+
+      return true;
+    } catch (error) {
+      setState({
+        action: null,
+        error: errorMessage(error, '라이선스 키를 제거하지 못했습니다.'),
+        message: null,
+      });
+      return false;
+    }
+  }, [refreshStatus, scheduleRefreshes]);
+
   const dismissFeedback = useCallback(() => {
     setState((current) => ({ ...current, error: null, message: null }));
   }, []);
@@ -153,7 +206,9 @@ export function useSafeShieldActions(
   return {
     ...state,
     dismissFeedback,
+    readLicense,
     refreshBlocklist,
+    removeLicense,
     setEnabled,
     updateLicense,
   };

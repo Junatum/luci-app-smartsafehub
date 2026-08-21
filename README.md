@@ -61,6 +61,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 차단 목록 수동 갱신
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
 - 라이선스, 플랜, 아티팩트와 차단 목록 통계 표시
+- 라이선스 키 보기/숨기기, 등록/변경과 제거 지원
 - 사용자 허용 목록과 차단 목록 관리
 - 규칙 저장과 유효성 검사는 SafeShield 공식 API가 담당
 - 규칙 변경은 SafeShield 엔진의 cached-artifact local apply 경로로 즉시 반영
@@ -276,6 +277,8 @@ safeshield.refresh
 safeshield.rules_list
 safeshield.rule_add
 safeshield.rule_delete
+safeshield.license_get
+safeshield.license_update
 ```
 
 ## ucode 컴파일 검사
