@@ -2,10 +2,10 @@
 
 SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 기기와 SafeShield DNS 보호 기능을 일반 사용자 중심의 화면에서 관리하기 위한 LuCI 애플리케이션입니다.
 
-현재 정식 배포 버전은 **`0.2.0-r8`**입니다.
+현재 정식 배포 버전은 **`0.2.0-r10`**입니다.
 
 - 애플리케이션 버전: `0.2.0`
-- OpenWrt 패키지 릴리스: `8`
+- OpenWrt 패키지 릴리스: `10`
 - 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
 - 백엔드: rpcd ucode 모듈
 - 라이선스: GPL-3.0-or-later
@@ -14,13 +14,18 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ## 주요 기능
 
-### 로그인
+### 로그인과 단일 진입 URL
 
-- `/cgi-bin/luci/`와 `/cgi-bin/luci/smartsafehub`에서 SmartSafeHub 전용 로그인 화면 제공
-- 로그인 화면도 Preact + TypeScript로 구현하고 기존 제품과 동일한 Vite 번들·Shadow DOM 스타일 런타임 재사용
-- 별도 인증 백엔드를 만들지 않고 LuCI의 `luci_username` / `luci_password` 로그인 및 세션 정책 사용
-- 기존 세션 자동 확인, 비밀번호 표시/숨김, Caps Lock 안내, 모바일 안전 영역 지원
-- 추가 인증 등 특수 LuCI 구성에서는 기본 LuCI 로그인 화면으로 계속할 수 있는 fallback 제공
+- 공식 사용자 URL은 `/cgi-bin/luci/smartsafehub#home` 하나로 통일
+- `/cgi-bin/luci/`도 first-child 규칙을 통해 인증이 필요 없는 SmartSafeHub Preact shell로 연결
+- 공개 shell은 `auth: {}`로 항상 로드되므로 비로그인 상태에서도 LuCI dispatcher가 stock 로그인 화면이나 403을 먼저 반환하지 않음
+- Preact가 보호된 `/cgi-bin/luci/smartsafehub/session` endpoint를 조회해 현재 LuCI cookie session을 확인
+- 세션이 없으면 `LoginApp`, 유효한 세션 ID를 받으면 제품 `App`을 같은 Shadow DOM에서 렌더링
+- 로그인 폼은 `luci_username` / `luci_password`를 보호된 session endpoint에 POST하며 실제 비밀번호 검증, cookie 발급과 추가 인증 정책은 LuCI dispatcher가 담당
+- 로그인 성공 후 페이지 이동 없이 받은 session ID로 `/admin/ubus` bootstrap을 구성하고 같은 `/cgi-bin/luci/smartsafehub#home` URL에서 제품 화면으로 전환
+- 예전 `/cgi-bin/luci/admin/smartsafehub` 경로도 공개 shell만 제공한 뒤 브라우저 주소를 공식 public URL로 정규화
+- 비밀번호 표시/숨김, Caps Lock 안내, 모바일 안전 영역 지원
+- 추가 인증 등 특수 LuCI 구성에서는 보호된 session endpoint의 기본 LuCI 로그인 화면으로 계속할 수 있는 fallback 제공
 
 ### 장치 대시보드
 
@@ -139,8 +144,6 @@ luci-app-smartsafehub/
 │   ├── scripts/
 │   ├── package.json
 │   └── vite.config.ts
-├── htdocs/
-│   └── luci-static/resources/view/smartsafehub/app.js
 ├── root/
 │   ├── usr/share/luci/menu.d/
 │   ├── usr/share/rpcd/acl.d/
@@ -232,23 +235,19 @@ make package/luci-app-smartsafehub/compile V=s
 - 제거된 `system_diagnostics` RPC가 소스와 번들에 다시 포함되지 않았는지 확인
 - 제거된 0바이트 `entry.uc` 파일이 다시 포함되지 않았는지 확인
 - 빌드된 `app.js`, `app.css` 존재 여부
-- LuCI 로더, 메뉴와 ACL 존재 여부
-- 패키지 버전과 `ASSET_VERSION` 일치 여부
+- 공개 Preact 진입 템플릿, 보호된 session bootstrap 템플릿, 메뉴와 ACL 존재 여부
+- public template의 `data-asset-version`과 패키지 릴리스 일치 여부
+- 제거된 legacy LuCI view loader가 다시 포함되지 않았는지 확인
+- 오래된 admin-route probe와 `login:false` optional-auth 구조가 남아 있지 않은지 확인
 
-현재 LuCI 로더의 자산 버전은 다음과 같아야 합니다.
-
-```js
-const ASSET_VERSION = '0.2.0-r5';
-```
-
-별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전이 JavaScript와 CSS 캐시 무효화 키입니다.
+별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.0-r10`이 JavaScript와 CSS 캐시 무효화 키입니다.
 
 ## 설치
 
 생성한 APK를 공유기에 복사한 뒤 설치합니다.
 
 ```bash
-apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.0-r5.apk
+apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.0-r10.apk
 ```
 
 기존 버전 위에 설치할 때는 사용하는 저장소 정책에 맞춰 `apk upgrade` 또는 로컬 APK 설치를 수행합니다.
@@ -365,7 +364,7 @@ rm -f /tmp/luci-indexcache
 /etc/init.d/uhttpd restart
 ```
 
-브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. LuCI 로더는 `ASSET_VERSION`이 바뀌면 이전 Preact 트리를 unmount한 뒤 module script와 전역을 제거하고 Shadow DOM의 CSS URL도 새 버전으로 교체합니다. 자산 로드가 실패하면 오류 화면과 재시도 버튼을 표시합니다.
+브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.0-r10`와 Shadow DOM용 `app.css?v=0.2.0-r10`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
 
 ## 배포 전 체크리스트
 
@@ -404,7 +403,7 @@ ubus call smartsafehub connected_devices '{}'
 - 사용자 기능 버전은 `PKG_VERSION`으로 관리합니다.
 - 같은 기능 버전의 OpenWrt 패키지 수정은 `PKG_RELEASE`를 올립니다.
 - `frontend/package.json`과 `frontend/package-lock.json`의 버전은 `PKG_VERSION`과 맞춥니다.
-- LuCI loader의 `ASSET_VERSION`은 `PKG_VERSION-rPKG_RELEASE`와 맞춥니다.
+- 통합 진입 템플릿의 `data-asset-version`과 `app.js?v=` 버전은 `PKG_VERSION-rPKG_RELEASE`와 맞춥니다.
 - 프런트엔드 build ID 상수는 별도로 두지 않습니다.
 - 정식 배포 이력은 `CHANGELOG.md`에 기록합니다.
 
@@ -416,7 +415,7 @@ PKG_RELEASE:=5
 ```
 
 ```js
-const ASSET_VERSION = '0.2.0-r5';
+data-asset-version="0.2.0-r10"
 ```
 
 ## 현재 제약

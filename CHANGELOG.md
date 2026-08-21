@@ -4,6 +4,27 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r4`는 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `4`를 의미합니다.
 
+## [0.2.0-r10] - 2026-08-21
+
+- Fixed the unauthenticated `403 Forbidden` regression introduced by the r9 optional-auth route design.
+- Made `/cgi-bin/luci/smartsafehub` a true public Preact shell with `auth: {}` so the dispatcher never blocks the custom login UI before JavaScript loads.
+- Added `/cgi-bin/luci/smartsafehub/session` as the dedicated protected LuCI cookie/session bootstrap endpoint.
+- Moved session probing and password submission to the protected session endpoint while keeping password verification, cookie issuance and additional-auth policy in LuCI.
+- Render `LoginApp` on a 403 session probe and switch directly to the authenticated `App` after receiving a valid session id, without navigating away from the public SmartSafeHub URL.
+- Made the legacy `/admin/smartsafehub` child route a public shell override and normalize it to the official public URL in the browser.
+- Removed template-side optional session bootstrap and the obsolete LuCI view lifecycle globals; the public template no longer exposes session data.
+- Added source, dist and package-time regression checks for the public-shell/protected-session split.
+
+## [0.2.0-r9] - 2026-08-21
+
+- Unified the login and authenticated product shell under `/cgi-bin/luci/smartsafehub`, keeping `#home` and other client routes on the same URL after login.
+- Changed the SmartSafeHub public route to optional LuCI cookie authentication (`login: false`) so a valid session can be discovered without invoking the stock LuCI login template.
+- Render `LoginApp` when no LuCI session exists and render the authenticated Preact `App` from the same server template when a valid session exists.
+- Bootstrap `/admin/ubus` directly from the session id exposed by the authenticated template, removing the need for the legacy LuCI view loader.
+- Kept `/admin/smartsafehub` as a compatibility template and normalize old bookmarks to the public SmartSafeHub URL in the browser.
+- Use `/admin/` only as the LuCI credential submission endpoint; successful login returns to `/cgi-bin/luci/smartsafehub#home`.
+- Removed the redundant login-time session probe and the obsolete `htdocs/luci-static/resources/view/smartsafehub/app.js` loader.
+
 ## [0.2.0-r8] - 2026-08-20
 
 - Added the public SmartSafeHub login route at `/cgi-bin/luci/smartsafehub`.

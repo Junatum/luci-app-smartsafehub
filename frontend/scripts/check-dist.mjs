@@ -22,20 +22,26 @@ for (const filename of requiredFiles) {
 const javascript = await readFile(new URL('app.js', outputDirectory), 'utf8');
 const stylesheet = await readFile(new URL('app.css', outputDirectory), 'utf8');
 
-if (!javascript.includes('smartsafehub-root')) {
-  throw new Error('app.js does not contain the SmartSafeHub host element');
+if (!javascript.includes('smartsafehub-entry-root')) {
+  throw new Error('app.js does not contain the unified SmartSafeHub public host element');
 }
 
 if (!javascript.includes('attachShadow')) {
   throw new Error('app.js does not mount SmartSafeHub in a shadow root');
 }
 
-if (!javascript.includes('__SMARTHUB_APP_UNMOUNT__')) {
-  throw new Error('app.js does not expose the Preact unmount lifecycle');
+for (const obsoleteGlobal of [
+  '__SMARTHUB_APP_MOUNT__',
+  '__SMARTHUB_APP_UNMOUNT__',
+  '__SMARTHUB_APP_ASSET_VERSION__',
+]) {
+  if (javascript.includes(obsoleteGlobal)) {
+    throw new Error(`app.js still contains obsolete LuCI view lifecycle global: ${obsoleteGlobal}`);
+  }
 }
 
 for (const loginContract of [
-  'smartsafehub-login-root',
+  'smartsafehub/session',
   'luci_username',
   'luci_password',
   'X-LuCI-Login-Required',
@@ -44,6 +50,21 @@ for (const loginContract of [
   if (!javascript.includes(loginContract)) {
     throw new Error(`app.js does not contain the Preact login contract: ${loginContract}`);
   }
+}
+
+for (const entryContract of [
+  'admin/ubus',
+  'smartsafehub',
+  'sessionId',
+  'smartsafehub-entry-root',
+]) {
+  if (!javascript.includes(entryContract)) {
+    throw new Error(`app.js does not contain the unified entry contract: ${entryContract}`);
+  }
+}
+
+if (javascript.includes('기존 로그인 세션을 확인하고 있습니다')) {
+  throw new Error('app.js still contains the old admin-route session probe');
 }
 
 if (!javascript.includes('RPC_TIMEOUT') || !javascript.includes('AbortController')) {

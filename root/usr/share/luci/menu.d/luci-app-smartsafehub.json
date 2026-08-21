@@ -8,17 +8,27 @@
     },
     "auth": {}
   },
+  "smartsafehub/session": {
+    "action": {
+      "type": "template",
+      "path": "smartsafehub/session"
+    },
+    "auth": {
+      "methods": [
+        "cookie:sysauth_https",
+        "cookie:sysauth_http"
+      ],
+      "login": true
+    },
+    "firstchild_ineligible": true
+  },
   "admin/smartsafehub": {
     "title": "SmartSafeHub",
     "order": 5,
     "action": {
-      "type": "view",
-      "path": "smartsafehub/app"
+      "type": "template",
+      "path": "smartsafehub/login"
     },
-    "depends": {
-      "acl": [
-        "luci-app-smartsafehub"
-      ]
-    }
+    "auth": {}
   }
 }

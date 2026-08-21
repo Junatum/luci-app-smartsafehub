@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r5`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r10`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -24,15 +24,20 @@ SmartSafeHub는 OpenWrt의 모든 고급 설정을 대체하지 않습니다. �
 ```text
 브라우저
   │
-  │ LuCI 인증 세션
+  │ /cgi-bin/luci/smartsafehub
   ▼
-LuCI view loader
-htdocs/luci-static/resources/view/smartsafehub/app.js
+LuCI public Preact shell (auth: {})
+root/usr/share/ucode/luci/template/smartsafehub/login.ut
   │
-  ├─ 전체 폭 제품 화면 활성화
-  ├─ bootstrap(sessionId, rpcUrl, assetVersion) 주입
-  ├─ 버전이 포함된 app.js 로드
-  └─ 화면 종료 시 LuCI chrome 복원
+  ├─ #smartsafehub-entry-root
+  └─ 버전이 포함된 app.js 로드
+       │
+       ├─ GET /cgi-bin/luci/smartsafehub/session
+       │      ├─ 403: LoginApp
+       │      └─ 200 + session id: App
+       │
+       └─ POST /cgi-bin/luci/smartsafehub/session
+              └─ LuCI password/session authentication
        │
        ▼
 Preact 애플리케이션 · Shadow DOM
@@ -62,7 +67,11 @@ SafeShield 관련 읽기·변경은 `safeshield` 패키지가 제공하는 공�
 root/usr/share/luci/menu.d/luci-app-smartsafehub.json
 ```
 
-등록 경로는 `admin/smartsafehub`이며 LuCI view `smartsafehub/app`을 실행합니다.
+공식 사용자 경로 `smartsafehub`는 `auth: {}`인 공개 shell입니다. 따라서 비로그인 요청도 dispatcher 인증 단계에서 막히지 않고 항상 `smartsafehub/login` 템플릿과 Preact 번들을 로드합니다.
+
+`smartsafehub/session`은 cookie authentication과 `login: true`를 사용하는 별도 보호 endpoint입니다. Preact는 이 endpoint를 GET하여 세션 유무를 확인하고, 로그인 폼 제출 시 같은 endpoint에 `luci_username` / `luci_password`를 POST합니다. 세션이 없으면 GET probe는 403으로 끝나지만 이는 background fetch이므로 stock 로그인 화면이 사용자 UI를 덮지 않습니다.
+
+`admin/smartsafehub`는 이전 북마크 호환을 위해 child node에서 `auth: {}`를 명시한 공개 shell로 유지합니다. LuCI의 `admin` parent가 인증 노드여도 child auth가 public shell로 override되며, 프런트엔드는 즉시 `history.replaceState()`로 `/cgi-bin/luci/smartsafehub` 주소로 정규화합니다.
 
 ### 3.2 ACL
 
@@ -94,26 +103,30 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
-### 3.3 LuCI view loader
+### 3.3 Public Preact shell과 보호된 session bootstrap
 
-`htdocs/luci-static/resources/view/smartsafehub/app.js`는 제품 UI 자체가 아니라 LuCI와 프런트엔드를 연결하는 로더입니다.
+`root/usr/share/ucode/luci/template/smartsafehub/login.ut`는 인증 상태와 무관하게 같은 `#smartsafehub-entry-root`를 제공하는 공개 서버 shell입니다. 이 템플릿은 session ID를 HTML에 직접 넣지 않습니다.
 
-주요 책임:
+`root/usr/share/ucode/luci/template/smartsafehub/session.ut`는 보호된 `smartsafehub/session` route에서만 실행되며 인증에 성공한 요청의 `ctx.authsession`만 반환합니다.
 
-1. `viewport-fit=cover`가 포함된 모바일 viewport 설정
-2. SmartSafeHub 화면에서 기존 LuCI header와 footer 숨김
-3. LuCI 콘텐츠 컨테이너의 최대 폭과 카드 스타일 해제
-4. `window.__SMARTHUB_BOOTSTRAP__` 생성
-5. 버전이 포함된 JavaScript URL 생성
-6. 이전 버전 Preact 트리 unmount, module script와 전역 제거
-7. module script 중복 로드 방지와 로드 실패 화면·재시도 제공
-8. DOM 변경 감시를 `requestAnimationFrame()` 단위로 합침
-9. SmartSafeHub 화면을 떠날 때 Preact unmount, observer 해제와 LuCI 레이아웃 복원
+주요 흐름:
+
+1. `/cgi-bin/luci/smartsafehub`는 `auth: {}`로 항상 Preact shell을 렌더링
+2. `main.tsx`가 `/cgi-bin/luci/smartsafehub/session`을 GET
+3. 403이면 `LoginApp`, 유효한 32자리 session ID면 제품 `App` 렌더링
+4. 로그인 폼은 같은 session endpoint에 credentials를 POST
+5. LuCI dispatcher가 비밀번호 검증, cookie 발급 및 추가 인증 정책을 처리
+6. fetch가 redirect를 따라 보호 template에서 session ID를 받으면 페이지 reload 없이 `App`으로 전환
+7. 제품 API는 받은 session ID를 `/admin/ubus` JSON-RPC에 사용
+
+이 분리로 public UI route에는 dispatcher authentication을 걸지 않으면서도 실제 관리 API와 session ID bootstrap은 LuCI 인증 경계 뒤에 유지합니다.
+
+기존 `htdocs/luci-static/resources/view/smartsafehub/app.js` LuCI view loader는 사용하지 않습니다. 인증 상태 전환과 bootstrap은 `frontend/src/main.tsx`와 `frontend/src/auth/session.ts`가 담당합니다.
 
 현재 자산 버전:
 
-```js
-const ASSET_VERSION = '0.2.0-r5';
+```text
+0.2.0-r10
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -138,7 +151,7 @@ root/www/luci-static/smartsafehub/app.css
 
 ### 4.2 Shadow DOM
 
-`frontend/src/main.tsx`는 LuCI가 만든 `#smartsafehub-root`에 open Shadow DOM을 생성합니다.
+`frontend/src/main.tsx`는 public entry template이 만든 `#smartsafehub-entry-root`에 open Shadow DOM을 생성하고, session probe 결과에 따라 같은 mount point에서 `LoginApp`과 제품 `App`을 전환합니다.
 
 사용 목적:
 
@@ -146,7 +159,7 @@ root/www/luci-static/smartsafehub/app.css
 - SmartSafeHub 스타일이 다른 LuCI 화면으로 새는 현상 방지
 - 제품 UI의 반응형 레이아웃 독립 유지
 
-Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다. `main.tsx`는 현재 mount point를 보관하고 `__SMARTHUB_APP_UNMOUNT__`를 제공해 LuCI 화면 이탈과 자산 교체 시 Preact 트리를 명시적으로 정리합니다.
+Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다. r10부터 legacy LuCI view loader용 전역 mount/unmount hook은 제거했으며 public shell의 단일 Preact lifecycle만 사용합니다.
 
 ### 4.3 화면과 route
 
@@ -499,12 +512,12 @@ SystemPage의 기존 system snapshot
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → ASSET_VERSION = 0.2.0-r5
-  → app.js?v=0.2.0-r5
-  → app.css?v=0.2.0-r5
+  → data-asset-version = 0.2.0-r10
+  → app.js?v=0.2.0-r10
+  → app.css?v=0.2.0-r10
 ```
 
-LuCI가 화면 이동 중 JavaScript 컨텍스트를 유지하더라도 로더는 이전 Preact 트리를 unmount한 뒤 버전이 다른 script, mount 전역과 오래된 CSS URL을 교체합니다. 동일 script가 로딩 중이면 중복 삽입하지 않으며 로드 실패 시 재시도 화면을 표시합니다.
+통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
 
 ## 8. 보안과 안정성
 
@@ -609,9 +622,10 @@ Makefile의 `Build/Prepare` hook은 다음을 추가로 확인합니다.
 - rpcd 검사 스크립트 성공
 - 프런트엔드 배포 파일 존재
 - 번들에 제거된 `system_diagnostics` 문자열이 없는지 확인
-- LuCI loader, ACL과 메뉴 존재
+- 통합 Preact 진입 템플릿, ACL과 메뉴 존재
+- legacy LuCI SmartSafeHub view loader가 존재하지 않음
 - 제거된 0바이트 `entry.uc`가 존재하지 않음
-- `ASSET_VERSION`과 `PKG_VERSION-rPKG_RELEASE` 일치
+- 템플릿 asset version과 `PKG_VERSION-rPKG_RELEASE` 일치
 
 ### 9.5 GitHub Actions
 
@@ -647,7 +661,7 @@ ubus call smartsafehub connected_devices '{}'
 8. 독립된 선택적 조회는 병렬 실행하되 부분 실패를 명시적으로 처리합니다.
 9. 폴링 기능은 중복 요청과 숨겨진 탭을 고려해야 합니다.
 10. 프런트엔드 소스를 변경하면 `npm run build`로 배포 산출물을 갱신합니다.
-11. 패키지 릴리스를 변경하면 LuCI loader의 `ASSET_VERSION`도 함께 변경합니다.
+11. 패키지 릴리스를 변경하면 통합 진입 템플릿의 `data-asset-version`과 `app.js?v=`도 함께 변경합니다.
 12. 배포 전 TypeScript, 소스·dist 검사, OpenWrt 패키지 빌드와 실제 ubus 호출을 모두 확인합니다.
 
 ## 11. 현재 제약

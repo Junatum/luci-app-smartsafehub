@@ -189,56 +189,128 @@ if (
 }
 
 const loginApp = await read(`${frontendRoot}src/login/LoginApp.tsx`);
+const authSession = await read(`${frontendRoot}src/auth/session.ts`);
 const frontendMain = await read(`${frontendRoot}src/main.tsx`);
+const luciUtils = await read(`${frontendRoot}src/utils/luci.ts`);
 const loginTemplate = await read(
   `${projectRoot}root/usr/share/ucode/luci/template/smartsafehub/login.ut`,
+);
+const sessionTemplate = await read(
+  `${projectRoot}root/usr/share/ucode/luci/template/smartsafehub/session.ut`,
 );
 const menu = JSON.parse(
   await read(`${projectRoot}root/usr/share/luci/menu.d/luci-app-smartsafehub.json`),
 );
-const loginRoute = menu.smartsafehub;
+const publicRoute = menu.smartsafehub;
+const sessionRoute = menu['smartsafehub/session'];
+const legacyRoute = menu['admin/smartsafehub'];
+const expectedSessionAuth = {
+  methods: ['cookie:sysauth_https', 'cookie:sysauth_http'],
+  login: true,
+};
+
+for (const [routeName, route] of [
+  ['smartsafehub', publicRoute],
+  ['admin/smartsafehub', legacyRoute],
+]) {
+  if (
+    route?.action?.type !== 'template' ||
+    route?.action?.path !== 'smartsafehub/login' ||
+    JSON.stringify(route?.auth) !== JSON.stringify({})
+  ) {
+    throw new Error(
+      `${routeName} must be a public SmartSafeHub Preact shell without dispatcher authentication`,
+    );
+  }
+}
 
 if (
-  loginRoute?.action?.type !== 'template' ||
-  loginRoute?.action?.path !== 'smartsafehub/login' ||
-  JSON.stringify(loginRoute?.auth) !== '{}'
+  sessionRoute?.action?.type !== 'template' ||
+  sessionRoute?.action?.path !== 'smartsafehub/session' ||
+  JSON.stringify(sessionRoute?.auth) !== JSON.stringify(expectedSessionAuth) ||
+  sessionRoute?.firstchild_ineligible !== true
 ) {
   throw new Error(
-    'SmartSafeHub public login route is not registered as an unauthenticated template',
+    'smartsafehub/session must be the protected LuCI session bootstrap/login endpoint',
   );
 }
 
 for (const contract of [
-  "import { LoginApp } from './login/LoginApp'",
-  "const LOGIN_HOST_ID = 'smartsafehub-login-root'",
-  'render(<LoginApp />, mountPoint)',
+  "import { probeLuciSession } from './auth/session'",
+  "const ENTRY_HOST_ID = 'smartsafehub-entry-root'",
+  '<LoginApp',
+  'probing',
+  'installBootstrap(sessionId, host)',
+  "rpcUrl: luciUrl('/admin/ubus')",
+  'canonicalizeEntryUrl()',
+  'render(<App />, mountPoint)',
 ]) {
   if (!frontendMain.includes(contract)) {
-    throw new Error(`main.tsx does not contain Preact login contract: ${contract}`);
+    throw new Error(`main.tsx does not contain public entry/session gate contract: ${contract}`);
   }
 }
 
 for (const contract of [
-  "body.set('luci_username'",
-  "body.set('luci_password'",
-  "credentials: 'same-origin'",
-  'X-LuCI-Login-Required',
+  'authenticateLuciSession',
+  'luciSessionUrl',
+  'onAuthenticated(sessionId)',
   '다시 오신 것을 환영합니다',
   '<form',
+  'spellcheck={false}',
 ]) {
   if (!loginApp.includes(contract)) {
     throw new Error(`LoginApp.tsx does not contain login contract: ${contract}`);
   }
 }
 
+if (loginApp.includes('/admin/smartsafehub') || loginApp.includes("luciUrl('/admin/')")) {
+  throw new Error('LoginApp.tsx must authenticate only through the protected SmartSafeHub session endpoint');
+}
+
 for (const contract of [
-  'smartsafehub-login-root',
+  "luciUrl('/smartsafehub/session')",
+  'X-LuCI-Login-Required',
+  "body.set('luci_username'",
+  "body.set('luci_password'",
+  "credentials: 'same-origin'",
+  'SESSION_ID_PATTERN',
+  'probeLuciSession',
+  'authenticateLuciSession',
+]) {
+  if (!authSession.includes(contract)) {
+    throw new Error(`auth/session.ts does not contain session contract: ${contract}`);
+  }
+}
+
+for (const contract of [
+  'smartsafehub-entry-root',
   'data-asset-base',
-  'data-asset-version',
-  'app.js?v=0.2.0-r8',
+  'data-asset-version="0.2.0-r10"',
+  'app.js?v=0.2.0-r10',
 ]) {
   if (!loginTemplate.includes(contract)) {
-    throw new Error(`SmartSafeHub login template does not contain: ${contract}`);
+    throw new Error(`SmartSafeHub public entry template does not contain: ${contract}`);
+  }
+}
+
+for (const forbidden of ['ctx.authsession', 'data-session-id', 'smartsafehub-login-root']) {
+  if (loginTemplate.includes(forbidden)) {
+    throw new Error(`SmartSafeHub public entry template must not contain dispatcher session state: ${forbidden}`);
+  }
+}
+
+if (!sessionTemplate.includes('ctx.authsession')) {
+  throw new Error('SmartSafeHub protected session template must expose ctx.authsession');
+}
+
+for (const contract of [
+  "const DEFAULT_LUCI_BASE = '/cgi-bin/luci'",
+  'export function luciBaseUrl()',
+  'export function luciUrl(route: string)',
+  'export function smartSafeHubPublicUrl',
+]) {
+  if (!luciUtils.includes(contract)) {
+    throw new Error(`luci.ts does not contain unified route contract: ${contract}`);
   }
 }
 
@@ -255,16 +327,14 @@ for (const obsoleteAsset of ['login.js', 'login.css']) {
   }
 }
 
-for (const obsoleteAsset of ['login.js', 'login.css']) {
-  try {
-    await access(`${projectRoot}root/www/luci-static/smartsafehub/${obsoleteAsset}`);
-    throw new Error(
-      `SmartSafeHub login must be Preact-based; remove standalone ${obsoleteAsset}`,
-    );
-  } catch (error) {
-    if (error instanceof Error && !('code' in error && error.code === 'ENOENT')) {
-      throw error;
-    }
+try {
+  await access(`${projectRoot}htdocs/luci-static/resources/view/smartsafehub/app.js`);
+  throw new Error(
+    'legacy LuCI SmartSafeHub view loader must be removed; the public template owns the full Preact app entry',
+  );
+} catch (error) {
+  if (error instanceof Error && !('code' in error && error.code === 'ENOENT')) {
+    throw error;
   }
 }
 
@@ -402,8 +472,17 @@ if (!asyncResource.includes('requested.current = false')) {
 }
 
 const main = await read(`${frontendRoot}src/main.tsx`);
-if (!main.includes('__SMARTHUB_APP_UNMOUNT__') || !main.includes('render(null')) {
-  throw new Error('main.tsx does not expose the Preact unmount lifecycle');
+if (!main.includes('void bootstrapEntry()')) {
+  throw new Error('main.tsx does not start the public session-gated Preact entry');
+}
+for (const obsoleteGlobal of [
+  '__SMARTHUB_APP_MOUNT__',
+  '__SMARTHUB_APP_UNMOUNT__',
+  '__SMARTHUB_APP_ASSET_VERSION__',
+]) {
+  if (main.includes(obsoleteGlobal)) {
+    throw new Error(`main.tsx still contains obsolete LuCI view lifecycle global: ${obsoleteGlobal}`);
+  }
 }
 
 if (!backendModules.system.includes('SYSTEM_BOARD_REQUEST_FAILED')) {
@@ -414,26 +493,6 @@ if (!backendModules.wifiManagement.includes('WIFI_UPDATE_LOCK')) {
 }
 if (!backendModules.wifiManagement.includes('valid_wifi_password(current_key)')) {
   throw new Error('wifi-management.uc does not validate a reused Wi-Fi password');
-}
-
-const luciLoader = await read(
-  `${projectRoot}htdocs/luci-static/resources/view/smartsafehub/app.js`,
-);
-if (
-  !luciLoader.includes('smartsafehub-product-view') ||
-  !luciLoader.includes('body > header')
-) {
-  throw new Error('SmartSafeHub LuCI loader does not hide the legacy top navigation');
-}
-
-for (const loaderContract of [
-  '__SMARTHUB_APP_UNMOUNT__',
-  'renderApplicationLoadError',
-  'SCRIPT_LOADING_KEY',
-]) {
-  if (!luciLoader.includes(loaderContract)) {
-    throw new Error(`SmartSafeHub LuCI loader does not contain: ${loaderContract}`);
-  }
 }
 
 console.log('Verified SmartSafeHub source architecture and rpcd module contract.');

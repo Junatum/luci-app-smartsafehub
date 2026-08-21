@@ -1,22 +1,45 @@
 import { render } from 'preact';
 
+import { probeLuciSession } from './auth/session';
 import { App } from './app/App';
 import { LoginApp } from './login/LoginApp';
+import { luciUrl, smartSafeHubPublicUrl } from './utils/luci';
 import './styles/app.css';
 
-const APP_HOST_ID = 'smartsafehub-root';
-const LOGIN_HOST_ID = 'smartsafehub-login-root';
+const ENTRY_HOST_ID = 'smartsafehub-entry-root';
 const MOUNT_ATTRIBUTE = 'data-smartsafehub-mount';
 const STYLESHEET_ATTRIBUTE = 'data-smartsafehub-shadow-style';
 
-let activeMountPoint: HTMLElement | null = null;
-let loginMountPoint: HTMLElement | null = null;
 
-function assetUrl(name: string, host?: HTMLElement | null): string {
+function canonicalizeEntryUrl(): void {
+  const legacyPath = luciUrl('/admin/smartsafehub');
+
+  if (window.location.pathname !== legacyPath) {
+    return;
+  }
+
+  window.history.replaceState(
+    null,
+    '',
+    `${smartSafeHubPublicUrl()}${window.location.search}${window.location.hash}`,
+  );
+}
+
+function installBootstrap(sessionId: string, host: HTMLElement): void {
+  window.__SMARTHUB_BOOTSTRAP__ = Object.freeze({
+    sessionId,
+    rpcUrl: luciUrl('/admin/ubus'),
+    assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
+    assetVersion: host.dataset.assetVersion ?? '0.2.0-r10',
+    locale: document.documentElement.lang || 'ko',
+  });
+}
+
+function assetUrl(name: string, host: HTMLElement): string {
   const bootstrap = window.__SMARTHUB_BOOTSTRAP__;
   const base =
-    bootstrap?.assetBase ?? host?.dataset.assetBase ?? '/luci-static/smartsafehub/';
-  const version = bootstrap?.assetVersion ?? host?.dataset.assetVersion;
+    bootstrap?.assetBase ?? host.dataset.assetBase ?? '/luci-static/smartsafehub/';
+  const version = bootstrap?.assetVersion ?? host.dataset.assetVersion;
   const separator = base.endsWith('/') ? '' : '/';
   const url = `${base}${separator}${name}`;
 
@@ -56,71 +79,70 @@ function getMountPoint(host: HTMLElement, className: string): HTMLElement {
   return mountPoint;
 }
 
-function unmount(): void {
-  if (!activeMountPoint) {
-    return;
-  }
-
-  render(null, activeMountPoint);
-  activeMountPoint = null;
+function renderAuthenticated(
+  host: HTMLElement,
+  mountPoint: HTMLElement,
+  sessionId: string,
+): void {
+  installBootstrap(sessionId, host);
+  mountPoint.className = 'smartsafehub-shadow-root';
+  render(<App />, mountPoint);
 }
 
-function mount(): void {
-  const host = document.getElementById(APP_HOST_ID);
+function renderLogin(host: HTMLElement, mountPoint: HTMLElement): void {
+  delete window.__SMARTHUB_BOOTSTRAP__;
+  mountPoint.className = 'smartsafehub-login-shadow-root';
+  render(
+    <LoginApp
+      onAuthenticated={(sessionId) => {
+        renderAuthenticated(host, mountPoint, sessionId);
+      }}
+    />,
+    mountPoint,
+  );
+}
+
+async function bootstrapEntry(): Promise<void> {
+  const host = document.getElementById(ENTRY_HOST_ID);
 
   if (!host) {
     return;
   }
+
+  canonicalizeEntryUrl();
 
   host.style.display = 'block';
   host.style.width = '100%';
   host.style.minWidth = '0';
-  host.style.maxWidth = '100%';
-  host.style.isolation = 'isolate';
-
-  const mountPoint = getMountPoint(host, 'smartsafehub-shadow-root');
-
-  if (activeMountPoint && activeMountPoint !== mountPoint) {
-    render(null, activeMountPoint);
-  }
-
-  activeMountPoint = mountPoint;
-  render(<App />, mountPoint);
-}
-
-function mountLogin(): boolean {
-  const host = document.getElementById(LOGIN_HOST_ID);
-
-  if (!host) {
-    return false;
-  }
-
-  host.style.display = 'block';
-  host.style.width = '100%';
   host.style.minHeight = '100dvh';
+  host.style.maxWidth = '100%';
   host.style.isolation = 'isolate';
 
   const mountPoint = getMountPoint(host, 'smartsafehub-login-shadow-root');
 
-  if (loginMountPoint && loginMountPoint !== mountPoint) {
-    render(null, loginMountPoint);
+  render(
+    <LoginApp
+      onAuthenticated={(sessionId) => {
+        renderAuthenticated(host, mountPoint, sessionId);
+      }}
+      probing
+    />,
+    mountPoint,
+  );
+
+  try {
+    const sessionId = await probeLuciSession();
+
+    if (sessionId) {
+      renderAuthenticated(host, mountPoint, sessionId);
+      return;
+    }
+  } catch {
+    // Keep the public entry usable. A manual login attempt will surface
+    // connectivity problems if the protected session endpoint is unreachable.
   }
 
-  loginMountPoint = mountPoint;
-  render(<LoginApp />, mountPoint);
-  return true;
+  renderLogin(host, mountPoint);
 }
 
-if (!mountLogin()) {
-  const assetVersion = window.__SMARTHUB_BOOTSTRAP__?.assetVersion;
-
-  if (assetVersion !== undefined) {
-    window.__SMARTHUB_APP_ASSET_VERSION__ = assetVersion;
-  } else {
-    delete window.__SMARTHUB_APP_ASSET_VERSION__;
-  }
-
-  window.__SMARTHUB_APP_MOUNT__ = mount;
-  window.__SMARTHUB_APP_UNMOUNT__ = unmount;
-  mount();
-}
+void bootstrapEntry();
