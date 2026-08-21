@@ -97,6 +97,7 @@ export function App() {
           onRefreshBlocklist={() => void safeshieldActions.refreshBlocklist()}
           onRetry={() => void safeshield.refresh()}
           onSetEnabled={(enabled) => void safeshieldActions.setEnabled(enabled)}
+          onUpdateLicense={safeshieldActions.updateLicense}
         />
       );
       break;

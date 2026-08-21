@@ -4,6 +4,18 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r4`는 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `4`를 의미합니다.
 
+## [Unreleased]
+
+### Added
+
+- SafeShield 라이선스 키 등록/변경 UI와 `safeshield.license_update` 연동을 추가했습니다.
+
+### Removed
+
+- Removed the package-time `Build/Prepare` string and file contract checks.
+- Removed the duplicated rpcd/source/dist contract-check scripts and simplified the frontend build to TypeScript plus Vite.
+- Removed unused SafeShield config mutation client code and the unused `safeshield.config_update` LuCI write permission.
+
 ## [0.2.0-r10] - 2026-08-21
 
 - Fixed the unauthenticated `403 Forbidden` regression introduced by the r9 optional-auth route design.

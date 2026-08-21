@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
 
 import {
   AlertIcon,
@@ -31,6 +32,7 @@ interface SafeShieldPageProps {
   onRefreshBlocklist: () => void;
   onRetry: () => void;
   onSetEnabled: (enabled: boolean) => void;
+  onUpdateLicense: (licenseKey: string) => Promise<boolean>;
 }
 
 function BooleanState({
@@ -270,7 +272,9 @@ export function SafeShieldPage({
   onRefreshBlocklist,
   onRetry,
   onSetEnabled,
+  onUpdateLicense,
 }: SafeShieldPageProps) {
+  const [licenseKey, setLicenseKey] = useState('');
   if (loading) {
     return <LoadingPanel />;
   }
@@ -425,8 +429,48 @@ export function SafeShieldPage({
             {data.license.status || (data.license.configured ? '상태 확인 중' : '라이선스 미설정')}
           </p>
           <p class="mt-4 mb-0 text-xs font-bold text-slate-500">
-            {data.license.configured ? '라이선스 연결됨' : '라이선스 키 없음'}
+            {data.license.configured
+              ? data.license.keyMasked || '라이선스 연결됨'
+              : '라이선스 키 없음'}
           </p>
+
+          <form
+            class="mt-4 grid gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void onUpdateLicense(licenseKey).then((updated) => {
+                if (updated) {
+                  setLicenseKey('');
+                }
+              });
+            }}
+          >
+            <label class="text-xs font-bold text-slate-600" for="safeshield-license-key">
+              {data.license.configured ? '라이선스 키 변경' : '라이선스 키 등록'}
+            </label>
+            <input
+              autocomplete="new-password"
+              class="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+              disabled={actionBusy}
+              id="safeshield-license-key"
+              onInput={(event) => setLicenseKey(event.currentTarget.value)}
+              placeholder="새 라이선스 키 입력"
+              spellcheck={false}
+              type="password"
+              value={licenseKey}
+            />
+            <button
+              class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={actionBusy || licenseKey.trim().length === 0}
+              type="submit"
+            >
+              {action === 'license'
+                ? '저장 중…'
+                : data.license.configured
+                  ? '라이선스 변경'
+                  : '라이선스 등록'}
+            </button>
+          </form>
         </InfoCard>
 
         <InfoCard eyebrow="Artifact" icon={<ShieldIcon class="size-5" />}>

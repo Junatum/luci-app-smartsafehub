@@ -156,8 +156,6 @@ luci-app-smartsafehub/
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc
 │   └── www/luci-static/smartsafehub/
-└── scripts/
-    └── check-rpcd-imports.sh
 ```
 
 `root/www/luci-static/smartsafehub/app.js`와 `app.css`는 Vite가 만드는 배포 산출물입니다. 프런트엔드 소스를 수정한 뒤 반드시 다시 빌드해야 합니다.
@@ -182,8 +180,6 @@ Vite 개발 서버는 컴포넌트 작업에 사용할 수 있지만 실제 LuCI
 ### 정적 검사
 
 ```bash
-npm run check:rpcd
-npm run check:source
 npm run typecheck
 ```
 
@@ -200,22 +196,7 @@ root/www/luci-static/smartsafehub/app.js
 root/www/luci-static/smartsafehub/app.css
 ```
 
-`npm run build`는 rpcd·소스 계약 검사, TypeScript 검사, Vite 빌드와 배포 산출물 검사를 순서대로 실행합니다.
-
-<!-- ### 지속적 통합
-
-`.github/workflows/ci.yml`은 Node.js 24 환경에서 다음을 확인합니다.
-
-```text
-npm ci
-npm run check:rpcd
-npm run build
-생성된 app.js·app.css 계약 검사
-0바이트 entry.uc 재등장 방지
-git diff --check
-```
-
-프런트엔드 소스를 변경한 커밋에는 갱신된 `root/www/luci-static/smartsafehub` 산출물도 함께 포함해야 합니다. 로컬에서 `npm run build` 후 변경된 산출물을 커밋합니다. -->
+`npm run build`는 TypeScript 검사를 통과한 뒤 Vite로 배포 자산을 생성합니다. 프런트엔드 소스를 변경한 경우 갱신된 `app.js`와 `app.css`도 함께 커밋합니다.
 
 ## OpenWrt 패키지 빌드
 
@@ -226,19 +207,7 @@ make package/luci-app-smartsafehub/clean
 make package/luci-app-smartsafehub/compile V=s
 ```
 
-`Build/Prepare` 단계에서 다음 항목을 확인합니다.
-
-- rpcd 진입점과 필수 기능 모듈 존재 여부
-- ucode named import의 trailing comma 금지
-- exported function의 `};` 종료 문법
-- 10개 공개 RPC 메서드 등록 여부
-- 제거된 `system_diagnostics` RPC가 소스와 번들에 다시 포함되지 않았는지 확인
-- 제거된 0바이트 `entry.uc` 파일이 다시 포함되지 않았는지 확인
-- 빌드된 `app.js`, `app.css` 존재 여부
-- 공개 Preact 진입 템플릿, 보호된 session bootstrap 템플릿, 메뉴와 ACL 존재 여부
-- public template의 `data-asset-version`과 패키지 릴리스 일치 여부
-- 제거된 legacy LuCI view loader가 다시 포함되지 않았는지 확인
-- 오래된 admin-route probe와 `login:false` optional-auth 구조가 남아 있지 않은지 확인
+별도의 `Build/Prepare` 검증 hook은 사용하지 않습니다. OpenWrt 패키지 빌드는 `luci.mk`의 기본 패키징 흐름을 사용하며, 프런트엔드 자산은 패키지 빌드 전에 `npm run build`로 갱신합니다.
 
 별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.0-r10`이 JavaScript와 CSS 캐시 무효화 키입니다.
 
@@ -302,13 +271,11 @@ SafeShield 기능은 `luci-app-smartsafehub`가 별도 프록시를 만들지 �
 ```text
 safeshield.status
 safeshield.config
-safeshield.config_update
 safeshield.set_enabled
 safeshield.refresh
 safeshield.rules_list
 safeshield.rule_add
 safeshield.rule_delete
-safeshield.license_update
 ```
 
 ## ucode 컴파일 검사
@@ -371,8 +338,6 @@ rm -f /tmp/luci-indexcache
 ```bash
 cd frontend
 npm ci
-npm run check:rpcd
-npm run check:source
 npm run typecheck
 npm run build
 cd ..
@@ -411,7 +376,7 @@ ubus call smartsafehub connected_devices '{}'
 
 ```makefile
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=5
+PKG_RELEASE:=10
 ```
 
 ```js

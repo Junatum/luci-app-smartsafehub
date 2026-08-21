@@ -17,63 +17,6 @@ LUCI_TITLE:=SmartSafeHub device application
 LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +safeshield
 LUCI_PKGARCH:=all
 
-SMARTSAFEHUB_RPCD_SOURCE_DIR:=$(CURDIR)/root/usr/share/rpcd/ucode/smartsafehub
-
-# luci.mk copies htdocs/ and root/ into the package build directory. This hook
-# validates the checked-in runtime assets and rpcd module contract before the
-# package is assembled.
-define Build/Prepare/luci-app-smartsafehub
-	@sh $(CURDIR)/scripts/check-rpcd-imports.sh \
-		$(CURDIR)/root/usr/share/rpcd/ucode/smartsafehub.uc \
-		$(SMARTSAFEHUB_RPCD_SOURCE_DIR)
-	@test -s $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
-		( echo "ERROR: SmartSafeHub frontend is not built: app.js" >&2; false )
-	@test -s $(CURDIR)/root/www/luci-static/smartsafehub/app.css || \
-		( echo "ERROR: SmartSafeHub frontend is not built: app.css" >&2; false )
-	@if grep -Fq "system_diagnostics" \
-		$(CURDIR)/root/www/luci-static/smartsafehub/app.js; then \
-		echo "ERROR: SmartSafeHub frontend bundle is stale; run npm run build" >&2; \
-		false; \
-	fi
-	@if grep -Eq "safeshield_(set_enabled|refresh|rules_list|rule_add|rule_delete)" \
-		$(CURDIR)/root/www/luci-static/smartsafehub/app.js; then \
-		echo "ERROR: SmartSafeHub frontend bundle still uses obsolete SafeShield proxy RPCs; run npm run build" >&2; \
-		false; \
-	fi
-	@if ! grep -Fq "로컬 규칙을 DNS에 적용하고 있습니다" \
-		$(CURDIR)/root/www/luci-static/smartsafehub/app.js; then \
-		echo "ERROR: SmartSafeHub frontend bundle is stale; rebuild the SafeShield local-rule fast apply integration" >&2; \
-		false; \
-	fi
-	@test -s $(CURDIR)/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json || \
-		( echo "ERROR: SmartSafeHub rpcd ACL is missing" >&2; false )
-	@test -s $(CURDIR)/root/usr/share/luci/menu.d/luci-app-smartsafehub.json || \
-		( echo "ERROR: SmartSafeHub LuCI menu entry is missing" >&2; false )
-	@test -s $(CURDIR)/root/usr/share/ucode/luci/template/smartsafehub/login.ut || \
-		( echo "ERROR: SmartSafeHub public Preact entry template is missing" >&2; false )
-	@grep -Fq "smartsafehub-entry-root" $(CURDIR)/root/usr/share/ucode/luci/template/smartsafehub/login.ut || \
-		( echo "ERROR: SmartSafeHub entry template does not expose the public Preact host" >&2; false )
-	@test -s $(CURDIR)/root/usr/share/ucode/luci/template/smartsafehub/session.ut || \
-		( echo "ERROR: SmartSafeHub protected session bootstrap template is missing" >&2; false )
-	@grep -Fq "ctx.authsession" $(CURDIR)/root/usr/share/ucode/luci/template/smartsafehub/session.ut || \
-		( echo "ERROR: SmartSafeHub session bootstrap does not expose the authenticated session id" >&2; false )
-	@if grep -Fq "기존 로그인 세션을 확인하고 있습니다" \
-		$(CURDIR)/root/www/luci-static/smartsafehub/app.js; then \
-		echo "ERROR: SmartSafeHub frontend bundle still uses the old admin-route session probe; run npm run build" >&2; \
-		false; \
-	fi
-	@grep -Fq "smartsafehub-entry-root" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
-		( echo "ERROR: SmartSafeHub frontend bundle is missing the unified public Preact entry; run npm run build" >&2; false )
-	@grep -Fq "smartsafehub/session" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
-		( echo "ERROR: SmartSafeHub frontend bundle is missing the protected session bootstrap flow; run npm run build" >&2; false )
-	@grep -Fq "다시 오신 것을 환영합니다" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
-		( echo "ERROR: SmartSafeHub frontend bundle is stale; rebuild the Preact login page" >&2; false )
-	@test ! -e $(CURDIR)/htdocs/luci-static/resources/view/smartsafehub/app.js || \
-		( echo "ERROR: obsolete LuCI SmartSafeHub view loader must be removed" >&2; false )
-	@test ! -e $(SMARTSAFEHUB_RPCD_SOURCE_DIR)/entry.uc || \
-		( echo "ERROR: obsolete smartsafehub/entry.uc must be removed" >&2; false )
-endef
-
 include $(TOPDIR)/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature

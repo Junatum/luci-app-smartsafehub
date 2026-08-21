@@ -4,9 +4,6 @@ import type {
   SafeShieldRules,
 } from '../types/rules';
 import type {
-  SafeShieldConfig,
-  SafeShieldConfigUpdate,
-  SafeShieldConfigUpdateResult,
   SafeShieldEnabledResult,
   SafeShieldLicenseUpdateResult,
   SafeShieldRefreshResult,
@@ -36,8 +33,11 @@ interface RawSafeShieldStatus {
 
 interface RawSafeShieldConfig {
   values?: Record<string, unknown>;
-  license?: Record<string, unknown>;
-  device?: Record<string, unknown>;
+}
+
+interface SafeShieldRuleConfig {
+  enabled: boolean;
+  applyLocalOverrides: boolean;
 }
 
 interface RawSafeShieldRules {
@@ -56,13 +56,10 @@ interface RawSafeShieldMutation {
   reconciled?: unknown;
   reason?: unknown;
   status?: unknown;
-  action?: unknown;
   domain?: unknown;
   added?: unknown;
   deleted?: unknown;
   refresh?: unknown;
-  restarted?: unknown;
-  config?: unknown;
   license?: unknown;
   error?: unknown;
 }
@@ -265,73 +262,13 @@ function normalizeStatus(sourceValue: RawSafeShieldStatus): SafeShieldStatus {
   };
 }
 
-function normalizeConfig(sourceValue: RawSafeShieldConfig): SafeShieldConfig {
-  const source = objectValue(sourceValue);
-  const values = objectValue(source.values);
-  const license = objectValue(source.license);
-  const device = objectValue(source.device);
+function normalizeRuleConfig(sourceValue: RawSafeShieldConfig): SafeShieldRuleConfig {
+  const values = objectValue(objectValue(sourceValue).values);
 
   return {
-    values: {
-      verbosity: numberValue(values.verbosity),
-      applyLocalOverrides: boolValue(values.apply_local_overrides),
-      maxBlocklistFileSizeKb: numberValue(values.max_blocklist_file_size_kb),
-      minValidLineCount: numberValue(values.min_valid_line_count),
-      compressBlocklist: boolValue(values.compress_blocklist),
-      initialDnsmasqRestart: boolValue(values.initial_dnsmasq_restart),
-      dnsmasqSanityCheck: boolValue(values.dnsmasq_sanity_check),
-      downloadTimeout: numberValue(values.download_timeout),
-      downloadRetry: numberValue(values.download_retry),
-      pauseTimeout: numberValue(values.pause_timeout),
-      bootStartDelayS: numberValue(values.boot_start_delay_s),
-      refreshOnBoot: boolValue(values.refresh_on_boot),
-      refreshIntervalS: numberValue(values.refresh_interval_s),
-      requireWan: boolValue(values.require_wan),
-      debug: boolValue(values.debug),
-      enabled: boolValue(values.enabled),
-    },
-    license: {
-      configured: boolValue(license.configured),
-      keyMasked: plainString(license.key_masked),
-    },
-    device: {
-      vendor: plainString(device.vendor),
-      model: plainString(device.model),
-      arch: plainString(device.arch),
-      memoryMb: numberValue(device.memory_mb),
-    },
+    enabled: boolValue(values.enabled),
+    applyLocalOverrides: boolValue(values.apply_local_overrides),
   };
-}
-
-function configUpdatePayload(values: SafeShieldConfigUpdate): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  const mappings: Array<[keyof SafeShieldConfigUpdate, string]> = [
-    ['verbosity', 'verbosity'],
-    ['applyLocalOverrides', 'apply_local_overrides'],
-    ['maxBlocklistFileSizeKb', 'max_blocklist_file_size_kb'],
-    ['minValidLineCount', 'min_valid_line_count'],
-    ['compressBlocklist', 'compress_blocklist'],
-    ['initialDnsmasqRestart', 'initial_dnsmasq_restart'],
-    ['dnsmasqSanityCheck', 'dnsmasq_sanity_check'],
-    ['downloadTimeout', 'download_timeout'],
-    ['downloadRetry', 'download_retry'],
-    ['pauseTimeout', 'pause_timeout'],
-    ['bootStartDelayS', 'boot_start_delay_s'],
-    ['refreshOnBoot', 'refresh_on_boot'],
-    ['refreshIntervalS', 'refresh_interval_s'],
-    ['requireWan', 'require_wan'],
-    ['debug', 'debug'],
-  ];
-
-  for (const [frontendName, apiName] of mappings) {
-    const value = values[frontendName];
-
-    if (value !== undefined) {
-      payload[apiName] = value;
-    }
-  }
-
-  return payload;
 }
 
 function normalizeRefresh(source: unknown): {
@@ -364,24 +301,9 @@ export async function fetchSafeShieldStatus(): Promise<SafeShieldStatus> {
   }
 }
 
-export async function fetchSafeShieldConfig(): Promise<SafeShieldConfig> {
+async function fetchSafeShieldRuleConfig(): Promise<SafeShieldRuleConfig> {
   const response = await callSafeShield<RawSafeShieldConfig>('config');
-  return normalizeConfig(response);
-}
-
-export async function updateSafeShieldConfig(
-  values: SafeShieldConfigUpdate,
-): Promise<SafeShieldConfigUpdateResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>('config_update', {
-    values: configUpdatePayload(values),
-  });
-
-  return {
-    changed: stringArray(response.changed),
-    restarted: boolValue(response.restarted),
-    refresh: response.refresh == null ? null : normalizeRefresh(response.refresh),
-    config: normalizeConfig(response.config as RawSafeShieldConfig),
-  };
+  return normalizeRuleConfig(response);
 }
 
 export async function setSafeShieldEnabled(
@@ -412,7 +334,7 @@ export async function requestSafeShieldRefresh(): Promise<SafeShieldRefreshResul
 export async function fetchSafeShieldRules(): Promise<SafeShieldRules> {
   const [rulesResponse, config] = await Promise.all([
     callSafeShield<RawSafeShieldRules>('rules_list'),
-    fetchSafeShieldConfig(),
+    fetchSafeShieldRuleConfig(),
   ]);
   const allow = stringArray(rulesResponse.allow);
   const block = stringArray(rulesResponse.block);
@@ -425,8 +347,8 @@ export async function fetchSafeShieldRules(): Promise<SafeShieldRules> {
       block: block.length,
       total: allow.length + block.length,
     },
-    safeshieldEnabled: config.values.enabled,
-    applyLocalOverrides: config.values.applyLocalOverrides,
+    safeshieldEnabled: config.enabled,
+    applyLocalOverrides: config.applyLocalOverrides,
   };
 }
 

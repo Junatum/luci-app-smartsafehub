@@ -94,12 +94,10 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 
 - `smartsafehub.wifi_update`
 - `smartsafehub.system_reboot`
-- `safeshield.config_update`
 - `safeshield.set_enabled`
 - `safeshield.refresh`
 - `safeshield.rule_add`
 - `safeshield.rule_delete`
-- `safeshield.license_update`
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
@@ -434,13 +432,11 @@ SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 |---|---|---|
 | `safeshield.status` | 읽기 | 상태, runtime, artifact, health |
 | `safeshield.config` | 읽기 | 공개 설정과 마스킹된 라이선스 상태 |
-| `safeshield.config_update` | 쓰기 | 공개 설정 변경 |
 | `safeshield.set_enabled` | 쓰기 | 비동기 enable/disable lifecycle 요청 |
 | `safeshield.refresh` | 쓰기 | 비동기 refresh 요청 |
 | `safeshield.rules_list` | 읽기 | 사용자 허용·차단 규칙 조회 |
 | `safeshield.rule_add` | 쓰기 | 사용자 규칙 추가 |
 | `safeshield.rule_delete` | 쓰기 | 사용자 규칙 삭제 |
-| `safeshield.license_update` | 쓰기 | 라이선스 키 변경·해제 |
 
 ## 7. 주요 데이터 흐름
 
@@ -562,76 +558,31 @@ PKG_VERSION + PKG_RELEASE
 - 모든 RPC에 제한 시간을 둬 영구 대기와 single-flight 고착 방지
 - DOM observer 콜백을 animation frame으로 병합
 
-## 9. 빌드와 계약 검사
+## 9. 빌드와 검증
 
-### 9.1 rpcd 검사
+### 9.1 프런트엔드 검사
+
+프런트엔드는 문자열 기반 계약 검사 대신 TypeScript와 Vite 자체 검증에 의존합니다.
 
 ```bash
-sh scripts/check-rpcd-imports.sh \
-  root/usr/share/rpcd/ucode/smartsafehub.uc \
-  root/usr/share/rpcd/ucode/smartsafehub
+cd frontend
+npm ci
+npm run typecheck
+npm run build
 ```
 
-검사 항목:
+`npm run build`는 TypeScript 검사를 통과한 뒤 `root/www/luci-static/smartsafehub/`에 배포 자산을 생성합니다. 프런트엔드 변경 시 생성된 `app.js`와 `app.css`도 함께 갱신합니다.
 
-- 필수 ucode 파일 존재
-- named import trailing comma 금지
-- exported function이 `};`로 종료되는지 확인
-- `wifi_band` import/export 연결
-- `wifi_is_managed_section` 연결
-- 필수 기능 모듈 import
-- 최종 rpcd signature 반환
-- 10개 공개 메서드 등록
-- 제거된 `system_diagnostics` 메서드 미등록
+### 9.2 OpenWrt 패키지 빌드
 
-### 9.2 프런트엔드 소스 검사
+Makefile에는 별도의 `Build/Prepare` 검증 hook을 두지 않습니다. 패키지는 `luci.mk`의 기본 흐름으로 구성합니다.
 
-`frontend/scripts/check-source.mjs` 검사 항목:
+```bash
+make package/luci-app-smartsafehub/clean
+make package/luci-app-smartsafehub/compile V=s
+```
 
-- `smartsafehub.uc`가 작은 composition root인지 확인
-- 기능 모듈이 필요한 public function을 export하는지 확인
-- `App.tsx`와 `AppShell.tsx` 책임 분리
-- 모바일 메뉴, 고급 설정과 로그아웃 계약
-- 공통 `callApi()` wrapper 사용
-- RPC timeout, AbortController와 JSON-RPC 응답 검증 계약
-- route 재진입 시 리소스 재조회 계약
-- Preact mount/unmount 생명주기 계약
-- 진단이 `Promise.allSettled()`와 기존 상세 API를 사용하는지 확인
-- 공통 비동기 훅이 `setInterval()`을 사용하지 않는지 확인
-- 숨겨진 탭 폴링 중단 계약
-- LuCI 제품 화면 chrome 처리
-
-### 9.3 배포 산출물 검사
-
-`frontend/scripts/check-dist.mjs` 검사 항목:
-
-- `app.js`, `app.css` 존재 및 비어 있지 않음
-- Shadow DOM mount와 명시적 unmount 코드
-- 모바일 메뉴와 로그아웃
-- 전체 폭 제품 shell
-- 필수 RPC API 문자열
-- 제거된 `system_diagnostics`와 SafeShield 프록시 미포함
-- `Promise.allSettled()` 기반 진단 번들 포함
-- `AbortController`와 `RPC_TIMEOUT` 포함
-- Shadow DOM stylesheet selector
-
-### 9.4 OpenWrt 패키지 준비 검사
-
-Makefile의 `Build/Prepare` hook은 다음을 추가로 확인합니다.
-
-- rpcd 검사 스크립트 성공
-- 프런트엔드 배포 파일 존재
-- 번들에 제거된 `system_diagnostics` 문자열이 없는지 확인
-- 통합 Preact 진입 템플릿, ACL과 메뉴 존재
-- legacy LuCI SmartSafeHub view loader가 존재하지 않음
-- 제거된 0바이트 `entry.uc`가 존재하지 않음
-- 템플릿 asset version과 `PKG_VERSION-rPKG_RELEASE` 일치
-
-### 9.5 GitHub Actions
-
-`.github/workflows/ci.yml`은 Node.js 24에서 의존성을 고정 설치한 뒤 rpcd 계약 검사와 전체 프런트엔드 빌드를 수행하고 생성된 `app.js`·`app.css`의 필수 계약을 검사합니다. `entry.uc` 재등장과 whitespace 오류도 함께 검사합니다. 프런트엔드 변경 시 로컬 빌드 산출물도 같은 커밋에 포함하는 것을 배포 규칙으로 둡니다.
-
-### 9.6 실제 장치 검사
+### 9.3 실제 장치 검사
 
 정적 검사는 ucode parser와 실제 rpcd 런타임 전체를 대신하지 않습니다.
 
@@ -656,13 +607,13 @@ ubus call smartsafehub connected_devices '{}'
 3. 읽기 전용 도메인 로직과 변경 작업을 가능한 한 분리합니다.
 4. ucode named import 마지막 항목에는 쉼표를 넣지 않습니다.
 5. exported function은 반드시 `};`로 종료합니다.
-6. 새 RPC를 추가하면 ACL, 프런트엔드 API, 타입과 검사 스크립트를 함께 수정합니다.
+6. 새 RPC를 추가하면 ACL, 프런트엔드 API와 타입을 함께 수정합니다.
 7. 프런트엔드 페이지는 직접 JSON-RPC를 호출하지 않고 hook과 API 계층을 사용합니다.
 8. 독립된 선택적 조회는 병렬 실행하되 부분 실패를 명시적으로 처리합니다.
 9. 폴링 기능은 중복 요청과 숨겨진 탭을 고려해야 합니다.
 10. 프런트엔드 소스를 변경하면 `npm run build`로 배포 산출물을 갱신합니다.
 11. 패키지 릴리스를 변경하면 통합 진입 템플릿의 `data-asset-version`과 `app.js?v=`도 함께 변경합니다.
-12. 배포 전 TypeScript, 소스·dist 검사, OpenWrt 패키지 빌드와 실제 ubus 호출을 모두 확인합니다.
+12. 배포 전 TypeScript 검사, 프런트엔드 빌드, OpenWrt 패키지 빌드와 실제 ubus 호출을 확인합니다.
 
 ## 11. 현재 제약
 

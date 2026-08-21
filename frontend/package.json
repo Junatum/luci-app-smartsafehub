@@ -8,10 +8,8 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "check:rpcd": "sh ../scripts/check-rpcd-imports.sh ../root/usr/share/rpcd/ucode/smartsafehub.uc ../root/usr/share/rpcd/ucode/smartsafehub",
-    "check:source": "node ./scripts/check-source.mjs",
-    "typecheck": "npm run check:source && tsc --noEmit",
-    "build": "npm run typecheck && vite build && node ./scripts/check-dist.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

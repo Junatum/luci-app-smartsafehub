@@ -3,10 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import {
   requestSafeShieldRefresh,
   setSafeShieldEnabled,
+  updateSafeShieldLicense,
 } from '../api/safeshield';
 import { errorMessage } from '../utils/errors';
 
-export type SafeShieldAction = 'enable' | 'disable' | 'refresh';
+export type SafeShieldAction = 'enable' | 'disable' | 'refresh' | 'license';
 
 interface SafeShieldActionState {
   action: SafeShieldAction | null;
@@ -102,6 +103,49 @@ export function useSafeShieldActions(
     }
   }, [scheduleRefreshes]);
 
+  const updateLicense = useCallback(
+    async (licenseKey: string): Promise<boolean> => {
+      const normalizedKey = licenseKey.trim();
+
+      if (!normalizedKey) {
+        setState({
+          action: null,
+          error: '라이선스 키를 입력해 주세요.',
+          message: null,
+        });
+        return false;
+      }
+
+      setState({ action: 'license', error: null, message: null });
+
+      try {
+        const result = await updateSafeShieldLicense(normalizedKey);
+        setState({
+          action: null,
+          error: null,
+          message: result.changed
+            ? '라이선스 키를 저장했습니다.'
+            : '입력한 라이선스 키가 이미 설정되어 있습니다.',
+        });
+        await refreshStatus();
+
+        if (result.refresh.requested) {
+          scheduleRefreshes([800, 2500, 6000, 12000]);
+        }
+
+        return true;
+      } catch (error) {
+        setState({
+          action: null,
+          error: errorMessage(error, '라이선스 키를 저장하지 못했습니다.'),
+          message: null,
+        });
+        return false;
+      }
+    },
+    [refreshStatus, scheduleRefreshes],
+  );
+
   const dismissFeedback = useCallback(() => {
     setState((current) => ({ ...current, error: null, message: null }));
   }, []);
@@ -111,5 +155,6 @@ export function useSafeShieldActions(
     dismissFeedback,
     refreshBlocklist,
     setEnabled,
+    updateLicense,
   };
 }

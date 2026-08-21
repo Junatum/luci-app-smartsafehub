@@ -63,54 +63,6 @@ export interface SafeShieldStatus {
   };
 }
 
-export interface SafeShieldConfigValues {
-  verbosity: number;
-  applyLocalOverrides: boolean;
-  maxBlocklistFileSizeKb: number;
-  minValidLineCount: number;
-  compressBlocklist: boolean;
-  initialDnsmasqRestart: boolean;
-  dnsmasqSanityCheck: boolean;
-  downloadTimeout: number;
-  downloadRetry: number;
-  pauseTimeout: number;
-  bootStartDelayS: number;
-  refreshOnBoot: boolean;
-  refreshIntervalS: number;
-  requireWan: boolean;
-  debug: boolean;
-  enabled: boolean;
-}
-
-export interface SafeShieldConfig {
-  values: SafeShieldConfigValues;
-  license: {
-    configured: boolean;
-    keyMasked: string;
-  };
-  device: {
-    vendor: string;
-    model: string;
-    arch: string;
-    memoryMb: number;
-  };
-}
-
-export type SafeShieldConfigUpdate = Partial<
-  Omit<SafeShieldConfigValues, 'enabled'>
->;
-
-export interface SafeShieldConfigUpdateResult {
-  changed: string[];
-  restarted: boolean;
-  refresh: {
-    requested: boolean;
-    accepted: boolean;
-    reason: string;
-  } | null;
-  config: SafeShieldConfig;
-}
-
 export interface SafeShieldEnabledResult {
   changed: boolean;
   accepted: boolean;

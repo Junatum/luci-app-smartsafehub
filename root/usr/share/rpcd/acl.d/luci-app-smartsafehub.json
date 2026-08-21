@@ -22,7 +22,6 @@
           "system_reboot"
         ],
         "safeshield": [
-          "config_update",
           "set_enabled",
           "refresh",
           "rule_add",
