@@ -66,6 +66,7 @@ SmartSafeHub 전용 사용자 화면과 rpcd 백엔드를 처음 정식 배포�
 - 기존 LuCI view loader와 중복된 로그인/session bootstrap 코드를 제거했습니다.
 - package-time `Build/Prepare` 문자열·파일 계약 검사와 중복 source/dist/rpcd 검사 스크립트를 제거했습니다.
 - 프런트엔드 빌드는 `tsc --noEmit`과 Vite 빌드로 단순화했습니다.
+- Vite production entry를 `frontend/src/main.tsx`로 직접 지정하고, 사용하지 않는 배포용 `root/www/luci-static/smartsafehub/index.html` 생성을 제거했습니다. `frontend/index.html`은 개발 서버용 shell로만 유지합니다.
 
 ### 검증
 

@@ -132,6 +132,7 @@ luci-app-smartsafehub/
 ├── docs/
 │   └── ARCHITECTURE.md
 ├── frontend/
+│   ├── index.html          # Vite 개발 서버용 shell (배포 입력 아님)
 │   ├── src/
 │   │   ├── api/
 │   │   ├── app/
@@ -157,9 +158,11 @@ luci-app-smartsafehub/
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc
 │   └── www/luci-static/smartsafehub/
+│       ├── app.js
+│       └── app.css
 ```
 
-`root/www/luci-static/smartsafehub/app.js`와 `app.css`는 Vite가 만드는 배포 산출물입니다. 프런트엔드 소스를 수정한 뒤 반드시 다시 빌드해야 합니다.
+`root/www/luci-static/smartsafehub/app.js`와 `app.css`는 Vite가 만드는 배포 산출물입니다. production build는 `frontend/src/main.tsx`를 직접 entry로 사용하므로 배포 디렉터리에 `index.html`을 생성하지 않습니다. `frontend/index.html`은 Vite 개발 서버에서만 사용하는 shell입니다. 프런트엔드 소스를 수정한 뒤 반드시 다시 빌드해야 합니다.
 
 ## 프런트엔드 개발
 
@@ -197,7 +200,7 @@ root/www/luci-static/smartsafehub/app.js
 root/www/luci-static/smartsafehub/app.css
 ```
 
-`npm run build`는 TypeScript 검사를 통과한 뒤 Vite로 배포 자산을 생성합니다. 프런트엔드 소스를 변경한 경우 갱신된 `app.js`와 `app.css`도 함께 커밋합니다.
+`npm run build`는 TypeScript 검사를 통과한 뒤 `frontend/src/main.tsx`를 production entry로 사용해 Vite 배포 자산을 생성합니다. HTML entry를 사용하지 않으므로 `root/www/luci-static/smartsafehub/index.html`은 생성되지 않습니다. 프런트엔드 소스를 변경한 경우 갱신된 `app.js`와 `app.css`도 함께 커밋합니다.
 
 ## OpenWrt 패키지 빌드
 

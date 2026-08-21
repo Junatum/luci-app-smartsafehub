@@ -144,12 +144,16 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - 브라우저 `fetch()` 기반 JSON-RPC
 - hash route 기반 단일 페이지 애플리케이션
 
-Vite 출력:
+Vite production entry와 출력:
 
 ```text
+frontend/src/main.tsx
+  ↓
 root/www/luci-static/smartsafehub/app.js
 root/www/luci-static/smartsafehub/app.css
 ```
+
+production build는 HTML을 entry로 사용하지 않습니다. `frontend/index.html`은 개발 서버용 shell에만 사용하며, 배포 디렉터리에는 `index.html`을 생성하지 않습니다. 실제 OpenWrt 진입 HTML은 LuCI의 `login.ut` / `session.ut` template이 담당합니다.
 
 ### 4.2 Shadow DOM
 
@@ -601,7 +605,7 @@ npm run typecheck
 npm run build
 ```
 
-`npm run build`는 TypeScript 검사를 통과한 뒤 `root/www/luci-static/smartsafehub/`에 배포 자산을 생성합니다. 프런트엔드 변경 시 생성된 `app.js`와 `app.css`도 함께 갱신합니다.
+`npm run build`는 TypeScript 검사를 통과한 뒤 `frontend/src/main.tsx`를 직접 production entry로 사용해 `root/www/luci-static/smartsafehub/`에 `app.js`와 `app.css`를 생성합니다. Vite HTML entry를 사용하지 않으므로 배포용 `index.html`은 생성하지 않습니다. 프런트엔드 변경 시 생성된 `app.js`와 `app.css`도 함께 갱신합니다.
 
 ### 9.2 OpenWrt 패키지 빌드
 

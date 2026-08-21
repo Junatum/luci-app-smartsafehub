@@ -19,7 +19,7 @@ export default defineConfig({
     cssCodeSplit: false,
     reportCompressedSize: true,
     rollupOptions: {
-      input: fileURLToPath(new URL('./index.html', import.meta.url)),
+      input: fileURLToPath(new URL('./src/main.tsx', import.meta.url)),
       output: {
         entryFileNames: 'app.js',
         chunkFileNames: 'chunks/[name]-[hash].js',
