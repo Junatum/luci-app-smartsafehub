@@ -2,10 +2,10 @@
 
 SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 기기와 SafeShield DNS 보호 기능을 일반 사용자 중심의 화면에서 관리하기 위한 LuCI 애플리케이션입니다.
 
-현재 정식 배포 버전은 **`0.2.0-r10`**입니다.
+현재 정식 배포 버전은 **`0.2.0-r1`**입니다.
 
 - 애플리케이션 버전: `0.2.0`
-- OpenWrt 패키지 릴리스: `10`
+- OpenWrt 패키지 릴리스: `1`
 - 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
 - 백엔드: rpcd ucode 모듈
 - 라이선스: GPL-3.0-or-later
@@ -61,7 +61,8 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 차단 목록 수동 갱신
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
 - 라이선스, 플랜, 아티팩트와 차단 목록 통계 표시
-- 라이선스 키 보기/숨기기, 등록/변경과 제거 지원
+- 새 라이선스 키는 일반 텍스트 입력란에서 확인하며 등록·변경·제거 가능
+- 현재 라이선스 키는 사용자가 `현재 키 불러오기`를 선택했을 때만 `safeshield.license_get`으로 평문 조회
 - 사용자 허용 목록과 차단 목록 관리
 - 규칙 저장과 유효성 검사는 SafeShield 공식 API가 담당
 - 규칙 변경은 SafeShield 엔진의 cached-artifact local apply 경로로 즉시 반영
@@ -97,8 +98,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - RPC는 기본 20초, Wi-Fi 변경은 35초 후 중단하며 JSON-RPC ID·결과·상태 코드 형식을 검증합니다.
 - 연결 기기 조회는 `network.wireless`에 station 정보가 없을 때만 hostapd를 추가 호출합니다.
 - Wi-Fi 변경 검증은 UCI 설정을 기준으로 수행해 불필요한 런타임 전체 조회를 피합니다.
-- LuCI DOM 감시는 프레임 단위로 합치며 SmartSafeHub 화면을 벗어나면 해제합니다.
-- 화면 이탈 시 Preact 트리를 명시적으로 unmount해 이벤트 리스너와 타이머를 정리합니다.
+- SmartSafeHub는 공개 shell의 단일 Preact lifecycle을 사용하며 legacy LuCI view loader나 DOM observer를 두지 않습니다.
 - SafeShield, 연결 기기와 진단 수집은 일부 소스 실패를 전체 기능 실패로 확대하지 않습니다.
 
 ## 지원 환경과 의존성
@@ -135,6 +135,7 @@ luci-app-smartsafehub/
 │   ├── src/
 │   │   ├── api/
 │   │   ├── app/
+│   │   ├── auth/
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   ├── login/
@@ -142,7 +143,6 @@ luci-app-smartsafehub/
 │   │   ├── styles/
 │   │   ├── types/
 │   │   └── utils/
-│   ├── scripts/
 │   ├── package.json
 │   └── vite.config.ts
 ├── root/
@@ -210,14 +210,14 @@ make package/luci-app-smartsafehub/compile V=s
 
 별도의 `Build/Prepare` 검증 hook은 사용하지 않습니다. OpenWrt 패키지 빌드는 `luci.mk`의 기본 패키징 흐름을 사용하며, 프런트엔드 자산은 패키지 빌드 전에 `npm run build`로 갱신합니다.
 
-별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.0-r10`이 JavaScript와 CSS 캐시 무효화 키입니다.
+별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.0-r1`이 JavaScript와 CSS 캐시 무효화 키입니다.
 
 ## 설치
 
 생성한 APK를 공유기에 복사한 뒤 설치합니다.
 
 ```bash
-apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.0-r10.apk
+apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.0-r1.apk
 ```
 
 기존 버전 위에 설치할 때는 사용하는 저장소 정책에 맞춰 `apk upgrade` 또는 로컬 APK 설치를 수행합니다.
@@ -281,6 +281,8 @@ safeshield.license_get
 safeshield.license_update
 ```
 
+`license_get`은 평문 라이선스 키를 반환하므로 일반 상태 조회에는 사용하지 않습니다. 사용자가 현재 키를 명시적으로 불러올 때만 호출하며, LuCI ACL에서도 일반 read 권한과 분리해 write 권한 그룹에 포함합니다. 진단 다운로드와 주기적 상태 polling은 `safeshield.status`의 마스킹된 라이선스 정보만 사용합니다.
+
 ## ucode 컴파일 검사
 
 `smartsafehub` ubus 객체가 등록되지 않으면 진입점을 직접 컴파일합니다.
@@ -334,7 +336,7 @@ rm -f /tmp/luci-indexcache
 /etc/init.d/uhttpd restart
 ```
 
-브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.0-r10`와 Shadow DOM용 `app.css?v=0.2.0-r10`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
+브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.0-r1`와 Shadow DOM용 `app.css?v=0.2.0-r1`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
 
 ## 배포 전 체크리스트
 
@@ -369,7 +371,8 @@ ubus call smartsafehub connected_devices '{}'
 ## 버전 관리 원칙
 
 - 사용자 기능 버전은 `PKG_VERSION`으로 관리합니다.
-- 같은 기능 버전의 OpenWrt 패키지 수정은 `PKG_RELEASE`를 올립니다.
+- 같은 기능 버전의 정식 배포 후 패키지 수정은 `PKG_RELEASE`를 올립니다.
+- 정식 배포 전 개발 과정에서 사용한 임시 package revision은 배포 기준점에서 `r1`로 squash할 수 있으며, `CHANGELOG.md`에는 중간 revision을 별도 릴리스로 남기지 않습니다.
 - `frontend/package.json`과 `frontend/package-lock.json`의 버전은 `PKG_VERSION`과 맞춥니다.
 - 통합 진입 템플릿의 `data-asset-version`과 `app.js?v=` 버전은 `PKG_VERSION-rPKG_RELEASE`와 맞춥니다.
 - 프런트엔드 build ID 상수는 별도로 두지 않습니다.
@@ -379,11 +382,11 @@ ubus call smartsafehub connected_devices '{}'
 
 ```makefile
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=10
+PKG_RELEASE:=1
 ```
 
 ```js
-data-asset-version="0.2.0-r10"
+data-asset-version="0.2.0-r1"
 ```
 
 ## 현재 제약
@@ -391,7 +394,7 @@ data-asset-version="0.2.0-r10"
 - Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
 - 게스트 Wi-Fi, VLAN, mesh, 방화벽과 상세 패키지 설정은 기존 LuCI에서 관리합니다.
 - WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
-- SafeShield 기능은 별도 `safeshield` 패키지와 해당 ubus API, 상태 파일과 init script에 의존합니다.
+- SafeShield 기능은 별도 `safeshield` 패키지와 공식 ubus API 계약에 의존하며, SmartSafeHub는 SafeShield의 상태 파일이나 init script를 직접 다루지 않습니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
 - ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.
 

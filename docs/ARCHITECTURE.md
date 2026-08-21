@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r10`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -15,7 +15,7 @@ SmartSafeHub는 일반 사용자가 OpenWrt의 복잡한 설정 전체를 직접
 - 일부 데이터 소스 실패를 전체 기능 실패로 확대하지 않는 best-effort 조회
 - 데스크톱과 모바일에서 동일한 핵심 기능 제공
 - 중복 RPC, 겹치는 폴링과 불필요한 hostapd 조회 최소화
-- 빌드 단계에서 소스·배포 산출물·RPC 계약 오류 차단
+- TypeScript/Vite와 OpenWrt 패키지 빌드로 소스·배포 산출물 오류를 조기에 확인
 
 SmartSafeHub는 OpenWrt의 모든 고급 설정을 대체하지 않습니다. 게스트 Wi-Fi, VLAN, mesh, 방화벽, 패키지와 세부 시스템 설정은 기존 LuCI 화면으로 연결합니다.
 
@@ -98,6 +98,10 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `safeshield.refresh`
 - `safeshield.rule_add`
 - `safeshield.rule_delete`
+- `safeshield.license_get`
+- `safeshield.license_update`
+
+`license_get`은 동작 자체는 읽기이지만 평문 라이선스 키를 반환하는 민감 API이므로 일반 상태 조회 권한과 분리해 write ACL 그룹에 포함합니다. 주기적 상태 polling과 진단 수집에서는 호출하지 않습니다.
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
@@ -124,7 +128,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 현재 자산 버전:
 
 ```text
-0.2.0-r10
+0.2.0-r1
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -157,7 +161,7 @@ root/www/luci-static/smartsafehub/app.css
 - SmartSafeHub 스타일이 다른 LuCI 화면으로 새는 현상 방지
 - 제품 UI의 반응형 레이아웃 독립 유지
 
-Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다. r10부터 legacy LuCI view loader용 전역 mount/unmount hook은 제거했으며 public shell의 단일 Preact lifecycle만 사용합니다.
+Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 생성됩니다. 이미 Shadow DOM이 존재하더라도 CSS URL의 버전이 다르면 새 URL로 교체합니다. legacy LuCI view loader용 전역 mount/unmount hook과 DOM observer는 사용하지 않으며 public shell의 단일 Preact lifecycle만 유지합니다.
 
 ### 4.3 화면과 route
 
@@ -391,14 +395,16 @@ MAC 주소를 기본 키로 병합해 다음 값을 생성합니다.
 SafeShield가 소유하는 기능:
 
 - 상태와 health
-- UCI 공개 설정 조회·변경
+- 공개 설정 조회
 - enable/disable lifecycle
 - 수동 refresh
 - local allow/block 규칙
-- 라이선스 키 변경
+- 라이선스 키 조회·등록·변경·제거
 - 규칙 파일, dnsmasq, procd와 refresh scheduling
 
-SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
+SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. `safeshield.config_update`도 사용하지 않으며 SmartSafeHub ACL에 부여하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
+
+라이선스 상태의 기본 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 평문 키는 사용자가 **현재 키 불러오기**를 명시적으로 실행했을 때만 `safeshield.license_get`으로 가져오며, 새 키 등록과 변경은 `license_update`, 제거는 `license_update`에 빈 키를 전달하는 기존 SafeShield 계약을 사용합니다. 따라서 평문 키는 일반 polling이나 진단 다운로드 흐름에 포함되지 않습니다.
 
 #### `system.uc`
 
@@ -437,6 +443,8 @@ SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 | `safeshield.rules_list` | 읽기 | 사용자 허용·차단 규칙 조회 |
 | `safeshield.rule_add` | 쓰기 | 사용자 규칙 추가 |
 | `safeshield.rule_delete` | 쓰기 | 사용자 규칙 삭제 |
+| `safeshield.license_get` | 민감 읽기 | 사용자가 요청한 경우 현재 평문 라이선스 키 조회 |
+| `safeshield.license_update` | 쓰기 | 라이선스 키 등록·변경, 빈 키로 제거 |
 
 ## 7. 주요 데이터 흐름
 
@@ -485,16 +493,38 @@ ConnectedDevicesPage
 
 ```text
 SafeShieldRulesPage
-  → add/delete API
-  → 규칙 lock 획득
-  → allowlist/blocklist 읽기
-  → 정규화·중복·충돌·제한 검사
-  → 임시 파일 작성 및 원자적 교체
-  → lock 해제
-  → SafeShield 갱신 요청
+  → safeshield.rule_add / safeshield.rule_delete
+  → SafeShield 엔진이 규칙 검증·저장·직렬화 수행
+  → cached-artifact local apply 요청
+  → safeshield.status polling
+  → last_local_apply / last_local_apply_failure 확인
 ```
 
-### 7.5 진단 파일
+SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지만, 규칙 파일과 적용 lifecycle의 authoritative source는 SafeShield입니다.
+
+### 7.5 SafeShield 라이선스
+
+```text
+기본 상태 조회
+  → safeshield.status
+  → configured + key_masked만 사용
+
+현재 키 불러오기
+  → 사용자 명시 동작
+  → safeshield.license_get
+  → 평문 키를 입력란에 채워 수정 가능
+
+등록 / 변경
+  → safeshield.license_update { license_key: "..." }
+
+제거
+  → 사용자 확인
+  → safeshield.license_update { license_key: "" }
+```
+
+라이선스 입력란은 비밀번호 필드로 취급하지 않고 일반 텍스트 입력으로 사용합니다. 브라우저 비밀번호 관리자 대상이 되지 않도록 autocomplete 및 주요 password-manager ignore 속성을 적용합니다.
+
+### 7.6 진단 파일
 
 ```text
 SystemPage의 기존 system snapshot
@@ -504,13 +534,13 @@ SystemPage의 기존 system snapshot
   → 비밀 정보가 없는 JSON 다운로드
 ```
 
-### 7.6 프런트엔드 자산 갱신
+### 7.7 프런트엔드 자산 갱신
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.0-r10
-  → app.js?v=0.2.0-r10
-  → app.css?v=0.2.0-r10
+  → data-asset-version = 0.2.0-r1
+  → app.js?v=0.2.0-r1
+  → app.css?v=0.2.0-r1
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -523,6 +553,7 @@ PKG_VERSION + PKG_RELEASE
 - 모든 원격 호출은 `/admin/ubus`를 통과합니다.
 - ACL에 등록하지 않은 메서드는 호출할 수 없습니다.
 - 읽기와 쓰기 메서드를 분리합니다.
+- 평문 라이선스 키를 반환하는 `license_get`은 일반 read ACL과 분리하고 사용자 명시 동작에서만 호출합니다.
 - 진단 파일은 비밀번호와 라이선스 키를 요청하거나 저장하지 않습니다.
 - 진단 파일에 포함될 수 있는 호스트명, WAN IPv4와 Wi-Fi SSID를 사용자에게 사전 안내합니다.
 
@@ -533,8 +564,8 @@ PKG_VERSION + PKG_RELEASE
 - SmartSafeHub 관리 대상 AP만 변경
 - SSID, 보안 방식, 비밀번호와 bool 타입 검증
 - 재부팅 확인 문자열 검증
-- SafeShield action과 domain 검증
-- 규칙 파일 크기와 개수 제한
+- SafeShield 도메인은 프런트엔드에서 1차 형식 검증하고 최종 규칙 검증과 제한은 SafeShield API가 담당
+- 규칙 파일 크기와 개수 제한은 SafeShield 엔진이 담당
 
 ### 8.3 실패 격리
 
@@ -556,7 +587,6 @@ PKG_VERSION + PKG_RELEASE
 - 시스템 진단에서 이미 로드된 상태 재사용
 - 비활성 화면은 폴링하지 않고 재진입 시 최신 상태 조회
 - 모든 RPC에 제한 시간을 둬 영구 대기와 single-flight 고착 방지
-- DOM observer 콜백을 animation frame으로 병합
 
 ## 9. 빌드와 검증
 
@@ -619,7 +649,7 @@ ubus call smartsafehub connected_devices '{}'
 
 - Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
 - WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
-- SafeShield 기능은 별도 `safeshield` 패키지와 해당 API·파일·init script에 의존합니다.
+- SafeShield 기능은 별도 `safeshield` 패키지와 공식 ubus API 계약에 의존하며 내부 파일·init script에는 직접 의존하지 않습니다.
 - 진단 파일은 현재 시점의 상태 snapshot이며 장기간의 로그 수집 기능은 아닙니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
 - ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.
