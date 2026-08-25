@@ -42,11 +42,11 @@
     <div
       id="smartsafehub-login-root"
       data-asset-base="/luci-static/smartsafehub/"
-      data-asset-version="0.2.0-r9"
+      data-asset-version="0.2.0-r10"
       data-locale="{{ dispatcher.lang }}"
       style="display:block;width:100%;min-height:100vh;"
     ></div>
     <noscript>{{ _('Please enable JavaScript to use SmartSafeHub.') }}</noscript>
-    <script type="module" src="/luci-static/smartsafehub/app.js?v=0.2.0-r9"></script>
+    <script type="module" src="/luci-static/smartsafehub/app.js?v=0.2.0-r10"></script>
   </body>
 </html>

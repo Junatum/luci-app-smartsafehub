@@ -2,7 +2,7 @@
 'require view';
 
 const ASSET_BASE = '/luci-static/smartsafehub/';
-const ASSET_VERSION = '0.2.0-r9';
+const ASSET_VERSION = '0.2.0-r10';
 const ROOT_ID = 'smartsafehub-root';
 const PRODUCT_VIEW_CLASS = 'smartsafehub-product-view';
 const PRODUCT_CHROME_STYLE_ID = 'smartsafehub-product-chrome-style';
