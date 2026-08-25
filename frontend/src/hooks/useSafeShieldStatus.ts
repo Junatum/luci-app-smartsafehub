@@ -1,5 +1,6 @@
 import { fetchSafeShieldStatus } from '../api/safeshield';
 import type { SafeShieldStatus } from '../types/safeshield';
+import { t } from '../utils/gettext';
 import { useAsyncResource } from './useAsyncResource';
 
 const TRANSITION_REFRESH_INTERVAL_MS = 3_000;
@@ -34,7 +35,7 @@ function isTransitioning(data: SafeShieldStatus | null): boolean {
 export function useSafeShieldStatus(active: boolean) {
   return useAsyncResource({
     active,
-    fallbackError: 'SafeShield 상태를 불러오지 못했습니다.',
+    fallbackError: t('Failed to load SafeShield status.'),
     loader: fetchSafeShieldStatus,
     pollInterval: (data) =>
       isTransitioning(data) ? TRANSITION_REFRESH_INTERVAL_MS : null,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 
 import { ROUTES } from '../app/routes';
 import type { AppRoute } from '../app/routes';
+import { t } from '../utils/gettext';
 import { luciAdminUrl } from '../utils/luci';
 import {
   CloseIcon,
@@ -87,7 +88,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
   return (
     <>
       <nav
-        aria-label="SmartSafeHub 모바일 메뉴"
+        aria-label={t('SmartSafeHub Mobile Menu')}
         class="ssh-mobile-navigation sticky top-0 z-30 -mx-4 mb-5 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-900/5 backdrop-blur md:hidden"
       >
         <div class="flex min-h-14 items-center justify-between gap-3">
@@ -102,7 +103,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
           <button
             aria-controls="smartsafehub-mobile-menu"
             aria-expanded={mobileMenuOpen}
-            aria-label={mobileMenuOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
+            aria-label={mobileMenuOpen ? t('Close mobile menu') : t('Mobile Menu Opener')}
             class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
             onClick={() => setMobileMenuOpen((open) => !open)}
             type="button"
@@ -148,7 +149,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
                   <SettingsIcon class="size-5" />
                 </span>
-                <span class="min-w-0 truncate">고급 설정</span>
+                <span class="min-w-0 truncate">{t('Advanced Settings')}</span>
               </a>
               <a
                 class="flex min-h-12 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold text-rose-700 no-underline transition hover:bg-rose-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100"
@@ -157,7 +158,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
                   <LogOutIcon class="size-5" />
                 </span>
-                <span class="min-w-0 truncate">로그아웃</span>
+                <span class="min-w-0 truncate">{t('Logout')}</span>
               </a>
             </div>
           </div>
@@ -165,7 +166,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
       </nav>
 
       <nav
-        aria-label="SmartSafeHub 메뉴"
+        aria-label={t('SmartSafeHub Menu')}
         class="mb-8 hidden overflow-x-auto border-b border-slate-200 bg-white md:block"
       >
         <div class="flex w-full min-w-max items-center gap-1">
@@ -193,16 +194,16 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
             <span class="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500">
               <SettingsIcon class="size-5" />
             </span>
-            고급 설정
+            {t('Advanced Settings')}
           </a>
           <span aria-hidden="true" class="min-w-4 flex-1" />
           <a
-            aria-label="SmartSafeHub에서 로그아웃"
+            aria-label={t('Log out of SmartSafeHub')}
             class="inline-flex min-h-14 items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-extrabold text-rose-600 no-underline transition hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-200 lg:px-4"
             href={luciAdminUrl('/admin/logout')}
           >
             <LogOutIcon class="size-5" />
-            로그아웃
+            {t('Logout')}
           </a>
         </div>
       </nav>

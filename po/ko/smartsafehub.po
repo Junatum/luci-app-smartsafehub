@@ -1,0 +1,1045 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-smartsafehub\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: SmartSafeHub Translators\n"
+"Language-Team: Korean\n"
+"Language: ko\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " · Stage %s"
+msgstr " · 단계 %s"
+
+msgid "%s % utilization"
+msgstr "사용률 %s%"
+
+msgid "%s %s rule: %s completed."
+msgstr "%s %s 규칙을 %s했습니다."
+
+msgid "%s %s rule: %s completed. It will take effect after SafeShield is enabled and refreshed."
+msgstr "%s %s 규칙을 %s했습니다. SafeShield를 켜면 다음 갱신에서 적용됩니다."
+
+msgid "%s %s rule: %s completed. Local rule application is disabled, so DNS has not been updated yet."
+msgstr "%s %s 규칙을 %s했습니다. 로컬 규칙 적용 설정이 꺼져 있어 아직 DNS에는 반영되지 않습니다."
+
+msgid "%s Search"
+msgstr "%s 검색"
+
+msgid "%s confirmed in recent DHCP leases"
+msgstr "%s대는 최근 DHCP 임대에서 확인"
+
+msgid "%s days and %s hours"
+msgstr "%s일 %s시간"
+
+msgid "%s h %s m"
+msgstr "%s시간 %s분"
+
+msgid "%s hour"
+msgstr "%s시간"
+
+msgid "%s minute"
+msgstr "%s분"
+
+msgid "-Memory usage"
+msgstr "메모리 사용률"
+
+msgid "1 min Load"
+msgstr "1분 Load"
+
+msgid "5 min %s · 15 min %s"
+msgstr "5분 %s · 15분 %s"
+
+msgid "A recent SafeShield operation encountered an error."
+msgstr "최근 SafeShield 작업에서 오류가 발생했습니다."
+
+msgid "ALL"
+msgstr "전체"
+
+msgid "AUTO"
+msgstr "자동"
+
+msgid "Added"
+msgstr "추가"
+
+msgid "Adding..."
+msgstr "추가 중…"
+
+msgid "Advanced Settings"
+msgstr "고급 설정"
+
+msgid "Advanced settings (%s)"
+msgstr "고급 설정 (%s)"
+
+msgid "Allow"
+msgstr "허용"
+
+msgid "Allowlist"
+msgstr "허용 목록"
+
+msgid "An error occurred on a recent task: %s"
+msgstr "최근 작업에서 오류가 발생했습니다: %s"
+
+msgid "An undefined error has ocurred"
+msgstr "장치에서 알 수 없는 오류가 발생했습니다."
+
+msgid "Applying"
+msgstr "적용 중"
+
+msgid "Applying Wi-Fi settings may temporarily disconnect you from your current wireless connection. Are you sure you want to continue?"
+msgstr "Wi-Fi 설정을 적용하면 현재 무선 연결이 잠시 끊어질 수 있습니다. 계속하시겠습니까?"
+
+msgid "Artifact not identified"
+msgstr "아티팩트 미확인"
+
+msgid "Banned"
+msgstr "사용 불가"
+
+msgid "Block"
+msgstr "차단"
+
+msgid "Blocklist"
+msgstr "차단 목록"
+
+msgid "Boot time %s"
+msgstr "부팅 시각 %s"
+
+msgid "Bound"
+msgstr "연결됨"
+
+msgid "CLOSE"
+msgstr "닫기"
+
+msgid "CONNECTION"
+msgstr "연결"
+
+msgid "Cancel"
+msgstr "취소"
+
+msgid "Caps Lock is enabled"
+msgstr "Caps Lock이 켜져 있습니다."
+
+msgid "Change the advanced security settings from the existing LuCI"
+msgstr "고급 보안 설정은 기존 LuCI에서 변경합니다"
+
+msgid "Changing your Wi-Fi name or password will disconnect you"
+msgstr "Wi-Fi 이름이나 비밀번호를 바꾸면 현재 연결이 끊어집니다"
+
+msgid "Channel"
+msgstr "채널"
+
+msgid "Check DNS protection status and manage blocklists."
+msgstr "DNS 보호 상태를 확인하고 차단 목록을 관리합니다."
+
+msgid "Checking SmartSafeHub connection"
+msgstr "SmartSafeHub 연결 확인 중"
+
+msgid "Checking status"
+msgstr "상태 확인 중"
+
+msgid "Checking system information."
+msgstr "시스템 정보를 확인하고 있습니다."
+
+msgid "Close mobile menu"
+msgstr "모바일 메뉴 닫기"
+
+msgid "Close notifications"
+msgstr "알림 닫기"
+
+msgid "Confirmed device"
+msgstr "확인된 기기"
+
+msgid "Connected Device Summary"
+msgstr "연결 기기 요약"
+
+msgid "Connection Attention"
+msgstr "연결 주의"
+
+msgid "Connection Type"
+msgstr "연결 방식"
+
+msgid "Connection Verification Required"
+msgstr "연결 확인 필요"
+
+msgid "Connection error"
+msgstr "연결 오류"
+
+msgid "Connection not confirmed"
+msgstr "연결 방식 미확인"
+
+msgid "Continue with default LuCI login"
+msgstr "기본 LuCI 로그인으로 계속"
+
+msgid "Current connection"
+msgstr "현재 연결"
+
+msgid "Current:"
+msgstr "현재:"
+
+msgid "Currently verified on Wi-Fi or ARP"
+msgstr "Wi-Fi 또는 ARP에서 현재 확인됨"
+
+msgid "DHCP Lease Active"
+msgstr "DHCP 임대 활성"
+
+msgid "DNS Runtime"
+msgstr "DNS 런타임"
+
+msgid "DNS protection"
+msgstr "DNS 보호"
+
+msgid "Default Wi-Fi settings"
+msgstr "기본 Wi-Fi 설정"
+
+msgid "Deleted"
+msgstr "삭제"
+
+msgid "Detailed networks, firewalls, packages and logs are managed from the existing LuCI admin screen."
+msgstr "상세 네트워크, 방화벽, 패키지와 로그는 기존 LuCI 관리자 화면에서 관리합니다."
+
+msgid "Device API response is empty."
+msgstr "장치 API 응답이 비어 있습니다."
+
+msgid "Device API returned HTTP %s error."
+msgstr "장치 API가 HTTP %s 오류를 반환했습니다."
+
+msgid "Device Dashboard"
+msgstr "장치 대시보드"
+
+msgid "Device List"
+msgstr "기기 목록"
+
+msgid "Device disconnected."
+msgstr "장치 연결이 끊어졌습니다."
+
+msgid "Device response timed out. Please try again in a moment."
+msgstr "장치 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+
+msgid "Device summary"
+msgstr "장치 요약"
+
+msgid "Devices connected to wireless APs"
+msgstr "무선 AP에 연결된 기기"
+
+msgid "Diagnostic Info"
+msgstr "진단 정보"
+
+msgid "Diagnostic information file has been created."
+msgstr "진단 정보 파일을 만들었습니다."
+
+msgid "Do you want to reboot the router now?"
+msgstr "지금 공유기를 재부팅하시겠습니까?"
+
+msgid "Download diagnostic information"
+msgstr "진단 정보 다운로드"
+
+msgid "Easily check the status of devices connected to your wireless network."
+msgstr "무선 네트워크와 연결된 기기의 상태를 쉽게 확인합니다."
+
+msgid "Error"
+msgstr "오류"
+
+msgid "Execution time could not be determined."
+msgstr "실행 시간을 확인할 수 없습니다."
+
+msgid "Failed to change user rules."
+msgstr "사용자 규칙을 변경하지 못했습니다."
+
+msgid "Failed to complete system operation."
+msgstr "시스템 작업을 완료하지 못했습니다."
+
+msgid "Failed to fetch device status."
+msgstr "장치 상태를 불러오지 못했습니다."
+
+msgid "Failed to fetch the list of connected devices."
+msgstr "연결된 기기 목록을 불러오지 못했습니다."
+
+msgid "Failed to find default Wi-Fi to manage"
+msgstr "관리할 기본 Wi-Fi를 찾지 못했습니다"
+
+msgid "Failed to load SafeShield status."
+msgstr "SafeShield 상태를 불러오지 못했습니다."
+
+msgid "Failed to load SmartSafeHub screen."
+msgstr "SmartSafeHub 화면을 불러오지 못했습니다."
+
+msgid "Failed to load device status"
+msgstr "장치 상태를 불러오지 못했습니다"
+
+msgid "Failed to load system information."
+msgstr "시스템 정보를 불러오지 못했습니다."
+
+msgid "Failed to load user rules."
+msgstr "사용자 규칙을 불러오지 못했습니다."
+
+msgid "Failed to process SafeShield API request."
+msgstr "SafeShield API 요청을 처리하지 못했습니다."
+
+msgid "Failed to process Wi-Fi settings."
+msgstr "Wi-Fi 설정을 처리하지 못했습니다."
+
+msgid "Failed to sign in, please verify your account information. Devices with additional authentication enabled can continue under the default LuCI login."
+msgstr "로그인하지 못했습니다. 계정 정보를 확인해 주세요. 추가 인증이 설정된 장치는 기본 LuCI 로그인에서 계속할 수 있습니다."
+
+msgid "File Size"
+msgstr "파일 크기"
+
+msgid "Firmware uploads, backups, and restores can have a big impact on your device, so use the existing LuCI verification procedures as they are. The SmartSafeHub product screen only provides frequent status checks and secure entry points."
+msgstr "펌웨어 업로드, 백업 및 복원은 장치에 큰 영향을 줄 수 있으므로 기존 LuCI의 검증 절차를 그대로 사용합니다. SmartSafeHub 제품 화면은 자주 사용하는 상태 확인과 안전한 진입점만 제공합니다."
+
+msgid "Full Memory"
+msgstr "전체 메모리"
+
+msgid "Generating diagnostic information"
+msgstr "진단 정보 생성 중"
+
+msgid "HIDDEN"
+msgstr "숨김"
+
+msgid "Health check"
+msgstr "상태 점검"
+
+msgid "Hide password"
+msgstr "비밀번호 숨기기"
+
+msgid "Home"
+msgstr "홈"
+
+msgid "How security works"
+msgstr "보안 방식"
+
+msgid "I like it"
+msgstr "좋음"
+
+msgid "I like it very much"
+msgstr "매우 좋음"
+
+msgid "INSTALLED"
+msgstr "설치됨"
+
+msgid "IP address"
+msgstr "IP 주소"
+
+msgid "If you turn SafeShield protection off, the current blocklist will be removed and DNS blocking will be interrupted immediately. Are you sure you want to continue?"
+msgstr "SafeShield 보호를 끄면 현재 차단 목록이 제거되고 DNS 차단이 즉시 중단됩니다. 계속하시겠습니까?"
+
+msgid "In Action"
+msgstr "동작 중"
+
+msgid "Inaccessible"
+msgstr "확인 불가"
+
+msgid "Internet and Wi-Fi connection interrupted briefly during reboot. If you have any unsaved LuCI settings, please save them first."
+msgstr "재부팅하는 동안 인터넷과 Wi-Fi 연결이 잠시 중단됩니다. 저장되지 않은 LuCI 설정이 있다면 먼저 저장해 주세요."
+
+msgid "Invalid command."
+msgstr "잘못된 명령입니다."
+
+msgid "JSON-RPC request failed."
+msgstr "JSON-RPC 요청에 실패했습니다."
+
+msgid "Keep current advanced settings ("
+msgstr "현재 고급 설정 유지 ("
+
+msgid "Kernel %s"
+msgstr "커널 %s"
+
+msgid "Last Success"
+msgstr "마지막 성공"
+
+msgid "Learn how to connect to devices that have been identified on your network."
+msgstr "네트워크에서 확인된 기기와 연결 방식을 살펴봅니다."
+
+msgid "Leave blank to keep existing password"
+msgstr "비워 두면 기존 비밀번호를 유지합니다"
+
+msgid "License not set"
+msgstr "라이선스 미설정"
+
+msgid "Licenses linked"
+msgstr "라이선스 연결됨"
+
+msgid "Linked devices"
+msgstr "연결된 기기"
+
+msgid "Listing Duration"
+msgstr "갱신 주기"
+
+msgid "Loading information from OpenWrt's rpcd API."
+msgstr "OpenWrt의 rpcd API에서 정보를 불러오는 중입니다."
+
+msgid "Local rule enforcement is off"
+msgstr "로컬 규칙 적용이 꺼져 있습니다"
+
+msgid "Log out of SmartSafeHub"
+msgstr "SmartSafeHub에서 로그아웃"
+
+msgid "Logging in..."
+msgstr "로그인 중…"
+
+msgid "Login"
+msgstr "로그인"
+
+msgid "Logout"
+msgstr "로그아웃"
+
+msgid "LuCI session information not found. Please refresh the page."
+msgstr "LuCI 세션 정보를 찾을 수 없습니다. 페이지를 새로고침해 주세요."
+
+msgid "Machine Filters"
+msgstr "기기 필터"
+
+msgid "Make your family's internet safer and easier to manage. From protected status to Wi-Fi and connected devices, all in one place."
+msgstr "가족의 인터넷을 더 안전하고 간편하게 관리하세요. 보호 상태부터 Wi-Fi와 연결 기기까지 한 곳에서 확인할 수 있습니다."
+
+msgid "Manage SmartSafeHub"
+msgstr "SmartSafeHub 관리"
+
+msgid "Manage the domains you want to allow or block."
+msgstr "직접 허용하거나 차단할 도메인을 관리합니다."
+
+msgid "Manage the name, security, and usage of your primary wireless network."
+msgstr "기본 무선 네트워크의 이름, 보안과 사용 상태를 관리합니다."
+
+msgid "Manage your network with ease"
+msgstr "간편한 네트워크 관리"
+
+msgid "Manual renewal runs in the background. Progress is reflected by screen refresh and automatic status check."
+msgstr "수동 갱신은 백그라운드에서 실행됩니다. 진행 상태는 화면 새로고침과 자동 상태 확인으로 반영됩니다."
+
+msgid "Memory Usage"
+msgstr "메모리 사용"
+
+msgid "Mix WPA2/WPA3"
+msgstr "WPA2/WPA3 혼합"
+
+msgid "Mobile Menu Opener"
+msgstr "모바일 메뉴 열기"
+
+msgid "Need verification"
+msgstr "확인 필요"
+
+msgid "Neutral"
+msgstr "보통"
+
+msgid "New Domain"
+msgstr "새 도메인"
+
+msgid "New password"
+msgstr "새 비밀번호"
+
+msgid "Next Renewal"
+msgstr "다음 갱신"
+
+msgid "No Wi-Fi settings have been changed."
+msgstr "변경된 Wi-Fi 설정이 없습니다."
+
+msgid "No encryption"
+msgstr "암호화 없음"
+
+msgid "No interface information"
+msgstr "인터페이스 정보 없음"
+
+msgid "No license key"
+msgstr "라이선스 키 없음"
+
+msgid "No reboot requests were received."
+msgstr "재부팅 요청이 접수되지 않았습니다."
+
+msgid "No records"
+msgstr "기록 없음"
+
+msgid "No response data found."
+msgstr "응답 데이터가 없습니다."
+
+msgid "No results found."
+msgstr "검색 결과가 없습니다."
+
+msgid "No version information"
+msgstr "버전 정보 없음"
+
+msgid "Non-wireless devices identified in LAN ARP"
+msgstr "LAN ARP에서 확인된 비무선 기기"
+
+msgid "Not Installed"
+msgstr "미설치"
+
+msgid "Not determined"
+msgstr "확인되지 않음"
+
+msgid "OFF"
+msgstr "꺼짐"
+
+msgid "OK"
+msgstr "정상"
+
+msgid "On-device verification"
+msgstr "장치 내 인증"
+
+msgid "Open Firmware Management"
+msgstr "펌웨어 관리 열기"
+
+msgid "Overall Status"
+msgstr "전체 상태"
+
+msgid "Password"
+msgstr "비밀번호"
+
+msgid "Password must be 8-63 characters or 64 hex digits."
+msgstr "비밀번호는 8~63자 또는 64자리 16진수여야 합니다."
+
+msgid "Pause"
+msgstr "일시 중지"
+
+msgid "Permissioned Denied!"
+msgstr "접근 권한이 없습니다."
+
+msgid "Plan not confirmed"
+msgstr "플랜 미확인"
+
+msgid "Please change your search terms or filters."
+msgstr "검색어 또는 필터를 변경해 주세요."
+
+msgid "Please check the network identifiers contained in the file before forwarding it to a support agent."
+msgstr "지원 담당자에게 전달하기 전에 파일에 포함된 네트워크 식별 정보를 확인해 주세요."
+
+msgid "Please configure the AP mode wireless network in the existing LuCI first."
+msgstr "기존 LuCI에서 AP 모드의 무선 네트워크를 먼저 구성해 주세요."
+
+msgid "Please enable JavaScript to use SmartSafeHub."
+msgstr "SmartSafeHub를 사용하려면 JavaScript를 활성화해 주세요."
+
+msgid "Please enter SSID between 1 and 32 bytes based on UTF-8."
+msgstr "SSID는 UTF-8 기준 1~32바이트로 입력해 주세요."
+
+msgid "Please enter a password that is at least 8 characters"
+msgstr "8자 이상의 비밀번호를 입력하세요"
+
+msgid "Please enter your password to use secure Wi-Fi."
+msgstr "보안 Wi-Fi를 사용하려면 비밀번호를 입력해 주세요."
+
+msgid "Please enter your username and password."
+msgstr "사용자 이름과 비밀번호를 입력해 주세요."
+
+msgid "Please log in with your router management account."
+msgstr "공유기 관리 계정으로 로그인해 주세요."
+
+msgid "Prepare for reboot"
+msgstr "재부팅 준비"
+
+msgid "Protection off"
+msgstr "보호 끄기"
+
+msgid "Quickly manage DNS-based protection and local blocking rules."
+msgstr "DNS 기반 보호와 로컬 차단 규칙을 빠르게 관리합니다."
+
+msgid "RELOAD"
+msgstr "다시 불러오기"
+
+msgid "RULES"
+msgstr "규칙"
+
+msgid "Reboot has started. Please reconnect to the router in a few minutes."
+msgstr "재부팅을 시작했습니다. 잠시 후 공유기에 다시 연결해 주세요."
+
+msgid "Reboot now"
+msgstr "지금 재부팅"
+
+msgid "Reboot router"
+msgstr "공유기 재부팅"
+
+msgid "Recent Devices"
+msgstr "최근 기기"
+
+msgid "Recent leases"
+msgstr "최근 임대"
+
+msgid "Refresh"
+msgstr "새로고침"
+
+msgid "Refresh the current screen"
+msgstr "현재 화면 새로고침"
+
+msgid "Refreshing..."
+msgstr "새로고침 중"
+
+msgid "Register a domain you want to block yourself, even if it's not in the SafeShield default list."
+msgstr "SafeShield 기본 목록에 없더라도 직접 차단할 도메인을 등록합니다."
+
+msgid "Register domains and subdomains that you want to allow even if they are on the blacklist."
+msgstr "차단 목록에 포함되어도 허용할 도메인과 하위 도메인을 등록합니다."
+
+msgid "Remove from %s %s"
+msgstr "%s %s에서 삭제"
+
+msgid "Renew your blocklist"
+msgstr "차단 목록 갱신"
+
+msgid "Requesting reboot"
+msgstr "재부팅 요청 중"
+
+msgid "Response Options"
+msgstr "보기"
+
+msgid "Rule has already been deleted."
+msgstr "이미 삭제된 규칙입니다."
+
+msgid "Rule saving and validation are managed by the SafeShield API. Domains will be normalized to lowercase and duplicates will remain as one."
+msgstr "규칙 저장과 유효성 검사는 SafeShield API가 관리합니다. 도메인은 소문자로 정규화되고 중복 항목은 하나로 유지됩니다."
+
+msgid "Rules will be saved, but will not be reflected in DNS until you turn on SafeShield's apply_local_overrides setting."
+msgstr "규칙은 저장되지만 SafeShield의 apply_local_overrides 설정을 켜기 전까지 DNS에 반영되지 않습니다."
+
+msgid "SYSTEM STATUS"
+msgstr "시스템 상태"
+
+msgid "SafeShield DNS protection is disabled."
+msgstr "SafeShield DNS 보호가 비활성화되어 있습니다."
+
+msgid "SafeShield Protection"
+msgstr "SafeShield 보호"
+
+msgid "SafeShield Service"
+msgstr "SafeShield 서비스"
+
+msgid "SafeShield Status API not found"
+msgstr "SafeShield 상태 API를 찾을 수 없습니다"
+
+msgid "SafeShield is disabled"
+msgstr "SafeShield가 비활성화되어 있습니다"
+
+msgid "SafeShield is enabled but the service is not running."
+msgstr "SafeShield가 활성화되어 있지만 서비스가 실행 중이 아닙니다."
+
+msgid "SafeShield job is paused."
+msgstr "SafeShield 작업이 일시 중지되어 있습니다."
+
+msgid "SafeShield operation failed."
+msgstr "SafeShield 작업을 수행하지 못했습니다."
+
+msgid "SafeShield protected status"
+msgstr "SafeShield 보호 상태"
+
+msgid "SafeShield protection is already active."
+msgstr "SafeShield 보호가 이미 활성화 상태입니다."
+
+msgid "SafeShield protection is already inactive."
+msgstr "SafeShield 보호가 이미 비활성화 상태입니다."
+
+msgid "Save"
+msgstr "저장"
+
+msgid "Save Config"
+msgstr "설정 저장"
+
+msgid "Saved the %s %s rule %s. Applying local rules to DNS…"
+msgstr "%s %s 규칙 %s를 저장했습니다. 로컬 규칙을 DNS에 적용하고 있습니다…"
+
+msgid "Saved your Wi-Fi settings and reloaded your wireless network."
+msgstr "Wi-Fi 설정을 저장하고 무선 네트워크를 다시 불러왔습니다."
+
+msgid "Screenshot request timed out."
+msgstr "요청 시간이 초과되었습니다."
+
+msgid "Search by name, IP, Mac or SSID"
+msgstr "이름, IP, MAC 또는 SSID 검색"
+
+msgid "Search devices"
+msgstr "기기 검색"
+
+msgid "Securely check the default status of OpenWrt devices."
+msgstr "OpenWrt 장치의 기본 상태를 안전하게 확인합니다."
+
+msgid "Securely manage firmware, diagnostics, advanced settings and reboot operations."
+msgstr "펌웨어, 진단, 고급 설정과 재부팅 작업을 안전하게 관리합니다."
+
+msgid "Show password"
+msgstr "비밀번호 표시"
+
+msgid "Signal"
+msgstr "신호"
+
+msgid "SmartSafeHub Key Features"
+msgstr "SmartSafeHub 주요 기능"
+
+msgid "SmartSafeHub Login"
+msgstr "SmartSafeHub 로그인"
+
+msgid "SmartSafeHub Menu"
+msgstr "SmartSafeHub 메뉴"
+
+msgid "SmartSafeHub Mobile Menu"
+msgstr "SmartSafeHub 모바일 메뉴"
+
+msgid "Starting"
+msgstr "시작 중…"
+
+msgid "Static assets may be missing or the browser cache may be out of date."
+msgstr "정적 자산이 누락되었거나 브라우저 캐시가 오래된 상태일 수 있습니다."
+
+msgid "Stopped"
+msgstr "중지됨"
+
+msgid "Stored passwords will not be re-disclosed to the screen or API."
+msgstr "저장된 비밀번호는 화면이나 API로 다시 노출하지 않습니다."
+
+msgid "Stores device, firmware, memory, Internet, Wi-Fi and SafeShield status as JSON files. It does not include your password and license key, but it does include your hostname and network identification information such as your WAN IP and Wi-Fi SSID."
+msgstr "장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않지만 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보는 포함됩니다."
+
+msgid "Successfully applied %s %s rules %s and DNS."
+msgstr "%s %s 규칙 %s와 DNS 적용이 완료되었습니다."
+
+msgid "System Logs"
+msgstr "시스템 로그"
+
+msgid "System Settings"
+msgstr "시스템 설정"
+
+msgid "System status is not ready. Please refresh and try again."
+msgstr "시스템 상태가 준비되지 않았습니다. 새로고침한 뒤 다시 시도해 주세요."
+
+msgid "The SafeShield service and DNS runtime are operating normally."
+msgstr "SafeShield 서비스와 DNS 런타임이 정상적으로 동작하고 있습니다."
+
+msgid "The blocklist is already being renewed."
+msgstr "차단 목록을 이미 갱신하고 있습니다."
+
+msgid "The blocklist is installed and DNS protection is working normally."
+msgstr "차단 목록이 설치되어 있으며 DNS 보호가 정상적으로 동작하고 있습니다."
+
+msgid "The device API returned an invalid response."
+msgstr "장치 API가 올바르지 않은 응답을 반환했습니다."
+
+msgid "The request argument is invalid."
+msgstr "요청 인자가 올바르지 않습니다."
+
+msgid "The requested method was not found."
+msgstr "요청한 메서드를 찾을 수 없습니다."
+
+msgid "The requested resource could not be found."
+msgstr "요청한 리소스를 찾을 수 없습니다."
+
+msgid "The rule has been saved, but SafeShield has been turned off and is awaiting DNS enforcement."
+msgstr "규칙은 저장되었지만 SafeShield가 꺼져 있어 DNS 적용을 대기하고 있습니다."
+
+msgid "The rule was saved but failed to initiate a local DNS enforcement request %s."
+msgstr "규칙은 저장되었지만 로컬 DNS 적용 요청을 시작하지 못했습니다%s."
+
+msgid "The rule was saved, but local DNS enforcement failed. Please check your SafeShield status."
+msgstr "규칙은 저장되었지만 로컬 DNS 적용이 실패했습니다. SafeShield 상태를 확인해 주세요."
+
+msgid "The rule was saved, but we couldn't confirm the completion of applying local DNS within the time limit."
+msgstr "규칙은 저장되었지만 제한 시간 안에 로컬 DNS 적용 완료를 확인하지 못했습니다."
+
+msgid "The system load could not be verified."
+msgstr "시스템 부하를 확인할 수 없습니다."
+
+msgid "There are no devices that match your criteria"
+msgstr "조건에 맞는 기기가 없습니다"
+
+msgid "There are no registered blocking domains."
+msgstr "등록된 차단 도메인이 없습니다."
+
+msgid "This domain is already on the blocklist."
+msgstr "이미 차단 목록에 있는 도메인입니다."
+
+msgid "This domain is already whitelisted."
+msgstr "이미 허용 목록에 있는 도메인입니다."
+
+msgid "This feature is not supported."
+msgstr "지원하지 않는 기능입니다."
+
+msgid "Try Again"
+msgstr "다시 시도"
+
+msgid "Turn on protection"
+msgstr "보호 켜기"
+
+msgid "Turning off protection will stop the SafeShield service and remove the current DNS blocklist. After turning it back on, you can renew it immediately when you need it."
+msgstr "보호를 끄면 SafeShield 서비스가 중지되고 현재 DNS 차단 목록이 제거됩니다. 다시 켠 뒤에는 필요할 때 즉시 갱신할 수 있습니다."
+
+msgid "Turning off…"
+msgstr "끄는 중…"
+
+msgid "Turning on…"
+msgstr "켜는 중…"
+
+msgid "Unable to communicate with router. Please check your network connection and try again."
+msgstr "공유기와 통신할 수 없습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요."
+
+msgid "Unable to communicate with router. Please check your network connection."
+msgstr "공유기와 통신할 수 없습니다. 네트워크 연결을 확인해 주세요."
+
+msgid "Unblock the false positives, and add the desired domains to the SafeShield protection list."
+msgstr "허용 목록은 오탐을 해제하고, 차단 목록은 원하는 도메인을 SafeShield 보호 목록에 추가합니다."
+
+msgid "Undetermined"
+msgstr "미확인"
+
+msgid "Unnamed Device"
+msgstr "이름 없는 기기"
+
+msgid "Unnamed Wi-Fi"
+msgstr "이름 없는 Wi-Fi"
+
+msgid "Up to DHCP %s"
+msgstr "DHCP %s까지"
+
+msgid "Update"
+msgstr "업데이트"
+
+msgid "Updates and systems"
+msgstr "업데이트 및 시스템"
+
+msgid "Updating"
+msgstr "갱신 중"
+
+msgid "Updating the firmware"
+msgstr "펌웨어 업데이트"
+
+msgid "Updating…"
+msgstr "갱신 중…"
+
+msgid "Use %s of %s"
+msgstr "%s / %s 사용"
+
+msgid "Use the LuCI authentication and session policy of the current router as it is."
+msgstr "현재 공유기의 LuCI 인증과 세션 정책을 그대로 사용합니다."
+
+msgid "Use this Wi-Fi"
+msgstr "이 Wi-Fi 사용"
+
+msgid "User Domain Rules"
+msgstr "사용자 도메인 규칙"
+
+msgid "User Rules"
+msgstr "사용자 규칙"
+
+msgid "User rule response is empty."
+msgstr "사용자 규칙 응답이 비어 있습니다."
+
+msgid "Validating and uploading firmware files is done from OpenWrt's Verified System Upgrades screen."
+msgstr "펌웨어 파일 검증과 업로드는 OpenWrt의 검증된 시스템 업그레이드 화면에서 진행합니다."
+
+msgid "Version"
+msgstr "버전"
+
+msgid "Version information could not be verified."
+msgstr "버전 정보를 확인할 수 없습니다."
+
+msgid "WAN interface not found."
+msgstr "WAN 인터페이스를 찾을 수 없습니다."
+
+msgid "WPA2/WPA3 Blend (Recommended)"
+msgstr "WPA2/WPA3 혼합 (권장)"
+
+msgid "Waiting to start"
+msgstr "시작 대기"
+
+msgid "Warning"
+msgstr "경고"
+
+msgid "We're checking the status of your device"
+msgstr "장치 상태를 확인하고 있습니다"
+
+msgid "We've processed your request to renew your blacklist."
+msgstr "차단 목록 갱신 요청을 처리했습니다."
+
+msgid "We've started updating your blacklists."
+msgstr "차단 목록 갱신 작업을 시작했습니다."
+
+msgid "Weak"
+msgstr "약함"
+
+msgid "Welcome back"
+msgstr "다시 오신 것을 환영합니다"
+
+msgid "Wi-Fi name (SSID)"
+msgstr "Wi-Fi 이름 (SSID)"
+
+msgid "Wired/Other"
+msgstr "유선/기타"
+
+msgid "Wired/other statuses are based on ARP tables, and recent DHCP leases may still have some time left after the device is disconnected."
+msgstr "유선/기타 상태는 ARP 테이블을 기준으로 하며, 최근 DHCP 임대는 기기가 연결 해제된 뒤에도 일정 시간 남을 수 있습니다."
+
+msgid "You Are Protected"
+msgstr "보호 중"
+
+msgid "You applied a SafeShield protection deactivation request."
+msgstr "SafeShield 보호 비활성화 요청을 적용했습니다."
+
+msgid "You applied a request to activate SafeShield protection."
+msgstr "SafeShield 보호 활성화 요청을 적용했습니다."
+
+msgid "You are checking an existing login session."
+msgstr "기존 로그인 세션을 확인하고 있습니다."
+
+msgid "You are protecting your DNS with %s domain blocking rules."
+msgstr "%s개 도메인 차단 규칙으로 DNS를 보호하고 있습니다."
+
+msgid "You can also download settings backups and restore backup files from the same screen."
+msgstr "같은 화면에서 설정 백업 다운로드와 백업 파일 복원도 수행할 수 있습니다."
+
+msgid "You can save the rule upfront, and it will take effect when you turn on SafeShield and renew the blocklist."
+msgstr "규칙을 미리 저장할 수 있으며, SafeShield를 켜고 차단 목록을 갱신하면 적용됩니다."
+
+msgid "You can still use SmartSafeHub by reconnecting with your changed Wi-Fi name and password. VLANs, guest networks and advanced wireless options are managed by the existing LuCI."
+msgstr "변경한 Wi-Fi 이름과 비밀번호로 다시 연결하면 SmartSafeHub를 계속 사용할 수 있습니다. VLAN, 게스트 네트워크와 고급 무선 옵션은 기존 LuCI에서 관리합니다."
+
+msgid "You don't have any allowed domains on file."
+msgstr "등록된 허용 도메인이 없습니다."
+
+msgid "You need to check the SafeShield DNS runtime status."
+msgstr "SafeShield DNS 런타임 상태를 확인해야 합니다."
+
+msgid "Your Wi-Fi may have restarted and you may have lost connection. Please reconnect to the SSID you changed and refresh the screen."
+msgstr "Wi-Fi가 다시 시작되면서 연결이 끊어졌을 수 있습니다. 변경한 SSID로 다시 연결한 뒤 화면을 새로고침해 주세요."
+
+msgid "Your blocklist is being updated."
+msgstr "차단 목록을 갱신하고 있습니다."
+
+msgid "Your blocklist is being updated. Current stage: %s"
+msgstr "차단 목록을 갱신하고 있습니다. 현재 단계: %s"
+
+msgid "Your credentials will only be sent to the LuCI login path on your current router."
+msgstr "인증 정보는 현재 공유기의 LuCI 로그인 경로로만 전송됩니다."
+
+msgid "Your username"
+msgstr "사용자 이름"
+
+msgid "bill(s)"
+msgstr "개"
+
+msgid "dnsmasq is not running and we need to check the DNS protection status."
+msgstr "dnsmasq가 실행 중이 아니어서 DNS 보호 상태를 확인해야 합니다."
+
+msgid "domains"
+msgstr "개 도메인"
+
+msgid "ea"
+msgstr "대"
+
+msgid "not active"
+msgstr "비활성화"
+
+msgid "please enter a domain with the format example.com. URLs, IP addresses, and wildcards are not allowed."
+msgstr "example.com 형식의 도메인을 입력해 주세요. URL, IP 주소, 와일드카드는 사용할 수 없습니다."
+
+msgid "please make sure you have the safeshield package and the rpcd ucode plugin installed."
+msgstr "safeshield 패키지와 rpcd ucode 플러그인이 설치되어 있는지 확인해 주세요."
+
+msgid "renew now"
+msgstr "지금 갱신"
+
+msgid "search"
+msgstr "검색"
+
+msgid "ubus error code %s returned."
+msgstr "ubus 오류 코드 %s가 반환되었습니다."
+
+msgid "· Connected device"
+msgstr "· 연결 기기"
+
+msgid "Advanced Settings (%s)"
+msgstr "고급 설정 (%s)"
+
+msgid "Artifact"
+msgstr "아티팩트"
+
+msgid "B"
+msgstr "B"
+
+msgid "Device"
+msgstr "장치"
+
+msgid "Device inventory"
+msgstr "기기 목록"
+
+msgid "Firmware"
+msgstr "펌웨어"
+
+msgid "GB"
+msgstr "GB"
+
+msgid "Health"
+msgstr "상태"
+
+msgid "Internet"
+msgstr "인터넷"
+
+msgid "KB"
+msgstr "KB"
+
+msgid "Keep current advanced settings (%s)"
+msgstr "현재 고급 설정 유지 (%s)"
+
+msgid "License"
+msgstr "라이선스"
+
+msgid "Load"
+msgstr "부하"
+
+msgid "Local overrides"
+msgstr "로컬 재정의"
+
+msgid "MB"
+msgstr "MB"
+
+msgid "Memory"
+msgstr "메모리"
+
+msgid "Protection"
+msgstr "보호"
+
+msgid "Refresh schedule"
+msgstr "갱신 일정"
+
+msgid "SMART NETWORK PROTECTION"
+msgstr "스마트 네트워크 보호"
+
+msgid "SafeShield"
+msgstr "SafeShield"
+
+msgid "SafeShield status API is unavailable"
+msgstr "SafeShield 상태 API를 사용할 수 없습니다"
+
+msgid "SafeShield status is unknown"
+msgstr "SafeShield 상태를 알 수 없습니다"
+
+msgid "Signal %s · %s dBm"
+msgstr "신호 %s · %s dBm"
+
+msgid "SmartSafeHub"
+msgstr "SmartSafeHub"
+
+msgid "System health"
+msgstr "시스템 상태"
+
+msgid "Unavailable"
+msgstr "사용 불가"
+
+msgid "Unknown"
+msgstr "알 수 없음"
+
+msgid "Uptime"
+msgstr "가동 시간"
+
+msgid "WPA2-Personal"
+msgstr "WPA2-Personal"
+
+msgid "WPA3-Personal"
+msgstr "WPA3-Personal"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "dnsmasq"
+msgstr "dnsmasq"
+
+msgid "example.com"
+msgstr "example.com"
+
+msgid "unknown"
+msgstr "알 수 없음"

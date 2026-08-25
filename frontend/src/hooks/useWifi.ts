@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { fetchWifiSummary, updateWifiNetwork } from '../api/smartsafehub';
 import { RpcError } from '../api/rpc';
 import type { WifiUpdateInput } from '../types/wifi';
+import { t } from '../utils/gettext';
 import { errorMessage } from '../utils/errors';
 import { useAsyncResource } from './useAsyncResource';
 
@@ -24,7 +25,7 @@ function delay(milliseconds: number): Promise<void> {
 export function useWifi(active: boolean) {
   const resource = useAsyncResource({
     active,
-    fallbackError: 'Wi-Fi 설정을 처리하지 못했습니다.',
+    fallbackError: t('Failed to process Wi-Fi settings.'),
     loader: fetchWifiSummary,
   });
   const mounted = useRef(true);
@@ -73,8 +74,8 @@ export function useWifi(active: boolean) {
           feedback: {
             kind: 'success',
             message: result.changed
-              ? 'Wi-Fi 설정을 저장하고 무선 네트워크를 다시 불러왔습니다.'
-              : '변경된 Wi-Fi 설정이 없습니다.',
+              ? t('Saved your Wi-Fi settings and reloaded your wireless network.')
+              : t('No Wi-Fi settings have been changed.'),
           },
         });
 
@@ -93,8 +94,8 @@ export function useWifi(active: boolean) {
           feedback: {
             kind: connectionMayHaveChanged ? 'warning' : 'error',
             message: connectionMayHaveChanged
-              ? 'Wi-Fi가 다시 시작되면서 연결이 끊어졌을 수 있습니다. 변경한 SSID로 다시 연결한 뒤 화면을 새로고침해 주세요.'
-              : errorMessage(error, 'Wi-Fi 설정을 처리하지 못했습니다.'),
+              ? t('Your Wi-Fi may have restarted and you may have lost connection. Please reconnect to the SSID you changed and refresh the screen.')
+              : errorMessage(error, t('Failed to process Wi-Fi settings.')),
           },
         });
         return false;

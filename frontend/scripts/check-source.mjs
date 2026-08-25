@@ -223,7 +223,7 @@ for (const contract of [
   "body.set('luci_password'",
   "credentials: 'same-origin'",
   'X-LuCI-Login-Required',
-  '다시 오신 것을 환영합니다',
+  'Welcome back',
   '<form',
 ]) {
   if (!loginApp.includes(contract)) {
@@ -235,7 +235,7 @@ for (const contract of [
   'smartsafehub-login-root',
   'data-asset-base',
   'data-asset-version',
-  'app.js?v=0.2.0-r8',
+  'app.js?v=0.2.0-r10',
 ]) {
   if (!loginTemplate.includes(contract)) {
     throw new Error(`SmartSafeHub login template does not contain: ${contract}`);
@@ -399,6 +399,103 @@ if (!asyncResource.includes("visibilitychange")) {
 
 if (!asyncResource.includes('requested.current = false')) {
   throw new Error('useAsyncResource does not reload data after route reactivation');
+}
+
+function findUntranslatedStrings(source, relativePath) {
+  const issues = [];
+  const lines = source.split(/\r?\n/);
+
+  const userFacingAttributes = [
+    'aria-label',
+    'title',
+    'placeholder',
+    'label',
+    'description',
+    'eyebrow',
+    'fallbackError',
+    'heading',
+    'subtitle',
+    'message',
+  ].join('|');
+
+  const attributePattern = new RegExp(
+    `\\b(?:${userFacingAttributes})\\s*[:=]\\s*(["'])(?!\\{t\\()(?!\\{\\s*t\\()([^"\\1>]{2,})\\1`,
+    'g',
+  );
+
+  for (let index = 0; index < lines.length; index += 1) {
+    let line = lines[index];
+
+    if (/^\s*\/\//.test(line)) {
+      continue;
+    }
+
+    const commentIndex = line.indexOf(' // ');
+    if (commentIndex >= 0) {
+      line = line.slice(0, commentIndex);
+    }
+
+    // JSX text nodes containing bare English text
+    // Avoid matching arrow/type syntax like `=> Promise<`
+    const textMatch = line.match(/(?<![=])>\s*([A-Za-z][^<{]*[A-Za-z])\s*</);
+    if (textMatch && textMatch[1].trim().length > 1) {
+      issues.push(`${relativePath}:${index + 1}: bare JSX text "${textMatch[1].trim()}"`);
+    }
+
+    let attributeMatch;
+    while ((attributeMatch = attributePattern.exec(line)) !== null) {
+      const value = attributeMatch[2];
+      if (/[A-Za-z]/.test(value) && !/^\d+(\.\d+)?$/.test(value)) {
+        issues.push(`${relativePath}:${index + 1}: untranslated ${attributeMatch[0].split(/[:=]/)[0]} "${value}"`);
+      }
+    }
+  }
+
+  return issues;
+}
+
+const uiSourceFiles = [
+  'src/app/routes.ts',
+  'src/components/ProductHeader.tsx',
+  'src/components/ProductNavigation.tsx',
+  'src/components/StatePanels.tsx',
+  'src/pages/HomePage.tsx',
+  'src/pages/ConnectedDevicesPage.tsx',
+  'src/pages/SystemPage.tsx',
+  'src/pages/WifiPage.tsx',
+  'src/pages/SafeShieldPage.tsx',
+  'src/pages/SafeShieldRulesPage.tsx',
+  'src/login/LoginApp.tsx',
+  'src/hooks/useSystemActions.ts',
+  'src/hooks/useSafeShieldActions.ts',
+  'src/hooks/useSafeShieldRules.ts',
+  'src/hooks/useWifi.ts',
+  'src/hooks/useStatus.ts',
+  'src/hooks/useConnectedDevices.ts',
+  'src/hooks/useSafeShieldStatus.ts',
+  'src/api/rpc.ts',
+  'src/api/safeshield.ts',
+  'src/app/format.ts',
+];
+
+const untranslatedIssues = [];
+for (const relativePath of uiSourceFiles) {
+  const source = await read(`${frontendRoot}${relativePath}`);
+  untranslatedIssues.push(...findUntranslatedStrings(source, relativePath));
+}
+
+if (untranslatedIssues.length > 0) {
+  for (const issue of untranslatedIssues) {
+    console.error(`Untranslated user-visible string: ${issue}`);
+  }
+  throw new Error(`Found ${untranslatedIssues.length} untranslated user-visible string(s)`);
+}
+
+for (const relativePath of uiSourceFiles) {
+  const source = await read(`${frontendRoot}${relativePath}`);
+  if (/Intl\.(?:Collator|DateTimeFormat|NumberFormat)\(['"]ko(?:-KR)?['"]/.test(source)) {
+    throw new Error(`${relativePath} contains a hard-coded Korean Intl locale`);
+  }
 }
 
 const main = await read(`${frontendRoot}src/main.tsx`);

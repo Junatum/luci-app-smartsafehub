@@ -12,6 +12,7 @@ import type {
   SafeShieldRefreshResult,
   SafeShieldStatus,
 } from '../types/safeshield';
+import { t } from '../utils/gettext';
 import { callRpc, RpcError } from './rpc';
 
 const API_OBJECT = 'safeshield';
@@ -103,7 +104,7 @@ function apiError(response: Record<string, unknown>): RpcError {
   const error = objectValue(response.error);
   const code = plainString(error.code) || 'UNKNOWN_ERROR';
   const message =
-    plainString(error.message) || 'SafeShield API 요청을 처리하지 못했습니다.';
+    plainString(error.message) || t('Failed to process SafeShield API request.');
 
   return new RpcError(`SAFESHIELD_${code.toUpperCase()}`, message);
 }
@@ -131,8 +132,8 @@ function unavailableStatus(): SafeShieldStatus {
     status: 'unavailable',
     stage: null,
     summary: {
-      label: 'Unavailable',
-      message: 'SafeShield status API is unavailable',
+      label: t('Unavailable'),
+      message: t('SafeShield status API is unavailable'),
       severity: 'warning',
     },
     runtime: {
@@ -209,10 +210,10 @@ function normalizeStatus(sourceValue: RawSafeShieldStatus): SafeShieldStatus {
     status: stringValue(source.status, 'unknown') ?? 'unknown',
     stage: stringValue(source.stage, null),
     summary: {
-      label: stringValue(summary.label, 'Unknown') ?? 'Unknown',
+      label: stringValue(summary.label, t('Unknown')) ?? t('Unknown'),
       message:
-        stringValue(summary.message, 'SafeShield status is unknown') ??
-        'SafeShield status is unknown',
+        stringValue(summary.message, t('SafeShield status is unknown')) ??
+        t('SafeShield status is unknown'),
       severity: stringValue(summary.severity, 'warning') ?? 'warning',
     },
     runtime: {

@@ -39,7 +39,7 @@ for (const loginContract of [
   'luci_username',
   'luci_password',
   'X-LuCI-Login-Required',
-  '다시 오신 것을 환영합니다',
+  'Welcome back',
 ]) {
   if (!javascript.includes(loginContract)) {
     throw new Error(`app.js does not contain the Preact login contract: ${loginContract}`);
@@ -50,17 +50,17 @@ if (!javascript.includes('RPC_TIMEOUT') || !javascript.includes('AbortController
   throw new Error('app.js does not contain RPC timeout handling');
 }
 
-if (!javascript.includes('admin/logout') || !javascript.includes('로그아웃')) {
+if (!javascript.includes('admin/logout') || !javascript.includes('Log out of SmartSafeHub')) {
   throw new Error('app.js does not contain the product logout action');
 }
 
-for (const mobileContract of ['모바일 메뉴 열기', 'smartsafehub-mobile-menu']) {
+for (const mobileContract of ['Mobile Menu Opener', 'smartsafehub-mobile-menu']) {
   if (!javascript.includes(mobileContract)) {
     throw new Error(`app.js does not contain the mobile navigation contract: ${mobileContract}`);
   }
 }
 
-if (!javascript.includes('ssh-product-hero') || !javascript.includes('고급 설정')) {
+if (!javascript.includes('ssh-product-hero') || !javascript.includes('Advanced Settings')) {
   throw new Error('app.js does not contain the full-width product navigation shell');
 }
 
@@ -104,7 +104,7 @@ if (!javascript.includes('safeshield') || !javascript.includes('status')) {
   throw new Error('app.js does not contain the direct SafeShield status API call');
 }
 
-if (!javascript.includes('로컬 규칙을 DNS에 적용하고 있습니다')) {
+if (!javascript.includes('Applying local rules to DNS')) {
   throw new Error('app.js does not contain the SafeShield local-rule fast apply integration');
 }
 

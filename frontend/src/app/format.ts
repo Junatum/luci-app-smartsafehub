@@ -1,14 +1,15 @@
+import { getLocale, t } from '../utils/gettext';
 import type { RuntimeMemory } from '../types/status';
 
-const NUMBER_FORMATTER = new Intl.NumberFormat('ko-KR');
-const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+const NUMBER_FORMATTER = new Intl.NumberFormat(getLocale());
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(getLocale(), {
   dateStyle: 'medium',
   timeStyle: 'short',
 });
 
 export function formatUptime(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) {
-    return '확인 불가';
+    return t('Inaccessible');
   }
 
   const days = Math.floor(totalSeconds / 86_400);
@@ -16,22 +17,22 @@ export function formatUptime(totalSeconds: number): string {
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
 
   if (days > 0) {
-    return `${days}일 ${hours}시간`;
+    return t('%s days and %s hours', days, hours);
   }
 
   if (hours > 0) {
-    return `${hours}시간 ${minutes}분`;
+    return t('%s h %s m', hours, minutes);
   }
 
-  return `${Math.max(minutes, 1)}분`;
+  return t('%s minute', Math.max(minutes, 1));
 }
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
-    return '확인 불가';
+    return t('Inaccessible');
   }
 
-  const units = ['B', 'KB', 'MB', 'GB'];
+  const units = [t('B'), t('KB'), t('MB'), t('GB')];
   let value = bytes;
   let unitIndex = 0;
 
@@ -40,7 +41,7 @@ export function formatBytes(bytes: number): string {
     unitIndex += 1;
   }
 
-  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex] ?? 'B'}`;
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex] ?? t('B')}`;
 }
 
 export function formatLoadAverage(value: number): string {
@@ -58,7 +59,7 @@ export function formatBootTime(localtime: number, uptime: number): string {
     !Number.isFinite(uptime) ||
     uptime < 0
   ) {
-    return '확인 불가';
+    return t('Inaccessible');
   }
 
   return formatTimestamp(localtime - uptime);
@@ -66,7 +67,7 @@ export function formatBootTime(localtime: number, uptime: number): string {
 
 export function formatTimestamp(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return '기록 없음';
+    return t('No records');
   }
 
   return TIMESTAMP_FORMATTER.format(new Date(timestamp * 1000));
@@ -74,17 +75,17 @@ export function formatTimestamp(timestamp: number): string {
 
 export function formatInterval(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
-    return '확인 불가';
+    return t('Inaccessible');
   }
 
   const hours = Math.floor(totalSeconds / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
 
   if (hours > 0) {
-    return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
+    return minutes > 0 ? t('%s h %s m', hours, minutes) : t('%s hour', hours);
   }
 
-  return `${minutes}분`;
+  return t('%s minute', minutes);
 }
 
 export function getMemoryUsage(memory: RuntimeMemory): {

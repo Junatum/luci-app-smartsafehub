@@ -2,7 +2,7 @@
 'require view';
 
 const ASSET_BASE = '/luci-static/smartsafehub/';
-const ASSET_VERSION = '0.2.0-r8';
+const ASSET_VERSION = '0.2.0-r10';
 const ROOT_ID = 'smartsafehub-root';
 const PRODUCT_VIEW_CLASS = 'smartsafehub-product-view';
 const PRODUCT_CHROME_STYLE_ID = 'smartsafehub-product-chrome-style';
@@ -74,13 +74,11 @@ html.${PRODUCT_VIEW_CLASS} .${PRODUCT_ANCESTOR_CLASS} {
 }
 
 html.${PRODUCT_VIEW_CLASS} #${ROOT_ID} {
-	position: relative !important;
-	left: 50% !important;
 	display: block !important;
-	width: 100vw !important;
+	width: 100% !important;
 	min-width: 0 !important;
-	max-width: none !important;
-	margin-left: -50vw !important;
+	max-width: 100% !important;
+	overflow-x: clip !important;
 }
 
 @media (max-width: 767px) {
@@ -233,17 +231,17 @@ function renderApplicationLoadError() {
 	].join(';');
 
 	const title = document.createElement('strong');
-	title.textContent = 'SmartSafeHub 화면을 불러오지 못했습니다.';
+	title.textContent = _('Failed to load SmartSafeHub screen.');
 	title.style.display = 'block';
 	title.style.marginBottom = '8px';
 
 	const description = document.createElement('p');
-	description.textContent = '정적 자산이 누락되었거나 브라우저 캐시가 오래된 상태일 수 있습니다.';
+	description.textContent = _('Static assets may be missing or the browser cache may be out of date.');
 	description.style.margin = '0 0 16px';
 
 	const retry = document.createElement('button');
 	retry.type = 'button';
-	retry.textContent = '다시 불러오기';
+	retry.textContent = _('RELOAD');
 	retry.style.cssText = [
 		'min-height:44px',
 		'padding:10px 16px',
@@ -326,7 +324,8 @@ return view.extend({
 			rpcUrl: L.url('admin/ubus'),
 			assetBase: ASSET_BASE,
 			assetVersion: ASSET_VERSION,
-			locale: document.documentElement.lang || 'ko',
+			locale: document.documentElement.lang || 'en',
+			translate: _,
 		});
 
 		removeLegacyStylesheet();

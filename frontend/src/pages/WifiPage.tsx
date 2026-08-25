@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
@@ -26,24 +27,24 @@ const SECURITY_OPTIONS: ReadonlyArray<{
   value: Exclude<WifiSecurityChoice, 'keep'>;
   label: string;
 }> = [
-  { value: 'sae-mixed', label: 'WPA2/WPA3 혼합 (권장)' },
-  { value: 'sae', label: 'WPA3-Personal' },
-  { value: 'psk2', label: 'WPA2-Personal' },
-  { value: 'none', label: '암호화 없음' },
+  { value: 'sae-mixed', label: t('WPA2/WPA3 Blend (Recommended)') },
+  { value: 'sae', label: t('WPA3-Personal') },
+  { value: 'psk2', label: t('WPA2-Personal') },
+  { value: 'none', label: t('No encryption') },
 ];
 
 function securityLabel(network: WifiNetworkSummary): string {
   switch (network.security) {
     case 'sae-mixed':
-      return 'WPA2/WPA3 혼합';
+      return t('Mix WPA2/WPA3');
     case 'sae':
-      return 'WPA3-Personal';
+      return t('WPA3-Personal');
     case 'psk2':
-      return 'WPA2-Personal';
+      return t('WPA2-Personal');
     case 'none':
-      return '암호화 없음';
+      return t('No encryption');
     default:
-      return `고급 설정 (${network.securityRaw})`;
+      return t('Advanced Settings (%s)', network.securityRaw);
   }
 }
 
@@ -94,12 +95,12 @@ function WifiNetworkCard({
     const ssidBytes = new TextEncoder().encode(normalizedSsid).length;
 
     if (ssidBytes < 1 || ssidBytes > 32) {
-      setValidationError('SSID는 UTF-8 기준 1~32바이트로 입력해 주세요.');
+      setValidationError(t('Please enter SSID between 1 and 32 bytes based on UTF-8.'));
       return;
     }
 
     if (password && !isValidPassword(password)) {
-      setValidationError('비밀번호는 8~63자 또는 64자리 16진수여야 합니다.');
+      setValidationError(t('Password must be 8-63 characters or 64 hex digits.'));
       return;
     }
 
@@ -108,13 +109,13 @@ function WifiNetworkCard({
       !network.passwordConfigured &&
       password.length === 0
     ) {
-      setValidationError('보안 Wi-Fi를 사용하려면 비밀번호를 입력해 주세요.');
+      setValidationError(t('Please enter your password to use secure Wi-Fi.'));
       return;
     }
 
     if (
       !window.confirm(
-        'Wi-Fi 설정을 적용하면 현재 무선 연결이 잠시 끊어질 수 있습니다. 계속하시겠습니까?',
+        t('Applying Wi-Fi settings may temporarily disconnect you from your current wireless connection. Are you sure you want to continue?'),
       )
     ) {
       return;
@@ -149,10 +150,10 @@ function WifiNetworkCard({
               {network.bandLabel}
             </p>
             <h2 class="mt-2 mb-0 break-words text-xl font-extrabold tracking-tight text-slate-950">
-              {network.ssid || '이름 없는 Wi-Fi'}
+              {network.ssid || t('Unnamed Wi-Fi')}
             </h2>
             <p class="mt-2 mb-0 text-sm text-slate-600">
-              채널 {network.channel ?? '자동'} · 연결 기기 {network.clientCount}대
+              {t('Channel')} {network.channel ?? t('AUTO')} {t('· Connected device')} {network.clientCount}{t('ea')}
             </p>
           </div>
         </div>
@@ -166,13 +167,13 @@ function WifiNetworkCard({
           <span
             class={`size-2 rounded-full ${network.runtimeUp ? 'bg-emerald-500' : 'bg-slate-400'}`}
           />
-          {network.runtimeUp ? '동작 중' : network.enabled ? '시작 대기' : '꺼짐'}
+          {network.runtimeUp ? t('In Action') : network.enabled ? t('Waiting to start') : t('OFF')}
         </span>
       </div>
 
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
         <label class="block">
-          <span class="text-sm font-extrabold text-slate-800">Wi-Fi 이름 (SSID)</span>
+          <span class="text-sm font-extrabold text-slate-800">{t('Wi-Fi name (SSID)')}</span>
           <input
             autocomplete="off"
             class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
@@ -184,7 +185,7 @@ function WifiNetworkCard({
         </label>
 
         <label class="block">
-          <span class="text-sm font-extrabold text-slate-800">보안 방식</span>
+          <span class="text-sm font-extrabold text-slate-800">{t('How security works')}</span>
           <select
             class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
             disabled={busy}
@@ -198,7 +199,7 @@ function WifiNetworkCard({
             value={security}
           >
             {network.security === 'custom' ? (
-              <option value="keep">현재 고급 설정 유지 ({network.securityRaw})</option>
+              <option value="keep">{t('Keep current advanced settings (%s)', network.securityRaw)}</option>
             ) : null}
             {SECURITY_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -207,12 +208,12 @@ function WifiNetworkCard({
             ))}
           </select>
           <span class="mt-2 block text-xs text-slate-500">
-            현재: {securityLabel(network)}
+            {t('Current:')} {securityLabel(network)}
           </span>
         </label>
 
         <label class="block lg:col-span-2">
-          <span class="text-sm font-extrabold text-slate-800">새 비밀번호</span>
+          <span class="text-sm font-extrabold text-slate-800">{t('New password')}</span>
           <input
             autocomplete="new-password"
             class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
@@ -220,16 +221,16 @@ function WifiNetworkCard({
             onInput={(event) => setPassword(event.currentTarget.value)}
             placeholder={
               keepsCustomSecurity
-                ? '고급 보안 설정은 기존 LuCI에서 변경합니다'
+                ? t('Change the advanced security settings from the existing LuCI')
                 : network.passwordConfigured
-                  ? '비워 두면 기존 비밀번호를 유지합니다'
-                  : '8자 이상의 비밀번호를 입력하세요'
+                  ? t('Leave blank to keep existing password')
+                  : t('Please enter a password that is at least 8 characters')
             }
             type="password"
             value={password}
           />
           <span class="mt-2 block text-xs text-slate-500">
-            저장된 비밀번호는 화면이나 API로 다시 노출하지 않습니다.
+            {t('Stored passwords will not be re-disclosed to the screen or API.')}
           </span>
         </label>
       </div>
@@ -243,7 +244,7 @@ function WifiNetworkCard({
             onChange={(event) => setEnabled(event.currentTarget.checked)}
             type="checkbox"
           />
-          이 Wi-Fi 사용
+          {t('Use this Wi-Fi')}
         </label>
         <button
           class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-0 bg-teal-700 px-5 sm:w-auto py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 disabled:cursor-wait disabled:opacity-60"
@@ -251,7 +252,7 @@ function WifiNetworkCard({
           type="submit"
         >
           <CheckCircleIcon class={`size-5 ${saving ? 'animate-pulse' : ''}`} />
-          {saving ? '적용 중' : '설정 저장'}
+          {saving ? t('Applying') : t('Save Config')}
         </button>
       </div>
 
@@ -289,7 +290,7 @@ function FeedbackPanel({
         onClick={onDismiss}
         type="button"
       >
-        닫기
+        {t('CLOSE')}
       </button>
     </div>
   );
@@ -325,19 +326,18 @@ export function WifiPage({
 
       <section class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950 sm:p-6">
         <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">
-          연결 주의
+          {t('Connection Attention')}
         </p>
         <h2 class="mt-2 mb-0 text-lg font-extrabold">
-          Wi-Fi 이름이나 비밀번호를 바꾸면 현재 연결이 끊어집니다
+          {t('Changing your Wi-Fi name or password will disconnect you')}
         </h2>
         <p class="mt-2 mb-0 text-sm leading-6 text-amber-900/80">
-          변경한 Wi-Fi 이름과 비밀번호로 다시 연결하면 SmartSafeHub를 계속 사용할 수
-          있습니다. VLAN, 게스트 네트워크와 고급 무선 옵션은 기존 LuCI에서 관리합니다.
+          {t('You can still use SmartSafeHub by reconnecting with your changed Wi-Fi name and password. VLANs, guest networks and advanced wireless options are managed by the existing LuCI.')}
         </p>
       </section>
 
       {data.networks.length ? (
-        <section aria-label="기본 Wi-Fi 설정" class="grid gap-5 xl:grid-cols-2">
+        <section aria-label={t('Default Wi-Fi settings')} class="grid gap-5 xl:grid-cols-2">
           {data.networks.map((network) => (
             <WifiNetworkCard
               key={network.section}
@@ -352,10 +352,10 @@ export function WifiPage({
         <section class="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm shadow-slate-900/5 sm:p-8">
           <RouterIcon class="mx-auto size-10 text-slate-400" />
           <h2 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            관리할 기본 Wi-Fi를 찾지 못했습니다
+            {t('Failed to find default Wi-Fi to manage')}
           </h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">
-            기존 LuCI에서 AP 모드의 무선 네트워크를 먼저 구성해 주세요.
+            {t('Please configure the AP mode wireless network in the existing LuCI first.')}
           </p>
         </section>
       )}

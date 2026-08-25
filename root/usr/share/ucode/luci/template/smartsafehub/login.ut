@@ -1,20 +1,52 @@
 <!doctype html>
-<html lang="ko">
+<html lang="{{ dispatcher.lang }}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light">
     <meta name="referrer" content="same-origin">
-    <title>SmartSafeHub 로그인</title>
+    <title>{{ _('SmartSafeHub Login') }}</title>
   </head>
   <body style="margin:0;background:#f8fafc;min-height:100vh;">
+    <div hidden id="smartsafehub-login-translations">
+      <span data-smartsafehub-msgid="Please enter your username and password.">{{ _('Please enter your username and password.') }}</span>
+      <span data-smartsafehub-msgid="Failed to sign in, please verify your account information. Devices with additional authentication enabled can continue under the default LuCI login.">{{ _('Failed to sign in, please verify your account information. Devices with additional authentication enabled can continue under the default LuCI login.') }}</span>
+      <span data-smartsafehub-msgid="Unable to communicate with router. Please check your network connection and try again.">{{ _('Unable to communicate with router. Please check your network connection and try again.') }}</span>
+      <span data-smartsafehub-msgid="SMART NETWORK PROTECTION">{{ _('SMART NETWORK PROTECTION') }}</span>
+      <span data-smartsafehub-msgid="SmartSafeHub">{{ _('SmartSafeHub') }}</span>
+      <span data-smartsafehub-msgid="Make your family's internet safer and easier to manage. From protected status to Wi-Fi and connected devices, all in one place.">{{ _("Make your family's internet safer and easier to manage. From protected status to Wi-Fi and connected devices, all in one place.") }}</span>
+      <span data-smartsafehub-msgid="SmartSafeHub Key Features">{{ _('SmartSafeHub Key Features') }}</span>
+      <span data-smartsafehub-msgid="Quickly manage DNS-based protection and local blocking rules.">{{ _('Quickly manage DNS-based protection and local blocking rules.') }}</span>
+      <span data-smartsafehub-msgid="SafeShield Protection">{{ _('SafeShield Protection') }}</span>
+      <span data-smartsafehub-msgid="Easily check the status of devices connected to your wireless network.">{{ _('Easily check the status of devices connected to your wireless network.') }}</span>
+      <span data-smartsafehub-msgid="Manage your network with ease">{{ _('Manage your network with ease') }}</span>
+      <span data-smartsafehub-msgid="Use the LuCI authentication and session policy of the current router as it is.">{{ _('Use the LuCI authentication and session policy of the current router as it is.') }}</span>
+      <span data-smartsafehub-msgid="On-device verification">{{ _('On-device verification') }}</span>
+      <span data-smartsafehub-msgid="Checking SmartSafeHub connection">{{ _('Checking SmartSafeHub connection') }}</span>
+      <span data-smartsafehub-msgid="You are checking an existing login session.">{{ _('You are checking an existing login session.') }}</span>
+      <span data-smartsafehub-msgid="Manage SmartSafeHub">{{ _('Manage SmartSafeHub') }}</span>
+      <span data-smartsafehub-msgid="Welcome back">{{ _('Welcome back') }}</span>
+      <span data-smartsafehub-msgid="Please log in with your router management account.">{{ _('Please log in with your router management account.') }}</span>
+      <span data-smartsafehub-msgid="Your username">{{ _('Your username') }}</span>
+      <span data-smartsafehub-msgid="Password">{{ _('Password') }}</span>
+      <span data-smartsafehub-msgid="Hide password">{{ _('Hide password') }}</span>
+      <span data-smartsafehub-msgid="Show password">{{ _('Show password') }}</span>
+      <span data-smartsafehub-msgid="HIDDEN">{{ _('HIDDEN') }}</span>
+      <span data-smartsafehub-msgid="Response Options">{{ _('Response Options') }}</span>
+      <span data-smartsafehub-msgid="Caps Lock is enabled">{{ _('Caps Lock is enabled') }}</span>
+      <span data-smartsafehub-msgid="Logging in...">{{ _('Logging in...') }}</span>
+      <span data-smartsafehub-msgid="Login">{{ _('Login') }}</span>
+      <span data-smartsafehub-msgid="Your credentials will only be sent to the LuCI login path on your current router.">{{ _('Your credentials will only be sent to the LuCI login path on your current router.') }}</span>
+      <span data-smartsafehub-msgid="Continue with default LuCI login">{{ _('Continue with default LuCI login') }}</span>
+    </div>
     <div
       id="smartsafehub-login-root"
       data-asset-base="/luci-static/smartsafehub/"
-      data-asset-version="0.2.0-r8"
+      data-asset-version="0.2.0-r10"
+      data-locale="{{ dispatcher.lang }}"
       style="display:block;width:100%;min-height:100vh;"
     ></div>
-    <noscript>SmartSafeHub를 사용하려면 JavaScript를 활성화해 주세요.</noscript>
-    <script type="module" src="/luci-static/smartsafehub/app.js?v=0.2.0-r8"></script>
+    <noscript>{{ _('Please enable JavaScript to use SmartSafeHub.') }}</noscript>
+    <script type="module" src="/luci-static/smartsafehub/app.js?v=0.2.0-r10"></script>
   </body>
 </html>

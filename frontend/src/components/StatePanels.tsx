@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import { RefreshIcon } from './Icons';
 
 export function LoadingPanel() {
@@ -9,10 +10,10 @@ export function LoadingPanel() {
     >
       <span class="mx-auto block size-9 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
       <h2 class="mt-5 mb-0 text-lg font-extrabold text-slate-950">
-        장치 상태를 확인하고 있습니다
+        {t('We\'re checking the status of your device')}
       </h2>
       <p class="mt-2 mb-0 text-sm text-slate-600">
-        OpenWrt의 rpcd API에서 정보를 불러오는 중입니다.
+        {t('Loading information from OpenWrt\'s rpcd API.')}
       </p>
     </section>
   );
@@ -30,10 +31,10 @@ export function ErrorPanel({ message, onRetry }: ErrorPanelProps) {
       class="rounded-2xl border border-red-200 bg-red-50 p-5 sm:p-6"
     >
       <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-red-700">
-        연결 오류
+        {t('Connection error')}
       </p>
       <h2 class="mt-2 mb-0 text-lg font-extrabold text-red-950">
-        장치 상태를 불러오지 못했습니다
+        {t('Failed to load device status')}
       </h2>
       <p class="mt-2 mb-0 text-sm leading-6 text-red-800">{message}</p>
       <button
@@ -42,7 +43,7 @@ export function ErrorPanel({ message, onRetry }: ErrorPanelProps) {
         type="button"
       >
         <RefreshIcon class="size-4" />
-        다시 시도
+        {t('Try Again')}
       </button>
     </section>
   );

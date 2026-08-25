@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import { useCallback, useState } from 'preact/hooks';
 
 import {
@@ -40,7 +41,7 @@ function sleep(milliseconds: number): Promise<void> {
 }
 
 function ruleLabel(action: SafeShieldRuleAction): string {
-  return action === 'allow' ? '허용' : '차단';
+  return action === 'allow' ? t('Allow') : t('Block');
 }
 
 function savedOnlyMessage(
@@ -50,39 +51,39 @@ function savedOnlyMessage(
   if (!result.changed) {
     return operation === 'add'
       ? result.action === 'allow'
-        ? '이미 허용 목록에 있는 도메인입니다.'
-        : '이미 차단 목록에 있는 도메인입니다.'
-      : '이미 삭제된 규칙입니다.';
+        ? t('This domain is already whitelisted.')
+        : t('This domain is already on the blocklist.')
+      : t('Rule has already been deleted.');
   }
 
   const label = ruleLabel(result.action);
-  const verb = operation === 'add' ? '저장' : '삭제';
+  const verb = operation === 'add' ? t('Save') : t('Deleted');
 
   if (!result.rules.safeshieldEnabled) {
-    return `${result.domain} ${label} 규칙을 ${verb}했습니다. SafeShield를 켜면 다음 갱신에서 적용됩니다.`;
+    return t('%s %s rule: %s completed. It will take effect after SafeShield is enabled and refreshed.', result.domain, label, verb);
   }
 
   if (!result.rules.applyLocalOverrides) {
-    return `${result.domain} ${label} 규칙을 ${verb}했습니다. 로컬 규칙 적용 설정이 꺼져 있어 아직 DNS에는 반영되지 않습니다.`;
+    return t('%s %s rule: %s completed. Local rule application is disabled, so DNS has not been updated yet.', result.domain, label, verb);
   }
 
-  return `${result.domain} ${label} 규칙을 ${verb}했습니다.`;
+  return t('%s %s rule: %s completed.', result.domain, label, verb);
 }
 
 function applyingMessage(
   operation: 'add' | 'delete',
   result: SafeShieldRuleMutationResult,
 ): string {
-  const verb = operation === 'add' ? '추가' : '삭제';
-  return `${result.domain} ${ruleLabel(result.action)} 규칙 ${verb}를 저장했습니다. 로컬 규칙을 DNS에 적용하고 있습니다…`;
+  const verb = operation === 'add' ? t('Added') : t('Deleted');
+  return t('Saved the %s %s rule %s. Applying local rules to DNS…', result.domain, ruleLabel(result.action), verb);
 }
 
 function appliedMessage(
   operation: 'add' | 'delete',
   result: SafeShieldRuleMutationResult,
 ): string {
-  const verb = operation === 'add' ? '추가' : '삭제';
-  return `${result.domain} ${ruleLabel(result.action)} 규칙 ${verb}와 DNS 적용이 완료되었습니다.`;
+  const verb = operation === 'add' ? t('Added') : t('Deleted');
+  return t('Successfully applied %s %s rules %s and DNS.', result.domain, ruleLabel(result.action), verb);
 }
 
 async function waitForLocalApply(
@@ -121,7 +122,7 @@ async function waitForLocalApply(
 export function useSafeShieldRules(active: boolean) {
   const resource = useAsyncResource({
     active,
-    fallbackError: '사용자 규칙을 불러오지 못했습니다.',
+    fallbackError: t('Failed to load user rules.'),
     loader: fetchSafeShieldRules,
   });
   const [mutation, setMutation] = useState<SafeShieldRulesMutationState>({
@@ -171,7 +172,7 @@ export function useSafeShieldRules(active: boolean) {
         if (!result.refresh.accepted) {
           setMutation({
             action: null,
-            error: `규칙은 저장되었지만 로컬 DNS 적용 요청을 시작하지 못했습니다${result.refresh.reason ? ` (${result.refresh.reason})` : ''}.`,
+            error: t('The rule was saved but failed to initiate a local DNS enforcement request %s.', result.refresh.reason ? ` (${result.refresh.reason})` : ''),
             feedback: null,
           });
           return true;
@@ -198,7 +199,7 @@ export function useSafeShieldRules(active: boolean) {
           setMutation({
             action: null,
             error: null,
-            feedback: '규칙은 저장되었지만 SafeShield가 꺼져 있어 DNS 적용을 대기하고 있습니다.',
+            feedback: t('The rule has been saved, but SafeShield has been turned off and is awaiting DNS enforcement.'),
           });
           return true;
         }
@@ -206,7 +207,7 @@ export function useSafeShieldRules(active: boolean) {
         if (outcome.kind === 'failure') {
           setMutation({
             action: null,
-            error: '규칙은 저장되었지만 로컬 DNS 적용이 실패했습니다. SafeShield 상태를 확인해 주세요.',
+            error: t('The rule was saved, but local DNS enforcement failed. Please check your SafeShield status.'),
             feedback: null,
           });
           return true;
@@ -214,14 +215,14 @@ export function useSafeShieldRules(active: boolean) {
 
         setMutation({
           action: null,
-          error: '규칙은 저장되었지만 제한 시간 안에 로컬 DNS 적용 완료를 확인하지 못했습니다.',
+          error: t('The rule was saved, but we couldn\'t confirm the completion of applying local DNS within the time limit.'),
           feedback: null,
         });
         return true;
       } catch (error) {
         setMutation({
           action: null,
-          error: errorMessage(error, '사용자 규칙을 변경하지 못했습니다.'),
+          error: errorMessage(error, t('Failed to change user rules.')),
           feedback: null,
         });
         return false;

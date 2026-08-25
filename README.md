@@ -2,10 +2,10 @@
 
 SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 기기와 SafeShield DNS 보호 기능을 일반 사용자 중심의 화면에서 관리하기 위한 LuCI 애플리케이션입니다.
 
-현재 정식 배포 버전은 **`0.2.0-r8`**입니다.
+현재 정식 배포 버전은 **`0.2.0-r10`**입니다.
 
 - 애플리케이션 버전: `0.2.0`
-- OpenWrt 패키지 릴리스: `8`
+- OpenWrt 패키지 릴리스: `10`
 - 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
 - 백엔드: rpcd ucode 모듈
 - 라이선스: GPL-3.0-or-later
