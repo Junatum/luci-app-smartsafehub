@@ -1,0 +1,1045 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-smartsafehub\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: SmartSafeHub Translators\n"
+"Language-Team: Simplified Chinese\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " · Stage %s"
+msgstr " · 阶段 %s"
+
+msgid "%s % utilization"
+msgstr "%s % 利用率"
+
+msgid "%s %s rule: %s completed."
+msgstr "已%s %s %s规则。"
+
+msgid "%s %s rule: %s completed. It will take effect after SafeShield is enabled and refreshed."
+msgstr "已%s %s %s规则。启用 SafeShield 后将在下次更新时应用。"
+
+msgid "%s %s rule: %s completed. Local rule application is disabled, so DNS has not been updated yet."
+msgstr "已%s %s %s规则。本地规则应用已关闭，尚未反映到 DNS。"
+
+msgid "%s Search"
+msgstr "搜索 %s"
+
+msgid "%s confirmed in recent DHCP leases"
+msgstr "%s 台来自近期 DHCP 租约"
+
+msgid "%s days and %s hours"
+msgstr "%s天 %s小时"
+
+msgid "%s h %s m"
+msgstr "%s小时 %s分钟"
+
+msgid "%s hour"
+msgstr "%s小时"
+
+msgid "%s minute"
+msgstr "%s分钟"
+
+msgid "-Memory usage"
+msgstr "内存使用率"
+
+msgid "1 min Load"
+msgstr "1 分钟负载"
+
+msgid "5 min %s · 15 min %s"
+msgstr "5 分钟 %s · 15 分钟 %s"
+
+msgid "A recent SafeShield operation encountered an error."
+msgstr "最近的 SafeShield 操作发生错误。"
+
+msgid "ALL"
+msgstr "全部"
+
+msgid "AUTO"
+msgstr "自动"
+
+msgid "Added"
+msgstr "添加"
+
+msgid "Adding..."
+msgstr "添加中…"
+
+msgid "Advanced Settings"
+msgstr "高级设置"
+
+msgid "Advanced settings (%s)"
+msgstr "高级设置（%s）"
+
+msgid "Allow"
+msgstr "放行"
+
+msgid "Allowlist"
+msgstr "放行列表"
+
+msgid "An error occurred on a recent task: %s"
+msgstr "最近操作发生错误：%s"
+
+msgid "An undefined error has ocurred"
+msgstr "发生未指定的或未知错误"
+
+msgid "Applying"
+msgstr "应用中"
+
+msgid "Applying Wi-Fi settings may temporarily disconnect you from your current wireless connection. Are you sure you want to continue?"
+msgstr "应用 Wi-Fi 设置可能会导致当前无线连接短暂中断。是否继续？"
+
+msgid "Artifact not identified"
+msgstr "制品未知"
+
+msgid "Banned"
+msgstr "不可用"
+
+msgid "Block"
+msgstr "拦截"
+
+msgid "Blocklist"
+msgstr "拦截列表"
+
+msgid "Boot time %s"
+msgstr "启动时间 %s"
+
+msgid "Bound"
+msgstr "已连接"
+
+msgid "CLOSE"
+msgstr "关闭"
+
+msgid "CONNECTION"
+msgstr "就位"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Caps Lock is enabled"
+msgstr "Caps Lock 已开启。"
+
+msgid "Change the advanced security settings from the existing LuCI"
+msgstr "高级安全设置请在 LuCI 中更改"
+
+msgid "Changing your Wi-Fi name or password will disconnect you"
+msgstr "更改 Wi-Fi 名称或密码将断开当前连接"
+
+msgid "Channel"
+msgstr "频道"
+
+msgid "Check DNS protection status and manage blocklists."
+msgstr "检查 DNS 保护状态并管理拦截列表。"
+
+msgid "Checking SmartSafeHub connection"
+msgstr "正在检查 SmartSafeHub 连接"
+
+msgid "Checking status"
+msgstr "正在检查状态"
+
+msgid "Checking system information."
+msgstr "正在检查系统信息。"
+
+msgid "Close mobile menu"
+msgstr "关闭移动菜单"
+
+msgid "Close notifications"
+msgstr "关闭通知"
+
+msgid "Confirmed device"
+msgstr "已识别设备"
+
+msgid "Connected Device Summary"
+msgstr "已连接设备概览"
+
+msgid "Connection Attention"
+msgstr "连接注意"
+
+msgid "Connection Type"
+msgstr "连接方式"
+
+msgid "Connection Verification Required"
+msgstr "连接需关注"
+
+msgid "Connection error"
+msgstr "连接错误"
+
+msgid "Connection not confirmed"
+msgstr "连接方式未知"
+
+msgid "Continue with default LuCI login"
+msgstr "使用默认 LuCI 登录继续"
+
+msgid "Current connection"
+msgstr "当前连接"
+
+msgid "Current:"
+msgstr "当前："
+
+msgid "Currently verified on Wi-Fi or ARP"
+msgstr "当前在 Wi-Fi 或 ARP 中可见"
+
+msgid "DHCP Lease Active"
+msgstr "DHCP 租约有效"
+
+msgid "DNS Runtime"
+msgstr "DNS 运行时"
+
+msgid "DNS protection"
+msgstr "DNS 保护"
+
+msgid "Default Wi-Fi settings"
+msgstr "基本 Wi-Fi 设置"
+
+msgid "Deleted"
+msgstr "删除"
+
+msgid "Detailed networks, firewalls, packages and logs are managed from the existing LuCI admin screen."
+msgstr "详细网络、防火墙、软件包和日志在 LuCI 管理界面中管理。"
+
+msgid "Device API response is empty."
+msgstr "设备API响应为空。"
+
+msgid "Device API returned HTTP %s error."
+msgstr "设备API返回HTTP %s错误。"
+
+msgid "Device Dashboard"
+msgstr "设备仪表盘"
+
+msgid "Device List"
+msgstr "设备列表"
+
+msgid "Device disconnected."
+msgstr "设备已断开连接。"
+
+msgid "Device response timed out. Please try again in a moment."
+msgstr "设备响应超时。请稍后重试。"
+
+msgid "Device summary"
+msgstr "设备概览"
+
+msgid "Devices connected to wireless APs"
+msgstr "连接到无线 AP 的设备"
+
+msgid "Diagnostic Info"
+msgstr "诊断信息"
+
+msgid "Diagnostic information file has been created."
+msgstr "诊断信息文件已创建。"
+
+msgid "Do you want to reboot the router now?"
+msgstr "确定要立即重启路由器吗？"
+
+msgid "Download diagnostic information"
+msgstr "下载诊断信息"
+
+msgid "Easily check the status of devices connected to your wireless network."
+msgstr "轻松查看无线网络和已连接设备的状态。"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "Execution time could not be determined."
+msgstr "无法确定运行时间。"
+
+msgid "Failed to change user rules."
+msgstr "无法修改用户规则。"
+
+msgid "Failed to complete system operation."
+msgstr "无法完成系统操作。"
+
+msgid "Failed to fetch device status."
+msgstr "无法加载设备状态。"
+
+msgid "Failed to fetch the list of connected devices."
+msgstr "无法加载已连接设备列表。"
+
+msgid "Failed to find default Wi-Fi to manage"
+msgstr "未找到可管理的基本 Wi-Fi"
+
+msgid "Failed to load SafeShield status."
+msgstr "无法加载 SafeShield 状态。"
+
+msgid "Failed to load SmartSafeHub screen."
+msgstr "无法加载 SmartSafeHub 界面。"
+
+msgid "Failed to load device status"
+msgstr "无法加载设备状态"
+
+msgid "Failed to load system information."
+msgstr "无法加载系统信息。"
+
+msgid "Failed to load user rules."
+msgstr "无法加载用户规则。"
+
+msgid "Failed to process SafeShield API request."
+msgstr "处理SafeShield API请求失败。"
+
+msgid "Failed to process Wi-Fi settings."
+msgstr "无法处理 Wi-Fi 设置。"
+
+msgid "Failed to sign in, please verify your account information. Devices with additional authentication enabled can continue under the default LuCI login."
+msgstr "登录失败。请检查账户信息。设置了额外认证的设备可从默认 LuCI 登录继续。"
+
+msgid "File Size"
+msgstr "文件大小"
+
+msgid "Firmware uploads, backups, and restores can have a big impact on your device, so use the existing LuCI verification procedures as they are. The SmartSafeHub product screen only provides frequent status checks and secure entry points."
+msgstr "固件上传、备份和恢复可能对设备产生重大影响，因此使用 LuCI 现有的验证流程。SmartSafeHub 产品界面仅提供常用状态检查和安全入口。"
+
+msgid "Full Memory"
+msgstr "总内存"
+
+msgid "Generating diagnostic information"
+msgstr "正在生成诊断信息"
+
+msgid "HIDDEN"
+msgstr "隐藏"
+
+msgid "Health check"
+msgstr "健康检查"
+
+msgid "Hide password"
+msgstr "隐藏密码"
+
+msgid "Home"
+msgstr "首页"
+
+msgid "How security works"
+msgstr "安全方式"
+
+msgid "I like it"
+msgstr "良好"
+
+msgid "I like it very much"
+msgstr "极好"
+
+msgid "INSTALLED"
+msgstr "已安装"
+
+msgid "IP address"
+msgstr "IP 地址"
+
+msgid "If you turn SafeShield protection off, the current blocklist will be removed and DNS blocking will be interrupted immediately. Are you sure you want to continue?"
+msgstr "关闭 SafeShield 保护将删除当前拦截列表并立即停止 DNS 拦截。是否继续？"
+
+msgid "In Action"
+msgstr "运行中"
+
+msgid "Inaccessible"
+msgstr "不可用"
+
+msgid "Internet and Wi-Fi connection interrupted briefly during reboot. If you have any unsaved LuCI settings, please save them first."
+msgstr "重启期间网络和 Wi-Fi 连接将短暂中断。如有未保存的 LuCI 设置，请先保存。"
+
+msgid "Invalid command."
+msgstr "命令无效。"
+
+msgid "JSON-RPC request failed."
+msgstr "JSON-RPC请求失败。"
+
+msgid "Keep current advanced settings ("
+msgstr "保留当前的高级设置（"
+
+msgid "Kernel %s"
+msgstr "内核 %s"
+
+msgid "Last Success"
+msgstr "上次成功"
+
+msgid "Learn how to connect to devices that have been identified on your network."
+msgstr "查看网络中发现的设备及其连接方式。"
+
+msgid "Leave blank to keep existing password"
+msgstr "留空则保持当前密码"
+
+msgid "License not set"
+msgstr "许可证未配置"
+
+msgid "Licenses linked"
+msgstr "许可证已连接"
+
+msgid "Linked devices"
+msgstr "已连接设备"
+
+msgid "Listing Duration"
+msgstr "更新间隔"
+
+msgid "Loading information from OpenWrt's rpcd API."
+msgstr "正在从 OpenWrt rpcd API 加载信息。"
+
+msgid "Local rule enforcement is off"
+msgstr "本地规则应用已关闭"
+
+msgid "Log out of SmartSafeHub"
+msgstr "退出 SmartSafeHub"
+
+msgid "Logging in..."
+msgstr "登录中…"
+
+msgid "Login"
+msgstr "登录"
+
+msgid "Logout"
+msgstr "注销"
+
+msgid "LuCI session information not found. Please refresh the page."
+msgstr "未找到LuCI会话信息。请刷新页面。"
+
+msgid "Machine Filters"
+msgstr "设备筛选"
+
+msgid "Make your family's internet safer and easier to manage. From protected status to Wi-Fi and connected devices, all in one place."
+msgstr "更安全、更便捷地管理家庭网络。在一处查看保护状态、Wi-Fi 和已连接设备。"
+
+msgid "Manage SmartSafeHub"
+msgstr "SmartSafeHub 管理"
+
+msgid "Manage the domains you want to allow or block."
+msgstr "管理手动放行或拦截的域名。"
+
+msgid "Manage the name, security, and usage of your primary wireless network."
+msgstr "管理主要无线网络的名称、安全性和启用状态。"
+
+msgid "Manage your network with ease"
+msgstr "便捷网络管理"
+
+msgid "Manual renewal runs in the background. Progress is reflected by screen refresh and automatic status check."
+msgstr "手动更新在后台运行。进度会通过页面刷新和自动状态检查反映。"
+
+msgid "Memory Usage"
+msgstr "内存使用"
+
+msgid "Mix WPA2/WPA3"
+msgstr "WPA2/WPA3 混合"
+
+msgid "Mobile Menu Opener"
+msgstr "打开移动菜单"
+
+msgid "Need verification"
+msgstr "需要关注"
+
+msgid "Neutral"
+msgstr "一般"
+
+msgid "New Domain"
+msgstr "新域名"
+
+msgid "New password"
+msgstr "新密码"
+
+msgid "Next Renewal"
+msgstr "下次更新"
+
+msgid "No Wi-Fi settings have been changed."
+msgstr "Wi-Fi 设置无更改。"
+
+msgid "No encryption"
+msgstr "无加密"
+
+msgid "No interface information"
+msgstr "无接口信息"
+
+msgid "No license key"
+msgstr "无许可证密钥"
+
+msgid "No reboot requests were received."
+msgstr "重启请求未被接受。"
+
+msgid "No records"
+msgstr "无记录"
+
+msgid "No response data found."
+msgstr "未找到响应数据。"
+
+msgid "No results found."
+msgstr "没有搜索结果。"
+
+msgid "No version information"
+msgstr "无版本信息"
+
+msgid "Non-wireless devices identified in LAN ARP"
+msgstr "LAN ARP 中的非无线设备"
+
+msgid "Not Installed"
+msgstr "未安装"
+
+msgid "Not determined"
+msgstr "未确认"
+
+msgid "OFF"
+msgstr "已关闭"
+
+msgid "OK"
+msgstr "正常"
+
+msgid "On-device verification"
+msgstr "设备端认证"
+
+msgid "Open Firmware Management"
+msgstr "打开固件管理"
+
+msgid "Overall Status"
+msgstr "整体状态"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Password must be 8-63 characters or 64 hex digits."
+msgstr "密码必须为 8-63 个字符或 64 位十六进制字符串。"
+
+msgid "Pause"
+msgstr "已暂停"
+
+msgid "Permissioned Denied!"
+msgstr "您无权访问此内容。"
+
+msgid "Plan not confirmed"
+msgstr "方案未知"
+
+msgid "Please change your search terms or filters."
+msgstr "请尝试更改搜索条件或筛选器。"
+
+msgid "Please check the network identifiers contained in the file before forwarding it to a support agent."
+msgstr "分享给技术支持前，请先确认文件中包含的网络标识信息。"
+
+msgid "Please configure the AP mode wireless network in the existing LuCI first."
+msgstr "请先在 LuCI 中配置 AP 模式的无线网络。"
+
+msgid "Please enable JavaScript to use SmartSafeHub."
+msgstr "使用 SmartSafeHub 需要启用 JavaScript。"
+
+msgid "Please enter SSID between 1 and 32 bytes based on UTF-8."
+msgstr "SSID 必须为 1-32 字节（UTF-8）。"
+
+msgid "Please enter a password that is at least 8 characters"
+msgstr "请输入密码（8 个字符以上）"
+
+msgid "Please enter your password to use secure Wi-Fi."
+msgstr "启用加密 Wi-Fi 需要输入密码。"
+
+msgid "Please enter your username and password."
+msgstr "请输入用户名和密码。"
+
+msgid "Please log in with your router management account."
+msgstr "请使用路由器管理员账户登录。"
+
+msgid "Prepare for reboot"
+msgstr "准备重启"
+
+msgid "Protection off"
+msgstr "关闭保护"
+
+msgid "Quickly manage DNS-based protection and local blocking rules."
+msgstr "快速管理基于 DNS 的保护和本地拦截规则。"
+
+msgid "RELOAD"
+msgstr "重新加载"
+
+msgid "RULES"
+msgstr "规则"
+
+msgid "Reboot has started. Please reconnect to the router in a few minutes."
+msgstr "已开始重启。请稍后重新连接路由器。"
+
+msgid "Reboot now"
+msgstr "立即重启"
+
+msgid "Reboot router"
+msgstr "重启路由器"
+
+msgid "Recent Devices"
+msgstr "近期设备"
+
+msgid "Recent leases"
+msgstr "近期租约"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Refresh the current screen"
+msgstr "刷新当前屏幕"
+
+msgid "Refreshing..."
+msgstr "刷新中"
+
+msgid "Register a domain you want to block yourself, even if it's not in the SafeShield default list."
+msgstr "注册即使不在 SafeShield 默认列表中也要拦截的域名。"
+
+msgid "Register domains and subdomains that you want to allow even if they are on the blacklist."
+msgstr "注册即使在拦截列表中也应放行的域名和子域名。"
+
+msgid "Remove from %s %s"
+msgstr "从%s中删除 %s"
+
+msgid "Renew your blocklist"
+msgstr "拦截列表更新"
+
+msgid "Requesting reboot"
+msgstr "正在请求重启"
+
+msgid "Response Options"
+msgstr "显示"
+
+msgid "Rule has already been deleted."
+msgstr "该规则已被删除。"
+
+msgid "Rule saving and validation are managed by the SafeShield API. Domains will be normalized to lowercase and duplicates will remain as one."
+msgstr "规则存储和验证由 SafeShield API 管理。域名会规范化为小写，重复条目仅保留一个。"
+
+msgid "Rules will be saved, but will not be reflected in DNS until you turn on SafeShield's apply_local_overrides setting."
+msgstr "规则已保存，但在启用 SafeShield 的 apply_local_overrides 设置之前不会在 DNS 中生效。"
+
+msgid "SYSTEM STATUS"
+msgstr "系统状态"
+
+msgid "SafeShield DNS protection is disabled."
+msgstr "SafeShield DNS 保护已停用。"
+
+msgid "SafeShield Protection"
+msgstr "SafeShield 保护"
+
+msgid "SafeShield Service"
+msgstr "SafeShield 服务"
+
+msgid "SafeShield Status API not found"
+msgstr "未找到 SafeShield 状态 API"
+
+msgid "SafeShield is disabled"
+msgstr "SafeShield 已停用"
+
+msgid "SafeShield is enabled but the service is not running."
+msgstr "SafeShield 已启用但服务未运行。"
+
+msgid "SafeShield job is paused."
+msgstr "SafeShield 操作已暂停。"
+
+msgid "SafeShield operation failed."
+msgstr "无法执行 SafeShield 操作。"
+
+msgid "SafeShield protected status"
+msgstr "SafeShield 保护状态"
+
+msgid "SafeShield protection is already active."
+msgstr "SafeShield 保护已处于启用状态。"
+
+msgid "SafeShield protection is already inactive."
+msgstr "SafeShield 保护已处于停用状态。"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save Config"
+msgstr "保存设置"
+
+msgid "Saved the %s %s rule %s. Applying local rules to DNS…"
+msgstr "已保存 %s %s规则%s。正在将本地规则应用到 DNS…"
+
+msgid "Saved your Wi-Fi settings and reloaded your wireless network."
+msgstr "Wi-Fi 设置已保存并重新加载无线网络。"
+
+msgid "Screenshot request timed out."
+msgstr "请求超时。"
+
+msgid "Search by name, IP, Mac or SSID"
+msgstr "按名称、IP、MAC 或 SSID 搜索"
+
+msgid "Search devices"
+msgstr "搜索设备"
+
+msgid "Securely check the default status of OpenWrt devices."
+msgstr "安全查看 OpenWrt 设备的基本状态。"
+
+msgid "Securely manage firmware, diagnostics, advanced settings and reboot operations."
+msgstr "安全管理固件、诊断、高级设置和重启。"
+
+msgid "Show password"
+msgstr "显示密码"
+
+msgid "Signal"
+msgstr "信号"
+
+msgid "SmartSafeHub Key Features"
+msgstr "SmartSafeHub 主要功能"
+
+msgid "SmartSafeHub Login"
+msgstr "SmartSafeHub 登录"
+
+msgid "SmartSafeHub Menu"
+msgstr "SmartSafeHub 菜单"
+
+msgid "SmartSafeHub Mobile Menu"
+msgstr "SmartSafeHub 移动菜单"
+
+msgid "Starting"
+msgstr "启动中…"
+
+msgid "Static assets may be missing or the browser cache may be out of date."
+msgstr "静态资源可能缺失，或浏览器缓存可能已过期。"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Stored passwords will not be re-disclosed to the screen or API."
+msgstr "已保存的密码不会通过界面或 API 再次显示。"
+
+msgid "Stores device, firmware, memory, Internet, Wi-Fi and SafeShield status as JSON files. It does not include your password and license key, but it does include your hostname and network identification information such as your WAN IP and Wi-Fi SSID."
+msgstr "将设备、固件、内存、网络、Wi-Fi 和 SafeShield 状态保存为 JSON 文件。不包含密码和许可证密钥，但包含主机名、WAN IP 和 Wi-Fi SSID 等网络标识信息。"
+
+msgid "Successfully applied %s %s rules %s and DNS."
+msgstr "%s %s规则%s和 DNS 应用已完成。"
+
+msgid "System Logs"
+msgstr "系统日志"
+
+msgid "System Settings"
+msgstr "系统设置"
+
+msgid "System status is not ready. Please refresh and try again."
+msgstr "系统状态未就绪。请刷新后重试。"
+
+msgid "The SafeShield service and DNS runtime are operating normally."
+msgstr "SafeShield 服务和 DNS 运行时正常运行。"
+
+msgid "The blocklist is already being renewed."
+msgstr "拦截列表正在更新中。"
+
+msgid "The blocklist is installed and DNS protection is working normally."
+msgstr "拦截列表已安装，DNS 保护正常运行。"
+
+msgid "The device API returned an invalid response."
+msgstr "设备API返回无效响应。"
+
+msgid "The request argument is invalid."
+msgstr "请求参数无效。"
+
+msgid "The requested method was not found."
+msgstr "未找到请求的方法。"
+
+msgid "The requested resource could not be found."
+msgstr "未找到请求的资源。"
+
+msgid "The rule has been saved, but SafeShield has been turned off and is awaiting DNS enforcement."
+msgstr "规则已保存，但 SafeShield 已关闭，DNS 应用待处理。"
+
+msgid "The rule was saved but failed to initiate a local DNS enforcement request %s."
+msgstr "规则已保存，但无法启动本地 DNS 应用请求%s。"
+
+msgid "The rule was saved, but local DNS enforcement failed. Please check your SafeShield status."
+msgstr "规则已保存，但本地 DNS 应用失败。请检查 SafeShield 状态。"
+
+msgid "The rule was saved, but we couldn't confirm the completion of applying local DNS within the time limit."
+msgstr "规则已保存，但在限定时间内未能确认本地 DNS 应用完成。"
+
+msgid "The system load could not be verified."
+msgstr "无法确定系统负载。"
+
+msgid "There are no devices that match your criteria"
+msgstr "没有符合条件的设备"
+
+msgid "There are no registered blocking domains."
+msgstr "没有已注册的拦截域名。"
+
+msgid "This domain is already on the blocklist."
+msgstr "该域名已在拦截列表中。"
+
+msgid "This domain is already whitelisted."
+msgstr "该域名已在放行列表中。"
+
+msgid "This feature is not supported."
+msgstr "尚未支持的功能。"
+
+msgid "Try Again"
+msgstr "重试"
+
+msgid "Turn on protection"
+msgstr "开启保护"
+
+msgid "Turning off protection will stop the SafeShield service and remove the current DNS blocklist. After turning it back on, you can renew it immediately when you need it."
+msgstr "关闭保护将停止 SafeShield 服务并删除当前 DNS 拦截列表。重新开启后可在需要时立即更新。"
+
+msgid "Turning off…"
+msgstr "正在关闭…"
+
+msgid "Turning on…"
+msgstr "正在开启…"
+
+msgid "Unable to communicate with router. Please check your network connection and try again."
+msgstr "无法与路由器通信。请检查网络连接后重试。"
+
+msgid "Unable to communicate with router. Please check your network connection."
+msgstr "无法与路由器通信。请检查您的网络连接。"
+
+msgid "Unblock the false positives, and add the desired domains to the SafeShield protection list."
+msgstr "放行列表解除误报，拦截列表将域名添加到 SafeShield 保护列表。"
+
+msgid "Undetermined"
+msgstr "未知"
+
+msgid "Unnamed Device"
+msgstr "未命名设备"
+
+msgid "Unnamed Wi-Fi"
+msgstr "未命名 Wi-Fi"
+
+msgid "Up to DHCP %s"
+msgstr "DHCP 至 %s"
+
+msgid "Update"
+msgstr "更新"
+
+msgid "Updates and systems"
+msgstr "更新与系统"
+
+msgid "Updating"
+msgstr "更新中"
+
+msgid "Updating the firmware"
+msgstr "固件更新"
+
+msgid "Updating…"
+msgstr "更新中…"
+
+msgid "Use %s of %s"
+msgstr "%s / %s 已使用"
+
+msgid "Use the LuCI authentication and session policy of the current router as it is."
+msgstr "使用路由器现有的 LuCI 认证和会话策略。"
+
+msgid "Use this Wi-Fi"
+msgstr "启用此 Wi-Fi"
+
+msgid "User Domain Rules"
+msgstr "用户域名规则"
+
+msgid "User Rules"
+msgstr "用户规则"
+
+msgid "User rule response is empty."
+msgstr "用户规则响应为空。"
+
+msgid "Validating and uploading firmware files is done from OpenWrt's Verified System Upgrades screen."
+msgstr "固件验证和上传在 OpenWrt 的系统升级页面进行。"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "Version information could not be verified."
+msgstr "无法确定版本信息。"
+
+msgid "WAN interface not found."
+msgstr "未找到 WAN 接口。"
+
+msgid "WPA2/WPA3 Blend (Recommended)"
+msgstr "WPA2/WPA3 混合（推荐）"
+
+msgid "Waiting to start"
+msgstr "等待启动"
+
+msgid "Warning"
+msgstr "警告"
+
+msgid "We're checking the status of your device"
+msgstr "正在检查设备状态"
+
+msgid "We've processed your request to renew your blacklist."
+msgstr "拦截列表更新请求已处理。"
+
+msgid "We've started updating your blacklists."
+msgstr "拦截列表更新已启动。"
+
+msgid "Weak"
+msgstr "较弱"
+
+msgid "Welcome back"
+msgstr "欢迎回来"
+
+msgid "Wi-Fi name (SSID)"
+msgstr "Wi-Fi 名称 (SSID)"
+
+msgid "Wired/Other"
+msgstr "有线/其他"
+
+msgid "Wired/other statuses are based on ARP tables, and recent DHCP leases may still have some time left after the device is disconnected."
+msgstr "有线/其他状态基于 ARP 表。设备断开连接后，近期 DHCP 租约可能仍会保留一段时间。"
+
+msgid "You Are Protected"
+msgstr "保护中"
+
+msgid "You applied a SafeShield protection deactivation request."
+msgstr "已应用 SafeShield 保护停用请求。"
+
+msgid "You applied a request to activate SafeShield protection."
+msgstr "已应用 SafeShield 保护启用请求。"
+
+msgid "You are checking an existing login session."
+msgstr "正在验证现有登录会话。"
+
+msgid "You are protecting your DNS with %s domain blocking rules."
+msgstr "正在使用 %s 条域名拦截规则保护 DNS。"
+
+msgid "You can also download settings backups and restore backup files from the same screen."
+msgstr "在同一页面还可以下载设置备份和恢复备份文件。"
+
+msgid "You can save the rule upfront, and it will take effect when you turn on SafeShield and renew the blocklist."
+msgstr "您可以提前保存规则。启用 SafeShield 并更新拦截列表后将应用这些规则。"
+
+msgid "You can still use SmartSafeHub by reconnecting with your changed Wi-Fi name and password. VLANs, guest networks and advanced wireless options are managed by the existing LuCI."
+msgstr "使用新的 Wi-Fi 名称和密码重新连接即可继续使用 SmartSafeHub。VLAN、访客网络和高级无线选项请在 LuCI 中管理。"
+
+msgid "You don't have any allowed domains on file."
+msgstr "没有已注册的放行域名。"
+
+msgid "You need to check the SafeShield DNS runtime status."
+msgstr "需要检查 SafeShield DNS 运行时状态。"
+
+msgid "Your Wi-Fi may have restarted and you may have lost connection. Please reconnect to the SSID you changed and refresh the screen."
+msgstr "Wi-Fi 重启可能导致连接中断。请使用新 SSID 重新连接后刷新页面。"
+
+msgid "Your blocklist is being updated."
+msgstr "正在更新拦截列表。"
+
+msgid "Your blocklist is being updated. Current stage: %s"
+msgstr "正在更新拦截列表。当前阶段：%s"
+
+msgid "Your credentials will only be sent to the LuCI login path on your current router."
+msgstr "认证信息仅通过此路由器的 LuCI 登录路径传输。"
+
+msgid "Your username"
+msgstr "用户名"
+
+msgid "bill(s)"
+msgstr "条"
+
+msgid "dnsmasq is not running and we need to check the DNS protection status."
+msgstr "dnsmasq 未运行，需要检查 DNS 保护状态。"
+
+msgid "domains"
+msgstr "域"
+
+msgid "ea"
+msgstr "台"
+
+msgid "not active"
+msgstr "已停用"
+
+msgid "please enter a domain with the format example.com. URLs, IP addresses, and wildcards are not allowed."
+msgstr "请输入 example.com 格式的域名。不支持 URL、IP 地址和通配符。"
+
+msgid "please make sure you have the safeshield package and the rpcd ucode plugin installed."
+msgstr "请确认已安装 safeshield 包和 rpcd ucode 插件。"
+
+msgid "renew now"
+msgstr "立即更新"
+
+msgid "search"
+msgstr "搜索"
+
+msgid "ubus error code %s returned."
+msgstr "ubus错误代码%s返回。"
+
+msgid "· Connected device"
+msgstr "·已连接的设备"
+
+msgid "Advanced Settings (%s)"
+msgstr "高级设置（%s）"
+
+msgid "Artifact"
+msgstr "制品"
+
+msgid "B"
+msgstr "B"
+
+msgid "Device"
+msgstr "设备"
+
+msgid "Device inventory"
+msgstr "设备清单"
+
+msgid "Firmware"
+msgstr "固件"
+
+msgid "GB"
+msgstr "GB"
+
+msgid "Health"
+msgstr "健康"
+
+msgid "Internet"
+msgstr "互联网"
+
+msgid "KB"
+msgstr "KB"
+
+msgid "Keep current advanced settings (%s)"
+msgstr "保留当前的高级设置（%s）"
+
+msgid "License"
+msgstr "许可证"
+
+msgid "Load"
+msgstr "负载"
+
+msgid "Local overrides"
+msgstr "本地覆盖"
+
+msgid "MB"
+msgstr "MB"
+
+msgid "Memory"
+msgstr "内存"
+
+msgid "Protection"
+msgstr "保护"
+
+msgid "Refresh schedule"
+msgstr "更新计划"
+
+msgid "SMART NETWORK PROTECTION"
+msgstr "智能网络安全防护"
+
+msgid "SafeShield"
+msgstr "SafeShield"
+
+msgid "SafeShield status API is unavailable"
+msgstr "SafeShield 状态 API 不可用"
+
+msgid "SafeShield status is unknown"
+msgstr "SafeShield 状态未知"
+
+msgid "Signal %s · %s dBm"
+msgstr "信号 %s · %s dBm"
+
+msgid "SmartSafeHub"
+msgstr "SmartSafeHub"
+
+msgid "System health"
+msgstr "系统健康"
+
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Unknown"
+msgstr "未知"
+
+msgid "Uptime"
+msgstr "运行时间"
+
+msgid "WPA2-Personal"
+msgstr "WPA2-Personal"
+
+msgid "WPA3-Personal"
+msgstr "WPA3-Personal"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "dnsmasq"
+msgstr "dnsmasq"
+
+msgid "example.com"
+msgstr "example.com"
+
+msgid "unknown"
+msgstr "未知"

@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=8
+PKG_RELEASE:=9
 
 PKG_MAINTAINER:=Beomjun Kang
 PKG_LICENSE:=GPL-3.0-or-later
@@ -40,7 +40,7 @@ define Build/Prepare/luci-app-smartsafehub
 		echo "ERROR: SmartSafeHub frontend bundle still uses obsolete SafeShield proxy RPCs; run npm run build" >&2; \
 		false; \
 	fi
-	@if ! grep -Fq "로컬 규칙을 DNS에 적용하고 있습니다" \
+	@if ! grep -Fq "Applying local rules to DNS" \
 		$(CURDIR)/root/www/luci-static/smartsafehub/app.js; then \
 		echo "ERROR: SmartSafeHub frontend bundle is stale; rebuild the SafeShield local-rule fast apply integration" >&2; \
 		false; \
@@ -58,7 +58,7 @@ define Build/Prepare/luci-app-smartsafehub
 		( echo "ERROR: SmartSafeHub Preact login template is missing" >&2; false )
 	@grep -Fq "smartsafehub-login-root" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
 		( echo "ERROR: SmartSafeHub frontend bundle is missing the Preact login entry; run npm run build" >&2; false )
-	@grep -Fq "다시 오신 것을 환영합니다" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
+	@grep -Fq "Welcome back" $(CURDIR)/root/www/luci-static/smartsafehub/app.js || \
 		( echo "ERROR: SmartSafeHub frontend bundle is stale; rebuild the Preact login page" >&2; false )
 	@test ! -e $(SMARTSAFEHUB_RPCD_SOURCE_DIR)/entry.uc || \
 		( echo "ERROR: obsolete smartsafehub/entry.uc must be removed" >&2; false )

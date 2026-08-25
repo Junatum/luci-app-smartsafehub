@@ -4,4 +4,5 @@ export interface SmartSafeHubBootstrap {
   assetBase: string;
   assetVersion: string;
   locale: string;
+  translate?: (message: string) => string;
 }

@@ -9,6 +9,7 @@ import type { SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SystemDiagnostics } from '../types/system';
 import type { WifiSummary } from '../types/wifi';
+import { t } from '../utils/gettext';
 import { diagnosticFilename, downloadJson } from '../utils/download';
 import { errorMessage } from '../utils/errors';
 
@@ -55,7 +56,7 @@ async function fetchDiagnostics(
 ): Promise<SystemDiagnostics> {
   if (!system) {
     throw new Error(
-      '시스템 상태가 준비되지 않았습니다. 새로고침한 뒤 다시 시도해 주세요.',
+      t('System status is not ready. Please refresh and try again.'),
     );
   }
 
@@ -109,13 +110,13 @@ export function useSystemActions(system: SmartSafeHubStatus | null) {
       setState((current) => ({
         ...current,
         action: null,
-        message: '진단 정보 파일을 만들었습니다.',
+        message: t('Diagnostic information file has been created.'),
       }));
     } catch (error) {
       setState((current) => ({
         ...current,
         action: null,
-        error: errorMessage(error, '시스템 작업을 완료하지 못했습니다.'),
+        error: errorMessage(error, t('Failed to complete system operation.')),
       }));
     }
   }, [system]);
@@ -134,15 +135,15 @@ export function useSystemActions(system: SmartSafeHubStatus | null) {
         action: null,
         error: null,
         message: result.accepted
-          ? '재부팅을 시작했습니다. 잠시 후 공유기에 다시 연결해 주세요.'
-          : '재부팅 요청이 접수되지 않았습니다.',
+          ? t('Reboot has started. Please reconnect to the router in a few minutes.')
+          : t('No reboot requests were received.'),
         rebootAccepted: result.accepted,
       });
     } catch (error) {
       setState((current) => ({
         ...current,
         action: null,
-        error: errorMessage(error, '시스템 작업을 완료하지 못했습니다.'),
+        error: errorMessage(error, t('Failed to complete system operation.')),
       }));
     }
   }, []);

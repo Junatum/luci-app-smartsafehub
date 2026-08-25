@@ -4,6 +4,13 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r4`는 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `4`를 의미합니다.
 
+## [0.2.0-r9] - 2026-08-25
+
+- Added standard LuCI gettext catalogs with Korean and Simplified Chinese translations.
+- Localized both the authenticated application and the branded public login page.
+- Added source checks to prevent untranslated user-facing strings.
+- Made the application width follow the LuCI content container to avoid horizontal overflow with sidebar themes.
+
 ## [0.2.0-r8] - 2026-08-20
 
 - Added the public SmartSafeHub login route at `/cgi-bin/luci/smartsafehub`.

@@ -1,0 +1,1043 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-smartsafehub\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: SmartSafeHub Translators\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " · Stage %s"
+msgstr ""
+
+msgid "%s % utilization"
+msgstr ""
+
+msgid "%s %s rule: %s completed."
+msgstr ""
+
+msgid "%s %s rule: %s completed. It will take effect after SafeShield is enabled and refreshed."
+msgstr ""
+
+msgid "%s %s rule: %s completed. Local rule application is disabled, so DNS has not been updated yet."
+msgstr ""
+
+msgid "%s Search"
+msgstr ""
+
+msgid "%s confirmed in recent DHCP leases"
+msgstr ""
+
+msgid "%s days and %s hours"
+msgstr ""
+
+msgid "%s h %s m"
+msgstr ""
+
+msgid "%s hour"
+msgstr ""
+
+msgid "%s minute"
+msgstr ""
+
+msgid "-Memory usage"
+msgstr ""
+
+msgid "1 min Load"
+msgstr ""
+
+msgid "5 min %s · 15 min %s"
+msgstr ""
+
+msgid "A recent SafeShield operation encountered an error."
+msgstr ""
+
+msgid "ALL"
+msgstr ""
+
+msgid "AUTO"
+msgstr ""
+
+msgid "Added"
+msgstr ""
+
+msgid "Adding..."
+msgstr ""
+
+msgid "Advanced Settings"
+msgstr ""
+
+msgid "Advanced settings (%s)"
+msgstr ""
+
+msgid "Allow"
+msgstr ""
+
+msgid "Allowlist"
+msgstr ""
+
+msgid "An error occurred on a recent task: %s"
+msgstr ""
+
+msgid "An undefined error has ocurred"
+msgstr ""
+
+msgid "Applying"
+msgstr ""
+
+msgid "Applying Wi-Fi settings may temporarily disconnect you from your current wireless connection. Are you sure you want to continue?"
+msgstr ""
+
+msgid "Artifact not identified"
+msgstr ""
+
+msgid "Banned"
+msgstr ""
+
+msgid "Block"
+msgstr ""
+
+msgid "Blocklist"
+msgstr ""
+
+msgid "Boot time %s"
+msgstr ""
+
+msgid "Bound"
+msgstr ""
+
+msgid "CLOSE"
+msgstr ""
+
+msgid "CONNECTION"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Caps Lock is enabled"
+msgstr ""
+
+msgid "Change the advanced security settings from the existing LuCI"
+msgstr ""
+
+msgid "Changing your Wi-Fi name or password will disconnect you"
+msgstr ""
+
+msgid "Channel"
+msgstr ""
+
+msgid "Check DNS protection status and manage blocklists."
+msgstr ""
+
+msgid "Checking SmartSafeHub connection"
+msgstr ""
+
+msgid "Checking status"
+msgstr ""
+
+msgid "Checking system information."
+msgstr ""
+
+msgid "Close mobile menu"
+msgstr ""
+
+msgid "Close notifications"
+msgstr ""
+
+msgid "Confirmed device"
+msgstr ""
+
+msgid "Connected Device Summary"
+msgstr ""
+
+msgid "Connection Attention"
+msgstr ""
+
+msgid "Connection Type"
+msgstr ""
+
+msgid "Connection Verification Required"
+msgstr ""
+
+msgid "Connection error"
+msgstr ""
+
+msgid "Connection not confirmed"
+msgstr ""
+
+msgid "Continue with default LuCI login"
+msgstr ""
+
+msgid "Current connection"
+msgstr ""
+
+msgid "Current:"
+msgstr ""
+
+msgid "Currently verified on Wi-Fi or ARP"
+msgstr ""
+
+msgid "DHCP Lease Active"
+msgstr ""
+
+msgid "DNS Runtime"
+msgstr ""
+
+msgid "DNS protection"
+msgstr ""
+
+msgid "Default Wi-Fi settings"
+msgstr ""
+
+msgid "Deleted"
+msgstr ""
+
+msgid "Detailed networks, firewalls, packages and logs are managed from the existing LuCI admin screen."
+msgstr ""
+
+msgid "Device API response is empty."
+msgstr ""
+
+msgid "Device API returned HTTP %s error."
+msgstr ""
+
+msgid "Device Dashboard"
+msgstr ""
+
+msgid "Device List"
+msgstr ""
+
+msgid "Device disconnected."
+msgstr ""
+
+msgid "Device response timed out. Please try again in a moment."
+msgstr ""
+
+msgid "Device summary"
+msgstr ""
+
+msgid "Devices connected to wireless APs"
+msgstr ""
+
+msgid "Diagnostic Info"
+msgstr ""
+
+msgid "Diagnostic information file has been created."
+msgstr ""
+
+msgid "Do you want to reboot the router now?"
+msgstr ""
+
+msgid "Download diagnostic information"
+msgstr ""
+
+msgid "Easily check the status of devices connected to your wireless network."
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "Execution time could not be determined."
+msgstr ""
+
+msgid "Failed to change user rules."
+msgstr ""
+
+msgid "Failed to complete system operation."
+msgstr ""
+
+msgid "Failed to fetch device status."
+msgstr ""
+
+msgid "Failed to fetch the list of connected devices."
+msgstr ""
+
+msgid "Failed to find default Wi-Fi to manage"
+msgstr ""
+
+msgid "Failed to load SafeShield status."
+msgstr ""
+
+msgid "Failed to load SmartSafeHub screen."
+msgstr ""
+
+msgid "Failed to load device status"
+msgstr ""
+
+msgid "Failed to load system information."
+msgstr ""
+
+msgid "Failed to load user rules."
+msgstr ""
+
+msgid "Failed to process SafeShield API request."
+msgstr ""
+
+msgid "Failed to process Wi-Fi settings."
+msgstr ""
+
+msgid "Failed to sign in, please verify your account information. Devices with additional authentication enabled can continue under the default LuCI login."
+msgstr ""
+
+msgid "File Size"
+msgstr ""
+
+msgid "Firmware uploads, backups, and restores can have a big impact on your device, so use the existing LuCI verification procedures as they are. The SmartSafeHub product screen only provides frequent status checks and secure entry points."
+msgstr ""
+
+msgid "Full Memory"
+msgstr ""
+
+msgid "Generating diagnostic information"
+msgstr ""
+
+msgid "HIDDEN"
+msgstr ""
+
+msgid "Health check"
+msgstr ""
+
+msgid "Hide password"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "How security works"
+msgstr ""
+
+msgid "I like it"
+msgstr ""
+
+msgid "I like it very much"
+msgstr ""
+
+msgid "INSTALLED"
+msgstr ""
+
+msgid "IP address"
+msgstr ""
+
+msgid "If you turn SafeShield protection off, the current blocklist will be removed and DNS blocking will be interrupted immediately. Are you sure you want to continue?"
+msgstr ""
+
+msgid "In Action"
+msgstr ""
+
+msgid "Inaccessible"
+msgstr ""
+
+msgid "Internet and Wi-Fi connection interrupted briefly during reboot. If you have any unsaved LuCI settings, please save them first."
+msgstr ""
+
+msgid "Invalid command."
+msgstr ""
+
+msgid "JSON-RPC request failed."
+msgstr ""
+
+msgid "Keep current advanced settings ("
+msgstr ""
+
+msgid "Kernel %s"
+msgstr ""
+
+msgid "Last Success"
+msgstr ""
+
+msgid "Learn how to connect to devices that have been identified on your network."
+msgstr ""
+
+msgid "Leave blank to keep existing password"
+msgstr ""
+
+msgid "License not set"
+msgstr ""
+
+msgid "Licenses linked"
+msgstr ""
+
+msgid "Linked devices"
+msgstr ""
+
+msgid "Listing Duration"
+msgstr ""
+
+msgid "Loading information from OpenWrt's rpcd API."
+msgstr ""
+
+msgid "Local rule enforcement is off"
+msgstr ""
+
+msgid "Log out of SmartSafeHub"
+msgstr ""
+
+msgid "Logging in..."
+msgstr ""
+
+msgid "Login"
+msgstr ""
+
+msgid "Logout"
+msgstr ""
+
+msgid "LuCI session information not found. Please refresh the page."
+msgstr ""
+
+msgid "Machine Filters"
+msgstr ""
+
+msgid "Make your family's internet safer and easier to manage. From protected status to Wi-Fi and connected devices, all in one place."
+msgstr ""
+
+msgid "Manage SmartSafeHub"
+msgstr ""
+
+msgid "Manage the domains you want to allow or block."
+msgstr ""
+
+msgid "Manage the name, security, and usage of your primary wireless network."
+msgstr ""
+
+msgid "Manage your network with ease"
+msgstr ""
+
+msgid "Manual renewal runs in the background. Progress is reflected by screen refresh and automatic status check."
+msgstr ""
+
+msgid "Memory Usage"
+msgstr ""
+
+msgid "Mix WPA2/WPA3"
+msgstr ""
+
+msgid "Mobile Menu Opener"
+msgstr ""
+
+msgid "Need verification"
+msgstr ""
+
+msgid "Neutral"
+msgstr ""
+
+msgid "New Domain"
+msgstr ""
+
+msgid "New password"
+msgstr ""
+
+msgid "Next Renewal"
+msgstr ""
+
+msgid "No Wi-Fi settings have been changed."
+msgstr ""
+
+msgid "No encryption"
+msgstr ""
+
+msgid "No interface information"
+msgstr ""
+
+msgid "No license key"
+msgstr ""
+
+msgid "No reboot requests were received."
+msgstr ""
+
+msgid "No records"
+msgstr ""
+
+msgid "No response data found."
+msgstr ""
+
+msgid "No results found."
+msgstr ""
+
+msgid "No version information"
+msgstr ""
+
+msgid "Non-wireless devices identified in LAN ARP"
+msgstr ""
+
+msgid "Not Installed"
+msgstr ""
+
+msgid "Not determined"
+msgstr ""
+
+msgid "OFF"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "On-device verification"
+msgstr ""
+
+msgid "Open Firmware Management"
+msgstr ""
+
+msgid "Overall Status"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Password must be 8-63 characters or 64 hex digits."
+msgstr ""
+
+msgid "Pause"
+msgstr ""
+
+msgid "Permissioned Denied!"
+msgstr ""
+
+msgid "Plan not confirmed"
+msgstr ""
+
+msgid "Please change your search terms or filters."
+msgstr ""
+
+msgid "Please check the network identifiers contained in the file before forwarding it to a support agent."
+msgstr ""
+
+msgid "Please configure the AP mode wireless network in the existing LuCI first."
+msgstr ""
+
+msgid "Please enable JavaScript to use SmartSafeHub."
+msgstr ""
+
+msgid "Please enter SSID between 1 and 32 bytes based on UTF-8."
+msgstr ""
+
+msgid "Please enter a password that is at least 8 characters"
+msgstr ""
+
+msgid "Please enter your password to use secure Wi-Fi."
+msgstr ""
+
+msgid "Please enter your username and password."
+msgstr ""
+
+msgid "Please log in with your router management account."
+msgstr ""
+
+msgid "Prepare for reboot"
+msgstr ""
+
+msgid "Protection off"
+msgstr ""
+
+msgid "Quickly manage DNS-based protection and local blocking rules."
+msgstr ""
+
+msgid "RELOAD"
+msgstr ""
+
+msgid "RULES"
+msgstr ""
+
+msgid "Reboot has started. Please reconnect to the router in a few minutes."
+msgstr ""
+
+msgid "Reboot now"
+msgstr ""
+
+msgid "Reboot router"
+msgstr ""
+
+msgid "Recent Devices"
+msgstr ""
+
+msgid "Recent leases"
+msgstr ""
+
+msgid "Refresh"
+msgstr ""
+
+msgid "Refresh the current screen"
+msgstr ""
+
+msgid "Refreshing..."
+msgstr ""
+
+msgid "Register a domain you want to block yourself, even if it's not in the SafeShield default list."
+msgstr ""
+
+msgid "Register domains and subdomains that you want to allow even if they are on the blacklist."
+msgstr ""
+
+msgid "Remove from %s %s"
+msgstr ""
+
+msgid "Renew your blocklist"
+msgstr ""
+
+msgid "Requesting reboot"
+msgstr ""
+
+msgid "Response Options"
+msgstr ""
+
+msgid "Rule has already been deleted."
+msgstr ""
+
+msgid "Rule saving and validation are managed by the SafeShield API. Domains will be normalized to lowercase and duplicates will remain as one."
+msgstr ""
+
+msgid "Rules will be saved, but will not be reflected in DNS until you turn on SafeShield's apply_local_overrides setting."
+msgstr ""
+
+msgid "SYSTEM STATUS"
+msgstr ""
+
+msgid "SafeShield DNS protection is disabled."
+msgstr ""
+
+msgid "SafeShield Protection"
+msgstr ""
+
+msgid "SafeShield Service"
+msgstr ""
+
+msgid "SafeShield Status API not found"
+msgstr ""
+
+msgid "SafeShield is disabled"
+msgstr ""
+
+msgid "SafeShield is enabled but the service is not running."
+msgstr ""
+
+msgid "SafeShield job is paused."
+msgstr ""
+
+msgid "SafeShield operation failed."
+msgstr ""
+
+msgid "SafeShield protected status"
+msgstr ""
+
+msgid "SafeShield protection is already active."
+msgstr ""
+
+msgid "SafeShield protection is already inactive."
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Save Config"
+msgstr ""
+
+msgid "Saved the %s %s rule %s. Applying local rules to DNS…"
+msgstr ""
+
+msgid "Saved your Wi-Fi settings and reloaded your wireless network."
+msgstr ""
+
+msgid "Screenshot request timed out."
+msgstr ""
+
+msgid "Search by name, IP, Mac or SSID"
+msgstr ""
+
+msgid "Search devices"
+msgstr ""
+
+msgid "Securely check the default status of OpenWrt devices."
+msgstr ""
+
+msgid "Securely manage firmware, diagnostics, advanced settings and reboot operations."
+msgstr ""
+
+msgid "Show password"
+msgstr ""
+
+msgid "Signal"
+msgstr ""
+
+msgid "SmartSafeHub Key Features"
+msgstr ""
+
+msgid "SmartSafeHub Login"
+msgstr ""
+
+msgid "SmartSafeHub Menu"
+msgstr ""
+
+msgid "SmartSafeHub Mobile Menu"
+msgstr ""
+
+msgid "Starting"
+msgstr ""
+
+msgid "Static assets may be missing or the browser cache may be out of date."
+msgstr ""
+
+msgid "Stopped"
+msgstr ""
+
+msgid "Stored passwords will not be re-disclosed to the screen or API."
+msgstr ""
+
+msgid "Stores device, firmware, memory, Internet, Wi-Fi and SafeShield status as JSON files. It does not include your password and license key, but it does include your hostname and network identification information such as your WAN IP and Wi-Fi SSID."
+msgstr ""
+
+msgid "Successfully applied %s %s rules %s and DNS."
+msgstr ""
+
+msgid "System Logs"
+msgstr ""
+
+msgid "System Settings"
+msgstr ""
+
+msgid "System status is not ready. Please refresh and try again."
+msgstr ""
+
+msgid "The SafeShield service and DNS runtime are operating normally."
+msgstr ""
+
+msgid "The blocklist is already being renewed."
+msgstr ""
+
+msgid "The blocklist is installed and DNS protection is working normally."
+msgstr ""
+
+msgid "The device API returned an invalid response."
+msgstr ""
+
+msgid "The request argument is invalid."
+msgstr ""
+
+msgid "The requested method was not found."
+msgstr ""
+
+msgid "The requested resource could not be found."
+msgstr ""
+
+msgid "The rule has been saved, but SafeShield has been turned off and is awaiting DNS enforcement."
+msgstr ""
+
+msgid "The rule was saved but failed to initiate a local DNS enforcement request %s."
+msgstr ""
+
+msgid "The rule was saved, but local DNS enforcement failed. Please check your SafeShield status."
+msgstr ""
+
+msgid "The rule was saved, but we couldn't confirm the completion of applying local DNS within the time limit."
+msgstr ""
+
+msgid "The system load could not be verified."
+msgstr ""
+
+msgid "There are no devices that match your criteria"
+msgstr ""
+
+msgid "There are no registered blocking domains."
+msgstr ""
+
+msgid "This domain is already on the blocklist."
+msgstr ""
+
+msgid "This domain is already whitelisted."
+msgstr ""
+
+msgid "This feature is not supported."
+msgstr ""
+
+msgid "Try Again"
+msgstr ""
+
+msgid "Turn on protection"
+msgstr ""
+
+msgid "Turning off protection will stop the SafeShield service and remove the current DNS blocklist. After turning it back on, you can renew it immediately when you need it."
+msgstr ""
+
+msgid "Turning off…"
+msgstr ""
+
+msgid "Turning on…"
+msgstr ""
+
+msgid "Unable to communicate with router. Please check your network connection and try again."
+msgstr ""
+
+msgid "Unable to communicate with router. Please check your network connection."
+msgstr ""
+
+msgid "Unblock the false positives, and add the desired domains to the SafeShield protection list."
+msgstr ""
+
+msgid "Undetermined"
+msgstr ""
+
+msgid "Unnamed Device"
+msgstr ""
+
+msgid "Unnamed Wi-Fi"
+msgstr ""
+
+msgid "Up to DHCP %s"
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+msgid "Updates and systems"
+msgstr ""
+
+msgid "Updating"
+msgstr ""
+
+msgid "Updating the firmware"
+msgstr ""
+
+msgid "Updating…"
+msgstr ""
+
+msgid "Use %s of %s"
+msgstr ""
+
+msgid "Use the LuCI authentication and session policy of the current router as it is."
+msgstr ""
+
+msgid "Use this Wi-Fi"
+msgstr ""
+
+msgid "User Domain Rules"
+msgstr ""
+
+msgid "User Rules"
+msgstr ""
+
+msgid "User rule response is empty."
+msgstr ""
+
+msgid "Validating and uploading firmware files is done from OpenWrt's Verified System Upgrades screen."
+msgstr ""
+
+msgid "Version"
+msgstr ""
+
+msgid "Version information could not be verified."
+msgstr ""
+
+msgid "WAN interface not found."
+msgstr ""
+
+msgid "WPA2/WPA3 Blend (Recommended)"
+msgstr ""
+
+msgid "Waiting to start"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "We're checking the status of your device"
+msgstr ""
+
+msgid "We've processed your request to renew your blacklist."
+msgstr ""
+
+msgid "We've started updating your blacklists."
+msgstr ""
+
+msgid "Weak"
+msgstr ""
+
+msgid "Welcome back"
+msgstr ""
+
+msgid "Wi-Fi name (SSID)"
+msgstr ""
+
+msgid "Wired/Other"
+msgstr ""
+
+msgid "Wired/other statuses are based on ARP tables, and recent DHCP leases may still have some time left after the device is disconnected."
+msgstr ""
+
+msgid "You Are Protected"
+msgstr ""
+
+msgid "You applied a SafeShield protection deactivation request."
+msgstr ""
+
+msgid "You applied a request to activate SafeShield protection."
+msgstr ""
+
+msgid "You are checking an existing login session."
+msgstr ""
+
+msgid "You are protecting your DNS with %s domain blocking rules."
+msgstr ""
+
+msgid "You can also download settings backups and restore backup files from the same screen."
+msgstr ""
+
+msgid "You can save the rule upfront, and it will take effect when you turn on SafeShield and renew the blocklist."
+msgstr ""
+
+msgid "You can still use SmartSafeHub by reconnecting with your changed Wi-Fi name and password. VLANs, guest networks and advanced wireless options are managed by the existing LuCI."
+msgstr ""
+
+msgid "You don't have any allowed domains on file."
+msgstr ""
+
+msgid "You need to check the SafeShield DNS runtime status."
+msgstr ""
+
+msgid "Your Wi-Fi may have restarted and you may have lost connection. Please reconnect to the SSID you changed and refresh the screen."
+msgstr ""
+
+msgid "Your blocklist is being updated."
+msgstr ""
+
+msgid "Your blocklist is being updated. Current stage: %s"
+msgstr ""
+
+msgid "Your credentials will only be sent to the LuCI login path on your current router."
+msgstr ""
+
+msgid "Your username"
+msgstr ""
+
+msgid "bill(s)"
+msgstr ""
+
+msgid "dnsmasq is not running and we need to check the DNS protection status."
+msgstr ""
+
+msgid "domains"
+msgstr ""
+
+msgid "ea"
+msgstr ""
+
+msgid "not active"
+msgstr ""
+
+msgid "please enter a domain with the format example.com. URLs, IP addresses, and wildcards are not allowed."
+msgstr ""
+
+msgid "please make sure you have the safeshield package and the rpcd ucode plugin installed."
+msgstr ""
+
+msgid "renew now"
+msgstr ""
+
+msgid "search"
+msgstr ""
+
+msgid "ubus error code %s returned."
+msgstr ""
+
+msgid "· Connected device"
+msgstr ""
+
+msgid "Advanced Settings (%s)"
+msgstr ""
+
+msgid "Artifact"
+msgstr ""
+
+msgid "B"
+msgstr ""
+
+msgid "Device"
+msgstr ""
+
+msgid "Device inventory"
+msgstr ""
+
+msgid "Firmware"
+msgstr ""
+
+msgid "GB"
+msgstr ""
+
+msgid "Health"
+msgstr ""
+
+msgid "Internet"
+msgstr ""
+
+msgid "KB"
+msgstr ""
+
+msgid "Keep current advanced settings (%s)"
+msgstr ""
+
+msgid "License"
+msgstr ""
+
+msgid "Load"
+msgstr ""
+
+msgid "Local overrides"
+msgstr ""
+
+msgid "MB"
+msgstr ""
+
+msgid "Memory"
+msgstr ""
+
+msgid "Protection"
+msgstr ""
+
+msgid "Refresh schedule"
+msgstr ""
+
+msgid "SMART NETWORK PROTECTION"
+msgstr ""
+
+msgid "SafeShield"
+msgstr ""
+
+msgid "SafeShield status API is unavailable"
+msgstr ""
+
+msgid "SafeShield status is unknown"
+msgstr ""
+
+msgid "Signal %s · %s dBm"
+msgstr ""
+
+msgid "SmartSafeHub"
+msgstr ""
+
+msgid "System health"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Uptime"
+msgstr ""
+
+msgid "WPA2-Personal"
+msgstr ""
+
+msgid "WPA3-Personal"
+msgstr ""
+
+msgid "Wi-Fi"
+msgstr ""
+
+msgid "dnsmasq"
+msgstr ""
+
+msgid "example.com"
+msgstr ""
+
+msgid "unknown"
+msgstr ""

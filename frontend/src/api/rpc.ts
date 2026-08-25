@@ -1,18 +1,33 @@
+import { t } from '../utils/gettext';
 import type { SmartSafeHubBootstrap } from '../types/bootstrap';
 import type { ApiResponse } from '../types/status';
 
-const UBUS_STATUS_TEXT: Readonly<Record<number, string>> = {
-  1: '잘못된 명령입니다.',
-  2: '요청 인자가 올바르지 않습니다.',
-  3: '요청한 메서드를 찾을 수 없습니다.',
-  4: '요청한 리소스를 찾을 수 없습니다.',
-  5: '응답 데이터가 없습니다.',
-  6: '접근 권한이 없습니다.',
-  7: '요청 시간이 초과되었습니다.',
-  8: '지원하지 않는 기능입니다.',
-  9: '장치에서 알 수 없는 오류가 발생했습니다.',
-  10: '장치 연결이 끊어졌습니다.',
-};
+function getUbusStatusText(status: number): string {
+  switch (status) {
+    case 1:
+      return t('Invalid command.');
+    case 2:
+      return t('The request argument is invalid.');
+    case 3:
+      return t('The requested method was not found.');
+    case 4:
+      return t('The requested resource could not be found.');
+    case 5:
+      return t('No response data found.');
+    case 6:
+      return t('Permissioned Denied!');
+    case 7:
+      return t('Screenshot request timed out.');
+    case 8:
+      return t('This feature is not supported.');
+    case 9:
+      return t('An undefined error has ocurred');
+    case 10:
+      return t('Device disconnected.');
+    default:
+      return t('ubus error code %s returned.', status);
+  }
+}
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MIN_TIMEOUT_MS = 1_000;
@@ -40,7 +55,7 @@ function getBootstrap(): SmartSafeHubBootstrap {
   if (!bootstrap?.sessionId || !bootstrap.rpcUrl) {
     throw new RpcError(
       'BOOTSTRAP_MISSING',
-      'LuCI 세션 정보를 찾을 수 없습니다. 페이지를 새로고침해 주세요.',
+      t('LuCI session information not found. Please refresh the page.'),
     );
   }
 
@@ -54,7 +69,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 function invalidResponse(): RpcError {
   return new RpcError(
     'INVALID_RESPONSE',
-    '장치 API가 올바르지 않은 응답을 반환했습니다.',
+    t('The device API returned an invalid response.'),
   );
 }
 
@@ -89,7 +104,7 @@ function parseJsonRpcResponse<T>(payload: unknown, requestIdentifier: number): T
       `JSON_RPC_${error.code}`,
       typeof error.message === 'string' && error.message.length > 0
         ? error.message
-        : 'JSON-RPC 요청에 실패했습니다.',
+        : t('JSON-RPC request failed.'),
     );
   }
 
@@ -108,12 +123,12 @@ function parseJsonRpcResponse<T>(payload: unknown, requestIdentifier: number): T
   if (status !== 0) {
     throw new RpcError(
       `UBUS_${status}`,
-      UBUS_STATUS_TEXT[status] ?? `ubus 오류 코드 ${status}가 반환되었습니다.`,
+      getUbusStatusText(status),
     );
   }
 
   if (result.length < 2 || result[1] === undefined) {
-    throw new RpcError('EMPTY_RESPONSE', '장치 API 응답이 비어 있습니다.');
+    throw new RpcError('EMPTY_RESPONSE', t('Device API response is empty.'));
   }
 
   return result[1] as T;
@@ -152,7 +167,7 @@ export async function callRpc<T>(
     if (!response.ok) {
       throw new RpcError(
         'HTTP_ERROR',
-        `장치 API가 HTTP ${response.status} 오류를 반환했습니다.`,
+        t('Device API returned HTTP %s error.', response.status),
       );
     }
 
@@ -169,7 +184,7 @@ export async function callRpc<T>(
     if (controller.signal.aborted) {
       throw new RpcError(
         'RPC_TIMEOUT',
-        '장치 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
+        t('Device response timed out. Please try again in a moment.'),
       );
     }
 
@@ -179,7 +194,7 @@ export async function callRpc<T>(
 
     throw new RpcError(
       'NETWORK_ERROR',
-      '공유기와 통신할 수 없습니다. 네트워크 연결을 확인해 주세요.',
+      t('Unable to communicate with router. Please check your network connection.'),
     );
   } finally {
     window.clearTimeout(timeout);

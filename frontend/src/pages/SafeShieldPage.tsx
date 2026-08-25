@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import type { ComponentChildren } from 'preact';
 
 import {
@@ -35,8 +36,8 @@ interface SafeShieldPageProps {
 
 function BooleanState({
   value,
-  trueLabel = '정상',
-  falseLabel = '확인 필요',
+  trueLabel = t('OK'),
+  falseLabel = t('Need verification'),
 }: {
   value: boolean;
   trueLabel?: string;
@@ -96,12 +97,12 @@ function getProductProtectionState(data: SafeShieldStatus): ProductProtectionSta
 
 function getSummaryLabel(data: SafeShieldStatus): string {
   const labels: Record<ProductProtectionState, string> = {
-    disabled: '비활성화',
-    refreshing: '갱신 중',
-    protecting: '보호 중',
-    paused: '일시 중지',
-    error: '오류',
-    attention: '확인 필요',
+    disabled: t('not active'),
+    refreshing: t('Updating'),
+    protecting: t('You Are Protected'),
+    paused: t('Pause'),
+    error: t('Error'),
+    attention: t('Need verification'),
   };
 
   return labels[getProductProtectionState(data)];
@@ -112,46 +113,46 @@ function getSummaryMessage(data: SafeShieldStatus): string {
 
   if (protectionState === 'protecting') {
     if (data.blocklist.validLineCount > 0) {
-      return `${formatNumber(data.blocklist.validLineCount)}개 도메인 차단 규칙으로 DNS를 보호하고 있습니다.`;
+      return t('You are protecting your DNS with %s domain blocking rules.', formatNumber(data.blocklist.validLineCount));
     }
 
     if (data.blocklist.installed) {
-      return '차단 목록이 설치되어 있으며 DNS 보호가 정상적으로 동작하고 있습니다.';
+      return t('The blocklist is installed and DNS protection is working normally.');
     }
 
-    return 'SafeShield 서비스와 DNS 런타임이 정상적으로 동작하고 있습니다.';
+    return t('The SafeShield service and DNS runtime are operating normally.');
   }
 
   if (protectionState === 'refreshing') {
     return data.stage
-      ? `차단 목록을 갱신하고 있습니다. 현재 단계: ${data.stage}`
-      : '차단 목록을 갱신하고 있습니다.';
+      ? t('Your blocklist is being updated. Current stage: %s', data.stage)
+      : t('Your blocklist is being updated.');
   }
 
   if (protectionState === 'disabled') {
-    return 'SafeShield DNS 보호가 비활성화되어 있습니다.';
+    return t('SafeShield DNS protection is disabled.');
   }
 
   if (protectionState === 'paused') {
-    return 'SafeShield 작업이 일시 중지되어 있습니다.';
+    return t('SafeShield job is paused.');
   }
 
   if (protectionState === 'error') {
     return data.runtime.lastErrorCode
-      ? `최근 작업에서 오류가 발생했습니다: ${data.runtime.lastErrorCode}`
-      : '최근 SafeShield 작업에서 오류가 발생했습니다.';
+      ? t('An error occurred on a recent task: %s', data.runtime.lastErrorCode)
+      : t('A recent SafeShield operation encountered an error.');
   }
 
   if (!data.active) {
-    return 'SafeShield가 활성화되어 있지만 서비스가 실행 중이 아닙니다.';
+    return t('SafeShield is enabled but the service is not running.');
   }
 
   if (!data.runtime.dnsmasqRunning) {
-    return 'dnsmasq가 실행 중이 아니어서 DNS 보호 상태를 확인해야 합니다.';
+    return t('dnsmasq is not running and we need to check the DNS protection status.');
   }
 
   if (!data.runtime.dnsRuntimeOk) {
-    return 'SafeShield DNS 런타임 상태를 확인해야 합니다.';
+    return t('You need to check the SafeShield DNS runtime status.');
   }
 
   return data.summary.message;
@@ -159,10 +160,10 @@ function getSummaryMessage(data: SafeShieldStatus): string {
 
 function getHealthLabel(value: string): string {
   const labels: Record<string, string> = {
-    ok: '정상',
-    warning: '경고',
-    error: '오류',
-    unavailable: '사용 불가',
+    ok: t('OK'),
+    warning: t('Warning'),
+    error: t('Error'),
+    unavailable: t('Banned'),
   };
 
   return labels[value] ?? value;
@@ -248,7 +249,7 @@ function ActionFeedback({
         <p class="m-0 font-semibold leading-6">{error ?? message}</p>
       </div>
       <button
-        aria-label="알림 닫기"
+        aria-label={t('Close notifications')}
         class="shrink-0 rounded-lg border-0 bg-transparent px-2 py-1 font-black text-current opacity-60 transition hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-current"
         onClick={onDismiss}
         type="button"
@@ -290,10 +291,10 @@ export function SafeShieldPage({
           <AlertIcon class="size-6" />
         </span>
         <h2 class="mt-5 mb-0 text-xl font-extrabold text-amber-950">
-          SafeShield 상태 API를 찾을 수 없습니다
+          {t('SafeShield Status API not found')}
         </h2>
         <p class="mt-2 mb-0 text-sm leading-6 text-amber-900">
-          safeshield 패키지와 rpcd ucode 플러그인이 설치되어 있는지 확인해 주세요.
+          {t('please make sure you have the safeshield package and the rpcd ucode plugin installed.')}
         </p>
       </section>
     );
@@ -304,16 +305,16 @@ export function SafeShieldPage({
   const actionBusy = action !== null;
   const toggleLabel = enabled
     ? action === 'disable'
-      ? '끄는 중…'
-      : '보호 끄기'
+      ? t('Turning off…')
+      : t('Protection off')
     : action === 'enable'
-      ? '켜는 중…'
-      : '보호 켜기';
+      ? t('Turning on…')
+      : t('Turn on protection');
 
   function handleToggle(): void {
     if (enabled) {
       const confirmed = window.confirm(
-        'SafeShield 보호를 끄면 현재 차단 목록이 제거되고 DNS 차단이 즉시 중단됩니다. 계속하시겠습니까?',
+        t('If you turn SafeShield protection off, the current blocklist will be removed and DNS blocking will be interrupted immediately. Are you sure you want to continue?'),
       );
 
       if (!confirmed) {
@@ -335,7 +336,7 @@ export function SafeShieldPage({
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-3">
                 <h2 class="m-0 break-words text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                  SafeShield 보호 상태
+                  {t('SafeShield protected status')}
                 </h2>
                 <SummaryBadge data={data} />
               </div>
@@ -343,8 +344,8 @@ export function SafeShieldPage({
                 {getSummaryMessage(data)}
               </p>
               <p class="mt-2 mb-0 text-xs font-semibold text-slate-500">
-                버전 {data.version ?? 'unknown'}
-                {data.stage ? ` · 단계 ${data.stage}` : ''}
+                {t('Version')} {data.version ?? t('unknown')}
+                {data.stage ? t(' · Stage %s', data.stage) : ''}
               </p>
             </div>
           </div>
@@ -371,10 +372,10 @@ export function SafeShieldPage({
             >
               <DownloadIcon class={`size-4 ${action === 'refresh' || refreshing ? 'animate-bounce' : ''}`} />
               {action === 'refresh'
-                ? '시작 중…'
+                ? t('Starting')
                 : refreshing
-                  ? '갱신 중…'
-                  : '지금 갱신'}
+                  ? t('Updating…')
+                  : t('renew now')}
             </button>
           </div>
         </div>
@@ -387,57 +388,57 @@ export function SafeShieldPage({
       />
 
       <section class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <InfoCard eyebrow="Protection" icon={<CheckCircleIcon class="size-5" />}>
+        <InfoCard eyebrow={t('Protection')} icon={<CheckCircleIcon class="size-5" />}>
           <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            DNS 보호
+            {t('DNS protection')}
           </h3>
           <dl class="mt-4 mb-0 grid gap-3">
             <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">SafeShield 서비스</dt>
-              <dd class="m-0"><BooleanState falseLabel="중지됨" trueLabel="동작 중" value={data.active} /></dd>
+              <dt class="text-sm text-slate-600">{t('SafeShield Service')}</dt>
+              <dd class="m-0"><BooleanState falseLabel={t('Stopped')} trueLabel={t('In Action')} value={data.active} /></dd>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">dnsmasq</dt>
-              <dd class="m-0"><BooleanState falseLabel="중지됨" value={data.runtime.dnsmasqRunning} /></dd>
+              <dt class="text-sm text-slate-600">{t('dnsmasq')}</dt>
+              <dd class="m-0"><BooleanState falseLabel={t('Stopped')} value={data.runtime.dnsmasqRunning} /></dd>
             </div>
             <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">DNS 런타임</dt>
+              <dt class="text-sm text-slate-600">{t('DNS Runtime')}</dt>
               <dd class="m-0"><BooleanState value={data.runtime.dnsRuntimeOk} /></dd>
             </div>
           </dl>
         </InfoCard>
 
-        <InfoCard eyebrow="Blocklist" icon={<DatabaseIcon class="size-5" />}>
+        <InfoCard eyebrow={t('Blocklist')} icon={<DatabaseIcon class="size-5" />}>
           <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {formatNumber(data.blocklist.validLineCount)}개 도메인
+            {formatNumber(data.blocklist.validLineCount)}{t('domains')}
           </h3>
           <p class="mt-2 mb-0 text-sm text-slate-600">
-            파일 크기 {formatBytes(data.blocklist.fileSizeKb * 1024)}
+            {t('File Size')} {formatBytes(data.blocklist.fileSizeKb * 1024)}
           </p>
-          <div class="mt-4"><BooleanState falseLabel="미설치" trueLabel="설치됨" value={data.blocklist.installed} /></div>
+          <div class="mt-4"><BooleanState falseLabel={t('Not Installed')} trueLabel={t('INSTALLED')} value={data.blocklist.installed} /></div>
         </InfoCard>
 
-        <InfoCard eyebrow="License" icon={<KeyIcon class="size-5" />}>
+        <InfoCard eyebrow={t('License')} icon={<KeyIcon class="size-5" />}>
           <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {data.license.plan?.toUpperCase() || '플랜 미확인'}
+            {data.license.plan?.toUpperCase() || t('Plan not confirmed')}
           </h3>
           <p class="mt-2 mb-0 text-sm text-slate-600">
-            {data.license.status || (data.license.configured ? '상태 확인 중' : '라이선스 미설정')}
+            {data.license.status || (data.license.configured ? t('Checking status') : t('License not set'))}
           </p>
           <p class="mt-4 mb-0 text-xs font-bold text-slate-500">
-            {data.license.configured ? '라이선스 연결됨' : '라이선스 키 없음'}
+            {data.license.configured ? t('Licenses linked') : t('No license key')}
           </p>
         </InfoCard>
 
-        <InfoCard eyebrow="Artifact" icon={<ShieldIcon class="size-5" />}>
+        <InfoCard eyebrow={t('Artifact')} icon={<ShieldIcon class="size-5" />}>
           <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {data.artifact.tier || '아티팩트 미확인'}
+            {data.artifact.tier || t('Artifact not identified')}
           </h3>
           <p class="mt-2 mb-0 break-all text-sm text-slate-600">
-            {data.artifact.version || '버전 정보 없음'}
+            {data.artifact.version || t('No version information')}
           </p>
           <p class="mt-4 mb-0 text-xs font-bold text-slate-500">
-            규칙 {formatNumber(data.artifact.rules)}개
+            {t('RULES')} {formatNumber(data.artifact.rules)}{t('bill(s)')}
           </p>
         </InfoCard>
       </section>
@@ -447,10 +448,10 @@ export function SafeShieldPage({
           <div class="flex items-center justify-between gap-4">
             <div>
               <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                Refresh schedule
+                {t('Refresh schedule')}
               </p>
               <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-                차단 목록 갱신
+                {t('Renew your blocklist')}
               </h2>
             </div>
             <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
@@ -459,52 +460,52 @@ export function SafeShieldPage({
           </div>
           <dl class="mt-6 grid gap-4 sm:grid-cols-3">
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">마지막 성공</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('Last Success')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold leading-5 text-slate-950">
                 {formatTimestamp(data.timestamps.lastSuccess)}
               </dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">다음 갱신</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('Next Renewal')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold leading-5 text-slate-950">
                 {formatTimestamp(data.timestamps.nextRefreshAt)}
               </dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">갱신 주기</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('Listing Duration')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold text-slate-950">
                 {formatInterval(data.timestamps.refreshIntervalS)}
               </dd>
             </div>
           </dl>
           <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-            수동 갱신은 백그라운드에서 실행됩니다. 진행 상태는 화면 새로고침과 자동 상태 확인으로 반영됩니다.
+            {t('Manual renewal runs in the background. Progress is reflected by screen refresh and automatic status check.')}
           </p>
         </article>
 
         <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
           <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-            Health
+            {t('Health')}
           </p>
           <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-            상태 점검
+            {t('Health check')}
           </h2>
           <dl class="mt-6 grid gap-4">
             <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">전체 상태</dt>
+              <dt class="text-sm font-bold text-slate-600">{t('Overall Status')}</dt>
               <dd class="m-0 text-sm font-extrabold text-slate-950">{getHealthLabel(data.health.overall)}</dd>
             </div>
             <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">경고</dt>
+              <dt class="text-sm font-bold text-slate-600">{t('Warning')}</dt>
               <dd class="m-0 text-sm font-extrabold text-amber-700">{data.issueCounts.warnings}</dd>
             </div>
             <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">오류</dt>
+              <dt class="text-sm font-bold text-slate-600">{t('Error')}</dt>
               <dd class="m-0 text-sm font-extrabold text-red-700">{data.issueCounts.errors}</dd>
             </div>
           </dl>
           <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-            보호를 끄면 SafeShield 서비스가 중지되고 현재 DNS 차단 목록이 제거됩니다. 다시 켠 뒤에는 필요할 때 즉시 갱신할 수 있습니다.
+            {t('Turning off protection will stop the SafeShield service and remove the current DNS blocklist. After turning it back on, you can renew it immediately when you need it.')}
           </p>
         </aside>
       </section>

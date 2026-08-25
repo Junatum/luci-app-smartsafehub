@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import type { ComponentChildren } from 'preact';
 
 interface StatusCardProps {
@@ -38,7 +39,7 @@ export function StatusCard({
       </p>
 
       {typeof progress === 'number' ? (
-        <div class="mt-4" aria-label={`사용률 ${Math.round(progress)}%`}>
+        <div class="mt-4" aria-label={t('%s % utilization', Math.round(progress))}>
           <div class="h-2 overflow-hidden rounded-full bg-slate-100">
             <div
               class="h-full rounded-full bg-teal-600 transition-[width] duration-300"

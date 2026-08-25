@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import type { ComponentChildren, JSX } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 
@@ -25,11 +26,11 @@ interface ConnectedDevicesPageProps {
 type DeviceFilter = 'all' | 'online' | 'wifi' | 'ethernet' | 'offline';
 
 const FILTERS: Array<{ value: DeviceFilter; label: string }> = [
-  { value: 'all', label: '전체' },
-  { value: 'online', label: '현재 연결' },
-  { value: 'wifi', label: 'Wi-Fi' },
-  { value: 'ethernet', label: '유선/기타' },
-  { value: 'offline', label: '최근 기기' },
+  { value: 'all', label: t('ALL') },
+  { value: 'online', label: t('Current connection') },
+  { value: 'wifi', label: t('Wi-Fi') },
+  { value: 'ethernet', label: t('Wired/Other') },
+  { value: 'offline', label: t('Recent Devices') },
 ];
 
 const DEVICE_NAME_COLLATOR = new Intl.Collator('ko');
@@ -43,16 +44,16 @@ const LEASE_DATE_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
 function connectionLabel(connection: DeviceConnection): string {
   switch (connection) {
     case 'wifi':
-      return 'Wi-Fi';
+      return t('Wi-Fi');
     case 'ethernet':
-      return '유선/기타';
+      return t('Wired/Other');
     default:
-      return '연결 방식 미확인';
+      return t('Connection not confirmed');
   }
 }
 
 function deviceName(device: ConnectedDevice): string {
-  return device.hostname ?? device.ipv4Address ?? '이름 없는 기기';
+  return device.hostname ?? device.ipv4Address ?? t('Unnamed Device');
 }
 
 function signalLabel(signal: number | null): string | null {
@@ -60,15 +61,15 @@ function signalLabel(signal: number | null): string | null {
     return null;
   }
   if (signal >= -50) {
-    return '매우 좋음';
+    return t('I like it very much');
   }
   if (signal >= -60) {
-    return '좋음';
+    return t('I like it');
   }
   if (signal >= -70) {
-    return '보통';
+    return t('Neutral');
   }
-  return '약함';
+  return t('Weak');
 }
 
 function formatDuration(seconds: number | null): string | null {
@@ -81,12 +82,12 @@ function formatDuration(seconds: number | null): string | null {
   const minutes = Math.floor((seconds % 3_600) / 60);
 
   if (days > 0) {
-    return `${days}일 ${hours}시간`;
+    return t('%s days and %s hours', days, hours);
   }
   if (hours > 0) {
-    return `${hours}시간 ${minutes}분`;
+    return t('%s h %s m', hours, minutes);
   }
-  return `${Math.max(minutes, 1)}분`;
+  return t('%s minute', Math.max(minutes, 1));
 }
 
 function leaseLabel(device: ConnectedDevice): string | null {
@@ -94,12 +95,12 @@ function leaseLabel(device: ConnectedDevice): string | null {
     return null;
   }
   if (device.leaseExpiresAt === null) {
-    return 'DHCP 임대 활성';
+    return t('DHCP Lease Active');
   }
 
-  return `DHCP ${LEASE_DATE_FORMATTER.format(
+  return t('Up to DHCP %s', LEASE_DATE_FORMATTER.format(
     new Date(device.leaseExpiresAt * 1000),
-  )}까지`;
+  ));
 }
 
 function matchesFilter(device: ConnectedDevice, filter: DeviceFilter): boolean {
@@ -129,7 +130,7 @@ function DeviceStatusBadge({ device }: { device: ConnectedDevice }) {
       <span
         class={`size-2 rounded-full ${device.online ? 'bg-emerald-500' : 'bg-slate-400'}`}
       />
-      {device.online ? '현재 연결' : '최근 임대'}
+      {device.online ? t('Current connection') : t('Recent leases')}
     </span>
   );
 }
@@ -174,13 +175,13 @@ function DeviceCard({ device }: { device: ConnectedDevice }) {
 
       <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
         <div class="rounded-xl bg-slate-50 p-3.5">
-          <dt class="text-xs font-bold text-slate-500">IP 주소</dt>
+          <dt class="text-xs font-bold text-slate-500">{t('IP address')}</dt>
           <dd class="mt-1.5 mb-0 ml-0 font-extrabold text-slate-900">
-            {device.ipv4Address ?? '확인되지 않음'}
+            {device.ipv4Address ?? t('Not determined')}
           </dd>
         </div>
         <div class="rounded-xl bg-slate-50 p-3.5">
-          <dt class="text-xs font-bold text-slate-500">연결 방식</dt>
+          <dt class="text-xs font-bold text-slate-500">{t('Connection Type')}</dt>
           <dd class="mt-1.5 mb-0 ml-0 font-extrabold text-slate-900">
             {connectionLabel(device.connection)}
           </dd>
@@ -195,12 +196,12 @@ function DeviceCard({ device }: { device: ConnectedDevice }) {
         ) : null}
         {signal ? (
           <span class="rounded-full bg-slate-100 px-3 py-1.5">
-            신호 {signal} · {device.signalDbm} dBm
+            {t('Signal %s · %s dBm', signal, device.signalDbm)}
           </span>
         ) : null}
         {connected ? (
           <span class="rounded-full bg-slate-100 px-3 py-1.5">
-            연결 {connected}
+            {t('CONNECTION')} {connected}
           </span>
         ) : null}
         {lease ? (
@@ -265,29 +266,29 @@ export function ConnectedDevicesPage({
 
   return (
     <>
-      <section aria-label="연결 기기 요약" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label={t('Connected Device Summary')} class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          description={`${data.totals.offline}대는 최근 DHCP 임대에서 확인`}
+          description={t('%s confirmed in recent DHCP leases', data.totals.offline)}
           icon={<DevicesIcon class="size-6" />}
-          label="확인된 기기"
+          label={t('Confirmed device')}
           value={data.totals.known}
         />
         <SummaryCard
-          description="Wi-Fi 또는 ARP에서 현재 확인됨"
+          description={t('Currently verified on Wi-Fi or ARP')}
           icon={<ClockIcon class="size-6" />}
-          label="현재 연결"
+          label={t('Current connection')}
           value={data.totals.online}
         />
         <SummaryCard
-          description="무선 AP에 연결된 기기"
+          description={t('Devices connected to wireless APs')}
           icon={<WifiIcon class="size-6" />}
-          label="Wi-Fi"
+          label={t('Wi-Fi')}
           value={data.totals.wireless}
         />
         <SummaryCard
-          description="LAN ARP에서 확인된 비무선 기기"
+          description={t('Non-wireless devices identified in LAN ARP')}
           icon={<CableIcon class="size-6" />}
-          label="유선/기타"
+          label={t('Wired/Other')}
           value={data.totals.ethernet}
         />
       </section>
@@ -296,28 +297,28 @@ export function ConnectedDevicesPage({
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Device inventory
+              {t('Device inventory')}
             </p>
             <h2 class="mt-2 mb-0 text-xl font-extrabold text-slate-950">
-              기기 목록
+              {t('Device List')}
             </h2>
           </div>
           <label class="relative block w-full lg:max-w-sm">
-            <span class="sr-only">기기 검색</span>
+            <span class="sr-only">{t('Search devices')}</span>
             <SearchIcon class="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-slate-400" />
             <input
               class="min-h-11 w-full rounded-xl border border-slate-300 bg-white pr-4 pl-11 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
               onInput={(event: JSX.TargetedEvent<HTMLInputElement>) =>
                 setQuery(event.currentTarget.value)
               }
-              placeholder="이름, IP, MAC 또는 SSID 검색"
+              placeholder={t('Search by name, IP, Mac or SSID')}
               type="search"
               value={query}
             />
           </label>
         </div>
 
-        <div class="ssh-touch-scroll mt-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="기기 필터">
+        <div class="ssh-touch-scroll mt-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t('Machine Filters')}>
           {FILTERS.map((item) => (
             <button
               aria-pressed={filter === item.value}
@@ -346,16 +347,16 @@ export function ConnectedDevicesPage({
         <section class="mt-5 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-center sm:p-8">
           <DevicesIcon class="mx-auto size-10 text-slate-400" />
           <h2 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            조건에 맞는 기기가 없습니다
+            {t('There are no devices that match your criteria')}
           </h2>
           <p class="mt-2 mb-0 text-sm text-slate-600">
-            검색어 또는 필터를 변경해 주세요.
+            {t('Please change your search terms or filters.')}
           </p>
         </section>
       )}
 
       <p class="mt-5 mb-0 rounded-xl bg-slate-100 px-4 py-3 text-xs leading-5 text-slate-600">
-        유선/기타 상태는 ARP 테이블을 기준으로 하며, 최근 DHCP 임대는 기기가 연결 해제된 뒤에도 일정 시간 남을 수 있습니다.
+        {t('Wired/other statuses are based on ARP tables, and recent DHCP leases may still have some time left after the device is disconnected.')}
       </p>
     </>
   );

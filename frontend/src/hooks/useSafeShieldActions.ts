@@ -4,6 +4,7 @@ import {
   requestSafeShieldRefresh,
   setSafeShieldEnabled,
 } from '../api/safeshield';
+import { t } from '../utils/gettext';
 import { errorMessage } from '../utils/errors';
 
 export type SafeShieldAction = 'enable' | 'disable' | 'refresh';
@@ -59,18 +60,18 @@ export function useSafeShieldActions(
           error: null,
           message: result.changed
             ? enabled
-              ? 'SafeShield 보호 활성화 요청을 적용했습니다.'
-              : 'SafeShield 보호 비활성화 요청을 적용했습니다.'
+              ? t('You applied a request to activate SafeShield protection.')
+              : t('You applied a SafeShield protection deactivation request.')
             : enabled
-              ? 'SafeShield 보호가 이미 활성화 상태입니다.'
-              : 'SafeShield 보호가 이미 비활성화 상태입니다.',
+              ? t('SafeShield protection is already active.')
+              : t('SafeShield protection is already inactive.'),
         });
         await refreshStatus();
         scheduleRefreshes([800, 2000, 5000]);
       } catch (error) {
         setState({
           action: null,
-          error: errorMessage(error, 'SafeShield 작업을 수행하지 못했습니다.'),
+          error: errorMessage(error, t('SafeShield operation failed.')),
           message: null,
         });
       }
@@ -87,16 +88,16 @@ export function useSafeShieldActions(
         action: null,
         error: null,
         message: result.accepted
-          ? '차단 목록 갱신 작업을 시작했습니다.'
+          ? t('We\'ve started updating your blacklists.')
           : result.reason === 'already_running'
-            ? '차단 목록을 이미 갱신하고 있습니다.'
-            : '차단 목록 갱신 요청을 처리했습니다.',
+            ? t('The blocklist is already being renewed.')
+            : t('We\'ve processed your request to renew your blacklist.'),
       });
       scheduleRefreshes([700, 2500, 6000, 12000]);
     } catch (error) {
       setState({
         action: null,
-        error: errorMessage(error, 'SafeShield 작업을 수행하지 못했습니다.'),
+        error: errorMessage(error, t('SafeShield operation failed.')),
         message: null,
       });
     }

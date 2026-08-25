@@ -1,3 +1,4 @@
+import { t } from '../utils/gettext';
 import { useMemo } from 'preact/hooks';
 
 import {
@@ -36,7 +37,7 @@ function StateBadge({ up }: { up: boolean }) {
       <span
         class={`size-2 rounded-full ${up ? 'bg-emerald-500' : 'bg-amber-500'}`}
       />
-      {up ? '정상' : '확인 필요'}
+      {up ? t('OK') : t('Need verification')}
     </span>
   );
 }
@@ -62,18 +63,18 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
   return (
     <>
       <section
-        aria-label="장치 요약"
+        aria-label={t('Device summary')}
         class="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
         <StatusCard
           description={data.device.hostname}
-          eyebrow="Device"
+          eyebrow={t('Device')}
           icon={<RouterIcon class="size-6" />}
           title={data.device.model}
         />
         <StatusCard
           description={`${data.software.distribution} ${data.software.version} · ${data.software.revision}`}
-          eyebrow="Firmware"
+          eyebrow={t('Firmware')}
           icon={<ShieldIcon class="size-6" />}
           title={data.software.version}
         />
@@ -83,16 +84,16 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
             data.network.available
               ? [data.network.protocol, data.network.ipv4Address]
                   .filter(Boolean)
-                  .join(' · ') || '인터페이스 정보 없음'
-              : 'WAN 인터페이스를 찾을 수 없습니다.'
+                  .join(' · ') || t('No interface information')
+              : t('WAN interface not found.')
           }
-          eyebrow="Internet"
+          eyebrow={t('Internet')}
           icon={<GlobeIcon class="size-6" />}
-          title={data.network.up ? '연결됨' : '연결 확인 필요'}
+          title={data.network.up ? t('Bound') : t('Connection Verification Required')}
         />
         <StatusCard
-          description={`부팅 시각 ${formatBootTime(data.runtime.localtime, data.runtime.uptime)}`}
-          eyebrow="Uptime"
+          description={t('Boot time %s', formatBootTime(data.runtime.localtime, data.runtime.uptime))}
+          eyebrow={t('Uptime')}
           icon={<ClockIcon class="size-6" />}
           title={formatUptime(data.runtime.uptime)}
         />
@@ -103,10 +104,10 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
           <div class="flex items-start justify-between gap-4">
             <div>
               <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                System health
+                {t('System health')}
               </p>
               <h2 class="mt-3 mb-0 text-xl font-extrabold tracking-tight text-slate-950">
-                시스템 상태
+                {t('SYSTEM STATUS')}
               </h2>
             </div>
             <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
@@ -116,19 +117,19 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
 
           <dl class="mt-6 grid gap-4 sm:grid-cols-3">
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">메모리 사용</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('Memory Usage')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-lg font-extrabold text-slate-950">
-                {memory ? formatBytes(memory.used) : '확인 불가'}
+                {memory ? formatBytes(memory.used) : t('Inaccessible')}
               </dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">전체 메모리</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('Full Memory')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-lg font-extrabold text-slate-950">
                 {formatBytes(data.runtime.memory.total)}
               </dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">1분 Load</dt>
+              <dt class="text-xs font-bold text-slate-500">{t('1 min Load')}</dt>
               <dd class="mt-2 mb-0 ml-0 text-lg font-extrabold text-slate-950">
                 {(data.runtime.load[0] / 65_536).toFixed(2)}
               </dd>
@@ -137,7 +138,7 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
 
           <div class="mt-5">
             <div class="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
-              <span>메모리 사용률</span>
+              <span>{t('-Memory usage')}</span>
               <span>{memory ? `${Math.round(memory.percent)}%` : '-'}</span>
             </div>
             <div class="h-2.5 overflow-hidden rounded-full bg-slate-100">
