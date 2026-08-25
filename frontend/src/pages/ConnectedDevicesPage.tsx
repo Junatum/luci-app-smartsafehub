@@ -1,4 +1,4 @@
-import { t } from '../utils/gettext';
+import { getLocale, t } from '../utils/gettext';
 import type { ComponentChildren, JSX } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 
@@ -33,8 +33,8 @@ const FILTERS: Array<{ value: DeviceFilter; label: string }> = [
   { value: 'offline', label: t('Recent Devices') },
 ];
 
-const DEVICE_NAME_COLLATOR = new Intl.Collator('ko');
-const LEASE_DATE_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+const DEVICE_NAME_COLLATOR = new Intl.Collator(getLocale());
+const LEASE_DATE_FORMATTER = new Intl.DateTimeFormat(getLocale(), {
   month: 'numeric',
   day: 'numeric',
   hour: '2-digit',

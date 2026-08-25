@@ -1,8 +1,8 @@
-import { t } from '../utils/gettext';
+import { getLocale, t } from '../utils/gettext';
 import type { RuntimeMemory } from '../types/status';
 
-const NUMBER_FORMATTER = new Intl.NumberFormat('ko-KR');
-const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+const NUMBER_FORMATTER = new Intl.NumberFormat(getLocale());
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat(getLocale(), {
   dateStyle: 'medium',
   timeStyle: 'short',
 });

@@ -6,6 +6,16 @@ declare global {
 
 let templateMessages: Map<string, string> | null = null;
 
+export function getLocale(): string {
+  return (
+    window.__SMARTHUB_BOOTSTRAP__?.locale ??
+    document.getElementById('smartsafehub-login-root')?.dataset.locale ??
+    document.documentElement.lang ??
+    navigator.language ??
+    'en'
+  ).replace(/_/g, '-');
+}
+
 function templateTranslate(message: string): string | null {
   if (!templateMessages) {
     templateMessages = new Map(

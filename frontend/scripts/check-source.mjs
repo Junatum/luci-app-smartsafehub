@@ -491,6 +491,13 @@ if (untranslatedIssues.length > 0) {
   throw new Error(`Found ${untranslatedIssues.length} untranslated user-visible string(s)`);
 }
 
+for (const relativePath of uiSourceFiles) {
+  const source = await read(`${frontendRoot}${relativePath}`);
+  if (/Intl\.(?:Collator|DateTimeFormat|NumberFormat)\(['"]ko(?:-KR)?['"]/.test(source)) {
+    throw new Error(`${relativePath} contains a hard-coded Korean Intl locale`);
+  }
+}
+
 const main = await read(`${frontendRoot}src/main.tsx`);
 if (!main.includes('__SMARTHUB_APP_UNMOUNT__') || !main.includes('render(null')) {
   throw new Error('main.tsx does not expose the Preact unmount lifecycle');
