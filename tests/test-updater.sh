@@ -28,7 +28,8 @@ assert_not_contains() {
 }
 
 assert_contains "$MAKEFILE" 'LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +safeshield'
-assert_contains "$MAKEFILE" 'EXTRA_DEPENDS:=safeshield (>= 0.3.10)'
+SAFESHIELD_MIN_VERSION="$(sed -n 's/^EXTRA_DEPENDS:=safeshield (>= \([^)]*\))$/\1/p' "$MAKEFILE")"
+[ -n "$SAFESHIELD_MIN_VERSION" ] || fail 'unable to read safeshield minimum version from EXTRA_DEPENDS'
 
 mkdir -p "$TMP/bin" "$TMP/repos" "$TMP/pkg"
 printf '%s\n' 'https://repo.smartsafehub.com/stable/packages/x86_64/smartsafehub/packages.adb' > "$TMP/repos/smartsafehub.list"
@@ -49,16 +50,16 @@ MOCKUCI
 chmod +x "$TMP/bin/uci"
 
 cat > "$TMP/pkg/safeshield.installed" <<EOF2
-0.3.9
+0.0.0
 EOF2
 cat > "$TMP/pkg/safeshield.available" <<EOF2
-0.3.10
+$SAFESHIELD_MIN_VERSION
 EOF2
 cat > "$TMP/pkg/luci-app-smartsafehub.installed" <<EOF2
 0.2.0-r2
 EOF2
 cat > "$TMP/pkg/luci-app-smartsafehub.available" <<EOF2
-0.2.1-r1
+0.2.2-r1
 EOF2
 
 cat > "$TMP/bin/apk" <<'MOCKAPK'
@@ -128,15 +129,15 @@ export SMARTSAFEHUB_UPDATER_LUCI_INDEX_CACHE="$TMP/luci-indexcache"
 TAB="$(printf '\t')"
 assert_contains "$TMP/updates.state" "phase${TAB}idle"
 assert_not_contains "$TMP/updates.state" "package${TAB}safeshield"
-assert_contains "$TMP/updates.state" "package${TAB}luci-app-smartsafehub${TAB}0.2.0-r2${TAB}0.2.1-r1${TAB}1"
+assert_contains "$TMP/updates.state" "package${TAB}luci-app-smartsafehub${TAB}0.2.0-r2${TAB}0.2.2-r1${TAB}1"
 
 "$UPDATER" install
 assert_contains "$TMP/apk.log" 'add --upgrade luci-app-smartsafehub'
 assert_not_contains "$TMP/apk.log" ' safeshield'
-[ "$(cat "$TMP/pkg/safeshield.installed")" = '0.3.10' ] || fail 'safeshield dependency did not reach the required minimum version'
-assert_contains "$TMP/updates.state" "package${TAB}luci-app-smartsafehub${TAB}0.2.1-r1${TAB}${TAB}0"
+[ "$(cat "$TMP/pkg/safeshield.installed")" = "$SAFESHIELD_MIN_VERSION" ] || fail 'safeshield dependency did not reach the required minimum version'
+assert_contains "$TMP/updates.state" "package${TAB}luci-app-smartsafehub${TAB}0.2.2-r1${TAB}${TAB}0"
 
 last_install_at="$(awk -F '\t' '$1 == "last_install_at" { print $2 }' "$TMP/updates.state")"
 [ "${last_install_at:-0}" -gt 0 ] || fail 'last_install_at was not recorded'
 
-echo 'PASS: smartsafehub updater tracks only luci-app-smartsafehub and enforces safeshield >= 0.3.10 through package metadata'
+echo "PASS: smartsafehub updater tracks only luci-app-smartsafehub and enforces safeshield >= $SAFESHIELD_MIN_VERSION through package metadata"

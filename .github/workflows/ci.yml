@@ -27,9 +27,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Validate executable permissions and package metadata
+        run: ./tests/test-package-contract.sh
+
       - name: Validate shell scripts
         run: |
+          sh -n root/etc/init.d/smartsafehub-updater
           sh -n root/usr/libexec/smartsafehub-updater
+          sh -n tests/test-package-contract.sh
+          sh -n tests/test-rpc-contract.sh
+          sh -n tests/test-ucode-imports.sh
           sh -n tests/test-updater.sh
 
       - name: Validate JSON files
@@ -38,11 +45,16 @@ jobs:
                root/usr/share/luci/menu.d \
                -type f -name '*.json' \
                -print0 |
-            xargs -0 -n1 jq empty
+            xargs -0 -r -n1 jq empty
+
+      - name: Validate ucode imports
+        run: ./tests/test-ucode-imports.sh
+
+      - name: Validate RPC and ACL contract
+        run: ./tests/test-rpc-contract.sh
 
       - name: Run updater tests
-        run: |
-          ./tests/test-updater.sh
+        run: ./tests/test-updater.sh
 
   frontend:
     name: Frontend
@@ -66,8 +78,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check
-        run: npm run typecheck
-
       - name: Build
         run: npm run build
+
+      - name: Validate committed production assets
+        run: |
+          test -s ../root/www/luci-static/smartsafehub/app.js
+          test -s ../root/www/luci-static/smartsafehub/app.css
+          test ! -e ../root/www/luci-static/smartsafehub/index.html
+          git -C .. diff --exit-code -- root/www/luci-static/smartsafehub/

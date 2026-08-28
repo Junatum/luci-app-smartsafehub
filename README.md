@@ -225,17 +225,24 @@ make package/luci-app-smartsafehub/compile V=s
 
 별도의 `Build/Prepare` 검증 hook은 사용하지 않습니다. OpenWrt 패키지 빌드는 `luci.mk`의 기본 패키징 흐름을 사용하며, 프런트엔드 자산은 패키지 빌드 전에 `npm run build`로 갱신합니다.
 
-별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.1-r1`이 JavaScript와 CSS 캐시 무효화 키입니다.
+별도의 프런트엔드 build ID는 사용하지 않습니다. JavaScript와 CSS 캐시 무효화 키는 현재 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`를 기준으로 관리합니다. README에는 특정 릴리스 버전을 고정해서 기록하지 않습니다.
 
 ## 설치
 
-생성한 APK를 공유기에 복사한 뒤 설치합니다.
+SmartSafeHub 저장소를 사용하는 경우 최신 버전은 패키지 이름으로 설치하거나 업데이트합니다.
 
 ```bash
-apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.1-r1.apk
+apk update
+apk add --upgrade luci-app-smartsafehub
 ```
 
-기존 버전 위에 설치할 때는 사용하는 저장소 정책에 맞춰 `apk upgrade` 또는 로컬 APK 설치를 수행합니다.
+직접 빌드한 APK를 테스트 장치에 설치하는 경우에는 `/tmp`에 해당 APK만 복사한 뒤 실제 생성된 파일을 설치합니다.
+
+```bash
+apk add --allow-untrusted /tmp/luci-app-smartsafehub-*.apk
+```
+
+정확한 현재 버전은 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`, 또는 설치된 장치의 `apk info luci-app-smartsafehub`로 확인합니다.
 
 설치 후 LuCI와 rpcd 캐시를 갱신합니다.
 
@@ -351,7 +358,7 @@ rm -f /tmp/luci-indexcache
 /etc/init.d/uhttpd restart
 ```
 
-브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.1-r1`와 Shadow DOM용 `app.css?v=0.2.1-r1`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
+브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿의 `app.js?v=...`와 Shadow DOM용 `app.css?v=...`에는 현재 패키지의 `PKG_VERSION-rPKG_RELEASE` 값이 사용되므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
 
 ## 배포 전 체크리스트
 
@@ -392,16 +399,22 @@ ubus call smartsafehub connected_devices '{}'
 - 통합 진입 템플릿의 `data-asset-version`과 `app.js?v=` 버전은 `PKG_VERSION-rPKG_RELEASE`와 맞춥니다.
 - 프런트엔드 build ID 상수는 별도로 두지 않습니다.
 - 정식 배포 이력은 `CHANGELOG.md`에 기록합니다.
+- README에는 현재 SmartSafeHub 릴리스 버전을 직접 기록하지 않습니다. 최신 버전은 `Makefile`과 배포 저장소를 기준으로 확인합니다.
 
-현재 값:
+현재 소스 트리의 패키지 버전은 다음 명령으로 확인할 수 있습니다.
 
-```makefile
-PKG_VERSION:=0.2.1
-PKG_RELEASE:=1
+```bash
+awk -F':=' '
+  /^PKG_VERSION:=/ { version=$2 }
+  /^PKG_RELEASE:=/ { release=$2 }
+  END { printf "%s-r%s\\n", version, release }
+' Makefile
 ```
 
-```js
-data-asset-version="0.2.1-r1"
+설치된 장치에서는 다음 명령으로 실제 설치 버전을 확인합니다.
+
+```bash
+apk info luci-app-smartsafehub
 ```
 
 ## 현재 제약

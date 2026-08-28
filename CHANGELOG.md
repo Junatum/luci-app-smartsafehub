@@ -4,6 +4,24 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.2-r1] - 2026-08-28
+
+GitHub Actions CI에서 SmartSafeHub 패키지 계약과 배포 산출물 회귀를 더 일찍 감지하도록 자동 검증 범위를 확장했습니다.
+
+### 추가
+
+- `tests/test-package-contract.sh`를 추가해 실행 권한, `PKG_VERSION`과 frontend package 버전 동기화, SafeShield dependency 형식, `/etc/config/smartsafehub` conffile 선언을 검증합니다.
+- `tests/test-rpc-contract.sh`를 추가해 updater RPC 등록과 ACL 권한, 단일 `luci-app-smartsafehub` 업데이트 대상, 전체 시스템 `apk upgrade` 금지 계약을 검증합니다.
+- `tests/test-ucode-imports.sh`를 추가해 분리된 rpcd ucode 모듈의 상대 import 대상이 실제 파일로 존재하는지 검증합니다.
+- frontend production build 후 커밋된 `app.js`와 `app.css`가 실제 소스 빌드 결과와 일치하는지 확인하는 CI 검사를 추가했습니다.
+- updater init script를 포함한 shell syntax 검사와 JSON 구문 검사를 보강했습니다.
+
+### CI
+
+- CI에서 `chmod`로 실행 권한을 보정하지 않고 저장소의 executable bit 자체를 검증합니다.
+- `npm run build`가 이미 TypeScript typecheck를 포함하므로 중복된 별도 typecheck step을 제거했습니다.
+- Vite production output에 `app.js`와 `app.css`가 존재하고 배포용 `index.html`이 생성되지 않는 계약을 검증합니다.
+
 ## [0.2.1-r1] - 2026-08-28
 
 `luci-app-smartsafehub` 업데이트를 감지하고, 사용자가 선택한 경우 공유기에서 예약 자동 설치할 수 있는 SmartSafeHub 업데이트 관리 기능을 추가했습니다.

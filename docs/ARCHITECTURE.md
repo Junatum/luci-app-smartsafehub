@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.1-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.2-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -137,7 +137,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 현재 자산 버전:
 
 ```text
-0.2.1-r1
+0.2.2-r1
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -551,9 +551,9 @@ SystemPage의 기존 system snapshot
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.1-r1
-  → app.js?v=0.2.1-r1
-  → app.css?v=0.2.1-r1
+  → data-asset-version = 0.2.2-r1
+  → app.js?v=0.2.2-r1
+  → app.css?v=0.2.2-r1
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
