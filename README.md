@@ -1,13 +1,14 @@
 # SmartSafeHub LuCI 애플리케이션
 
+[![Lint](https://github.com/Junatum/luci-app-smartsafehub/actions/workflows/ci.yml/badge.svg)](https://github.com/Junatum/luci-app-smartsafehub/actions/workflows/ci.yml)
+![OpenWrt](https://img.shields.io/badge/OpenWrt-Compatible-blue)
+![License](https://img.shields.io/github/license/Junatum/luci-app-smartsafehub?label=License)
+
 SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 기기와 SafeShield DNS 보호 기능을 일반 사용자 중심의 화면에서 관리하기 위한 LuCI 애플리케이션입니다.
 
-현재 정식 배포 버전은 **`0.2.1-r1`**입니다.
-
-- 애플리케이션 버전: `0.2.1`
-- OpenWrt 패키지 릴리스: `1`
-- 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
+- OpenWrt: **25.12 버전 이상**
 - 백엔드: rpcd ucode 모듈
+- 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
 - 라이선스: GPL-3.0-or-later
 
 변경 내역은 [CHANGELOG.md](CHANGELOG.md), 내부 구조와 데이터 흐름은 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
