@@ -44,6 +44,16 @@ grep -Fq "const UPDATE_PACKAGE = 'luci-app-smartsafehub';" "$UPDATES_MODULE" || 
 	fail 'ucode updater target must be luci-app-smartsafehub'
 grep -Fq 'UPDATE_PACKAGE="luci-app-smartsafehub"' "$UPDATER" || \
 	fail 'shell updater target must be luci-app-smartsafehub'
+grep -Fq "const RELEASE_NOTES_FILE = '/tmp/smartsafehub-release-notes.json';" "$UPDATES_MODULE" || \
+	fail 'rpc update status must read the release-note bundle cache'
+grep -Fq 'state.releaseNotes = release_notes.notes;' "$UPDATES_MODULE" || \
+	fail 'updates_status must expose validated release note metadata'
+grep -Fq 'state.releaseNotesComplete = release_notes.complete;' "$UPDATES_MODULE" || \
+	fail 'updates_status must expose release-note completeness'
+grep -Fq 'refresh_release_notes "$packages_file"' "$UPDATER" || \
+	fail 'updater must refresh display-only release notes after package checks'
+grep -Fq '/releases/${UPDATE_PACKAGE}/index.json' "$UPDATER" || \
+	fail 'updater must consult the release index before selecting skipped releases'
 
 if grep -Eq '^[[:space:]]*(apk|"\$APK_BIN"|\$APK_BIN)[[:space:]]+upgrade([[:space:]]|$)' "$UPDATER"; then
 	fail 'full-system apk upgrade must not be used by SmartSafeHub updater'

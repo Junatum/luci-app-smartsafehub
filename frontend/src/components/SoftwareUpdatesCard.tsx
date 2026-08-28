@@ -230,6 +230,86 @@ export function SoftwareUpdatesCard({
             )}
           </div>
 
+          {data.updateCount > 0 ? (
+            <section class="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <h3 class="m-0 text-sm font-black text-slate-950">업데이트 내용</h3>
+                {data.releaseNotes.length ? (
+                  <span class="text-xs font-bold text-slate-500">
+                    {data.releaseNotes.length === 1
+                      ? '1개 릴리즈'
+                      : `${data.releaseNotes.length}개 릴리즈 포함`}
+                  </span>
+                ) : null}
+              </div>
+
+              {data.releaseNotes.length ? (
+                <div class="mt-4 grid gap-3">
+                  {data.releaseNotes.map((releaseNote) => (
+                    <article
+                      class="rounded-xl border border-slate-200 bg-white p-4"
+                      key={releaseNote.version}
+                    >
+                      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <strong class="break-all text-sm font-black text-slate-900">
+                          {releaseNote.version}
+                        </strong>
+                        {releaseNote.date ? (
+                          <span class="text-xs font-bold text-slate-500">
+                            {releaseNote.date}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {releaseNote.summary ? (
+                        <p class="mt-3 mb-0 text-sm leading-6 text-slate-700">
+                          {releaseNote.summary}
+                        </p>
+                      ) : null}
+
+                      {releaseNote.sections.length ? (
+                        <details
+                          class="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3"
+                          open={data.releaseNotes.length === 1}
+                        >
+                          <summary class="cursor-pointer text-xs font-extrabold text-slate-800">
+                            자세한 변경 사항
+                          </summary>
+                          <div class="mt-3 grid gap-4">
+                            {releaseNote.sections.map((section) => (
+                              <section key={`${releaseNote.version}-${section.title}`}>
+                                <h4 class="m-0 text-xs font-extrabold text-slate-700">
+                                  {section.title}
+                                </h4>
+                                <ul class="mt-2 mb-0 space-y-1.5 pl-5 text-xs leading-5 text-slate-600">
+                                  {section.items.map((item, index) => (
+                                    <li key={`${releaseNote.version}-${section.title}-${index}`}>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </section>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </article>
+                  ))}
+
+                  {!data.releaseNotesComplete ? (
+                    <p class="m-0 text-xs leading-5 text-amber-700">
+                      일부 릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+                  릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
+                </p>
+              )}
+            </section>
+          ) : null}
+
           <div class="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               class="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"

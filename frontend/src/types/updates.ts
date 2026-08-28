@@ -7,6 +7,20 @@ export interface SoftwareUpdatePackage {
   updateAvailable: boolean;
 }
 
+export interface SoftwareReleaseNoteSection {
+  title: string;
+  items: string[];
+}
+
+export interface SoftwareReleaseNote {
+  schemaVersion: number;
+  package: string;
+  version: string;
+  date: string | null;
+  summary: string | null;
+  sections: SoftwareReleaseNoteSection[];
+}
+
 export interface SoftwareUpdateError {
   code: string;
   message: string;
@@ -29,6 +43,8 @@ export interface SoftwareUpdateStatus {
   lastCheckAt: number | null;
   lastInstallAt: number | null;
   lastError: SoftwareUpdateError | null;
+  releaseNotes: SoftwareReleaseNote[];
+  releaseNotesComplete: boolean;
   settings: SoftwareUpdateSettings;
 }
 

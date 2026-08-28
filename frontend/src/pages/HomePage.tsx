@@ -49,6 +49,12 @@ export function HomePage({ data, error, loading, onRetry, updates }: HomePagePro
     () => (data ? getMemoryUsage(data.runtime.memory) : null),
     [data],
   );
+  const availableVersion = updates?.packages.find(
+    (item) => item.name === 'luci-app-smartsafehub' && item.updateAvailable,
+  )?.availableVersion;
+  const latestReleaseNote =
+    updates?.releaseNotes.find((note) => note.version === availableVersion) ??
+    updates?.releaseNotes[0];
 
   if (loading) {
     return <LoadingPanel />;
@@ -75,7 +81,8 @@ export function HomePage({ data, error, loading, onRetry, updates }: HomePagePro
           <span class="min-w-0 flex-1">
             <strong class="block text-sm font-black">SmartSafeHub 업데이트가 있습니다.</strong>
             <span class="mt-1 block text-xs leading-5 text-amber-800">
-              새 SmartSafeHub 버전을 설치할 수 있습니다. 업데이트 화면에서 확인해 주세요.
+              {latestReleaseNote?.summary ||
+                '새 SmartSafeHub 버전을 설치할 수 있습니다. 업데이트 화면에서 확인해 주세요.'}
             </span>
           </span>
           <span class="shrink-0 text-sm font-black">확인</span>

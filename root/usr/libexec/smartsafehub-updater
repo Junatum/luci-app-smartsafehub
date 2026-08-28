@@ -3,15 +3,23 @@
 set -u
 
 STATE_FILE="${SMARTSAFEHUB_UPDATER_STATE_FILE:-/tmp/smartsafehub-updates.state}"
+RELEASE_NOTES_FILE="${SMARTSAFEHUB_UPDATER_RELEASE_NOTES_FILE:-/tmp/smartsafehub-release-notes.json}"
 LOCK_DIR="${SMARTSAFEHUB_UPDATER_LOCK_DIR:-/tmp/smartsafehub-updater.lock}"
 AUTO_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_MARKER:-/tmp/smartsafehub-updater-auto-date}"
 REPOSITORY_DIR="${SMARTSAFEHUB_UPDATER_REPOSITORY_DIR:-/etc/apk/repositories.d}"
 APK_BIN="${SMARTSAFEHUB_UPDATER_APK_BIN:-apk}"
+UCLIENT_FETCH_BIN="${SMARTSAFEHUB_UPDATER_UCLIENT_FETCH_BIN:-uclient-fetch}"
 UCI_BIN="${SMARTSAFEHUB_UPDATER_UCI_BIN:-uci}"
 RPCD_INIT="${SMARTSAFEHUB_UPDATER_RPCD_INIT:-/etc/init.d/rpcd}"
 LUCI_INDEX_CACHE="${SMARTSAFEHUB_UPDATER_LUCI_INDEX_CACHE:-/tmp/luci-indexcache}"
 UPDATE_PACKAGE="luci-app-smartsafehub"
+FEED_NAME="smartsafehub"
 DEFAULT_REPOSITORY_HOST="repo.smartsafehub.com"
+RELEASE_NOTE_TIMEOUT_S=10
+RELEASE_INDEX_MAX_BYTES=65536
+RELEASE_NOTE_MAX_BYTES=65536
+RELEASE_NOTES_MAX_BYTES=1048576
+RELEASE_NOTES_MAX_COUNT=32
 DEFAULT_CHECK_INTERVAL_S=21600
 MIN_CHECK_INTERVAL_S=900
 MAX_CHECK_INTERVAL_S=604800
@@ -156,6 +164,230 @@ repository_is_configured() {
 	return 1
 }
 
+repository_release_base_url() {
+	local file line url rest channel
+	[ -d "$REPOSITORY_DIR" ] || return 1
+
+	for file in "$REPOSITORY_DIR"/*; do
+		[ -f "$file" ] || continue
+		while IFS= read -r line || [ -n "$line" ]; do
+			case "$line" in
+				''|'#'*) continue ;;
+			esac
+
+			url="$(printf '%s\n' "$line" | awk '{ print $1 }')"
+			case "$url" in
+				https://"$REPOSITORY_HOST"/*/packages/*/"$FEED_NAME"/packages.adb)
+					rest="${url#https://$REPOSITORY_HOST/}"
+					channel="${rest%%/*}"
+					case "$channel" in
+						''|*[!A-Za-z0-9._-]*) continue ;;
+					esac
+					printf 'https://%s/%s' "$REPOSITORY_HOST" "$channel"
+					return 0
+					;;
+			esac
+		done < "$file"
+	done
+
+	return 1
+}
+
+safe_release_version() {
+	case "$1" in
+		''|*[!A-Za-z0-9._~+-]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+file_size_is_valid() {
+	local file="$1" max_bytes="$2" size
+	size="$(wc -c < "$file" 2>/dev/null | tr -d '[:space:]')"
+	case "$size" in
+		''|*[!0-9]*) size=0 ;;
+	esac
+	[ "$size" -gt 0 ] && [ "$size" -le "$max_bytes" ]
+}
+
+select_release_versions() {
+	local index_file="$1" installed="$2" available="$3" output_file="$4"
+	local versions_file candidate_file version started found_installed count truncated
+
+	versions_file="${output_file}.index"
+	candidate_file="${output_file}.candidate"
+	: > "$candidate_file"
+
+	sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' \
+		"$index_file" > "$versions_file"
+
+	started=0
+	found_installed=0
+	count=0
+	truncated=0
+	while IFS= read -r version || [ -n "$version" ]; do
+		safe_release_version "$version" || continue
+
+		if [ "$started" -eq 0 ]; then
+			[ "$version" = "$available" ] || continue
+			started=1
+		fi
+
+		if [ "$version" = "$installed" ]; then
+			found_installed=1
+			break
+		fi
+
+		if [ "$count" -lt "$RELEASE_NOTES_MAX_COUNT" ]; then
+			printf '%s\n' "$version" >> "$candidate_file"
+			count=$((count + 1))
+		else
+			truncated=1
+		fi
+	done < "$versions_file"
+
+	rm -f "$versions_file"
+
+	if [ "$started" -eq 1 ] && [ "$found_installed" -eq 1 ] && [ -s "$candidate_file" ]; then
+		mv "$candidate_file" "$output_file"
+		[ "$truncated" -eq 0 ]
+		return
+	fi
+
+	rm -f "$candidate_file"
+	printf '%s\n' "$available" > "$output_file"
+	return 1
+}
+
+refresh_release_notes() {
+	local packages_file="$1" installed available base index_url index_file versions_file
+	local work_dir bundle_tmp log_file complete version note_file note_count first size
+
+	installed="$(
+		awk -F '\t' -v package="$UPDATE_PACKAGE" \
+			'$1 == "package" && $2 == package && $5 == "1" { print $3; exit }' \
+			"$packages_file" 2>/dev/null || true
+	)"
+	available="$(
+		awk -F '\t' -v package="$UPDATE_PACKAGE" \
+			'$1 == "package" && $2 == package && $5 == "1" { print $4; exit }' \
+			"$packages_file" 2>/dev/null || true
+	)"
+
+	if [ -z "$installed" ] || [ -z "$available" ]; then
+		rm -f "$RELEASE_NOTES_FILE"
+		return 0
+	fi
+
+	if ! safe_release_version "$installed" || ! safe_release_version "$available"; then
+		rm -f "$RELEASE_NOTES_FILE"
+		log_message "release notes skipped for unsafe version range: $installed -> $available"
+		return 0
+	fi
+
+	base="$(repository_release_base_url 2>/dev/null || true)"
+	if [ -z "$base" ]; then
+		rm -f "$RELEASE_NOTES_FILE"
+		log_message 'release notes skipped: SmartSafeHub repository channel could not be resolved'
+		return 0
+	fi
+
+	work_dir="/tmp/smartsafehub-updater-release-notes.$$"
+	index_file="$work_dir/index.json"
+	versions_file="$work_dir/versions"
+	bundle_tmp="${RELEASE_NOTES_FILE}.$$"
+	log_file="$work_dir/fetch.log"
+	complete=true
+	umask 022
+	rm -rf "$work_dir"
+	mkdir -p "$work_dir" || {
+		rm -f "$RELEASE_NOTES_FILE"
+		return 0
+	}
+
+	index_url="${base}/releases/${UPDATE_PACKAGE}/index.json"
+	if "$UCLIENT_FETCH_BIN" -q -T "$RELEASE_NOTE_TIMEOUT_S" -O "$index_file" "$index_url" > "$log_file" 2>&1 \
+		&& file_size_is_valid "$index_file" "$RELEASE_INDEX_MAX_BYTES"; then
+		if ! select_release_versions "$index_file" "$installed" "$available" "$versions_file"; then
+			complete=false
+		fi
+	else
+		printf '%s\n' "$available" > "$versions_file"
+		complete=false
+		log_message "release index unavailable for $installed -> $available; using latest release note only"
+	fi
+
+	note_count=0
+	while IFS= read -r version || [ -n "$version" ]; do
+		safe_release_version "$version" || {
+			complete=false
+			continue
+		}
+
+		note_file="$work_dir/note.$(printf '%03d' "$note_count").json"
+		if ! "$UCLIENT_FETCH_BIN" -q -T "$RELEASE_NOTE_TIMEOUT_S" -O "$note_file" \
+			"${base}/releases/${UPDATE_PACKAGE}/${version}.json" >> "$log_file" 2>&1; then
+			rm -f "$note_file"
+			complete=false
+			log_message "release note unavailable for $version"
+			continue
+		fi
+
+		if ! file_size_is_valid "$note_file" "$RELEASE_NOTE_MAX_BYTES" \
+			|| ! grep -Fq "\"package\": \"$UPDATE_PACKAGE\"" "$note_file" \
+			|| ! grep -Fq "\"version\": \"$version\"" "$note_file"; then
+			rm -f "$note_file"
+			complete=false
+			log_message "release note rejected for $version"
+			continue
+		fi
+
+		note_count=$((note_count + 1))
+	done < "$versions_file"
+
+	if [ "$note_count" -eq 0 ]; then
+		rm -rf "$work_dir"
+		rm -f "$bundle_tmp" "$RELEASE_NOTES_FILE"
+		return 0
+	fi
+
+	{
+		printf '{\n'
+		printf '  "schema_version": 1,\n'
+		printf '  "package": "%s",\n' "$UPDATE_PACKAGE"
+		printf '  "installed_version": "%s",\n' "$installed"
+		printf '  "available_version": "%s",\n' "$available"
+		printf '  "complete": %s,\n' "$complete"
+		printf '  "releases": [\n'
+		first=1
+		for note_file in "$work_dir"/note.*.json; do
+			[ -f "$note_file" ] || continue
+			if [ "$first" -eq 0 ]; then
+				printf ',\n'
+			fi
+			cat "$note_file"
+			first=0
+		done
+		printf '  ]\n'
+		printf '}\n'
+	} > "$bundle_tmp"
+
+	size="$(wc -c < "$bundle_tmp" 2>/dev/null | tr -d '[:space:]')"
+	case "$size" in
+		''|*[!0-9]*) size=0 ;;
+	esac
+	if [ "$size" -le 0 ] || [ "$size" -gt "$RELEASE_NOTES_MAX_BYTES" ]; then
+		rm -rf "$work_dir"
+		rm -f "$bundle_tmp" "$RELEASE_NOTES_FILE"
+		log_message "release note bundle rejected: invalid size $size"
+		return 0
+	fi
+
+	mv "$bundle_tmp" "$RELEASE_NOTES_FILE"
+	rm -rf "$work_dir"
+	log_message "release note bundle cached for $installed -> $available ($note_count release(s), complete=$complete)"
+	return 0
+}
+
 apk_error_message() {
 	local log_file="$1" message
 	message="$(tail -n 6 "$log_file" 2>/dev/null | tr '\r\n\t' '   ' | cut -c 1-300)"
@@ -219,6 +451,7 @@ perform_check_locked() {
 	fi
 
 	collect_packages "$packages_file"
+	refresh_release_notes "$packages_file"
 	now="$(date +%s)"
 	write_state idle "$now" "$last_install_at" '' '' "$packages_file"
 	rm -f "$log_file" "$packages_file"
@@ -254,6 +487,7 @@ perform_install_locked() {
 	fi
 
 	collect_packages "$packages_file"
+	refresh_release_notes "$packages_file"
 	upgradable="$(awk -F '\t' -v package="$UPDATE_PACKAGE" '$1 == "package" && $2 == package { print $5; exit }' "$packages_file")"
 
 	now="$(date +%s)"
@@ -275,6 +509,7 @@ perform_install_locked() {
 	fi
 
 	collect_packages "$after_file"
+	refresh_release_notes "$after_file"
 	now="$(date +%s)"
 	write_state idle "$last_check_at" "$now" '' '' "$after_file"
 	rm -f "$log_file" "$packages_file" "$after_file" "$LUCI_INDEX_CACHE"

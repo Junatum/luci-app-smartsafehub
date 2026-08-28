@@ -73,6 +73,8 @@ grep -Fq "assetVersion: host.dataset.assetVersion ?? '$package_release_version'"
 
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+safeshield([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +safeshield'
+grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+uclient-fetch([[:space:]]|$)' "$MAKEFILE" || \
+	fail 'LUCI_DEPENDS must include +uclient-fetch for release note downloads'
 grep -Eq '^EXTRA_DEPENDS:=safeshield \(>= [0-9]+\.[0-9]+\.[0-9]+([._~+-][A-Za-z0-9._~+-]+)?\)$' "$MAKEFILE" || \
 	fail 'EXTRA_DEPENDS must require a minimum safeshield version'
 

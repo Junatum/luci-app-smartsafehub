@@ -11,6 +11,11 @@ import {
 } from './core.uc';
 
 const UPDATE_STATE_FILE = '/tmp/smartsafehub-updates.state';
+const RELEASE_NOTES_FILE = '/tmp/smartsafehub-release-notes.json';
+const MAX_RELEASE_NOTES_BYTES = 1048576;
+const MAX_RELEASE_NOTES = 32;
+const MAX_RELEASE_NOTE_SECTIONS = 12;
+const MAX_RELEASE_NOTE_ITEMS = 30;
 const AUTO_INSTALL_MARKER = '/tmp/smartsafehub-updater-auto-date';
 const UPDATE_PACKAGE = 'luci-app-smartsafehub';
 const MIN_CHECK_INTERVAL_S = 900;
@@ -64,12 +69,165 @@ function empty_update_state() {
 		lastCheckAt: null,
 		lastInstallAt: null,
 		lastError: null,
+		releaseNotes: [],
+		releaseNotesComplete: true,
 	};
 }
 
 function state_timestamp(value) {
 	const parsed = integer_value(value, 0);
 	return parsed > 0 ? parsed : null;
+}
+
+function limited_string(value, max_length) {
+	if (type(value) != 'string' || !length(value)) {
+		return null;
+	}
+
+	return substr(value, 0, max_length);
+}
+
+function release_update_range(state) {
+	for (let package_entry in state.packages) {
+		if (
+			package_entry?.name == UPDATE_PACKAGE &&
+			package_entry?.updateAvailable &&
+			package_entry?.installedVersion != null &&
+			package_entry?.availableVersion != null
+		) {
+			return {
+				installedVersion: package_entry.installedVersion,
+				availableVersion: package_entry.availableVersion,
+			};
+		}
+	}
+
+	return null;
+}
+
+function sanitize_release_note(document) {
+	if (
+		type(document) != 'object' ||
+		document?.schema_version != 1 ||
+		document?.package != UPDATE_PACKAGE ||
+		type(document?.version) != 'string' ||
+		match(document.version, /^[A-Za-z0-9._~+-]+$/) == null
+	) {
+		return null;
+	}
+
+	const version = limited_string(document.version, 120);
+	const summary = limited_string(document?.summary, 1200);
+	const date = type(document?.date) == 'string' && match(document.date, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) != null
+		? document.date
+		: null;
+	let sections = [];
+
+	if (type(document?.sections) == 'array') {
+		for (let section in document.sections) {
+			if (length(sections) >= MAX_RELEASE_NOTE_SECTIONS) {
+				break;
+			}
+			if (type(section) != 'object') {
+				continue;
+			}
+
+			const title = limited_string(section?.title, 120);
+			if (title == null) {
+				continue;
+			}
+
+			let items = [];
+			if (type(section?.items) == 'array') {
+				for (let item in section.items) {
+					if (length(items) >= MAX_RELEASE_NOTE_ITEMS) {
+						break;
+					}
+
+					const text = limited_string(item, 600);
+					if (text != null) {
+						push(items, text);
+					}
+				}
+			}
+
+			if (length(items)) {
+				push(sections, { title: title, items: items });
+			}
+		}
+	}
+
+	if (version == null || (summary == null && !length(sections))) {
+		return null;
+	}
+
+	return {
+		schemaVersion: 1,
+		package: UPDATE_PACKAGE,
+		version: version,
+		date: date,
+		summary: summary,
+		sections: sections,
+	};
+}
+
+function read_release_notes(state) {
+	const range = release_update_range(state);
+	if (range == null) {
+		return { notes: [], complete: true };
+	}
+
+	const raw = fs.readfile(RELEASE_NOTES_FILE);
+	if (type(raw) != 'string' || !length(raw) || length(raw) > MAX_RELEASE_NOTES_BYTES) {
+		return { notes: [], complete: false };
+	}
+
+	let document;
+	try {
+		document = json(raw);
+	}
+	catch (e) {
+		return { notes: [], complete: false };
+	}
+
+	if (
+		type(document) != 'object' ||
+		document?.schema_version != 1 ||
+		document?.package != UPDATE_PACKAGE ||
+		document?.installed_version != range.installedVersion ||
+		document?.available_version != range.availableVersion ||
+		type(document?.releases) != 'array'
+	) {
+		return { notes: [], complete: false };
+	}
+
+	let notes = [];
+	let complete = document?.complete == true;
+	let available_seen = false;
+
+	for (let release in document.releases) {
+		if (length(notes) >= MAX_RELEASE_NOTES) {
+			complete = false;
+			break;
+		}
+
+		const note = sanitize_release_note(release);
+		if (note == null) {
+			complete = false;
+			continue;
+		}
+
+		if (note.version == range.availableVersion) {
+			available_seen = true;
+		}
+		push(notes, note);
+	}
+
+	if (!available_seen) {
+		complete = false;
+	}
+
+	return { notes: notes, complete: complete };
 }
 
 function read_update_state() {
@@ -143,6 +301,9 @@ function read_update_state() {
 		};
 	}
 
+	const release_notes = read_release_notes(state);
+	state.releaseNotes = release_notes.notes;
+	state.releaseNotesComplete = release_notes.complete;
 	return state;
 }
 
