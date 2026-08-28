@@ -2,9 +2,9 @@
 
 SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 기기와 SafeShield DNS 보호 기능을 일반 사용자 중심의 화면에서 관리하기 위한 LuCI 애플리케이션입니다.
 
-현재 정식 배포 버전은 **`0.2.0-r1`**입니다.
+현재 정식 배포 버전은 **`0.2.1-r1`**입니다.
 
-- 애플리케이션 버전: `0.2.0`
+- 애플리케이션 버전: `0.2.1`
 - OpenWrt 패키지 릴리스: `1`
 - 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
 - 백엔드: rpcd ucode 모듈
@@ -71,6 +71,10 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ### 업데이트 및 시스템
 
+- `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전 표시
+- 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 업데이트 표시
+- 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치 설정
+- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield >= 0.3.10`은 패키지 dependency로 함께 관리
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
 - OpenWrt의 검증된 펌웨어 업그레이드·백업·복원 화면으로 이동
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
@@ -112,8 +116,11 @@ ucode
 ucode-mod-ubus
 ucode-mod-fs
 ucode-mod-uci
-safeshield
+procd
+safeshield (>= 0.3.10)
 ```
+
+`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `EXTRA_DEPENDS:=safeshield (>= 0.3.10)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
 
 프런트엔드 빌드에는 **Node.js 24 이상**이 필요합니다.
 
@@ -147,6 +154,9 @@ luci-app-smartsafehub/
 │   ├── package.json
 │   └── vite.config.ts
 ├── root/
+│   ├── etc/config/smartsafehub
+│   ├── etc/init.d/smartsafehub-updater
+│   ├── usr/libexec/smartsafehub-updater
 │   ├── usr/share/luci/menu.d/
 │   ├── usr/share/rpcd/acl.d/
 │   ├── usr/share/rpcd/ucode/
@@ -155,6 +165,7 @@ luci-app-smartsafehub/
 │   │       ├── core.uc
 │   │       ├── devices.uc
 │   │       ├── system.uc
+│   │       ├── updates.uc
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc
 │   └── www/luci-static/smartsafehub/
@@ -213,14 +224,14 @@ make package/luci-app-smartsafehub/compile V=s
 
 별도의 `Build/Prepare` 검증 hook은 사용하지 않습니다. OpenWrt 패키지 빌드는 `luci.mk`의 기본 패키징 흐름을 사용하며, 프런트엔드 자산은 패키지 빌드 전에 `npm run build`로 갱신합니다.
 
-별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.0-r1`이 JavaScript와 CSS 캐시 무효화 키입니다.
+별도의 프런트엔드 build ID는 사용하지 않습니다. 패키지 버전 `0.2.1-r1`이 JavaScript와 CSS 캐시 무효화 키입니다.
 
 ## 설치
 
 생성한 APK를 공유기에 복사한 뒤 설치합니다.
 
 ```bash
-apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.0-r1.apk
+apk add --allow-untrusted /tmp/luci-app-smartsafehub-0.2.1-r1.apk
 ```
 
 기존 버전 위에 설치할 때는 사용하는 저장소 정책에 맞춰 `apk upgrade` 또는 로컬 APK 설치를 수행합니다.
@@ -339,7 +350,7 @@ rm -f /tmp/luci-indexcache
 /etc/init.d/uhttpd restart
 ```
 
-브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.0-r1`와 Shadow DOM용 `app.css?v=0.2.0-r1`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
+브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿은 `app.js?v=0.2.1-r1`와 Shadow DOM용 `app.css?v=0.2.1-r1`를 사용하므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
 
 ## 배포 전 체크리스트
 
@@ -384,12 +395,12 @@ ubus call smartsafehub connected_devices '{}'
 현재 값:
 
 ```makefile
-PKG_VERSION:=0.2.0
+PKG_VERSION:=0.2.1
 PKG_RELEASE:=1
 ```
 
 ```js
-data-asset-version="0.2.0-r1"
+data-asset-version="0.2.1-r1"
 ```
 
 ## 현재 제약

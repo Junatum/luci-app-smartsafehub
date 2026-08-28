@@ -11,6 +11,7 @@ interface AppShellProps {
   onRefresh: () => void;
   refreshing: boolean;
   route: AppRoute;
+  updateCount: number;
 }
 
 export function AppShell({
@@ -19,6 +20,7 @@ export function AppShell({
   onRefresh,
   refreshing,
   route,
+  updateCount,
 }: AppShellProps) {
   const copy = ROUTE_BY_NAME[route];
 
@@ -33,7 +35,7 @@ export function AppShell({
       />
 
       <main class="ssh-product-main bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-10 lg:pb-12">
-        <ProductNavigation route={route} title={copy.title} />
+        <ProductNavigation route={route} title={copy.title} updateCount={updateCount} />
         {children}
       </main>
     </div>

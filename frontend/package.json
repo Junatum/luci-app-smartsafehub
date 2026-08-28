@@ -1,7 +1,7 @@
 {
   "name": "luci-app-smartsafehub-frontend",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "engines": {
     "node": ">=24.0"
@@ -18,9 +18,9 @@
   "devDependencies": {
     "@preact/preset-vite": "2.10.6",
     "@tailwindcss/vite": "4.3.3",
-    "@types/node": "26.2.0",
+    "@types/node": "26.4.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "vite": "8.2.1"
+    "vite": "8.2.2"
   }
 }

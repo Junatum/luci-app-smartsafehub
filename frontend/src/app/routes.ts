@@ -55,7 +55,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     hash: '#system',
     label: '업데이트',
     title: '업데이트 및 시스템',
-    description: '펌웨어, 진단, 고급 설정과 재부팅 작업을 안전하게 관리합니다.',
+    description: 'SmartSafeHub 소프트웨어 업데이트, 펌웨어, 진단과 시스템 작업을 관리합니다.',
   },
 ] as const;
 

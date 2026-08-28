@@ -6,7 +6,8 @@
         "smartsafehub": [
           "status",
           "connected_devices",
-          "wifi_summary"
+          "wifi_summary",
+          "updates_status"
         ],
         "safeshield": [
           "status",
@@ -19,7 +20,10 @@
       "ubus": {
         "smartsafehub": [
           "wifi_update",
-          "system_reboot"
+          "system_reboot",
+          "updates_check",
+          "updates_install",
+          "updates_settings_update"
         ],
         "safeshield": [
           "set_enabled",

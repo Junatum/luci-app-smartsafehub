@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.0-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.1-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -51,7 +51,12 @@ rpcd ucode: smartsafehub       rpcd ucode: safeshield
        ├─ system / network           ├─ status / config
        ├─ wireless / hostapd         ├─ enable / refresh
        ├─ DHCP leases / ARP          ├─ local rules
-       └─ reboot / wifi reload       └─ license
+       ├─ reboot / wifi reload       └─ license
+       └─ update status/settings
+              │
+              ▼
+       smartsafehub-updater (procd)
+              └─ apk update / targeted package upgrade
 
 SmartSafeHub backend는 SafeShield의 UCI, 규칙 파일, init script를 직접 다루지 않습니다.
 SafeShield 관련 읽기·변경은 `safeshield` 패키지가 제공하는 공식 ubus API만 호출합니다.
@@ -86,6 +91,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.status`
 - `smartsafehub.connected_devices`
 - `smartsafehub.wifi_summary`
+- `smartsafehub.updates_status`
 - `safeshield.status`
 - `safeshield.config`
 - `safeshield.rules_list`
@@ -94,6 +100,9 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 
 - `smartsafehub.wifi_update`
 - `smartsafehub.system_reboot`
+- `smartsafehub.updates_check`
+- `smartsafehub.updates_install`
+- `smartsafehub.updates_settings_update`
 - `safeshield.set_enabled`
 - `safeshield.refresh`
 - `safeshield.rule_add`
@@ -128,7 +137,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 현재 자산 버전:
 
 ```text
-0.2.0-r1
+0.2.1-r1
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -542,9 +551,9 @@ SystemPage의 기존 system snapshot
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.0-r1
-  → app.js?v=0.2.0-r1
-  → app.css?v=0.2.0-r1
+  → data-asset-version = 0.2.1-r1
+  → app.js?v=0.2.1-r1
+  → app.css?v=0.2.1-r1
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -657,3 +666,11 @@ ubus call smartsafehub connected_devices '{}'
 - 진단 파일은 현재 시점의 상태 snapshot이며 장기간의 로그 수집 기능은 아닙니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
 - ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.
+
+## 12. SmartSafeHub 패키지 업데이트
+
+업데이트 기능은 rpcd와 실제 APK 작업을 분리합니다. `updates_check`와 `updates_install`은 요청을 검증한 뒤 `/usr/libexec/smartsafehub-updater`를 백그라운드에서 시작하고 즉시 반환합니다. updater는 `apk update`와 패키지 조회·설치를 수행하고 `/tmp/smartsafehub-updates.state`에 결과를 atomic write합니다. `updates_status`는 이 로컬 상태 파일과 UCI 설정만 읽으므로 저장소 응답 속도가 제품 UI API에 영향을 주지 않습니다.
+
+업데이트 감지 대상은 `luci-app-smartsafehub` 하나입니다. 새 버전이 확인되면 `apk add --upgrade luci-app-smartsafehub`만 실행합니다. Makefile은 `LUCI_DEPENDS:=... +safeshield`와 `EXTRA_DEPENDS:=safeshield (>= 0.3.10)`를 함께 선언합니다. 따라서 빌드 시 SafeShield 선택 관계를 유지하면서, 설치·업데이트 시 APK dependency resolver가 최소 `0.3.10` 조건을 만족하도록 필요한 경우 SafeShield를 함께 갱신합니다.
+
+자동화 설정은 `/etc/config/smartsafehub`의 `updates` section에 보존됩니다. `smartsafehub-updater` procd 서비스는 기본 6시간 주기로 확인하며, 자동 설치는 기본 비활성화 상태입니다. 자동 설치를 활성화하면 지정 시각의 다음 실행 기회에 하루 한 번만 설치를 시도합니다. 공유기가 예약 시각 이후에 부팅된 경우 그날의 지난 예약을 즉시 소급 실행하지 않고 다음 예약 시각까지 기다립니다.

@@ -7,8 +7,11 @@ import {
   formatUptime,
   getMemoryUsage,
 } from '../app/format';
+import { SoftwareUpdatesCard } from '../components/SoftwareUpdatesCard';
+import type { SoftwareUpdateAction } from '../hooks/useSoftwareUpdates';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { SmartSafeHubStatus } from '../types/status';
+import type { SoftwareUpdateSettingsInput, SoftwareUpdateStatus } from '../types/updates';
 import { luciAdminUrl } from '../utils/luci';
 
 interface SystemPageProps {
@@ -23,6 +26,17 @@ interface SystemPageProps {
   onDownloadDiagnostics: () => void;
   onReboot: () => void;
   onRetry: () => void;
+  updateAction: SoftwareUpdateAction;
+  updateActionError: string | null;
+  updateData: SoftwareUpdateStatus | null;
+  updateError: string | null;
+  updateLoading: boolean;
+  updateMessage: string | null;
+  onCheckUpdates: () => void;
+  onDismissUpdateFeedback: () => void;
+  onInstallUpdates: () => void;
+  onRetryUpdates: () => void;
+  onSaveUpdateSettings: (input: SoftwareUpdateSettingsInput) => Promise<boolean>;
 }
 
 function InfoCard(props: { label: string; value: string; description: string }) {
@@ -76,6 +90,17 @@ export function SystemPage({
   onDownloadDiagnostics,
   onReboot,
   onRetry,
+  updateAction,
+  updateActionError,
+  updateData,
+  updateError,
+  updateLoading,
+  updateMessage,
+  onCheckUpdates,
+  onDismissUpdateFeedback,
+  onInstallUpdates,
+  onRetryUpdates,
+  onSaveUpdateSettings,
 }: SystemPageProps) {
   const [confirmingReboot, setConfirmingReboot] = useState(false);
 
@@ -161,6 +186,20 @@ export function SystemPage({
       </div>
 
       <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <SoftwareUpdatesCard
+          action={updateAction}
+          actionError={updateActionError}
+          data={updateData}
+          error={updateError}
+          loading={updateLoading}
+          message={updateMessage}
+          onCheck={onCheckUpdates}
+          onDismissFeedback={onDismissUpdateFeedback}
+          onInstall={onInstallUpdates}
+          onRetry={onRetryUpdates}
+          onSaveSettings={onSaveUpdateSettings}
+        />
+
         <ActionCard
           title="펌웨어 업데이트"
           description="펌웨어 파일 검증과 업로드는 OpenWrt의 검증된 시스템 업그레이드 화면에서 진행합니다."

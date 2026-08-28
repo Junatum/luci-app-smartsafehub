@@ -6,6 +6,7 @@ import { useHashRoute } from '../hooks/useHashRoute';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
 import { useSafeShieldStatus } from '../hooks/useSafeShieldStatus';
+import { useSoftwareUpdates } from '../hooks/useSoftwareUpdates';
 import { useStatus } from '../hooks/useStatus';
 import { useSystemActions } from '../hooks/useSystemActions';
 import { useWifi } from '../hooks/useWifi';
@@ -19,6 +20,7 @@ import { WifiPage } from '../pages/WifiPage';
 export function App() {
   const route = useHashRoute();
   const status = useStatus(route === 'home' || route === 'system');
+  const updates = useSoftwareUpdates(true);
   const wifi = useWifi(route === 'wifi');
   const devices = useConnectedDevices(route === 'devices');
   const safeshield = useSafeShieldStatus(route === 'safeshield');
@@ -80,6 +82,17 @@ export function App() {
           onReboot={() => void systemActions.reboot()}
           onRetry={() => void status.refresh()}
           rebootAccepted={systemActions.rebootAccepted}
+          updateAction={updates.action}
+          updateActionError={updates.actionError}
+          updateData={updates.data}
+          updateError={updates.error}
+          updateLoading={updates.loading}
+          updateMessage={updates.message}
+          onCheckUpdates={() => void updates.check()}
+          onDismissUpdateFeedback={updates.dismissFeedback}
+          onInstallUpdates={() => void updates.install()}
+          onRetryUpdates={() => void updates.refresh()}
+          onSaveUpdateSettings={updates.saveSettings}
         />
       );
       break;
@@ -127,16 +140,27 @@ export function App() {
           error={status.error}
           loading={status.loading}
           onRetry={() => void status.refresh()}
+          updates={updates.data}
         />
       );
   }
 
+  const refreshCurrent = () => {
+    if (route === 'system') {
+      void Promise.all([status.refresh(), updates.refresh()]);
+      return;
+    }
+
+    void current.refresh();
+  };
+
   return (
     <AppShell
       loading={current.loading}
-      onRefresh={() => void current.refresh()}
-      refreshing={current.refreshing}
+      onRefresh={refreshCurrent}
+      refreshing={current.refreshing || (route === 'system' && updates.refreshing)}
       route={route}
+      updateCount={updates.data?.updateCount ?? 0}
     >
       {content}
     </AppShell>

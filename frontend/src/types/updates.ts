@@ -1,0 +1,44 @@
+export type SoftwareUpdatePhase = 'idle' | 'checking' | 'installing' | 'error';
+
+export interface SoftwareUpdatePackage {
+  name: string;
+  installedVersion: string;
+  availableVersion: string | null;
+  updateAvailable: boolean;
+}
+
+export interface SoftwareUpdateError {
+  code: string;
+  message: string;
+  at: number | null;
+}
+
+export interface SoftwareUpdateSettings {
+  checkEnabled: boolean;
+  checkIntervalSeconds: number;
+  autoInstall: boolean;
+  autoInstallTime: string;
+  repositoryHost: string;
+  updatePackage: string;
+}
+
+export interface SoftwareUpdateStatus {
+  phase: SoftwareUpdatePhase;
+  updateCount: number;
+  packages: SoftwareUpdatePackage[];
+  lastCheckAt: number | null;
+  lastInstallAt: number | null;
+  lastError: SoftwareUpdateError | null;
+  settings: SoftwareUpdateSettings;
+}
+
+export interface SoftwareUpdateSettingsInput {
+  checkEnabled: boolean;
+  checkIntervalSeconds: number;
+  autoInstall: boolean;
+  autoInstallTime: string;
+}
+
+export interface SoftwareUpdateAccepted {
+  accepted: boolean;
+}

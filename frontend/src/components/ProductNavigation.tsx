@@ -19,6 +19,7 @@ import {
 interface ProductNavigationProps {
   route: AppRoute;
   title: string;
+  updateCount: number;
 }
 
 function NavigationIcon({ route }: { route: AppRoute }) {
@@ -62,7 +63,7 @@ function mobileNavigationClass(active: boolean): string {
   }`;
 }
 
-export function ProductNavigation({ route, title }: ProductNavigationProps) {
+export function ProductNavigation({ route, title, updateCount }: ProductNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -135,6 +136,11 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
                       <NavigationIcon route={item.route} />
                     </span>
                     <span class="min-w-0 truncate">{item.label}</span>
+                    {item.route === 'system' && updateCount > 0 ? (
+                      <span class="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                        {updateCount}
+                      </span>
+                    ) : null}
                   </a>
                 );
               })}
@@ -183,6 +189,11 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
                   <NavigationIcon route={item.route} />
                 </span>
                 {item.label}
+                {item.route === 'system' && updateCount > 0 ? (
+                  <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                    {updateCount}
+                  </span>
+                ) : null}
               </a>
             );
           })}

@@ -6,10 +6,12 @@ import {
   MemoryIcon,
   RouterIcon,
   ShieldIcon,
+  UpdateIcon,
 } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import { StatusCard } from '../components/StatusCard';
 import type { SmartSafeHubStatus } from '../types/status';
+import type { SoftwareUpdateStatus } from '../types/updates';
 import {
   formatBootTime,
   formatBytes,
@@ -22,6 +24,7 @@ interface HomePageProps {
   error: string | null;
   loading: boolean;
   onRetry: () => void;
+  updates: SoftwareUpdateStatus | null;
 }
 
 function StateBadge({ up }: { up: boolean }) {
@@ -41,7 +44,7 @@ function StateBadge({ up }: { up: boolean }) {
   );
 }
 
-export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
+export function HomePage({ data, error, loading, onRetry, updates }: HomePageProps) {
   const memory = useMemo(
     () => (data ? getMemoryUsage(data.runtime.memory) : null),
     [data],
@@ -61,6 +64,24 @@ export function HomePage({ data, error, loading, onRetry }: HomePageProps) {
 
   return (
     <>
+      {updates && updates.updateCount > 0 ? (
+        <a
+          class="mb-5 flex min-w-0 items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950 no-underline shadow-sm shadow-amber-900/5 transition hover:bg-amber-100/70 sm:px-5"
+          href="#system"
+        >
+          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-800">
+            <UpdateIcon class="size-6" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <strong class="block text-sm font-black">SmartSafeHub 업데이트가 있습니다.</strong>
+            <span class="mt-1 block text-xs leading-5 text-amber-800">
+              새 SmartSafeHub 버전을 설치할 수 있습니다. 업데이트 화면에서 확인해 주세요.
+            </span>
+          </span>
+          <span class="shrink-0 text-sm font-black">확인</span>
+        </a>
+      ) : null}
+
       <section
         aria-label="장치 요약"
         class="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4"

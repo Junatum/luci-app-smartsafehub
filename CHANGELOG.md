@@ -4,6 +4,30 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.1-r1] - 2026-08-28
+
+`luci-app-smartsafehub` 업데이트를 감지하고, 사용자가 선택한 경우 공유기에서 예약 자동 설치할 수 있는 SmartSafeHub 업데이트 관리 기능을 추가했습니다.
+
+### 추가
+
+- `repo.smartsafehub.com`이 등록된 APK 저장소를 갱신하고 `luci-app-smartsafehub`의 업데이트를 확인하는 updater를 추가했습니다.
+- 업데이트 감지·설치 대상은 `luci-app-smartsafehub` 하나이며 `safeshield`는 `EXTRA_DEPENDS:=safeshield (>= 0.3.10)` 버전 제약을 통해 함께 관리합니다.
+- 홈 화면 업데이트 알림, 데스크톱·모바일 업데이트 메뉴 badge, SmartSafeHub 현재/신규 버전 표시를 추가했습니다.
+- 수동 업데이트 확인과 명시적 확인이 필요한 수동 설치 기능을 추가했습니다.
+- 자동 확인 주기와 자동 설치 여부·시각을 `/etc/config/smartsafehub`에 저장하고 `smartsafehub-updater` procd 서비스가 브라우저와 독립적으로 실행하도록 구성했습니다.
+- 업데이트 상태는 `/tmp/smartsafehub-updates.state`에 atomic write하여 rpcd가 네트워크 작업 없이 즉시 조회합니다.
+- `updates_status`, `updates_check`, `updates_install`, `updates_settings_update` rpcd API와 ACL을 추가했습니다.
+- mock `apk`/`uci`를 사용하는 `tests/test-updater.sh` 회귀 테스트를 추가했습니다.
+- Github Actions CI를 추가하였습니다.
+
+### 안전성
+
+- 전체 시스템 `apk upgrade`는 실행하지 않으며, 업데이트가 확인된 경우에만 `apk add --upgrade luci-app-smartsafehub`를 실행합니다. 설치된 `safeshield`가 최소 `0.3.10` 조건을 만족하지 않으면 APK dependency resolver가 함께 갱신합니다.
+- 패키지 저장소 작업은 rpcd 프로세스에서 직접 수행하지 않고 별도 updater 프로세스에서 실행해 LuCI API 이벤트 루프 차단을 방지합니다.
+- updater는 PID 기반 잠금으로 수동 확인, 수동 설치와 예약 작업의 동시 실행을 방지합니다.
+- 자동 설치는 기본적으로 꺼져 있으며 기본 예약 시각은 `03:00`, 자동 확인 기본 주기는 6시간입니다.
+- OpenWrt 펌웨어 업그레이드는 기존 LuCI 펌웨어 관리 화면에 계속 위임합니다.
+
 ## [0.2.0-r1] - 2026-08-21
 
 SmartSafeHub 전용 사용자 화면과 rpcd 백엔드를 처음 정식 배포하는 릴리스입니다. `0.2.0` 개발 과정에서 사용한 중간 package revision은 정식 배포 기준점인 `r1`으로 squash했습니다.

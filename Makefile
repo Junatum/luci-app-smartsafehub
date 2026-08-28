@@ -6,16 +6,21 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
-PKG_VERSION:=0.2.0
-PKG_RELEASE:=2
+PKG_VERSION:=0.2.1
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=Beomjun Kang
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=LICENSE
 
 LUCI_TITLE:=SmartSafeHub device application
-LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +safeshield
+LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +safeshield
+EXTRA_DEPENDS:=safeshield (>= 0.3.10)
 LUCI_PKGARCH:=all
+
+define Package/luci-app-smartsafehub/conffiles
+/etc/config/smartsafehub
+endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
 
