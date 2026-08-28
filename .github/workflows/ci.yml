@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend tests
+    name: Backend
     runs-on: ubuntu-latest
 
     steps:
@@ -42,7 +42,6 @@ jobs:
 
       - name: Run updater tests
         run: |
-          chmod +x tests/test-updater.sh
           ./tests/test-updater.sh
 
   frontend:
