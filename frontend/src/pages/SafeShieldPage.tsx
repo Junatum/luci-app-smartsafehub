@@ -40,6 +40,7 @@ interface SafeShieldPageProps {
   onRetry: () => void;
   onRetryStatistics: () => void;
   onSetEnabled: (enabled: boolean) => void;
+  onSetStatisticsEnabled: (enabled: boolean) => void;
   onUpdateLicense: (licenseKey: string) => Promise<boolean>;
 }
 
@@ -287,6 +288,7 @@ export function SafeShieldPage({
   onRetry,
   onRetryStatistics,
   onSetEnabled,
+  onSetStatisticsEnabled,
   onUpdateLicense,
 }: SafeShieldPageProps) {
   const [licenseKey, setLicenseKey] = useState('');
@@ -453,7 +455,9 @@ export function SafeShieldPage({
         data={statistics}
         error={statisticsError}
         loading={statisticsLoading}
+        action={action}
         onRetry={onRetryStatistics}
+        onSetEnabled={onSetStatisticsEnabled}
         refreshing={statisticsRefreshing}
       />
 

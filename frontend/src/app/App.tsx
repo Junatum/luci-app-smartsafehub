@@ -28,7 +28,10 @@ export function App() {
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
-  const safeshieldActions = useSafeShieldActions(safeshield.refresh);
+  const safeshieldActions = useSafeShieldActions(
+    safeshield.refresh,
+    safeshieldStatistics.refresh,
+  );
 
   const current =
     route === 'wifi'
@@ -119,6 +122,9 @@ export function App() {
           onRetry={() => void safeshield.refresh()}
           onRetryStatistics={() => void safeshieldStatistics.refresh()}
           onSetEnabled={(enabled) => void safeshieldActions.setEnabled(enabled)}
+          onSetStatisticsEnabled={(enabled) =>
+            void safeshieldActions.setStatisticsEnabled(enabled)
+          }
           onUpdateLicense={safeshieldActions.updateLicense}
         />
       );

@@ -4,6 +4,7 @@ import {
   fetchSafeShieldLicense,
   requestSafeShieldRefresh,
   setSafeShieldEnabled,
+  setSafeShieldStatisticsEnabled,
   updateSafeShieldLicense,
 } from '../api/safeshield';
 import { errorMessage } from '../utils/errors';
@@ -12,6 +13,8 @@ export type SafeShieldAction =
   | 'enable'
   | 'disable'
   | 'refresh'
+  | 'statistics-enable'
+  | 'statistics-disable'
   | 'license-read'
   | 'license-update'
   | 'license-remove';
@@ -24,6 +27,7 @@ interface SafeShieldActionState {
 
 export function useSafeShieldActions(
   refreshStatus: () => Promise<void>,
+  refreshStatistics: () => Promise<void>,
 ) {
   const [state, setState] = useState<SafeShieldActionState>({
     action: null,
@@ -84,6 +88,39 @@ export function useSafeShieldActions(
       }
     },
     [refreshStatus, scheduleRefreshes],
+  );
+
+  const setStatisticsEnabled = useCallback(
+    async (enabled: boolean) => {
+      const action: SafeShieldAction = enabled
+        ? 'statistics-enable'
+        : 'statistics-disable';
+      setState({ action, error: null, message: null });
+
+      try {
+        const result = await setSafeShieldStatisticsEnabled(enabled);
+        setState({
+          action: null,
+          error: null,
+          message: result.changed
+            ? enabled
+              ? '차단 통계 수집을 활성화했습니다.'
+              : '차단 통계 수집을 비활성화했습니다.'
+            : enabled
+              ? '차단 통계 수집이 이미 활성화되어 있습니다.'
+              : '차단 통계 수집이 이미 비활성화되어 있습니다.',
+        });
+        await Promise.all([refreshStatus(), refreshStatistics()]);
+        scheduleRefreshes([800, 2000]);
+      } catch (error) {
+        setState({
+          action: null,
+          error: errorMessage(error, '차단 통계 설정을 변경하지 못했습니다.'),
+          message: null,
+        });
+      }
+    },
+    [refreshStatistics, refreshStatus, scheduleRefreshes],
   );
 
   const refreshBlocklist = useCallback(async () => {
@@ -210,6 +247,7 @@ export function useSafeShieldActions(
     refreshBlocklist,
     removeLicense,
     setEnabled,
+    setStatisticsEnabled,
     updateLicense,
   };
 }

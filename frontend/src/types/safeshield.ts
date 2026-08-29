@@ -70,6 +70,12 @@ export interface SafeShieldEnabledResult {
   reconciled: boolean;
 }
 
+export interface SafeShieldStatisticsEnabledResult {
+  changed: boolean;
+  enabled: boolean;
+  restarted: boolean;
+}
+
 export interface SafeShieldRefreshResult {
   accepted: boolean;
   reason: string;
@@ -111,6 +117,8 @@ export interface SafeShieldDeviceStatistics {
 }
 
 export interface SafeShieldStatistics {
+  enabled: boolean;
+  collectorRunning: boolean;
   available: boolean;
   schemaVersion: number;
   volatile: boolean;

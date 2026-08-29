@@ -69,7 +69,6 @@ interface RawSafeShieldRules {
 interface RawSafeShieldMutation {
   ok?: unknown;
   changed?: unknown;
-  restarted?: unknown;
   accepted?: unknown;
   target_enabled?: unknown;
   reconciled?: unknown;

@@ -67,4 +67,18 @@ fi
 grep -Fq 'prefers-reduced-motion: reduce' "$CHART" || \
   fail 'statistics chart must respect reduced-motion preferences'
 
-echo 'PASS: SafeShield statistics API, ACL, polling and Chart.js 24-hour UI contracts are consistent'
+jq -e \
+  '.["luci-app-smartsafehub"].write.ubus.safeshield | index("config_update") != null' \
+  "$ACL" >/dev/null || fail 'statistics toggle requires config_update write ACL'
+grep -Fq "callSafeShield<RawSafeShieldMutation>('config_update'" "$API" || \
+  fail 'statistics toggle must update SafeShield through config_update'
+grep -Fq 'statistics_enabled: enabled' "$API" || \
+  fail 'statistics toggle must only update statistics_enabled'
+grep -Fq 'collectorRunning: boolValue(source.collector_running)' "$API" || \
+  fail 'statistics API must expose collector runtime state'
+grep -Fq 'role="switch"' "$PANEL" || \
+  fail 'statistics panel must expose an accessible enable switch'
+grep -Fq 'onSetEnabled(!data.enabled)' "$PANEL" || \
+  fail 'statistics switch must toggle the current enabled state'
+
+echo 'PASS: SafeShield statistics API, ACL, toggle, polling and Chart.js 24-hour UI contracts are consistent'

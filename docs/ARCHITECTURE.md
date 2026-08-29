@@ -104,6 +104,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.updates_install`
 - `smartsafehub.updates_settings_update`
 - `safeshield.set_enabled`
+- `safeshield.config_update` (통계 수집 설정에 한정)
 - `safeshield.refresh`
 - `safeshield.rule_add`
 - `safeshield.rule_delete`
@@ -415,7 +416,7 @@ SafeShield가 소유하는 기능:
 - 라이선스 키 조회·등록·변경·제거
 - 규칙 파일, dnsmasq, procd와 refresh scheduling
 
-SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. `safeshield.config_update`도 사용하지 않으며 SmartSafeHub ACL에 부여하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
+SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. 통계 수집 ON/OFF는 SafeShield 공식 `safeshield.config_update`에 `statistics_enabled`만 전달해 변경하며, 그 외 일반 설정 편집에는 사용하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
 
 라이선스 상태의 기본 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 평문 키는 사용자가 **현재 키 불러오기**를 명시적으로 실행했을 때만 `safeshield.license_get`으로 가져오며, 새 키 등록과 변경은 `license_update`, 제거는 `license_update`에 빈 키를 전달하는 기존 SafeShield 계약을 사용합니다. 따라서 평문 키는 일반 polling이나 진단 다운로드 흐름에 포함되지 않습니다.
 
@@ -452,6 +453,7 @@ SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 | `safeshield.status` | 읽기 | 상태, runtime, artifact, health |
 | `safeshield.config` | 읽기 | 공개 설정과 마스킹된 라이선스 상태 |
 | `safeshield.set_enabled` | 쓰기 | 비동기 enable/disable lifecycle 요청 |
+| `safeshield.config_update` | 쓰기 | `statistics_enabled` 통계 수집 설정 변경 |
 | `safeshield.refresh` | 쓰기 | 비동기 refresh 요청 |
 | `safeshield.rules_list` | 읽기 | 사용자 허용·차단 규칙 조회 |
 | `safeshield.rule_add` | 쓰기 | 사용자 규칙 추가 |

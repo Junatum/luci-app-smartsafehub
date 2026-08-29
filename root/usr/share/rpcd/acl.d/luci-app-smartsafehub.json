@@ -28,6 +28,7 @@
         ],
         "safeshield": [
           "set_enabled",
+          "config_update",
           "refresh",
           "rule_add",
           "rule_delete",

@@ -1,4 +1,5 @@
 import { formatNumber, formatTimestamp } from '../app/format';
+import type { SafeShieldAction } from '../hooks/useSafeShieldActions';
 import type {
   SafeShieldStatistics,
   SafeShieldStatisticsBucket,
@@ -8,10 +9,12 @@ import { SafeShieldBlockedBarChart } from './SafeShieldBlockedBarChart';
 import { SafeShieldDeviceStatisticsList } from './SafeShieldDeviceStatisticsList';
 
 interface SafeShieldStatisticsPanelProps {
+  action: SafeShieldAction | null;
   data: SafeShieldStatistics | null;
   error: string | null;
   loading: boolean;
   onRetry: () => void;
+  onSetEnabled: (enabled: boolean) => void;
   refreshing: boolean;
 }
 
@@ -67,10 +70,12 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 export function SafeShieldStatisticsPanel({
+  action,
   data,
   error,
   loading,
   onRetry,
+  onSetEnabled,
   refreshing,
 }: SafeShieldStatisticsPanelProps) {
   if (loading && data === null) {
@@ -101,7 +106,7 @@ export function SafeShieldStatisticsPanel({
     );
   }
 
-  if (!data?.available) {
+  if (!data) {
     return (
       <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
         <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -134,10 +139,46 @@ export function SafeShieldStatisticsPanel({
             DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에 집계합니다.
           </p>
         </div>
-        <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
-          <DatabaseIcon class="size-6" />
-        </span>
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <p class="m-0 text-xs font-bold text-slate-500">통계 수집</p>
+            <p class={`mt-1 mb-0 text-xs font-extrabold ${data.enabled ? 'text-emerald-700' : 'text-slate-500'}`}>
+              {data.enabled
+                ? data.collectorRunning
+                  ? '활성화 · 수집 중'
+                  : '활성화 · 시작 중'
+                : '비활성화'}
+            </p>
+          </div>
+          <button
+            aria-checked={data.enabled}
+            aria-label={data.enabled ? '차단 통계 수집 끄기' : '차단 통계 수집 켜기'}
+            class={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-0 p-0 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+              data.enabled ? 'bg-teal-600' : 'bg-slate-300'
+            }`}
+            disabled={action !== null}
+            onClick={() => onSetEnabled(!data.enabled)}
+            role="switch"
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              class={`block size-5 rounded-full bg-white shadow-sm transition-transform ${
+                data.enabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
+            <DatabaseIcon class="size-6" />
+          </span>
+        </div>
       </div>
+
+      {!data.enabled ? (
+        <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+          통계 수집이 꺼져 있습니다. 활성화하면 DNS 요청 원본은 저장하지 않고 요청 수와 차단 수만 로컬 메모리에 집계합니다.
+        </div>
+      ) : null}
 
       <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="전체 DNS 요청" value={formatNumber(data.totals.queries)} />
