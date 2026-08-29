@@ -41,6 +41,9 @@ interface RawSafeShieldStatistics {
   retention_hours?: unknown;
   totals?: Record<string, unknown>;
   hourly?: unknown;
+  device_limit?: unknown;
+  devices_truncated?: unknown;
+  devices?: unknown;
 }
 
 interface RawSafeShieldConfig {
@@ -144,6 +147,9 @@ function unavailableStatistics(): SafeShieldStatistics {
       blocked: 0,
     },
     hourly: [],
+    deviceLimit: 0,
+    devicesTruncated: false,
+    devices: [],
   };
 }
 
@@ -168,6 +174,27 @@ function normalizeStatistics(sourceValue: RawSafeShieldStatistics): SafeShieldSt
         .sort((left, right) => left.bucketStart - right.bucketStart)
     : [];
 
+  const devices = Array.isArray(source.devices)
+    ? source.devices
+        .map((entry) => objectValue(entry))
+        .map((entry) => {
+          const ip = plainString(entry.ip);
+          const mac = plainString(entry.mac);
+          const id = plainString(entry.id) || mac || (ip ? `ip:${ip}` : '');
+
+          return {
+            id,
+            mac,
+            ip,
+            hostname: plainString(entry.hostname),
+            identified: boolValue(entry.identified),
+            queries: numberValue(entry.queries),
+            blocked: numberValue(entry.blocked),
+          };
+        })
+        .filter((entry) => entry.id.length > 0)
+    : [];
+
   return {
     available: true,
     schemaVersion: numberValue(schema.version),
@@ -180,6 +207,9 @@ function normalizeStatistics(sourceValue: RawSafeShieldStatistics): SafeShieldSt
       blocked: numberValue(totals.blocked),
     },
     hourly,
+    deviceLimit: numberValue(source.device_limit),
+    devicesTruncated: boolValue(source.devices_truncated),
+    devices,
   };
 }
 

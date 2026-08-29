@@ -13,7 +13,7 @@ apk info luci-app-smartsafehub
 /etc/init.d/safeshield statistics
 ```
 
-SmartSafeHub는 SafeShield `0.3.14-r2` 이상을 요구합니다.
+SmartSafeHub는 SafeShield `0.3.14-r7` 이상을 요구합니다.
 
 통계가 활성화된 상태에서는 collector가 한 세트만 있어야 합니다.
 
@@ -33,6 +33,7 @@ SmartSafeHub의 `SafeShield` 화면에서 다음 항목을 확인합니다.
 - 현재 시간 차단 수
 - 최근 24시간 시간대별 차단 막대
 - 수집 시작 시각과 보존 시간
+- 기기별 DNS 요청, 차단 수, 차단율, IP/MAC 및 식별 상태
 
 DNS 요청을 발생시킨 뒤 최대 한 번의 통계 snapshot/polling 주기인 약 60초 이내에 값이 갱신되는지 확인합니다.
 

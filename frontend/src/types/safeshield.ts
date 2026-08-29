@@ -100,6 +100,16 @@ export interface SafeShieldStatisticsBucket {
   blocked: number;
 }
 
+export interface SafeShieldDeviceStatistics {
+  id: string;
+  mac: string;
+  ip: string;
+  hostname: string;
+  identified: boolean;
+  queries: number;
+  blocked: number;
+}
+
 export interface SafeShieldStatistics {
   available: boolean;
   schemaVersion: number;
@@ -112,4 +122,7 @@ export interface SafeShieldStatistics {
     blocked: number;
   };
   hourly: SafeShieldStatisticsBucket[];
+  deviceLimit: number;
+  devicesTruncated: boolean;
+  devices: SafeShieldDeviceStatistics[];
 }

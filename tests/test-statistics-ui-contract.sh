@@ -10,6 +10,7 @@ HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
 APP="$ROOT_DIR/frontend/src/app/App.tsx"
 PANEL="$ROOT_DIR/frontend/src/components/SafeShieldStatisticsPanel.tsx"
 CHART="$ROOT_DIR/frontend/src/components/SafeShieldBlockedBarChart.tsx"
+DEVICE_LIST="$ROOT_DIR/frontend/src/components/SafeShieldDeviceStatisticsList.tsx"
 PACKAGE_JSON="$ROOT_DIR/frontend/package.json"
 
 fail() {
@@ -21,8 +22,8 @@ jq -e \
   '.["luci-app-smartsafehub"].read.ubus.safeshield | index("statistics") != null' \
   "$ACL" >/dev/null || fail 'statistics must be allowed by the SafeShield read ACL'
 
-grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.14-r2)' "$MAKEFILE" || \
-  fail 'SmartSafeHub must require safeshield 0.3.14-r2 or later'
+grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.14-r7)' "$MAKEFILE" || \
+  fail 'SmartSafeHub must require safeshield 0.3.14-r7 or later'
 grep -Fq "callSafeShield<RawSafeShieldStatistics>('statistics')" "$API" || \
   fail 'frontend API must call the safeshield statistics RPC'
 grep -Fq 'const STATISTICS_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
@@ -35,6 +36,22 @@ grep -Fq 'DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에
   fail 'statistics UI must explain local aggregate-only behavior'
 grep -Fq '<SafeShieldBlockedBarChart buckets={buckets} />' "$PANEL" || \
   fail 'statistics panel must render the Chart.js bar chart component'
+grep -Fq 'deviceLimit: numberValue(source.device_limit)' "$API" || \
+  fail 'statistics API must normalize the per-device tracking limit'
+grep -Fq 'devicesTruncated: boolValue(source.devices_truncated)' "$API" || \
+  fail 'statistics API must normalize the device truncation flag'
+grep -Fq 'devices,' "$API" || \
+  fail 'statistics API must expose normalized per-device statistics'
+grep -Fq '<SafeShieldDeviceStatisticsList' "$PANEL" || \
+  fail 'statistics panel must render the per-device statistics list'
+grep -Fq '기기별 통계' "$DEVICE_LIST" || \
+  fail 'device statistics list must label the per-device section'
+grep -Fq 'DHCP 식별' "$DEVICE_LIST" || \
+  fail 'device statistics list must show DHCP identification state'
+grep -Fq 'IP 임시 식별' "$DEVICE_LIST" || \
+  fail 'device statistics list must show temporary IP identification state'
+grep -Fq 'device.blocked' "$DEVICE_LIST" || \
+  fail 'device statistics list must render blocked request counts'
 jq -e '.dependencies["chart.js"] == "4.5.1"' "$PACKAGE_JSON" >/dev/null || \
   fail 'frontend must pin Chart.js 4.5.1'
 grep -Fq "from 'chart.js';" "$CHART" || \

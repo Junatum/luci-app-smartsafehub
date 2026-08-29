@@ -5,6 +5,7 @@ import type {
 } from '../types/safeshield';
 import { DatabaseIcon } from './Icons';
 import { SafeShieldBlockedBarChart } from './SafeShieldBlockedBarChart';
+import { SafeShieldDeviceStatisticsList } from './SafeShieldDeviceStatisticsList';
 
 interface SafeShieldStatisticsPanelProps {
   data: SafeShieldStatistics | null;
@@ -110,7 +111,7 @@ export function SafeShieldStatisticsPanel({
           차단 통계
         </h2>
         <p class="mt-3 mb-0 text-sm leading-6 text-slate-600">
-          현재 SafeShield에서 통계 데이터를 제공하지 않습니다. SafeShield 0.3.14-r2 이상이 설치되어 있고 통계 수집이 활성화되어 있는지 확인해 주세요.
+          현재 SafeShield에서 통계 데이터를 제공하지 않습니다. SafeShield 0.3.14-r7 이상이 설치되어 있고 통계 수집이 활성화되어 있는지 확인해 주세요.
         </p>
       </section>
     );
@@ -168,6 +169,12 @@ export function SafeShieldStatisticsPanel({
 
         <SafeShieldBlockedBarChart buckets={buckets} />
       </div>
+
+      <SafeShieldDeviceStatisticsList
+        deviceLimit={data.deviceLimit}
+        devices={data.devices}
+        truncated={data.devicesTruncated}
+      />
 
       <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5 text-slate-500">
         <span>수집 시작 {formatTimestamp(data.startedAt)}</span>
