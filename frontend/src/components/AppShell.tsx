@@ -23,7 +23,7 @@ export function AppShell({
   const copy = ROUTE_BY_NAME[route];
 
   return (
-    <div class="ssh-app min-h-screen bg-slate-50 text-slate-950">
+    <div class="ssh-app min-h-screen bg-transparent text-slate-950">
       <ProductHeader
         description={copy.description}
         loading={loading}
@@ -32,7 +32,7 @@ export function AppShell({
         title={copy.title}
       />
 
-      <main class="ssh-product-main bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-10 lg:pb-12">
+      <main class="ssh-product-main bg-transparent px-4 pb-8 sm:px-6 sm:pb-10 lg:px-10 lg:pb-12">
         <ProductNavigation route={route} title={copy.title} />
         {children}
       </main>

@@ -2,7 +2,7 @@
 'require view';
 
 const ASSET_BASE = '/luci-static/smartsafehub/';
-const ASSET_VERSION = '0.2.0-r10';
+const ASSET_VERSION = '0.2.0-r14';
 const ROOT_ID = 'smartsafehub-root';
 const PRODUCT_VIEW_CLASS = 'smartsafehub-product-view';
 const PRODUCT_CHROME_STYLE_ID = 'smartsafehub-product-chrome-style';
@@ -53,7 +53,6 @@ html.${PRODUCT_VIEW_CLASS},
 html.${PRODUCT_VIEW_CLASS} body {
 	margin: 0 !important;
 	padding: 0 !important;
-	background: #f8fafc !important;
 	overflow-x: hidden !important;
 }
 
@@ -66,11 +65,9 @@ html.${PRODUCT_VIEW_CLASS} #footer {
 
 html.${PRODUCT_VIEW_CLASS} .${PRODUCT_ANCESTOR_CLASS} {
 	max-width: none !important;
-	background: transparent !important;
 	border: 0 !important;
 	border-radius: 0 !important;
 	box-shadow: none !important;
-	overflow: visible !important;
 }
 
 html.${PRODUCT_VIEW_CLASS} #${ROOT_ID} {

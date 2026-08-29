@@ -167,7 +167,7 @@ export function ProductNavigation({ route, title }: ProductNavigationProps) {
 
       <nav
         aria-label={t('SmartSafeHub Menu')}
-        class="mb-8 hidden overflow-x-auto border-b border-slate-200 bg-white md:block"
+        class="mb-8 hidden overflow-x-auto rounded-xl border-b border-slate-200 bg-white md:block"
       >
         <div class="flex w-full min-w-max items-center gap-1">
           {ROUTES.map((item) => {

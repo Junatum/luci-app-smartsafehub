@@ -45,6 +45,35 @@
   overflow: clip;
 }
 
+.ssh-app [class~="bg-white"] {
+  background-color: rgba(var(--primary-rgbbody, 255, 255, 255), 0.7);
+  box-shadow: 0 0.1rem 0.3rem var(--input-boxcolor, rgb(15 23 42 / 0.08));
+}
+
+.ssh-app [class~="bg-slate-50"],
+.ssh-app [class~="bg-slate-100"] {
+  background-color: rgba(var(--primary-rgbbody, 255, 255, 255), 0.45);
+}
+
+.ssh-app [class~="text-slate-950"],
+.ssh-app [class~="text-slate-900"],
+.ssh-app [class~="text-slate-800"] {
+  color: var(--primary-title-color, #0f172a);
+}
+
+.ssh-app [class~="text-slate-700"],
+.ssh-app [class~="text-slate-600"],
+.ssh-app [class~="text-slate-500"],
+.ssh-app [class~="text-slate-400"] {
+  color: var(--body-color, #475569);
+}
+
+.ssh-app [class~="border-slate-100"],
+.ssh-app [class~="border-slate-200"],
+.ssh-app [class~="border-slate-300"] {
+  border-color: var(--inputborder-color, #e2e8f0);
+}
+
 .ssh-app main,
 .ssh-app section,
 .ssh-app article,
