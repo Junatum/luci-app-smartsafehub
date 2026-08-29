@@ -11,9 +11,10 @@ import {
   PowerIcon,
   ShieldIcon,
 } from '../components/Icons';
+import { SafeShieldStatisticsPanel } from '../components/SafeShieldStatisticsPanel';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { SafeShieldAction } from '../hooks/useSafeShieldActions';
-import type { SafeShieldStatus } from '../types/safeshield';
+import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import {
   formatBytes,
   formatInterval,
@@ -28,11 +29,16 @@ interface SafeShieldPageProps {
   data: SafeShieldStatus | null;
   error: string | null;
   loading: boolean;
+  statistics: SafeShieldStatistics | null;
+  statisticsError: string | null;
+  statisticsLoading: boolean;
+  statisticsRefreshing: boolean;
   onDismissFeedback: () => void;
   onReadLicense: () => Promise<string | null>;
   onRefreshBlocklist: () => void;
   onRemoveLicense: () => Promise<boolean>;
   onRetry: () => void;
+  onRetryStatistics: () => void;
   onSetEnabled: (enabled: boolean) => void;
   onUpdateLicense: (licenseKey: string) => Promise<boolean>;
 }
@@ -270,11 +276,16 @@ export function SafeShieldPage({
   data,
   error,
   loading,
+  statistics,
+  statisticsError,
+  statisticsLoading,
+  statisticsRefreshing,
   onDismissFeedback,
   onReadLicense,
   onRefreshBlocklist,
   onRemoveLicense,
   onRetry,
+  onRetryStatistics,
   onSetEnabled,
   onUpdateLicense,
 }: SafeShieldPageProps) {
@@ -436,6 +447,14 @@ export function SafeShieldPage({
         error={actionError}
         message={actionMessage}
         onDismiss={onDismissFeedback}
+      />
+
+      <SafeShieldStatisticsPanel
+        data={statistics}
+        error={statisticsError}
+        loading={statisticsLoading}
+        onRetry={onRetryStatistics}
+        refreshing={statisticsRefreshing}
       />
 
       <section class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

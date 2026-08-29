@@ -71,7 +71,9 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - SafeShield 사용 여부와 실행 상태 표시
 - 차단 목록 수동 갱신
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
-- 라이선스, 플랜, 아티팩트와 차단 목록 통계 표시
+- 라이선스, 플랜, 아티팩트와 차단 목록 상태 표시
+- 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
+- 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지
 - 새 라이선스 키는 일반 텍스트 입력란에서 확인하며 등록·변경·제거 가능
 - 현재 라이선스 키는 사용자가 `현재 키 불러오기`를 선택했을 때만 `safeshield.license_get`으로 평문 조회
 - 사용자 허용 목록과 차단 목록 관리
@@ -86,7 +88,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 새 버전의 릴리즈 요약, 배포일과 섹션별 변경 사항 표시
 - 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 업데이트 표시
 - 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치 설정
-- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield >= 0.3.10`은 패키지 dependency로 함께 관리
+- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield >= 0.3.14-r2`은 패키지 dependency로 함께 관리
 - 릴리즈 노트는 같은 SmartSafeHub 저장소 channel의 `releases/luci-app-smartsafehub/index.json`에서 릴리즈 순서를 확인한 뒤 현재 설치 버전 이후의 `<version>.json`을 표시용으로 사용하며, 일부 또는 전체 조회 실패가 업데이트 설치를 막지 않음
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
 - OpenWrt의 검증된 펌웨어 업그레이드·백업·복원 화면으로 이동
@@ -117,6 +119,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - Wi-Fi 변경 검증은 UCI 설정을 기준으로 수행해 불필요한 런타임 전체 조회를 피합니다.
 - SmartSafeHub는 공개 shell의 단일 Preact lifecycle을 사용하며 legacy LuCI view loader나 DOM observer를 두지 않습니다.
 - SafeShield, 연결 기기와 진단 수집은 일부 소스 실패를 전체 기능 실패로 확대하지 않습니다.
+- 저사양 장비의 통계 성능 검증 절차는 [`docs/STATISTICS_TESTING.md`](docs/STATISTICS_TESTING.md)를 따릅니다.
 
 ## 지원 환경과 의존성
 

@@ -93,3 +93,23 @@ export interface SafeShieldLicenseUpdateResult {
     reason: string;
   };
 }
+
+export interface SafeShieldStatisticsBucket {
+  bucketStart: number;
+  queries: number;
+  blocked: number;
+}
+
+export interface SafeShieldStatistics {
+  available: boolean;
+  schemaVersion: number;
+  volatile: boolean;
+  startedAt: number;
+  updatedAt: number;
+  retentionHours: number;
+  totals: {
+    queries: number;
+    blocked: number;
+  };
+  hourly: SafeShieldStatisticsBucket[];
+}

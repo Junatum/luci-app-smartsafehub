@@ -31,6 +31,10 @@ for method in updates_status updates_check updates_install updates_settings_upda
 	assert_rpc_method "$method"
 done
 
+jq -e \
+	'.["luci-app-smartsafehub"].read.ubus.safeshield | index("statistics") != null' \
+	"$ACL" >/dev/null || fail 'safeshield statistics is missing from read ACL'
+
 assert_acl_method read updates_status
 assert_acl_method write updates_check
 assert_acl_method write updates_install

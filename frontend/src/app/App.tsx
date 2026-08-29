@@ -5,6 +5,7 @@ import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
+import { useSafeShieldStatistics } from '../hooks/useSafeShieldStatistics';
 import { useSafeShieldStatus } from '../hooks/useSafeShieldStatus';
 import { useSoftwareUpdates } from '../hooks/useSoftwareUpdates';
 import { useStatus } from '../hooks/useStatus';
@@ -24,6 +25,7 @@ export function App() {
   const wifi = useWifi(route === 'wifi');
   const devices = useConnectedDevices(route === 'devices');
   const safeshield = useSafeShieldStatus(route === 'safeshield');
+  const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
   const safeshieldActions = useSafeShieldActions(safeshield.refresh);
@@ -106,11 +108,16 @@ export function App() {
           data={safeshield.data}
           error={safeshield.error}
           loading={safeshield.loading}
+          statistics={safeshieldStatistics.data}
+          statisticsError={safeshieldStatistics.error}
+          statisticsLoading={safeshieldStatistics.loading}
+          statisticsRefreshing={safeshieldStatistics.refreshing}
           onDismissFeedback={safeshieldActions.dismissFeedback}
           onReadLicense={safeshieldActions.readLicense}
           onRefreshBlocklist={() => void safeshieldActions.refreshBlocklist()}
           onRemoveLicense={safeshieldActions.removeLicense}
           onRetry={() => void safeshield.refresh()}
+          onRetryStatistics={() => void safeshieldStatistics.refresh()}
           onSetEnabled={(enabled) => void safeshieldActions.setEnabled(enabled)}
           onUpdateLicense={safeshieldActions.updateLicense}
         />
@@ -151,6 +158,11 @@ export function App() {
       return;
     }
 
+    if (route === 'safeshield') {
+      void Promise.all([safeshield.refresh(), safeshieldStatistics.refresh()]);
+      return;
+    }
+
     void current.refresh();
   };
 
@@ -158,7 +170,11 @@ export function App() {
     <AppShell
       loading={current.loading}
       onRefresh={refreshCurrent}
-      refreshing={current.refreshing || (route === 'system' && updates.refreshing)}
+      refreshing={
+        current.refreshing ||
+        (route === 'system' && updates.refreshing) ||
+        (route === 'safeshield' && safeshieldStatistics.refreshing)
+      }
       route={route}
       updateCount={updates.data?.updateCount ?? 0}
     >

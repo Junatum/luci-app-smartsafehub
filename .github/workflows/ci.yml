@@ -36,6 +36,7 @@ jobs:
           sh -n root/usr/libexec/smartsafehub-updater
           sh -n tests/test-package-contract.sh
           sh -n tests/test-rpc-contract.sh
+          sh -n tests/test-statistics-ui-contract.sh
           sh -n tests/test-ucode-imports.sh
           sh -n tests/test-updater.sh
 
@@ -52,6 +53,9 @@ jobs:
 
       - name: Validate RPC and ACL contract
         run: ./tests/test-rpc-contract.sh
+
+      - name: Validate SafeShield statistics UI contract
+        run: sh ./tests/test-statistics-ui-contract.sh
 
       - name: Run updater tests
         run: ./tests/test-updater.sh

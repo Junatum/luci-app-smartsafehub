@@ -8,6 +8,7 @@ import type {
   SafeShieldLicenseReadResult,
   SafeShieldLicenseUpdateResult,
   SafeShieldRefreshResult,
+  SafeShieldStatistics,
   SafeShieldStatus,
 } from '../types/safeshield';
 import { callRpc, RpcError } from './rpc';
@@ -30,6 +31,16 @@ interface RawSafeShieldStatus {
   warnings?: unknown;
   errors?: unknown;
   timestamps?: Record<string, unknown>;
+}
+
+interface RawSafeShieldStatistics {
+  schema?: Record<string, unknown>;
+  volatile?: unknown;
+  started_at?: unknown;
+  updated_at?: unknown;
+  retention_hours?: unknown;
+  totals?: Record<string, unknown>;
+  hourly?: unknown;
 }
 
 interface RawSafeShieldConfig {
@@ -118,6 +129,58 @@ async function callSafeShield<T>(
   }
 
   return response as T;
+}
+
+function unavailableStatistics(): SafeShieldStatistics {
+  return {
+    available: false,
+    schemaVersion: 0,
+    volatile: true,
+    startedAt: 0,
+    updatedAt: 0,
+    retentionHours: 0,
+    totals: {
+      queries: 0,
+      blocked: 0,
+    },
+    hourly: [],
+  };
+}
+
+function normalizeStatistics(sourceValue: RawSafeShieldStatistics): SafeShieldStatistics {
+  const source = objectValue(sourceValue);
+
+  if (Object.keys(source).length === 0) {
+    return unavailableStatistics();
+  }
+
+  const schema = objectValue(source.schema);
+  const totals = objectValue(source.totals);
+  const hourly = Array.isArray(source.hourly)
+    ? source.hourly
+        .map((entry) => objectValue(entry))
+        .map((entry) => ({
+          bucketStart: numberValue(entry.bucket_start),
+          queries: numberValue(entry.queries),
+          blocked: numberValue(entry.blocked),
+        }))
+        .filter((entry) => entry.bucketStart > 0)
+        .sort((left, right) => left.bucketStart - right.bucketStart)
+    : [];
+
+  return {
+    available: true,
+    schemaVersion: numberValue(schema.version),
+    volatile: source.volatile !== false,
+    startedAt: numberValue(source.started_at),
+    updatedAt: numberValue(source.updated_at),
+    retentionHours: numberValue(source.retention_hours),
+    totals: {
+      queries: numberValue(totals.queries),
+      blocked: numberValue(totals.blocked),
+    },
+    hourly,
+  };
 }
 
 function unavailableStatus(): SafeShieldStatus {
@@ -284,6 +347,22 @@ function normalizeRefresh(source: unknown): {
     accepted: boolValue(refresh.accepted),
     reason: plainString(refresh.reason),
   };
+}
+
+export async function fetchSafeShieldStatistics(): Promise<SafeShieldStatistics> {
+  try {
+    const response = await callSafeShield<RawSafeShieldStatistics>('statistics');
+    return normalizeStatistics(response);
+  } catch (error) {
+    if (
+      error instanceof RpcError &&
+      ['UBUS_3', 'UBUS_4', 'UBUS_5'].includes(error.code)
+    ) {
+      return unavailableStatistics();
+    }
+
+    throw error;
+  }
 }
 
 export async function fetchSafeShieldStatus(): Promise<SafeShieldStatus> {
