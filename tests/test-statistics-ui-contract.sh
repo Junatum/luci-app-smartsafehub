@@ -9,6 +9,8 @@ API="$ROOT_DIR/frontend/src/api/safeshield.ts"
 HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
 APP="$ROOT_DIR/frontend/src/app/App.tsx"
 PANEL="$ROOT_DIR/frontend/src/components/SafeShieldStatisticsPanel.tsx"
+CHART="$ROOT_DIR/frontend/src/components/SafeShieldBlockedBarChart.tsx"
+PACKAGE_JSON="$ROOT_DIR/frontend/package.json"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -31,5 +33,21 @@ grep -Fq 'const DISPLAY_HOURS = 24;' "$PANEL" || \
   fail 'statistics chart must display the latest 24 hourly buckets'
 grep -Fq 'DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에 집계합니다.' "$PANEL" || \
   fail 'statistics UI must explain local aggregate-only behavior'
+grep -Fq '<SafeShieldBlockedBarChart buckets={buckets} />' "$PANEL" || \
+  fail 'statistics panel must render the Chart.js bar chart component'
+jq -e '.dependencies["chart.js"] == "4.5.1"' "$PACKAGE_JSON" >/dev/null || \
+  fail 'frontend must pin Chart.js 4.5.1'
+grep -Fq "from 'chart.js';" "$CHART" || \
+  fail 'statistics chart must import Chart.js modules directly'
+grep -Fq 'BarController' "$CHART" || fail 'statistics chart must register BarController'
+grep -Fq 'BarElement' "$CHART" || fail 'statistics chart must register BarElement'
+grep -Fq 'CategoryScale' "$CHART" || fail 'statistics chart must register CategoryScale'
+grep -Fq 'LinearScale' "$CHART" || fail 'statistics chart must register LinearScale'
+grep -Fq 'Tooltip' "$CHART" || fail 'statistics chart must register Tooltip'
+if grep -Fq "chart.js/auto" "$CHART"; then
+  fail 'statistics chart must not use chart.js/auto'
+fi
+grep -Fq 'prefers-reduced-motion: reduce' "$CHART" || \
+  fail 'statistics chart must respect reduced-motion preferences'
 
-echo 'PASS: SafeShield statistics API, ACL, polling and lightweight 24-hour UI contracts are consistent'
+echo 'PASS: SafeShield statistics API, ACL, polling and Chart.js 24-hour UI contracts are consistent'

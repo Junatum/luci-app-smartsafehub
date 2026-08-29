@@ -4,6 +4,7 @@ import type {
   SafeShieldStatisticsBucket,
 } from '../types/safeshield';
 import { DatabaseIcon } from './Icons';
+import { SafeShieldBlockedBarChart } from './SafeShieldBlockedBarChart';
 
 interface SafeShieldStatisticsPanelProps {
   data: SafeShieldStatistics | null;
@@ -15,11 +16,6 @@ interface SafeShieldStatisticsPanelProps {
 
 const HOUR_SECONDS = 3_600;
 const DISPLAY_HOURS = 24;
-const HOUR_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
-  hour: '2-digit',
-  hour12: false,
-});
-
 function blockRate(queries: number, blocked: number): string {
   if (queries <= 0) {
     return '0.0%';
@@ -121,7 +117,6 @@ export function SafeShieldStatisticsPanel({
   }
 
   const buckets = recentBuckets(data);
-  const maxBlocked = Math.max(1, ...buckets.map((bucket) => bucket.blocked));
   const latest = buckets[buckets.length - 1];
 
   return (
@@ -171,44 +166,7 @@ export function SafeShieldStatisticsPanel({
           </span>
         </div>
 
-        <div
-          aria-label="최근 24시간 시간대별 SafeShield 차단 요청"
-          class="mt-5 grid h-40 items-end gap-1 sm:gap-1.5"
-          role="img"
-          style={{
-            gridTemplateColumns: `repeat(${DISPLAY_HOURS}, minmax(0, 1fr))`,
-          }}
-        >
-          {buckets.map((bucket, index) => {
-            const height =
-              bucket.blocked > 0
-                ? Math.max(4, (bucket.blocked / maxBlocked) * 100)
-                : 0;
-            const hour = HOUR_FORMATTER.format(
-              new Date(bucket.bucketStart * 1_000),
-            );
-            const showLabel =
-              index % 3 === 0 || index === buckets.length - 1;
-
-            return (
-              <div
-                class="flex h-full min-w-0 flex-col justify-end gap-1"
-                key={bucket.bucketStart}
-                title={`${hour} · DNS 요청 ${formatNumber(bucket.queries)} · 차단 ${formatNumber(bucket.blocked)}`}
-              >
-                <div class="flex min-h-0 flex-1 items-end rounded-sm bg-slate-200/70">
-                  <div
-                    class="w-full rounded-sm bg-teal-600"
-                    style={{ height: `${height}%` }}
-                  />
-                </div>
-                <span class="h-4 truncate text-center text-xs font-bold text-slate-400">
-                  {showLabel ? hour : ''}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        <SafeShieldBlockedBarChart buckets={buckets} />
       </div>
 
       <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5 text-slate-500">
