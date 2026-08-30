@@ -89,7 +89,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 새 버전의 릴리즈 요약, 배포일과 섹션별 변경 사항 표시
 - 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 업데이트 표시
 - 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치 설정
-- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield >= 0.3.14-r7`은 패키지 dependency로 함께 관리
+- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield >= 0.3.14-r8`은 패키지 dependency로 함께 관리
 - 릴리즈 노트는 같은 SmartSafeHub 저장소 channel의 `releases/luci-app-smartsafehub/index.json`에서 릴리즈 순서를 확인한 뒤 현재 설치 버전 이후의 `<version>.json`을 표시용으로 사용하며, 일부 또는 전체 조회 실패가 업데이트 설치를 막지 않음
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
 - OpenWrt의 검증된 펌웨어 업그레이드·백업·복원 화면으로 이동

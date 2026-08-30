@@ -4,6 +4,20 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.5-r5] - 2026-08-30
+
+### 변경
+
+- SafeShield `0.3.14-r8`의 statistics-only runtime reconciliation에 맞춰 통계 토글 후 전체 SafeShield 상태를 장시간 재조회하지 않고 통계 상태만 짧게 확인합니다.
+- 통계 설정 RPC와 첫 통계 재조회가 끝날 때까지 토글의 busy 상태를 유지해 변경이 진행 중임을 명확하게 표시합니다.
+- 통계 수집 활성화/비활성화 중 스위치 knob에 spinner를 표시하고 통계 카드에 wait cursor를 적용합니다.
+- 토글 직후에는 목표 상태를 스위치에 즉시 반영하고 `활성화하는 중…` 또는 `비활성화하는 중…` 상태 문구를 표시합니다.
+- SafeShield 최소 의존성을 `0.3.14-r8`로 올려 통계 토글이 refresh daemon을 재시작하지 않는 backend 동작을 요구합니다.
+
+### 테스트
+
+- statistics reconciliation 응답, spinner/wait cursor, 목표 상태 표시와 statistics-only 후속 polling 계약을 테스트합니다.
+
 ## [0.2.5-r4] - 2026-08-29
 
 ### 추가

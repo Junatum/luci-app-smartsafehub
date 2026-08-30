@@ -124,9 +124,31 @@ export function SafeShieldStatisticsPanel({
 
   const buckets = recentBuckets(data);
   const latest = buckets[buckets.length - 1];
+  const statisticsActionBusy =
+    action === 'statistics-enable' || action === 'statistics-disable';
+  const targetEnabled =
+    action === 'statistics-enable'
+      ? true
+      : action === 'statistics-disable'
+        ? false
+        : data.enabled;
+  const collectionStatus = statisticsActionBusy
+    ? targetEnabled
+      ? '활성화하는 중…'
+      : '비활성화하는 중…'
+    : data.enabled
+      ? data.collectorRunning
+        ? '활성화 · 수집 중'
+        : '활성화 · 시작 중'
+      : '비활성화';
 
   return (
-    <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+    <section
+      aria-busy={statisticsActionBusy}
+      class={`mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 ${
+        statisticsActionBusy ? 'cursor-wait' : ''
+      }`}
+    >
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
@@ -142,20 +164,25 @@ export function SafeShieldStatisticsPanel({
         <div class="flex items-center gap-3">
           <div class="text-right">
             <p class="m-0 text-xs font-bold text-slate-500">통계 수집</p>
-            <p class={`mt-1 mb-0 text-xs font-extrabold ${data.enabled ? 'text-emerald-700' : 'text-slate-500'}`}>
-              {data.enabled
-                ? data.collectorRunning
-                  ? '활성화 · 수집 중'
-                  : '활성화 · 시작 중'
-                : '비활성화'}
+            <p
+              class={`mt-1 mb-0 text-xs font-extrabold ${
+                statisticsActionBusy || targetEnabled
+                  ? 'text-emerald-700'
+                  : 'text-slate-500'
+              }`}
+              role="status"
+            >
+              {collectionStatus}
             </p>
           </div>
           <button
-            aria-checked={data.enabled}
-            aria-label={data.enabled ? '차단 통계 수집 끄기' : '차단 통계 수집 켜기'}
-            class={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-0 p-0 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
-              data.enabled ? 'bg-teal-600' : 'bg-slate-300'
-            }`}
+            aria-checked={targetEnabled}
+            aria-label={targetEnabled ? '차단 통계 수집 끄기' : '차단 통계 수집 켜기'}
+            class={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-0 p-0 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
+              statisticsActionBusy
+                ? 'cursor-wait opacity-80'
+                : 'disabled:cursor-not-allowed disabled:opacity-50'
+            } ${targetEnabled ? 'bg-teal-600' : 'bg-slate-300'}`}
             disabled={action !== null}
             onClick={() => onSetEnabled(!data.enabled)}
             role="switch"
@@ -163,10 +190,14 @@ export function SafeShieldStatisticsPanel({
           >
             <span
               aria-hidden="true"
-              class={`block size-5 rounded-full bg-white shadow-sm transition-transform ${
-                data.enabled ? 'translate-x-6' : 'translate-x-1'
+              class={`grid size-5 place-items-center rounded-full bg-white shadow-sm transition-transform ${
+                targetEnabled ? 'translate-x-6' : 'translate-x-1'
               }`}
-            />
+            >
+              {statisticsActionBusy ? (
+                <span class="size-3 animate-spin rounded-full border-2 border-slate-300 border-t-teal-600" />
+              ) : null}
+            </span>
           </button>
           <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
             <DatabaseIcon class="size-6" />

@@ -403,7 +403,6 @@ export async function fetchSafeShieldStatistics(): Promise<SafeShieldStatistics>
   }
 }
 
-
 export async function setSafeShieldStatisticsEnabled(
   enabled: boolean,
 ): Promise<SafeShieldStatisticsEnabledResult> {
@@ -421,6 +420,7 @@ export async function setSafeShieldStatisticsEnabled(
     changed,
     enabled,
     restarted: boolValue(response.restarted),
+    reconciled: boolValue(response.reconciled),
   };
 }
 

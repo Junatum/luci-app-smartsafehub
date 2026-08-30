@@ -74,6 +74,7 @@ export interface SafeShieldStatisticsEnabledResult {
   changed: boolean;
   enabled: boolean;
   restarted: boolean;
+  reconciled: boolean;
 }
 
 export interface SafeShieldRefreshResult {

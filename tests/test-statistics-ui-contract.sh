@@ -22,8 +22,8 @@ jq -e \
   '.["luci-app-smartsafehub"].read.ubus.safeshield | index("statistics") != null' \
   "$ACL" >/dev/null || fail 'statistics must be allowed by the SafeShield read ACL'
 
-grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.14-r7)' "$MAKEFILE" || \
-  fail 'SmartSafeHub must require safeshield 0.3.14-r7 or later'
+grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.14-r8)' "$MAKEFILE" || \
+  fail 'SmartSafeHub must require safeshield 0.3.14-r8 or later'
 grep -Fq "callSafeShield<RawSafeShieldStatistics>('statistics')" "$API" || \
   fail 'frontend API must call the safeshield statistics RPC'
 grep -Fq 'const STATISTICS_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
@@ -80,5 +80,20 @@ grep -Fq 'role="switch"' "$PANEL" || \
   fail 'statistics panel must expose an accessible enable switch'
 grep -Fq 'onSetEnabled(!data.enabled)' "$PANEL" || \
   fail 'statistics switch must toggle the current enabled state'
+
+grep -Fq 'reconciled: boolValue(response.reconciled)' "$API" || \
+  fail 'statistics toggle must normalize backend reconciliation state'
+grep -Fq "action === 'statistics-enable' || action === 'statistics-disable'" "$PANEL" || \
+  fail 'statistics panel must expose a dedicated busy state for toggle actions'
+grep -Fq 'animate-spin' "$PANEL" || \
+  fail 'statistics switch must show a spinner while the setting is being reconciled'
+grep -Fq 'cursor-wait' "$PANEL" || \
+  fail 'statistics panel must show a wait cursor while the setting is being reconciled'
+grep -Fq '활성화하는 중…' "$PANEL" || \
+  fail 'statistics panel must show an enabling state label'
+grep -Fq '비활성화하는 중…' "$PANEL" || \
+  fail 'statistics panel must show a disabling state label'
+grep -Fq 'scheduleStatisticsRefreshes([500, 1500]);' "$ROOT_DIR/frontend/src/hooks/useSafeShieldActions.ts" || \
+  fail 'statistics toggle must use short statistics-only follow-up refreshes'
 
 echo 'PASS: SafeShield statistics API, ACL, toggle, polling and Chart.js 24-hour UI contracts are consistent'

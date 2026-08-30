@@ -57,6 +57,19 @@ export function useSafeShieldActions(
     [clearTimers, refreshStatus],
   );
 
+  const scheduleStatisticsRefreshes = useCallback(
+    (delays: number[]) => {
+      clearTimers();
+
+      timers.current = delays.map((delay) =>
+        window.setTimeout(() => {
+          void refreshStatistics();
+        }, delay),
+      );
+    },
+    [clearTimers, refreshStatistics],
+  );
+
   useEffect(() => clearTimers, [clearTimers]);
 
   const setEnabled = useCallback(
@@ -99,19 +112,29 @@ export function useSafeShieldActions(
 
       try {
         const result = await setSafeShieldStatisticsEnabled(enabled);
+
+        // Statistics-only configuration changes are reconciled synchronously by
+        // SafeShield 0.3.14-r8+, so keep the busy indicator visible until the
+        // first statistics refresh has observed the new runtime state.
+        await refreshStatistics();
+
         setState({
           action: null,
           error: null,
           message: result.changed
-            ? enabled
-              ? '차단 통계 수집을 활성화했습니다.'
-              : '차단 통계 수집을 비활성화했습니다.'
+            ? result.reconciled
+              ? enabled
+                ? '차단 통계 수집을 활성화했습니다.'
+                : '차단 통계 수집을 비활성화했습니다.'
+              : '차단 통계 설정을 저장했습니다.'
             : enabled
               ? '차단 통계 수집이 이미 활성화되어 있습니다.'
               : '차단 통계 수집이 이미 비활성화되어 있습니다.',
         });
-        await Promise.all([refreshStatus(), refreshStatistics()]);
-        scheduleRefreshes([800, 2000]);
+
+        if (result.changed) {
+          scheduleStatisticsRefreshes([500, 1500]);
+        }
       } catch (error) {
         setState({
           action: null,
@@ -120,7 +143,7 @@ export function useSafeShieldActions(
         });
       }
     },
-    [refreshStatistics, refreshStatus, scheduleRefreshes],
+    [refreshStatistics, scheduleStatisticsRefreshes],
   );
 
   const refreshBlocklist = useCallback(async () => {
