@@ -59,6 +59,10 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 - 통계 collector lifecycle 수정이 포함된 SafeShield `0.3.14-r2` 이상을 최소 의존성으로 요구합니다.
 - APK dependency 문법에 맞게 `EXTRA_DEPENDS`의 버전 조건에서 연산자 뒤 공백을 제거합니다.
 
+## [0.2.4-r2] - 2026-08-30
+
+빌드 오류를 수정하였습니다.
+
 ## [0.2.4-r1] - 2026-08-28
 
 safeshield의 성능 개선 버전인 0.3.13 버전을 기본 버전으로 설정하였습니다.
