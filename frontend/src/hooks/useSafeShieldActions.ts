@@ -114,7 +114,7 @@ export function useSafeShieldActions(
         const result = await setSafeShieldStatisticsEnabled(enabled);
 
         // Statistics-only configuration changes are reconciled synchronously by
-        // SafeShield 0.3.14-r8+, so keep the busy indicator visible until the
+        // SafeShield 0.3.15, so keep the busy indicator visible until the
         // first statistics refresh has observed the new runtime state.
         await refreshStatistics();
 

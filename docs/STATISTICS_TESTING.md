@@ -13,7 +13,7 @@ apk info luci-app-smartsafehub
 /etc/init.d/safeshield statistics
 ```
 
-SmartSafeHub는 SafeShield `0.3.14-r7` 이상을 요구합니다.
+SmartSafeHub는 SafeShield `0.3.15-r1` 이상을 요구합니다.
 
 통계가 활성화된 상태에서는 collector가 한 세트만 있어야 합니다.
 

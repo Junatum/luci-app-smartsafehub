@@ -22,8 +22,8 @@ jq -e \
   '.["luci-app-smartsafehub"].read.ubus.safeshield | index("statistics") != null' \
   "$ACL" >/dev/null || fail 'statistics must be allowed by the SafeShield read ACL'
 
-grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.14-r8)' "$MAKEFILE" || \
-  fail 'SmartSafeHub must require safeshield 0.3.14-r8 or later'
+grep -Fq 'EXTRA_DEPENDS:=safeshield (>=0.3.15)' "$MAKEFILE" || \
+  fail 'SmartSafeHub must require safeshield 0.3.15 or later'
 grep -Fq "callSafeShield<RawSafeShieldStatistics>('statistics')" "$API" || \
   fail 'frontend API must call the safeshield statistics RPC'
 grep -Fq 'const STATISTICS_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
