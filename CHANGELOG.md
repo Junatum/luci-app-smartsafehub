@@ -4,6 +4,13 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.6-r3] - 2026-08-30
+
+### 변경
+
+- backend CI에서 개별적으로 실행하던 shell syntax, JSON, package/RPC/ucode/statistics/updater 검증을 `tests/run.sh` 하나로 통합했습니다.
+- 로컬에서도 `./tests/run.sh`로 GitHub Actions backend job과 동일한 테스트 흐름을 실행할 수 있습니다.
+
 ## [0.2.6-r2] - 2026-08-30
 
 safeshield의 최소 버전을 0.3.17 이상으로 설정하였습니다.

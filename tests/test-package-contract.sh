@@ -37,6 +37,7 @@ require_file "$FRONTEND_ENTRY"
 
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
+require_executable "$ROOT_DIR/tests/run.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
 require_executable "$ROOT_DIR/tests/test-package-contract.sh"
 require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"

@@ -27,38 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Validate executable permissions and package metadata
-        run: ./tests/test-package-contract.sh
-
-      - name: Validate shell scripts
-        run: |
-          sh -n root/etc/init.d/smartsafehub-updater
-          sh -n root/usr/libexec/smartsafehub-updater
-          sh -n tests/test-package-contract.sh
-          sh -n tests/test-rpc-contract.sh
-          sh -n tests/test-statistics-ui-contract.sh
-          sh -n tests/test-ucode-imports.sh
-          sh -n tests/test-updater.sh
-
-      - name: Validate JSON files
-        run: |
-          find root/usr/share/rpcd/acl.d \
-               root/usr/share/luci/menu.d \
-               -type f -name '*.json' \
-               -print0 |
-            xargs -0 -r -n1 jq empty
-
-      - name: Validate ucode imports
-        run: ./tests/test-ucode-imports.sh
-
-      - name: Validate RPC and ACL contract
-        run: ./tests/test-rpc-contract.sh
-
-      - name: Validate SafeShield statistics UI contract
-        run: sh ./tests/test-statistics-ui-contract.sh
-
-      - name: Run updater tests
-        run: ./tests/test-updater.sh
+      - name: Run tests
+        shell: bash
+        run: sh tests/run.sh
 
   frontend:
     name: Frontend

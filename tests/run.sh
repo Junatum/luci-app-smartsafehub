@@ -1,0 +1,43 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -eu
+
+ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+
+fail() {
+	echo "FAIL: $*" >&2
+	exit 1
+}
+
+command -v jq >/dev/null 2>&1 || fail 'jq is required to validate JSON files'
+
+for script in \
+	root/etc/init.d/smartsafehub-updater \
+	root/usr/libexec/smartsafehub-updater \
+	tests/run.sh \
+	tests/test-package-contract.sh \
+	tests/test-rpc-contract.sh \
+	tests/test-statistics-ui-contract.sh \
+	tests/test-ucode-imports.sh \
+	tests/test-updater.sh; do
+	sh -n "$ROOT_DIR/$script"
+done
+
+echo 'shell syntax tests: ok'
+
+find \
+	"$ROOT_DIR/root/usr/share/rpcd/acl.d" \
+	"$ROOT_DIR/root/usr/share/luci/menu.d" \
+	-type f -name '*.json' -print |
+	sort |
+	while IFS= read -r json_file; do
+		jq empty "$json_file"
+	done
+
+echo 'JSON validation tests: ok'
+
+sh "$ROOT_DIR/tests/test-package-contract.sh"
+sh "$ROOT_DIR/tests/test-ucode-imports.sh"
+sh "$ROOT_DIR/tests/test-rpc-contract.sh"
+sh "$ROOT_DIR/tests/test-statistics-ui-contract.sh"
+sh "$ROOT_DIR/tests/test-updater.sh"
