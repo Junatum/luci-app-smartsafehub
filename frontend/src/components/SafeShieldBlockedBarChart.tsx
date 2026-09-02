@@ -184,7 +184,7 @@ export function SafeShieldBlockedBarChart({
   }, [buckets]);
 
   return (
-    <div class="mt-5 h-40">
+    <div class="mt-5 h-44 sm:h-52">
       <canvas
         aria-label="최근 24시간 시간대별 SafeShield 차단 요청"
         ref={canvasRef}

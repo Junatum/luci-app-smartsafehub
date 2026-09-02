@@ -16,7 +16,9 @@ for script in \
 	root/usr/libexec/smartsafehub-updater \
 	tests/run.sh \
 	tests/test-package-contract.sh \
+	tests/test-navigation-contract.sh \
 	tests/test-rpc-contract.sh \
+	tests/test-safeshield-page-contract.sh \
 	tests/test-statistics-ui-contract.sh \
 	tests/test-ucode-imports.sh \
 	tests/test-updater.sh; do
@@ -37,8 +39,10 @@ find \
 echo 'JSON validation tests: ok'
 
 sh "$ROOT_DIR/tests/test-package-contract.sh"
+sh "$ROOT_DIR/tests/test-navigation-contract.sh"
 sh "$ROOT_DIR/tests/test-ucode-imports.sh"
 sh "$ROOT_DIR/tests/test-rpc-contract.sh"
+sh "$ROOT_DIR/tests/test-safeshield-page-contract.sh"
 sh "$ROOT_DIR/tests/test-statistics-ui-contract.sh"
 sh "$ROOT_DIR/tests/test-updater.sh"
 echo 'Done'

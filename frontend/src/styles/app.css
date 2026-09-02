@@ -130,6 +130,33 @@
   }
 }
 
+
+.ssh-sidebar-toggle {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
+}
+
+.ssh-sidebar-toggle:hover {
+  border-color: #99f6e4;
+  background: #f8fafc;
+  color: #0f766e;
+}
+
+.ssh-app[data-theme='dark'] .ssh-sidebar-toggle {
+  border-color: #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.28);
+}
+
+.ssh-app[data-theme='dark'] .ssh-sidebar-toggle:hover {
+  border-color: #0f766e;
+  background: #334155;
+  color: #5eead4;
+}
+
 /* Authenticated product color theme. The application lives inside a shadow
  * root, so these overrides can safely remap the existing utility palette
  * without affecting LuCI itself. */

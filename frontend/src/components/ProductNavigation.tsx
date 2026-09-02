@@ -242,7 +242,7 @@ export function ProductNavigation({
         class="hidden min-h-screen border-r border-slate-200 bg-white md:flex md:flex-col"
         data-collapsed={collapsed ? 'true' : 'false'}
       >
-        <div class="relative sticky top-0 flex h-screen flex-col">
+        <div class="sticky top-0 flex h-screen flex-col">
           <div
             class={`flex min-h-20 items-center border-b border-slate-100 ${
               collapsed ? 'justify-center px-2' : 'gap-3 px-4'
@@ -270,6 +270,21 @@ export function ProductNavigation({
                 </div>
               )}
             </a>
+            <button
+              aria-controls="smartsafehub-desktop-navigation"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+              class="ssh-sidebar-toggle absolute right-0 top-20 z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+              onClick={onToggleCollapsed}
+              title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+              type="button"
+            >
+              {collapsed ? (
+                <PanelLeftOpenIcon class="size-4" />
+              ) : (
+                <PanelLeftCloseIcon class="size-4.5" />
+              )}
+            </button>
           </div>
           <nav
             aria-label="SmartSafeHub 메뉴"
@@ -278,21 +293,6 @@ export function ProductNavigation({
           >
             <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
-          <button
-            aria-controls="smartsafehub-desktop-navigation"
-            aria-expanded={!collapsed}
-            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            class="absolute right-0 top-20 z-20 inline-flex size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-teal-500 bg-teal-600 text-white shadow-lg shadow-teal-950/20 transition hover:border-teal-400 hover:bg-teal-500 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200"
-            onClick={onToggleCollapsed}
-            title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            type="button"
-          >
-            {collapsed ? (
-              <PanelLeftOpenIcon class="size-4" />
-            ) : (
-              <PanelLeftCloseIcon class="size-4" />
-            )}
-          </button>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
             <button
               aria-label={`${themeLabel}로 전환`}

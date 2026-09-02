@@ -8,6 +8,7 @@ import {
   DatabaseIcon,
   DownloadIcon,
   KeyIcon,
+  ListIcon,
   PowerIcon,
   ShieldIcon,
 } from '../components/Icons';
@@ -94,11 +95,7 @@ function getProductProtectionState(data: SafeShieldStatus): ProductProtectionSta
     return 'paused';
   }
 
-  if (
-    data.active &&
-    data.runtime.dnsmasqRunning &&
-    data.runtime.dnsRuntimeOk
-  ) {
+  if (data.active && data.runtime.dnsmasqRunning && data.runtime.dnsRuntimeOk) {
     return 'protecting';
   }
 
@@ -201,27 +198,78 @@ function SummaryBadge({ data }: { data: SafeShieldStatus }) {
   );
 }
 
-function InfoCard({
+function SummaryFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div class="bg-white px-5 py-4 sm:px-6">
+      <dt class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400">
+        {label}
+      </dt>
+      <dd class="mt-2 mb-0 ml-0 truncate text-sm font-extrabold text-slate-950" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function SectionHeading({
+  description,
   eyebrow,
-  icon,
-  children,
+  title,
 }: {
+  description: string;
   eyebrow: string;
-  icon: ComponentChildren;
-  children: ComponentChildren;
+  title: string;
 }) {
   return (
-    <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <div class="flex items-center justify-between gap-4">
-        <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.18em] text-teal-700">
           {eyebrow}
         </p>
-        <span class="grid size-10 place-items-center rounded-xl bg-teal-50 text-teal-700">
+        <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950">
+          {title}
+        </h2>
+        <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function DetailCard({
+  children,
+  eyebrow,
+  icon,
+  title,
+}: {
+  children: ComponentChildren;
+  eyebrow: string;
+  icon: ComponentChildren;
+  title: string;
+}) {
+  return (
+    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+            {eyebrow}
+          </p>
+          <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">{title}</h3>
+        </div>
+        <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
           {icon}
         </span>
       </div>
-      {children}
+      <dl class="mt-5 mb-0 grid gap-3">{children}</dl>
     </article>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ComponentChildren }) {
+  return (
+    <div class="flex min-w-0 items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+      <dt class="text-sm font-semibold text-slate-500">{label}</dt>
+      <dd class="m-0 min-w-0 text-right text-sm font-extrabold text-slate-950">{value}</dd>
+    </div>
   );
 }
 
@@ -243,7 +291,7 @@ function ActionFeedback({
   return (
     <div
       aria-live={failed ? 'assertive' : 'polite'}
-      class={`mt-4 flex flex-col items-start gap-3 rounded-2xl border px-4 sm:flex-row sm:justify-between py-3 text-sm ${
+      class={`mt-4 flex flex-col items-start gap-3 rounded-2xl border px-4 py-3 text-sm sm:flex-row sm:justify-between ${
         failed
           ? 'border-red-200 bg-red-50 text-red-900'
           : 'border-emerald-200 bg-emerald-50 text-emerald-900'
@@ -300,6 +348,7 @@ export function SafeShieldPage({
       setLicenseKeyLoaded(false);
     }
   }, [data?.license.configured]);
+
   if (loading) {
     return <LoadingPanel />;
   }
@@ -392,24 +441,27 @@ export function SafeShieldPage({
   return (
     <>
       <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
-        <div class="flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between sm:p-6">
+        <div class="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
           <div class="flex min-w-0 items-start gap-3 sm:gap-4">
             <span class="grid size-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700">
               <ShieldIcon class="size-7" />
             </span>
             <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-3">
+              <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.18em] text-teal-700">
+                Protection
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-3">
                 <h2 class="m-0 break-words text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
                   SafeShield 보호 상태
                 </h2>
                 <SummaryBadge data={data} />
               </div>
-              <p class="mt-3 mb-0 text-sm leading-6 text-slate-600">
+              <p class="mt-3 mb-0 max-w-3xl text-sm leading-6 text-slate-600">
                 {getSummaryMessage(data)}
               </p>
               <p class="mt-2 mb-0 text-xs font-semibold text-slate-500">
-                버전 {data.version ?? 'unknown'}
-                {data.stage ? ` · 단계 ${data.stage}` : ''}
+                SafeShield {data.version ?? 'unknown'}
+                {data.stage ? ` · ${data.stage}` : ''}
               </p>
             </div>
           </div>
@@ -425,7 +477,9 @@ export function SafeShieldPage({
               onClick={handleToggle}
               type="button"
             >
-              <PowerIcon class={`size-4 ${action === 'enable' || action === 'disable' ? 'animate-pulse' : ''}`} />
+              <PowerIcon
+                class={`size-4 ${action === 'enable' || action === 'disable' ? 'animate-pulse' : ''}`}
+              />
               {toggleLabel}
             </button>
             <button
@@ -434,7 +488,9 @@ export function SafeShieldPage({
               onClick={onRefreshBlocklist}
               type="button"
             >
-              <DownloadIcon class={`size-4 ${action === 'refresh' || refreshing ? 'animate-bounce' : ''}`} />
+              <DownloadIcon
+                class={`size-4 ${action === 'refresh' || refreshing ? 'animate-bounce' : ''}`}
+              />
               {action === 'refresh'
                 ? '시작 중…'
                 : refreshing
@@ -442,6 +498,18 @@ export function SafeShieldPage({
                   : '지금 갱신'}
             </button>
           </div>
+        </div>
+
+        <div class="px-5 pb-5 sm:px-6 sm:pb-6">
+          <dl class="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryFact label="Protection" value={getSummaryLabel(data)} />
+            <SummaryFact
+              label="Blocklist"
+              value={`${formatNumber(data.blocklist.validLineCount)}개 도메인`}
+            />
+            <SummaryFact label="Last refresh" value={formatTimestamp(data.timestamps.lastSuccess)} />
+            <SummaryFact label="Plan" value={data.license.plan?.toUpperCase() || 'FREE'} />
+          </dl>
         </div>
       </section>
 
@@ -452,209 +520,253 @@ export function SafeShieldPage({
       />
 
       <SafeShieldStatisticsPanel
+        action={action}
         data={statistics}
         error={statisticsError}
         loading={statisticsLoading}
-        action={action}
         onRetry={onRetryStatistics}
         onSetEnabled={onSetStatisticsEnabled}
         refreshing={statisticsRefreshing}
       />
 
-      <section class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <InfoCard eyebrow="Protection" icon={<CheckCircleIcon class="size-5" />}>
-          <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            DNS 보호
-          </h3>
-          <dl class="mt-4 mb-0 grid gap-3">
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">SafeShield 서비스</dt>
-              <dd class="m-0"><BooleanState falseLabel="중지됨" trueLabel="동작 중" value={data.active} /></dd>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">dnsmasq</dt>
-              <dd class="m-0"><BooleanState falseLabel="중지됨" value={data.runtime.dnsmasqRunning} /></dd>
-            </div>
-            <div class="flex items-center justify-between gap-3">
-              <dt class="text-sm text-slate-600">DNS 런타임</dt>
-              <dd class="m-0"><BooleanState value={data.runtime.dnsRuntimeOk} /></dd>
-            </div>
-          </dl>
-        </InfoCard>
+      <section class="mt-7">
+        <SectionHeading
+          description="DNS 보호 런타임, 차단 목록, 갱신 일정과 상태 점검 결과를 한곳에서 확인합니다."
+          eyebrow="Protection details"
+          title="보호 구성"
+        />
 
-        <InfoCard eyebrow="Blocklist" icon={<DatabaseIcon class="size-5" />}>
-          <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {formatNumber(data.blocklist.validLineCount)}개 도메인
-          </h3>
-          <p class="mt-2 mb-0 text-sm text-slate-600">
-            파일 크기 {formatBytes(data.blocklist.fileSizeKb * 1024)}
-          </p>
-          <div class="mt-4"><BooleanState falseLabel="미설치" trueLabel="설치됨" value={data.blocklist.installed} /></div>
-        </InfoCard>
-
-        <InfoCard eyebrow="License" icon={<KeyIcon class="size-5" />}>
-          <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {data.license.plan?.toUpperCase() || '플랜 미확인'}
-          </h3>
-          <p class="mt-2 mb-0 text-sm text-slate-600">
-            {data.license.status || (data.license.configured ? '상태 확인 중' : '라이선스 미설정')}
-          </p>
-          <p class="mt-4 mb-0 text-xs font-bold text-slate-500">
-            {data.license.configured
-              ? data.license.keyMasked || '라이선스 연결됨'
-              : '라이선스 키 없음'}
-          </p>
-
-          <form
-            class="mt-4 grid gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void onUpdateLicense(licenseKey).then((updated) => {
-                if (updated) {
-                  resetLicenseEditor();
-                }
-              });
-            }}
+        <div class="grid gap-4 lg:grid-cols-2">
+          <DetailCard
+            eyebrow="Runtime"
+            icon={<CheckCircleIcon class="size-5" />}
+            title="DNS 보호 런타임"
           >
-            <label class="text-xs font-bold text-slate-600" for="safeshield-license-key">
-              {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
-            </label>
-            <div class="flex gap-2">
-              <input
-                autocomplete="off"
-                autocapitalize="none"
-                class="min-h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-50"
-                data-1p-ignore
-                data-bwignore="true"
-                data-lpignore="true"
-                disabled={actionBusy}
-                id="safeshield-license-key"
-                onInput={(event) => {
-                  setLicenseKey(event.currentTarget.value);
-                  setLicenseKeyLoaded(false);
-                }}
-                placeholder={data.license.configured ? '새 라이선스 키 입력' : '라이선스 키 입력'}
-                spellcheck={false}
-                type="text"
-                value={licenseKey}
-              />
-              <button
-                class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={actionBusy || licenseKey.length > 0 || !data.license.configured}
-                onClick={() => void handleLoadCurrentLicense()}
-                type="button"
-              >
-                {action === 'license-read'
-                  ? '불러오는 중…'
-                  : licenseKeyLoaded
-                    ? '현재 키 불러옴'
-                    : '현재 키 불러오기'}
-              </button>
-            </div>
-            <div class="grid gap-2 sm:grid-cols-2">
-              <button
-                class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={actionBusy || licenseKey.trim().length === 0}
-                type="submit"
-              >
-                {action === 'license-update'
-                  ? '저장 중…'
-                  : data.license.configured
-                    ? '라이선스 변경'
-                    : '라이선스 등록'}
-              </button>
-              {data.license.configured ? (
-                <button
-                  class="inline-flex min-h-10 items-center justify-center rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-extrabold text-red-700 transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={actionBusy}
-                  onClick={handleRemoveLicense}
-                  type="button"
-                >
-                  {action === 'license-remove' ? '제거 중…' : '라이선스 제거'}
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </InfoCard>
+            <DetailRow
+              label="SafeShield 서비스"
+              value={<BooleanState falseLabel="중지됨" trueLabel="동작 중" value={data.active} />}
+            />
+            <DetailRow
+              label="dnsmasq"
+              value={<BooleanState falseLabel="중지됨" value={data.runtime.dnsmasqRunning} />}
+            />
+            <DetailRow label="DNS 런타임" value={<BooleanState value={data.runtime.dnsRuntimeOk} />} />
+            <DetailRow
+              label="Refresh daemon"
+              value={<BooleanState falseLabel="중지됨" value={data.runtime.refreshdRunning} />}
+            />
+          </DetailCard>
 
-        <InfoCard eyebrow="Artifact" icon={<ShieldIcon class="size-5" />}>
-          <h3 class="mt-4 mb-0 text-lg font-extrabold text-slate-950">
-            {data.artifact.tier || '아티팩트 미확인'}
-          </h3>
-          <p class="mt-2 mb-0 break-all text-sm text-slate-600">
-            {data.artifact.version || '버전 정보 없음'}
-          </p>
-          <p class="mt-4 mb-0 text-xs font-bold text-slate-500">
-            규칙 {formatNumber(data.artifact.rules)}개
-          </p>
-        </InfoCard>
+          <DetailCard
+            eyebrow="Blocklist"
+            icon={<DatabaseIcon class="size-5" />}
+            title="차단 목록"
+          >
+            <DetailRow
+              label="적용 규칙"
+              value={`${formatNumber(data.blocklist.validLineCount)}개 도메인`}
+            />
+            <DetailRow label="파일 크기" value={formatBytes(data.blocklist.fileSizeKb * 1024)} />
+            <DetailRow
+              label="설치 상태"
+              value={<BooleanState falseLabel="미설치" trueLabel="설치됨" value={data.blocklist.installed} />}
+            />
+            <DetailRow
+              label="검증 상태"
+              value={<BooleanState falseLabel="확인 필요" value={data.blocklist.verificationOk} />}
+            />
+          </DetailCard>
+
+          <DetailCard
+            eyebrow="Refresh schedule"
+            icon={<CalendarIcon class="size-5" />}
+            title="차단 목록 갱신"
+          >
+            <DetailRow label="마지막 성공" value={formatTimestamp(data.timestamps.lastSuccess)} />
+            <DetailRow label="다음 갱신" value={formatTimestamp(data.timestamps.nextRefreshAt)} />
+            <DetailRow label="갱신 주기" value={formatInterval(data.timestamps.refreshIntervalS)} />
+            <DetailRow
+              label="최근 결과"
+              value={data.runtime.lastResult || (refreshing ? '갱신 중' : '확인되지 않음')}
+            />
+          </DetailCard>
+
+          <DetailCard eyebrow="Health" icon={<ShieldIcon class="size-5" />} title="상태 점검">
+            <DetailRow label="전체 상태" value={getHealthLabel(data.health.overall)} />
+            <DetailRow
+              label="경고"
+              value={<span class="text-amber-700">{formatNumber(data.issueCounts.warnings)}</span>}
+            />
+            <DetailRow
+              label="오류"
+              value={<span class="text-red-700">{formatNumber(data.issueCounts.errors)}</span>}
+            />
+            <DetailRow label="최근 오류 코드" value={data.runtime.lastErrorCode || '없음'} />
+          </DetailCard>
+        </div>
       </section>
 
-      <section class="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-                Refresh schedule
-              </p>
-              <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-                차단 목록 갱신
-              </h2>
-            </div>
-            <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
-              <CalendarIcon class="size-6" />
-            </span>
-          </div>
-          <dl class="mt-6 grid gap-4 sm:grid-cols-3">
-            <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">마지막 성공</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold leading-5 text-slate-950">
-                {formatTimestamp(data.timestamps.lastSuccess)}
-              </dd>
-            </div>
-            <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">다음 갱신</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold leading-5 text-slate-950">
-                {formatTimestamp(data.timestamps.nextRefreshAt)}
-              </dd>
-            </div>
-            <div class="rounded-xl bg-slate-50 p-4">
-              <dt class="text-xs font-bold text-slate-500">갱신 주기</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold text-slate-950">
-                {formatInterval(data.timestamps.refreshIntervalS)}
-              </dd>
-            </div>
-          </dl>
-          <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-            수동 갱신은 백그라운드에서 실행됩니다. 진행 상태는 화면 새로고침과 자동 상태 확인으로 반영됩니다.
-          </p>
-        </article>
+      <section class="mt-7">
+        <SectionHeading
+          description="라이선스와 현재 적용 중인 SafeShield 아티팩트 및 로컬 규칙 구성을 관리합니다."
+          eyebrow="Settings"
+          title="SafeShield 설정"
+        />
 
-        <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-          <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-            Health
-          </p>
-          <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-            상태 점검
-          </h2>
-          <dl class="mt-6 grid gap-4">
-            <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">전체 상태</dt>
-              <dd class="m-0 text-sm font-extrabold text-slate-950">{getHealthLabel(data.health.overall)}</dd>
+        <div class="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+          <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                  License
+                </p>
+                <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
+                  라이선스
+                </h3>
+                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
+                  현재 플랜은 {data.license.plan?.toUpperCase() || 'FREE'}이며, 라이선스 키를 등록하거나 변경할 수 있습니다.
+                </p>
+              </div>
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+                <KeyIcon class="size-5" />
+              </span>
             </div>
-            <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">경고</dt>
-              <dd class="m-0 text-sm font-extrabold text-amber-700">{data.issueCounts.warnings}</dd>
+
+            <div class="mt-5 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
+              <span class="text-sm font-extrabold text-slate-950">
+                {data.license.plan?.toUpperCase() || 'FREE'}
+              </span>
+              <span class="text-xs font-semibold text-slate-500">
+                {data.license.status || (data.license.configured ? '라이선스 연결됨' : '라이선스 미설정')}
+              </span>
+              {data.license.configured && data.license.keyMasked ? (
+                <span class="ml-auto text-xs font-bold text-slate-400">{data.license.keyMasked}</span>
+              ) : null}
             </div>
-            <div class="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-              <dt class="text-sm font-bold text-slate-600">오류</dt>
-              <dd class="m-0 text-sm font-extrabold text-red-700">{data.issueCounts.errors}</dd>
-            </div>
-          </dl>
-          <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-            보호를 끄면 SafeShield 서비스가 중지되고 현재 DNS 차단 목록이 제거됩니다. 다시 켠 뒤에는 필요할 때 즉시 갱신할 수 있습니다.
-          </p>
-        </aside>
+
+            <form
+              class="mt-5 grid gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void onUpdateLicense(licenseKey).then((updated) => {
+                  if (updated) {
+                    resetLicenseEditor();
+                  }
+                });
+              }}
+            >
+              <label class="text-xs font-bold text-slate-600" for="safeshield-license-key">
+                {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
+              </label>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <input
+                  autocomplete="off"
+                  autocapitalize="none"
+                  class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-900 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  data-1p-ignore
+                  data-bwignore="true"
+                  data-lpignore="true"
+                  disabled={actionBusy}
+                  id="safeshield-license-key"
+                  onInput={(event) => {
+                    setLicenseKey(event.currentTarget.value);
+                    setLicenseKeyLoaded(false);
+                  }}
+                  placeholder={data.license.configured ? '새 라이선스 키 입력' : '라이선스 키 입력'}
+                  spellcheck={false}
+                  type="text"
+                  value={licenseKey}
+                />
+                <button
+                  class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-xs font-extrabold text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:opacity-70"
+                  disabled={actionBusy || licenseKey.length > 0 || !data.license.configured}
+                  onClick={() => void handleLoadCurrentLicense()}
+                  type="button"
+                >
+                  <DownloadIcon class="size-4" />
+                  {action === 'license-read'
+                    ? '불러오는 중…'
+                    : licenseKeyLoaded
+                      ? '현재 키 불러옴'
+                      : '현재 키 불러오기'}
+                </button>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <button
+                  class="inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={actionBusy || licenseKey.trim().length === 0}
+                  type="submit"
+                >
+                  {action === 'license-update'
+                    ? '저장 중…'
+                    : data.license.configured
+                      ? '라이선스 변경'
+                      : '라이선스 등록'}
+                </button>
+                {data.license.configured ? (
+                  <button
+                    class="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-700 transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={actionBusy}
+                    onClick={handleRemoveLicense}
+                    type="button"
+                  >
+                    {action === 'license-remove' ? '제거 중…' : '라이선스 제거'}
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </article>
+
+          <div class="grid gap-4">
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                    Artifact
+                  </p>
+                  <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
+                    보호 데이터
+                  </h3>
+                </div>
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+                  <DatabaseIcon class="size-5" />
+                </span>
+              </div>
+              <dl class="mt-5 mb-0 grid gap-3">
+                <DetailRow label="Tier" value={data.artifact.tier || '확인되지 않음'} />
+                <DetailRow label="Version" value={data.artifact.version || '확인되지 않음'} />
+                <DetailRow label="Rules" value={formatNumber(data.artifact.rules)} />
+                <DetailRow label="Unique domains" value={formatNumber(data.artifact.uniqueDomains)} />
+              </dl>
+            </article>
+
+            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
+              <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                Custom rules
+              </p>
+              <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
+                사용자 규칙
+              </h3>
+              <div class="mt-4">
+                <BooleanState
+                  falseLabel="비활성화"
+                  trueLabel="활성화"
+                  value={data.localOverrides.enabled}
+                />
+              </div>
+              <p class="mt-4 mb-0 text-sm font-semibold leading-6 text-slate-500">
+                허용하거나 차단할 도메인을 직접 관리해 SafeShield 보호 정책에 반영합니다.
+              </p>
+              <a
+                class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-extrabold text-white no-underline shadow-sm transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+                href="#rules"
+              >
+                <ListIcon class="size-4" />
+                사용자 규칙 관리
+              </a>
+            </article>
+          </div>
+        </div>
       </section>
     </>
   );

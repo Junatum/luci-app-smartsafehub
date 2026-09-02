@@ -20,6 +20,7 @@ interface SafeShieldStatisticsPanelProps {
 
 const HOUR_SECONDS = 3_600;
 const DISPLAY_HOURS = 24;
+
 function blockRate(queries: number, blocked: number): string {
   if (queries <= 0) {
     return '0.0%';
@@ -60,9 +61,11 @@ function recentBuckets(data: SafeShieldStatistics): SafeShieldStatisticsBucket[]
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div class="rounded-xl bg-slate-50 p-4">
-      <dt class="text-xs font-bold text-slate-500">{label}</dt>
-      <dd class="mt-2 mb-0 ml-0 text-xl font-extrabold text-slate-950">
+    <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
+      <dt class="text-[0.68rem] font-black uppercase tracking-[0.12em] text-slate-400">
+        {label}
+      </dt>
+      <dd class="mt-2 mb-0 ml-0 text-2xl font-black tracking-tight text-slate-950">
         {value}
       </dd>
     </div>
@@ -110,10 +113,10 @@ export function SafeShieldStatisticsPanel({
     return (
       <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
         <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-          Statistics
+          Activity
         </p>
         <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-          차단 통계
+          보호 활동
         </h2>
         <p class="mt-3 mb-0 text-sm leading-6 text-slate-600">
           현재 SafeShield에서 통계 데이터를 제공하지 않습니다. SafeShield 0.3.15 버전 이상이 설치되어 있고, 통계 수집이 활성화되어 있는지 확인해 주세요.
@@ -124,6 +127,13 @@ export function SafeShieldStatisticsPanel({
 
   const buckets = recentBuckets(data);
   const latest = buckets[buckets.length - 1];
+  const recentTotals = buckets.reduce(
+    (totals, bucket) => ({
+      queries: totals.queries + bucket.queries,
+      blocked: totals.blocked + bucket.blocked,
+    }),
+    { queries: 0, blocked: 0 },
+  );
   const statisticsActionBusy =
     action === 'statistics-enable' || action === 'statistics-disable';
   const targetEnabled =
@@ -151,19 +161,23 @@ export function SafeShieldStatisticsPanel({
     >
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-            Statistics
+          <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.18em] text-teal-700">
+            Activity
           </p>
-          <h2 class="mt-3 mb-0 text-xl font-extrabold text-slate-950">
-            차단 통계
+          <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950">
+            최근 24시간 보호 활동
           </h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">
+          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
             DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에 집계합니다.
           </p>
         </div>
-        <div class="flex items-center gap-3">
+
+        <div class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+          <span class="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
+            <DatabaseIcon class="size-5" />
+          </span>
           <div class="text-right">
-            <p class="m-0 text-xs font-bold text-slate-500">통계 수집</p>
+            <p class="m-0 text-[0.68rem] font-bold text-slate-400">통계 수집</p>
             <p
               class={`mt-1 mb-0 text-xs font-extrabold ${
                 statisticsActionBusy || targetEnabled
@@ -190,8 +204,8 @@ export function SafeShieldStatisticsPanel({
           >
             <span
               aria-hidden="true"
-              class={`grid size-5 place-items-center rounded-full bg-white shadow-sm transition-transform ${
-                targetEnabled ? 'translate-x-6' : 'translate-x-1'
+              class={`absolute top-1 grid size-5 place-items-center rounded-full bg-white shadow-sm transition-all ${
+                targetEnabled ? 'left-6' : 'left-1'
               }`}
             >
               {statisticsActionBusy ? (
@@ -199,9 +213,6 @@ export function SafeShieldStatisticsPanel({
               ) : null}
             </span>
           </button>
-          <span class="grid size-11 place-items-center rounded-xl bg-teal-50 text-teal-700">
-            <DatabaseIcon class="size-6" />
-          </span>
         </div>
       </div>
 
@@ -212,19 +223,16 @@ export function SafeShieldStatisticsPanel({
       ) : null}
 
       <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="전체 DNS 요청" value={formatNumber(data.totals.queries)} />
-        <Metric label="차단 요청" value={formatNumber(data.totals.blocked)} />
+        <Metric label="최근 24시간 DNS 요청" value={formatNumber(recentTotals.queries)} />
+        <Metric label="최근 24시간 차단" value={formatNumber(recentTotals.blocked)} />
         <Metric
-          label="차단율"
-          value={blockRate(data.totals.queries, data.totals.blocked)}
+          label="최근 24시간 차단율"
+          value={blockRate(recentTotals.queries, recentTotals.blocked)}
         />
-        <Metric
-          label="현재 시간 차단"
-          value={formatNumber(latest?.blocked ?? 0)}
-        />
+        <Metric label="현재 시간 차단" value={formatNumber(latest?.blocked ?? 0)} />
       </dl>
 
-      <div class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5">
+      <div class="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p class="m-0 text-xs font-bold text-slate-500">최근 24시간</p>
@@ -248,7 +256,9 @@ export function SafeShieldStatisticsPanel({
         truncated={data.devicesTruncated}
       />
 
-      <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs leading-5 text-slate-500">
+      <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-xs leading-5 text-slate-500">
+        <span>수집 누적 DNS 요청 {formatNumber(data.totals.queries)}</span>
+        <span>수집 누적 차단 {formatNumber(data.totals.blocked)}</span>
         <span>수집 시작 {formatTimestamp(data.startedAt)}</span>
         <span>보존 {formatNumber(data.retentionHours)}시간</span>
         {data.volatile ? <span>재부팅 시 초기화되는 메모리 통계</span> : null}
