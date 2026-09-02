@@ -18,9 +18,9 @@ export const ROUTES: readonly RouteDefinition[] = [
   {
     route: 'home',
     hash: '#home',
-    label: '홈',
-    title: '장치 대시보드',
-    description: 'OpenWrt 장치의 기본 상태를 안전하게 확인합니다.',
+    label: 'Dashboard',
+    title: 'Dashboard',
+    description: '네트워크, 장치와 시스템 상태를 한눈에 확인합니다.',
   },
   {
     route: 'wifi',

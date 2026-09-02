@@ -33,7 +33,6 @@ export function AppShell({
         refreshing={refreshing}
         title={copy.title}
       />
-
       <main class="ssh-product-main bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-10 lg:pb-12">
         <ProductNavigation route={route} title={copy.title} updateCount={updateCount} />
         {children}

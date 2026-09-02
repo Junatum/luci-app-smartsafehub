@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 
-import { ROUTES } from '../app/routes';
+import { ROUTE_BY_NAME } from '../app/routes';
 import type { AppRoute } from '../app/routes';
 import { luciAdminUrl } from '../utils/luci';
 import {
@@ -22,6 +22,16 @@ interface ProductNavigationProps {
   updateCount: number;
 }
 
+const NAVIGATION_GROUPS: readonly {
+  label: string;
+  routes: readonly AppRoute[];
+}[] = [
+  { label: 'Overview', routes: ['home'] },
+  { label: 'Network', routes: ['wifi', 'devices'] },
+  { label: 'Security', routes: ['safeshield', 'rules'] },
+  { label: 'System', routes: ['system'] },
+];
+
 function NavigationIcon({ route }: { route: AppRoute }) {
   switch (route) {
     case 'home':
@@ -39,29 +49,56 @@ function NavigationIcon({ route }: { route: AppRoute }) {
   }
 }
 
-function desktopNavigationClass(active: boolean): string {
-  return `inline-flex min-h-14 items-center gap-2 border-b-2 px-3 py-2 text-sm font-extrabold no-underline transition lg:px-4 ${
-    active
-      ? 'border-teal-600 text-teal-700'
-      : 'border-transparent text-slate-600 hover:border-slate-200 hover:text-slate-950'
-  }`;
-}
-
-function desktopNavigationIconClass(active: boolean): string {
-  return `grid size-10 shrink-0 place-items-center rounded-xl transition ${
-    active
-      ? 'bg-teal-700 text-white shadow-sm shadow-teal-900/20'
-      : 'text-slate-500'
-  }`;
-}
-
-function mobileNavigationClass(active: boolean): string {
-  return `flex min-h-12 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-extrabold no-underline transition ${
+function navigationClass(active: boolean): string {
+  return `flex min-h-11 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold no-underline transition ${
     active
       ? 'bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200'
-      : 'text-slate-700 hover:bg-slate-50 hover:text-slate-950'
+      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
   }`;
 }
+
+function NavigationItems({ route, updateCount }: { route: AppRoute; updateCount: number }) {
+  return (
+    <div class="space-y-5">
+      {NAVIGATION_GROUPS.map((group) => (
+        <section aria-label={group.label} key={group.label}>
+          <p class="mb-2 px-3 text-[0.65rem] font-black uppercase tracking-[0.18em] text-slate-400">
+            {group.label}
+          </p>
+          <div class="space-y-1">
+            {group.routes.map((routeName) => {
+              const item = ROUTE_BY_NAME[routeName];
+              const active = route === routeName;
+              return (
+                <a
+                  aria-current={active ? 'page' : undefined}
+                  class={navigationClass(active)}
+                  href={item.hash}
+                  key={routeName}
+                >
+                  <span
+                    class={`grid size-9 shrink-0 place-items-center rounded-lg ${
+                      active ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    <NavigationIcon route={routeName} />
+                  </span>
+                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                  {routeName === 'system' && updateCount > 0 ? (
+                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                      {updateCount}
+                    </span>
+                  ) : null}
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 
 export function ProductNavigation({ route, title, updateCount }: ProductNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -89,17 +126,18 @@ export function ProductNavigation({ route, title, updateCount }: ProductNavigati
     <>
       <nav
         aria-label="SmartSafeHub 모바일 메뉴"
-        class="ssh-mobile-navigation sticky top-0 z-30 -mx-4 mb-5 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-900/5 backdrop-blur md:hidden"
+        class="ssh-mobile-navigation sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 shadow-sm shadow-slate-900/5 backdrop-blur md:hidden"
       >
-        <div class="flex min-h-14 items-center justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-3">
-            <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-teal-700 text-white">
-              <NavigationIcon route={route} />
+        <div class="flex min-h-16 items-center justify-between gap-3">
+          <a class="flex min-w-0 items-center gap-3 no-underline" href="#home">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300">
+              <ShieldIcon class="size-5" />
             </span>
-            <span class="truncate text-sm font-extrabold text-slate-950">
-              {title}
+            <span class="min-w-0">
+              <strong class="block truncate text-sm font-black text-slate-950">SmartSafeHub</strong>
+              <span class="block truncate text-xs font-semibold text-slate-500">{title}</span>
             </span>
-          </div>
+          </a>
           <button
             aria-controls="smartsafehub-mobile-menu"
             aria-expanded={mobileMenuOpen}
@@ -108,115 +146,65 @@ export function ProductNavigation({ route, title, updateCount }: ProductNavigati
             onClick={() => setMobileMenuOpen((open) => !open)}
             type="button"
           >
-            {mobileMenuOpen ? (
-              <CloseIcon class="size-5" />
-            ) : (
-              <MenuIcon class="size-5" />
-            )}
+            {mobileMenuOpen ? <CloseIcon class="size-5" /> : <MenuIcon class="size-5" />}
           </button>
         </div>
 
         {mobileMenuOpen ? (
-          <div
-            class="ssh-mobile-menu border-t border-slate-100 py-3"
-            id="smartsafehub-mobile-menu"
-          >
-            <div class="grid grid-cols-1 gap-1 min-[390px]:grid-cols-2">
-              {ROUTES.map((item) => {
-                const active = route === item.route;
-
-                return (
-                  <a
-                    aria-current={active ? 'page' : undefined}
-                    class={mobileNavigationClass(active)}
-                    href={item.hash}
-                    key={item.route}
-                  >
-                    <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
-                      <NavigationIcon route={item.route} />
-                    </span>
-                    <span class="min-w-0 truncate">{item.label}</span>
-                    {item.route === 'system' && updateCount > 0 ? (
-                      <span class="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
-                        {updateCount}
-                      </span>
-                    ) : null}
-                  </a>
-                );
-              })}
-            </div>
-
-            <div class="mt-2 grid grid-cols-1 gap-1 border-t border-slate-100 pt-2 min-[390px]:grid-cols-2">
-              <a
-                class={mobileNavigationClass(false)}
-                href={luciAdminUrl('/admin/system')}
-              >
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
+          <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
+            <NavigationItems route={route} updateCount={updateCount} />
+            <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
+              <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
                   <SettingsIcon class="size-5" />
                 </span>
-                <span class="min-w-0 truncate">고급 설정</span>
+                고급 설정
               </a>
-              <a
-                class="flex min-h-12 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold text-rose-700 no-underline transition hover:bg-rose-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-100"
-                href={luciAdminUrl('/admin/logout')}
-              >
+              <a class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`} href={luciAdminUrl('/admin/logout')}>
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
                   <LogOutIcon class="size-5" />
                 </span>
-                <span class="min-w-0 truncate">로그아웃</span>
+                로그아웃
               </a>
             </div>
           </div>
         ) : null}
       </nav>
 
-      <nav
-        aria-label="SmartSafeHub 메뉴"
-        class="mb-8 hidden overflow-x-auto border-b border-slate-200 bg-white md:block"
-      >
-        <div class="flex w-full min-w-max items-center gap-1">
-          {ROUTES.map((item) => {
-            const active = route === item.route;
-
-            return (
-              <a
-                aria-current={active ? 'page' : undefined}
-                class={desktopNavigationClass(active)}
-                href={item.hash}
-                key={item.route}
-              >
-                <span class={desktopNavigationIconClass(active)}>
-                  <NavigationIcon route={item.route} />
-                </span>
-                {item.label}
-                {item.route === 'system' && updateCount > 0 ? (
-                  <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
-                    {updateCount}
-                  </span>
-                ) : null}
-              </a>
-            );
-          })}
-          <a
-            class="inline-flex min-h-14 items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-extrabold text-slate-600 no-underline transition hover:border-slate-200 hover:text-slate-950 lg:px-4"
-            href={luciAdminUrl('/admin/system')}
-          >
-            <span class="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500">
-              <SettingsIcon class="size-5" />
-            </span>
-            고급 설정
-          </a>
-          <span aria-hidden="true" class="min-w-4 flex-1" />
-          <a
-            aria-label="SmartSafeHub에서 로그아웃"
-            class="inline-flex min-h-14 items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-extrabold text-rose-600 no-underline transition hover:border-rose-100 hover:bg-rose-50 hover:text-rose-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-200 lg:px-4"
-            href={luciAdminUrl('/admin/logout')}
-          >
-            <LogOutIcon class="size-5" />
-            로그아웃
-          </a>
+      <aside class="hidden min-h-screen border-r border-slate-200 bg-white md:flex md:flex-col">
+        <div class="sticky top-0 flex h-screen flex-col">
+          <div class="flex min-h-20 items-center gap-3 border-b border-slate-100 px-5">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300 shadow-sm shadow-slate-950/10">
+              <ShieldIcon class="size-5" />
+             </span>
+            <div class="min-w-0">
+              <strong class="block truncate text-sm font-black tracking-tight text-slate-950">SmartSafeHub</strong>
+              <span class="block text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-400">Home Gateway</span>
+            </div>
+          </div>
+          <nav aria-label="SmartSafeHub 메뉴" class="flex-1 overflow-y-auto px-3 py-5">
+            <NavigationItems route={route} updateCount={updateCount} />
+          </nav>
+          <div class="border-t border-slate-100 p-3">
+            <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
+              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                <SettingsIcon class="size-5" />
+              </span>
+              고급 설정
+            </a>
+            <a
+              aria-label="SmartSafeHub에서 로그아웃"
+              class={`${navigationClass(false)} mt-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
+              href={luciAdminUrl('/admin/logout')}
+            >
+              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
+                <LogOutIcon class="size-5" />
+              </span>
+              로그아웃
+            </a>
+          </div>
         </div>
-      </nav>
+      </aside>
     </>
   );
 }
