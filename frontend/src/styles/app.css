@@ -130,6 +130,241 @@
   }
 }
 
+/* Authenticated product color theme. The application lives inside a shadow
+ * root, so these overrides can safely remap the existing utility palette
+ * without affecting LuCI itself. */
+.ssh-app[data-theme='dark'] {
+  background: #020617;
+  color: #f8fafc;
+  color-scheme: dark;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-white'],
+.ssh-app[data-theme='dark'] [class~='bg-white/95'] {
+  background-color: #0f172a;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-white/95'] {
+  background-color: rgb(15 23 42 / 0.95);
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-50'],
+.ssh-app[data-theme='dark'] [class~='bg-slate-50/70'] {
+  background-color: #020617;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-50/70'] {
+  background-color: rgb(2 6 23 / 0.72);
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-100'] {
+  background-color: #1e293b;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-200'] {
+  background-color: #334155;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-300'] {
+  background-color: #475569;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-slate-400'] {
+  background-color: #64748b;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-black/5'] {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-950'] {
+  color: #f8fafc;
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-900'] {
+  color: #f1f5f9;
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-800'] {
+  color: #e2e8f0;
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-700'],
+.ssh-app[data-theme='dark'] [class~='text-slate-600'] {
+  color: #cbd5e1;
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-500'],
+.ssh-app[data-theme='dark'] [class~='text-slate-400'] {
+  color: #94a3b8;
+}
+
+.ssh-app[data-theme='dark'] [class~='text-slate-300'] {
+  color: #cbd5e1;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-slate-100'],
+.ssh-app[data-theme='dark'] [class~='border-slate-200'],
+.ssh-app[data-theme='dark'] [class~='divide-slate-200'] {
+  border-color: #1e293b;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-slate-300'] {
+  border-color: #334155;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-slate-100'],
+.ssh-app[data-theme='dark'] [class~='ring-slate-200'],
+.ssh-app[data-theme='dark'] [class~='ring-white'] {
+  --tw-ring-color: #334155;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-teal-50'],
+.ssh-app[data-theme='dark'] [class~='bg-teal-100'] {
+  background-color: rgb(13 148 136 / 0.16);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-teal-700'],
+.ssh-app[data-theme='dark'] [class~='text-teal-800'],
+.ssh-app[data-theme='dark'] [class~='text-teal-950'] {
+  color: #5eead4;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-teal-200'],
+.ssh-app[data-theme='dark'] [class~='border-teal-300'] {
+  border-color: #115e59;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-teal-100'],
+.ssh-app[data-theme='dark'] [class~='ring-teal-200'] {
+  --tw-ring-color: #134e4a;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-emerald-50'],
+.ssh-app[data-theme='dark'] [class~='bg-emerald-100'] {
+  background-color: rgb(16 185 129 / 0.13);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-emerald-700'],
+.ssh-app[data-theme='dark'] [class~='text-emerald-800'],
+.ssh-app[data-theme='dark'] [class~='text-emerald-900'],
+.ssh-app[data-theme='dark'] [class~='text-emerald-950'] {
+  color: #6ee7b7;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-emerald-200'] {
+  border-color: #065f46;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-emerald-100'],
+.ssh-app[data-theme='dark'] [class~='ring-emerald-200'] {
+  --tw-ring-color: #064e3b;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-amber-50'],
+.ssh-app[data-theme='dark'] [class~='bg-amber-50/60'],
+.ssh-app[data-theme='dark'] [class~='bg-amber-100'],
+.ssh-app[data-theme='dark'] [class~='bg-amber-100/70'] {
+  background-color: rgb(245 158 11 / 0.13);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-amber-700'],
+.ssh-app[data-theme='dark'] [class~='text-amber-800'],
+.ssh-app[data-theme='dark'] [class~='text-amber-900'],
+.ssh-app[data-theme='dark'] [class~='text-amber-900/80'],
+.ssh-app[data-theme='dark'] [class~='text-amber-950'] {
+  color: #fcd34d;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-amber-200'],
+.ssh-app[data-theme='dark'] [class~='border-amber-300'] {
+  border-color: #92400e;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-amber-100'],
+.ssh-app[data-theme='dark'] [class~='ring-amber-200'] {
+  --tw-ring-color: #78350f;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-red-50'],
+.ssh-app[data-theme='dark'] [class~='bg-red-100'] {
+  background-color: rgb(239 68 68 / 0.12);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-red-700'],
+.ssh-app[data-theme='dark'] [class~='text-red-800'],
+.ssh-app[data-theme='dark'] [class~='text-red-900'],
+.ssh-app[data-theme='dark'] [class~='text-red-950'] {
+  color: #fca5a5;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-red-200'],
+.ssh-app[data-theme='dark'] [class~='border-red-300'] {
+  border-color: #991b1b;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-red-100'],
+.ssh-app[data-theme='dark'] [class~='ring-red-200'] {
+  --tw-ring-color: #7f1d1d;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-rose-50'] {
+  background-color: rgb(244 63 94 / 0.12);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-rose-600'],
+.ssh-app[data-theme='dark'] [class~='text-rose-700'],
+.ssh-app[data-theme='dark'] [class~='text-rose-800'],
+.ssh-app[data-theme='dark'] [class~='text-rose-900'],
+.ssh-app[data-theme='dark'] [class~='text-rose-950'] {
+  color: #fda4af;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-rose-200'],
+.ssh-app[data-theme='dark'] [class~='border-rose-300'] {
+  border-color: #9f1239;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-rose-200'] {
+  --tw-ring-color: #881337;
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-blue-50'] {
+  background-color: rgb(59 130 246 / 0.12);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-blue-700'] {
+  color: #93c5fd;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-blue-200'] {
+  --tw-ring-color: #1e3a8a;
+}
+
+.ssh-app[data-theme='dark'] .hover\:bg-slate-50:hover {
+  background-color: #1e293b;
+}
+
+.ssh-app[data-theme='dark'] .hover\:bg-rose-50:hover {
+  background-color: rgb(244 63 94 / 0.18);
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-slate-950:hover {
+  color: #f8fafc;
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-slate-700:hover {
+  color: #e2e8f0;
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-rose-800:hover {
+  color: #fecdd3;
+}
+
+.ssh-app[data-theme='dark'] .hover\:border-slate-300:hover {
+  border-color: #475569;
+}
+
 /* SmartSafeHub public login. It is mounted into its own shadow root so these
  * styles remain isolated from LuCI themes and from the authenticated product. */
 .smartsafehub-login-shadow-root {

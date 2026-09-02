@@ -7,6 +7,9 @@ import { ProductHeader } from './ProductHeader';
 import { ProductNavigation } from './ProductNavigation';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'smartsafehub.sidebar.collapsed';
+const THEME_STORAGE_KEY = 'smartsafehub.theme';
+
+type ColorTheme = 'dark' | 'light';
 
 interface AppShellProps {
   children: ComponentChildren;
@@ -29,6 +32,26 @@ function readSidebarCollapsed(): boolean {
   }
 }
 
+function readColorTheme(): ColorTheme {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  try {
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+
+    if (storedTheme === 'dark' || storedTheme === 'light') {
+      return storedTheme;
+    }
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
 export function AppShell({
   children,
   loading,
@@ -39,6 +62,7 @@ export function AppShell({
 }: AppShellProps) {
   const copy = ROUTE_BY_NAME[route];
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  const [theme, setTheme] = useState<ColorTheme>(readColorTheme);
 
   useEffect(() => {
     try {
@@ -51,6 +75,14 @@ export function AppShell({
     }
   }, [sidebarCollapsed]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
+  }, [theme]);
+
   return (
     <div
       class={`ssh-app min-h-screen bg-slate-50 text-slate-950 md:grid md:transition-[grid-template-columns] md:duration-200 md:ease-out ${
@@ -58,11 +90,14 @@ export function AppShell({
           ? 'md:grid-cols-[5rem_minmax(0,1fr)]'
           : 'md:grid-cols-[16rem_minmax(0,1fr)]'
       }`}
+      data-theme={theme}
     >
       <ProductNavigation
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
         route={route}
+        theme={theme}
         title={copy.title}
         updateCount={updateCount}
       />

@@ -9,10 +9,12 @@ import {
   HomeIcon,
   LogOutIcon,
   MenuIcon,
+  MoonIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   SettingsIcon,
   ShieldIcon,
+  SunIcon,
   UpdateIcon,
   UserIcon,
   WifiIcon,
@@ -21,7 +23,9 @@ import {
 interface ProductNavigationProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onToggleTheme: () => void;
   route: AppRoute;
+  theme: 'dark' | 'light';
   title: string;
   updateCount: number;
 }
@@ -51,6 +55,14 @@ function NavigationIcon({ route }: { route: AppRoute }) {
     case 'system':
       return <UpdateIcon class="size-5" />;
   }
+}
+
+function ThemeIcon({ theme }: { theme: 'dark' | 'light' }) {
+  return theme === 'dark' ? <SunIcon class="size-5" /> : <MoonIcon class="size-5" />;
+}
+
+function themeActionLabel(theme: 'dark' | 'light'): string {
+  return theme === 'dark' ? '라이트 모드' : '다크 모드';
 }
 
 function navigationClass(active: boolean, collapsed = false): string {
@@ -135,11 +147,14 @@ function NavigationItems({
 export function ProductNavigation({
   collapsed,
   onToggleCollapsed,
+  onToggleTheme,
   route,
+  theme,
   title,
   updateCount,
 }: ProductNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const themeLabel = themeActionLabel(theme);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -192,6 +207,17 @@ export function ProductNavigation({
           <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
             <NavigationItems route={route} updateCount={updateCount} />
             <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
+              <button
+                aria-label={`${themeLabel}로 전환`}
+                class={`${navigationClass(false)} w-full`}
+                onClick={onToggleTheme}
+                type="button"
+              >
+                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                  <ThemeIcon theme={theme} />
+                </span>
+                {themeLabel}
+              </button>
               <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
                   <SettingsIcon class="size-5" />
@@ -222,15 +248,18 @@ export function ProductNavigation({
               collapsed ? 'justify-center px-2' : 'gap-3 px-4'
             }`}
           >
-            {collapsed ? null : (
-              <a
-                aria-label="SmartSafeHub Dashboard"
-                class="flex min-w-0 flex-1 items-center gap-3 no-underline"
-                href="#home"
-              >
-                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300 shadow-sm shadow-slate-950/10">
-                  <ShieldIcon class="size-5" />
-                </span>
+            <a
+              aria-label="SmartSafeHub Dashboard"
+              class={`flex items-center no-underline ${
+                collapsed ? 'justify-center' : 'min-w-0 flex-1 gap-3'
+              }`}
+              href="#home"
+              title={collapsed ? 'SmartSafeHub' : undefined}
+            >
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300 shadow-sm shadow-slate-950/10">
+                <ShieldIcon class="size-5" />
+              </span>
+              {collapsed ? null : (
                 <div class="min-w-0">
                   <strong class="block truncate text-sm font-black tracking-tight text-slate-950">
                     SmartSafeHub
@@ -239,21 +268,23 @@ export function ProductNavigation({
                     Home Gateway
                   </span>
                 </div>
-              </a>
-            )}
+              )}
+            </a>
             <button
               aria-controls="smartsafehub-desktop-navigation"
               aria-expanded={!collapsed}
               aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              class={`inline-flex shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
-                collapsed ? 'size-10' : 'size-8'
+              class={`inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
+                collapsed
+                  ? 'absolute -right-3 top-6 z-10 size-7 border-slate-200 shadow-sm shadow-slate-900/10'
+                  : 'size-8'
               }`}
               onClick={onToggleCollapsed}
               title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
               type="button"
             >
               {collapsed ? (
-                <PanelLeftOpenIcon class="size-5" />
+                <PanelLeftOpenIcon class="size-4" />
               ) : (
                 <PanelLeftCloseIcon class="size-4.5" />
               )}
@@ -267,6 +298,18 @@ export function ProductNavigation({
             <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
+            <button
+              aria-label={`${themeLabel}로 전환`}
+              class={`${navigationClass(false, collapsed)} w-full`}
+              onClick={onToggleTheme}
+              title={collapsed ? themeLabel : undefined}
+              type="button"
+            >
+              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                <ThemeIcon theme={theme} />
+              </span>
+              {collapsed ? null : themeLabel}
+            </button>
             <a
               aria-label={collapsed ? '고급 설정' : undefined}
               class={navigationClass(false, collapsed)}
