@@ -266,3 +266,21 @@ export function CloseIcon(props: IconProps) {
     </IconBase>
   );
 }
+
+export function PanelLeftCloseIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect height="18" rx="2" width="18" x="3" y="3" />
+      <path d="M9 3v18M15 9l-3 3 3 3" />
+    </IconBase>
+  );
+}
+
+export function PanelLeftOpenIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect height="18" rx="2" width="18" x="3" y="3" />
+      <path d="M9 3v18M13 9l3 3-3 3" />
+    </IconBase>
+  );
+}

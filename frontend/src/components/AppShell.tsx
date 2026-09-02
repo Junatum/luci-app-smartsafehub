@@ -1,9 +1,12 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 
 import { ROUTE_BY_NAME } from '../app/routes';
 import type { AppRoute } from '../app/routes';
 import { ProductHeader } from './ProductHeader';
 import { ProductNavigation } from './ProductNavigation';
+
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'smartsafehub.sidebar.collapsed';
 
 interface AppShellProps {
   children: ComponentChildren;
@@ -12,6 +15,18 @@ interface AppShellProps {
   refreshing: boolean;
   route: AppRoute;
   updateCount: number;
+}
+
+function readSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 export function AppShell({
@@ -23,10 +38,34 @@ export function AppShell({
   updateCount,
 }: AppShellProps) {
   const copy = ROUTE_BY_NAME[route];
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_COLLAPSED_STORAGE_KEY,
+        sidebarCollapsed ? '1' : '0',
+      );
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
+  }, [sidebarCollapsed]);
 
   return (
-    <div class="ssh-app min-h-screen bg-slate-50 text-slate-950 md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
-      <ProductNavigation route={route} title={copy.title} updateCount={updateCount} />
+    <div
+      class={`ssh-app min-h-screen bg-slate-50 text-slate-950 md:grid md:transition-[grid-template-columns] md:duration-200 md:ease-out ${
+        sidebarCollapsed
+          ? 'md:grid-cols-[5rem_minmax(0,1fr)]'
+          : 'md:grid-cols-[16rem_minmax(0,1fr)]'
+      }`}
+    >
+      <ProductNavigation
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        route={route}
+        title={copy.title}
+        updateCount={updateCount}
+      />
       <div class="min-w-0 md:min-h-screen">
         <ProductHeader
           description={copy.description}

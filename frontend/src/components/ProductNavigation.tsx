@@ -9,6 +9,8 @@ import {
   HomeIcon,
   LogOutIcon,
   MenuIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   SettingsIcon,
   ShieldIcon,
   UpdateIcon,
@@ -17,6 +19,8 @@ import {
 } from './Icons';
 
 interface ProductNavigationProps {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   route: AppRoute;
   title: string;
   updateCount: number;
@@ -49,22 +53,40 @@ function NavigationIcon({ route }: { route: AppRoute }) {
   }
 }
 
-function navigationClass(active: boolean): string {
-  return `flex min-h-11 min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-extrabold no-underline transition ${
+function navigationClass(active: boolean, collapsed = false): string {
+  return `relative flex min-h-11 min-w-0 items-center rounded-xl py-2.5 text-sm font-extrabold no-underline transition ${
+    collapsed ? 'justify-center px-2' : 'gap-3 px-3'
+  } ${
     active
       ? 'bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200'
       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
   }`;
 }
 
-function NavigationItems({ route, updateCount }: { route: AppRoute; updateCount: number }) {
+function NavigationItems({
+  collapsed = false,
+  route,
+  updateCount,
+}: {
+  collapsed?: boolean;
+  route: AppRoute;
+  updateCount: number;
+}) {
   return (
-    <div class="space-y-5">
-      {NAVIGATION_GROUPS.map((group) => (
-        <section aria-label={group.label} key={group.label}>
-          <p class="mb-2 px-3 text-[0.65rem] font-black uppercase tracking-[0.18em] text-slate-400">
-            {group.label}
-          </p>
+    <div class={collapsed ? 'space-y-3' : 'space-y-5'}>
+      {NAVIGATION_GROUPS.map((group, groupIndex) => (
+        <section
+          aria-label={group.label}
+          class={
+            collapsed && groupIndex > 0 ? 'border-t border-slate-100 pt-3' : undefined
+          }
+          key={group.label}
+        >
+          {collapsed ? null : (
+            <p class="mb-2 px-3 text-[0.65rem] font-black uppercase tracking-[0.18em] text-slate-400">
+              {group.label}
+            </p>
+          )}
           <div class="space-y-1">
             {group.routes.map((routeName) => {
               const item = ROUTE_BY_NAME[routeName];
@@ -72,9 +94,11 @@ function NavigationItems({ route, updateCount }: { route: AppRoute; updateCount:
               return (
                 <a
                   aria-current={active ? 'page' : undefined}
-                  class={navigationClass(active)}
+                  aria-label={collapsed ? item.label : undefined}
+                  class={navigationClass(active, collapsed)}
                   href={item.hash}
                   key={routeName}
+                  title={collapsed ? item.label : undefined}
                 >
                   <span
                     class={`grid size-9 shrink-0 place-items-center rounded-lg ${
@@ -83,11 +107,20 @@ function NavigationItems({ route, updateCount }: { route: AppRoute; updateCount:
                   >
                     <NavigationIcon route={routeName} />
                   </span>
-                  <span class="min-w-0 flex-1 truncate">{item.label}</span>
+                  {collapsed ? null : <span class="min-w-0 flex-1 truncate">{item.label}</span>}
                   {routeName === 'system' && updateCount > 0 ? (
-                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
-                      {updateCount}
-                    </span>
+                    collapsed ? (
+                      <span
+                        aria-label={`${updateCount}개의 업데이트`}
+                        class="absolute right-1.5 top-1.5 min-w-4 rounded-full bg-amber-100 px-1 py-0.5 text-center text-[9px] font-black leading-none text-amber-800 ring-2 ring-white"
+                      >
+                        {updateCount}
+                      </span>
+                    ) : (
+                      <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                        {updateCount}
+                      </span>
+                    )
                   ) : null}
                 </a>
               );
@@ -99,8 +132,13 @@ function NavigationItems({ route, updateCount }: { route: AppRoute; updateCount:
   );
 }
 
-
-export function ProductNavigation({ route, title, updateCount }: ProductNavigationProps) {
+export function ProductNavigation({
+  collapsed,
+  onToggleCollapsed,
+  route,
+  title,
+  updateCount,
+}: ProductNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -160,7 +198,10 @@ export function ProductNavigation({ route, title, updateCount }: ProductNavigati
                 </span>
                 고급 설정
               </a>
-              <a class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`} href={luciAdminUrl('/admin/logout')}>
+              <a
+                class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
+                href={luciAdminUrl('/admin/logout')}
+              >
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
                   <LogOutIcon class="size-5" />
                 </span>
@@ -171,36 +212,82 @@ export function ProductNavigation({ route, title, updateCount }: ProductNavigati
         ) : null}
       </nav>
 
-      <aside class="hidden min-h-screen border-r border-slate-200 bg-white md:flex md:flex-col">
+      <aside
+        class="hidden min-h-screen border-r border-slate-200 bg-white md:flex md:flex-col"
+        data-collapsed={collapsed ? 'true' : 'false'}
+      >
         <div class="sticky top-0 flex h-screen flex-col">
-          <div class="flex min-h-20 items-center gap-3 border-b border-slate-100 px-5">
-            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300 shadow-sm shadow-slate-950/10">
-              <ShieldIcon class="size-5" />
-             </span>
-            <div class="min-w-0">
-              <strong class="block truncate text-sm font-black tracking-tight text-slate-950">SmartSafeHub</strong>
-              <span class="block text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-400">Home Gateway</span>
-            </div>
+          <div
+            class={`flex min-h-20 items-center border-b border-slate-100 ${
+              collapsed ? 'justify-center px-2' : 'gap-3 px-4'
+            }`}
+          >
+            {collapsed ? null : (
+              <a
+                aria-label="SmartSafeHub Dashboard"
+                class="flex min-w-0 flex-1 items-center gap-3 no-underline"
+                href="#home"
+              >
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-950 text-teal-300 shadow-sm shadow-slate-950/10">
+                  <ShieldIcon class="size-5" />
+                </span>
+                <div class="min-w-0">
+                  <strong class="block truncate text-sm font-black tracking-tight text-slate-950">
+                    SmartSafeHub
+                  </strong>
+                  <span class="block text-[0.68rem] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Home Gateway
+                  </span>
+                </div>
+              </a>
+            )}
+            <button
+              aria-controls="smartsafehub-desktop-navigation"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+              class={`inline-flex shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
+                collapsed ? 'size-10' : 'size-8'
+              }`}
+              onClick={onToggleCollapsed}
+              title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+              type="button"
+            >
+              {collapsed ? (
+                <PanelLeftOpenIcon class="size-5" />
+              ) : (
+                <PanelLeftCloseIcon class="size-4.5" />
+              )}
+            </button>
           </div>
-          <nav aria-label="SmartSafeHub 메뉴" class="flex-1 overflow-y-auto px-3 py-5">
-            <NavigationItems route={route} updateCount={updateCount} />
+          <nav
+            aria-label="SmartSafeHub 메뉴"
+            class={`flex-1 overflow-y-auto py-5 ${collapsed ? 'px-2' : 'px-3'}`}
+            id="smartsafehub-desktop-navigation"
+          >
+            <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
-          <div class="border-t border-slate-100 p-3">
-            <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
+          <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
+            <a
+              aria-label={collapsed ? '고급 설정' : undefined}
+              class={navigationClass(false, collapsed)}
+              href={luciAdminUrl('/admin/system')}
+              title={collapsed ? '고급 설정' : undefined}
+            >
               <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
                 <SettingsIcon class="size-5" />
               </span>
-              고급 설정
+              {collapsed ? null : '고급 설정'}
             </a>
             <a
               aria-label="SmartSafeHub에서 로그아웃"
-              class={`${navigationClass(false)} mt-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
+              class={`${navigationClass(false, collapsed)} mt-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
               href={luciAdminUrl('/admin/logout')}
+              title={collapsed ? '로그아웃' : undefined}
             >
               <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-rose-600">
                 <LogOutIcon class="size-5" />
               </span>
-              로그아웃
+              {collapsed ? null : '로그아웃'}
             </a>
           </div>
         </div>
