@@ -282,7 +282,7 @@ export function ProductNavigation({
             aria-controls="smartsafehub-desktop-navigation"
             aria-expanded={!collapsed}
             aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-            class="absolute right-0 top-1/2 z-20 inline-flex size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-md shadow-slate-900/10 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+            class="absolute right-0 top-20 z-20 inline-flex size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-teal-500 bg-teal-600 text-white shadow-lg shadow-teal-950/20 transition hover:border-teal-400 hover:bg-teal-500 hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200"
             onClick={onToggleCollapsed}
             title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
             type="button"
