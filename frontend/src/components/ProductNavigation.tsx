@@ -242,7 +242,7 @@ export function ProductNavigation({
         class="hidden min-h-screen border-r border-slate-200 bg-white md:flex md:flex-col"
         data-collapsed={collapsed ? 'true' : 'false'}
       >
-        <div class="sticky top-0 flex h-screen flex-col">
+        <div class="relative sticky top-0 flex h-screen flex-col">
           <div
             class={`flex min-h-20 items-center border-b border-slate-100 ${
               collapsed ? 'justify-center px-2' : 'gap-3 px-4'
@@ -270,25 +270,6 @@ export function ProductNavigation({
                 </div>
               )}
             </a>
-            <button
-              aria-controls="smartsafehub-desktop-navigation"
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              class={`inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
-                collapsed
-                  ? 'absolute -right-3 top-6 z-10 size-7 border-slate-200 shadow-sm shadow-slate-900/10'
-                  : 'size-8'
-              }`}
-              onClick={onToggleCollapsed}
-              title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              type="button"
-            >
-              {collapsed ? (
-                <PanelLeftOpenIcon class="size-4" />
-              ) : (
-                <PanelLeftCloseIcon class="size-4.5" />
-              )}
-            </button>
           </div>
           <nav
             aria-label="SmartSafeHub 메뉴"
@@ -297,6 +278,21 @@ export function ProductNavigation({
           >
             <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
+          <button
+            aria-controls="smartsafehub-desktop-navigation"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            class="absolute right-0 top-1/2 z-20 inline-flex size-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-md shadow-slate-900/10 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+            onClick={onToggleCollapsed}
+            title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            type="button"
+          >
+            {collapsed ? (
+              <PanelLeftOpenIcon class="size-4" />
+            ) : (
+              <PanelLeftCloseIcon class="size-4" />
+            )}
+          </button>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
             <button
               aria-label={`${themeLabel}로 전환`}

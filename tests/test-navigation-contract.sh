@@ -34,6 +34,10 @@ grep -Fq "title={collapsed ? 'SmartSafeHub' : undefined}" "$NAVIGATION" || \
 	fail 'collapsed sidebar must retain the SmartSafeHub logo mark'
 grep -Fq "aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}" "$NAVIGATION" || \
 	fail 'desktop navigation must expose an accessible sidebar toggle'
+grep -Fq 'absolute right-0 top-1/2' "$NAVIGATION" || \
+	fail 'desktop sidebar toggle must stay centered on the sidebar boundary'
+grep -Fq 'translate-x-1/2 -translate-y-1/2' "$NAVIGATION" || \
+	fail 'desktop sidebar toggle must straddle the sidebar boundary'
 grep -Fq 'onClick={onToggleTheme}' "$NAVIGATION" || \
 	fail 'navigation must expose the theme toggle'
 grep -Fq 'export function MoonIcon' "$ICONS" || fail 'dark mode must provide a moon icon'
