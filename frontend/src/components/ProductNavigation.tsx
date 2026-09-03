@@ -191,33 +191,33 @@ export function ProductNavigation({
               <span class="block truncate text-xs font-semibold text-slate-500">{title}</span>
             </span>
           </a>
-          <button
-            aria-controls="smartsafehub-mobile-menu"
-            aria-expanded={mobileMenuOpen}
-            aria-label={mobileMenuOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
-            class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            type="button"
-          >
-            {mobileMenuOpen ? <CloseIcon class="size-5" /> : <MenuIcon class="size-5" />}
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              aria-label={`${themeLabel}로 전환`}
+              class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-teal-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+              onClick={onToggleTheme}
+              title={themeLabel}
+              type="button"
+            >
+              <ThemeIcon theme={theme} />
+            </button>
+            <button
+              aria-controls="smartsafehub-mobile-menu"
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
+              class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              type="button"
+            >
+              {mobileMenuOpen ? <CloseIcon class="size-5" /> : <MenuIcon class="size-5" />}
+            </button>
+          </div>
         </div>
 
         {mobileMenuOpen ? (
           <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
             <NavigationItems route={route} updateCount={updateCount} />
             <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
-              <button
-                aria-label={`${themeLabel}로 전환`}
-                class={`${navigationClass(false)} w-full`}
-                onClick={onToggleTheme}
-                type="button"
-              >
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                  <ThemeIcon theme={theme} />
-                </span>
-                {themeLabel}
-              </button>
               <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
                 <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
                   <SettingsIcon class="size-5" />
@@ -294,18 +294,6 @@ export function ProductNavigation({
             <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
-            <button
-              aria-label={`${themeLabel}로 전환`}
-              class={`${navigationClass(false, collapsed)} w-full`}
-              onClick={onToggleTheme}
-              title={collapsed ? themeLabel : undefined}
-              type="button"
-            >
-              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                <ThemeIcon theme={theme} />
-              </span>
-              {collapsed ? null : themeLabel}
-            </button>
             <a
               aria-label={collapsed ? '고급 설정' : undefined}
               class={navigationClass(false, collapsed)}

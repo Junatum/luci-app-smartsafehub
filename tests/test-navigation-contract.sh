@@ -5,6 +5,7 @@ set -eu
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 APP_SHELL="$ROOT_DIR/frontend/src/components/AppShell.tsx"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
+HEADER="$ROOT_DIR/frontend/src/components/ProductHeader.tsx"
 ICONS="$ROOT_DIR/frontend/src/components/Icons.tsx"
 STYLES="$ROOT_DIR/frontend/src/styles/app.css"
 THEME="$ROOT_DIR/frontend/src/utils/theme.ts"
@@ -14,7 +15,7 @@ fail() {
 	exit 1
 }
 
-for file in "$APP_SHELL" "$NAVIGATION" "$ICONS" "$STYLES" "$THEME"; do
+for file in "$APP_SHELL" "$NAVIGATION" "$HEADER" "$ICONS" "$STYLES" "$THEME"; do
 	[ -f "$file" ] || fail "missing frontend navigation source: ${file#$ROOT_DIR/}"
 done
 
@@ -49,8 +50,22 @@ grep -Fq 'title={collapsed ? item.label : undefined}' "$NAVIGATION" || \
 	fail 'collapsed navigation items must retain hover labels'
 grep -Fq 'data-collapsed={collapsed ? '\''true'\'' : '\''false'\''}' "$NAVIGATION" || \
 	fail 'desktop sidebar must expose its collapsed state'
-grep -Fq 'onClick={onToggleTheme}' "$NAVIGATION" || \
-	fail 'navigation must expose the theme toggle'
+[ "$(grep -Fc 'onClick={onToggleTheme}' "$NAVIGATION")" -eq 1 ] || \
+	fail 'mobile navigation must expose exactly one top-level theme toggle'
+grep -Fq 'class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600' "$NAVIGATION" || \
+	fail 'mobile theme toggle must be an icon button next to the hamburger menu'
+grep -Fq 'aria-controls="smartsafehub-mobile-menu"' "$NAVIGATION" || \
+	fail 'mobile hamburger menu control must remain available'
+[ "$(grep -Fc 'onClick={onToggleTheme}' "$HEADER")" -eq 1 ] || \
+	fail 'desktop product header must expose exactly one theme toggle'
+grep -Fq 'md:inline-flex' "$HEADER" || \
+	fail 'desktop header theme toggle must be hidden below the desktop breakpoint'
+grep -Fq "theme === 'dark' ? <SunIcon" "$HEADER" || \
+	fail 'desktop header theme toggle must switch between sun and moon icons'
+grep -Fq "onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}" "$APP_SHELL" || \
+	fail 'AppShell must wire the desktop header theme action'
+[ "$(grep -Fc 'aria-label={`${themeLabel}로 전환`}' "$NAVIGATION")" -eq 1 ] || \
+	fail 'theme action must not remain duplicated inside sidebar or mobile drawer menus'
 grep -Fq 'class="ssh-mobile-navigation' "$NAVIGATION" || \
 	fail 'mobile navigation drawer must remain available'
 
@@ -68,4 +83,4 @@ grep -Fq ".ssh-app[data-theme='dark'] .ssh-sidebar-toggle" "$STYLES" || \
 grep -Fq ".ssh-app[data-theme='dark']" "$STYLES" || \
 	fail 'authenticated application must provide dark theme styles'
 
-echo 'PASS: collapsible sidebar boundary toggle and dark theme contracts are present'
+echo 'PASS: collapsible sidebar, header theme actions and dark theme contracts are present'

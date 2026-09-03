@@ -82,7 +82,9 @@ export function AppShell({
           description={copy.description}
           loading={loading}
           onRefresh={onRefresh}
+          onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
           refreshing={refreshing}
+          theme={theme}
           title={copy.title}
         />
         <main

@@ -1,10 +1,12 @@
-import { RefreshIcon } from './Icons';
+import { MoonIcon, RefreshIcon, SunIcon } from './Icons';
 
 interface ProductHeaderProps {
   description: string;
   loading: boolean;
   onRefresh: () => void;
+  onToggleTheme: () => void;
   refreshing: boolean;
+  theme: 'dark' | 'light';
   title: string;
 }
 
@@ -12,7 +14,9 @@ export function ProductHeader({
   description,
   loading,
   onRefresh,
+  onToggleTheme,
   refreshing,
+  theme,
   title,
 }: ProductHeaderProps) {
   return (
@@ -32,18 +36,29 @@ export function ProductHeader({
           </div>
         </div>
 
-        <button
-          aria-label={refreshing ? '새로고침 중' : '현재 화면 새로고침'}
-          class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-bold text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
-          disabled={loading || refreshing}
-          onClick={onRefresh}
-          type="button"
-        >
-          <RefreshIcon class={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-          <span class="hidden sm:inline">
-            {refreshing ? '새로고침 중' : '새로고침'}
-          </span>
-        </button>
+        <div class="flex shrink-0 items-center gap-2">
+          <button
+            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            class="hidden size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-teal-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 md:inline-flex"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? '라이트 모드' : '다크 모드'}
+            type="button"
+          >
+            {theme === 'dark' ? <SunIcon class="size-4.5" /> : <MoonIcon class="size-4.5" />}
+          </button>
+          <button
+            aria-label={refreshing ? '새로고침 중' : '현재 화면 새로고침'}
+            class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-bold text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+            disabled={loading || refreshing}
+            onClick={onRefresh}
+            type="button"
+          >
+            <RefreshIcon class={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span class="hidden sm:inline">
+              {refreshing ? '새로고침 중' : '새로고침'}
+            </span>
+          </button>
+        </div>
       </div>
     </header>
   );
