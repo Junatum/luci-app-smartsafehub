@@ -35,8 +35,6 @@ fi
 
 grep -Fq 'px-5 pb-5 sm:px-6 sm:pb-6' "$PAGE" || \
 	fail 'SafeShield summary facts must remain visually inside the protection card'
-grep -Fq 'gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200' "$PAGE" || \
-	fail 'SafeShield summary facts must use an inset segmented surface'
 grep -Fq 'class="bg-white px-5 py-4 sm:px-6"' "$PAGE" || \
 	fail 'SafeShield summary fact cells must use the protection card surface color'
 grep -Fq 'border-2 border-slate-300 bg-slate-50' "$PAGE" || \

@@ -18,8 +18,8 @@ export const ROUTES: readonly RouteDefinition[] = [
   {
     route: 'home',
     hash: '#home',
-    label: 'Dashboard',
-    title: 'Dashboard',
+    label: '대시보드',
+    title: '대시보드',
     description: '네트워크, 장치와 시스템 상태를 한눈에 확인합니다.',
   },
   {

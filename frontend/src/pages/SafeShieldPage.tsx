@@ -501,7 +501,7 @@ export function SafeShieldPage({
         </div>
 
         <div class="px-5 pb-5 sm:px-6 sm:pb-6">
-          <dl class="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+          <dl class="grid overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryFact label="Protection" value={getSummaryLabel(data)} />
             <SummaryFact
               label="Blocklist"

@@ -18,6 +18,7 @@ for script in \
 	tests/test-package-contract.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-network-input-contract.sh \
+	tests/test-update-ui-contract.sh \
 	tests/test-rpc-contract.sh \
 	tests/test-rules-ui-contract.sh \
 	tests/test-safeshield-page-contract.sh \
@@ -43,6 +44,7 @@ echo 'JSON validation tests: ok'
 sh "$ROOT_DIR/tests/test-package-contract.sh"
 sh "$ROOT_DIR/tests/test-navigation-contract.sh"
 sh "$ROOT_DIR/tests/test-network-input-contract.sh"
+sh "$ROOT_DIR/tests/test-update-ui-contract.sh"
 sh "$ROOT_DIR/tests/test-ucode-imports.sh"
 sh "$ROOT_DIR/tests/test-rpc-contract.sh"
 sh "$ROOT_DIR/tests/test-rules-ui-contract.sh"
