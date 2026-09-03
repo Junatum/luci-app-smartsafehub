@@ -23,7 +23,9 @@ export function App() {
   const status = useStatus(route === 'home' || route === 'system');
   const updates = useSoftwareUpdates(true);
   const wifi = useWifi(route === 'wifi');
+  const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
+  const dashboardSafeShield = useSafeShieldStatus(route === 'home');
   const safeshield = useSafeShieldStatus(route === 'safeshield');
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
@@ -150,15 +152,40 @@ export function App() {
       content = (
         <HomePage
           data={status.data}
+          devices={dashboardDevices.data}
+          devicesError={dashboardDevices.error}
+          devicesLoading={dashboardDevices.loading}
           error={status.error}
           loading={status.loading}
-          onRetry={() => void status.refresh()}
+          onRetry={() =>
+            void Promise.all([
+              status.refresh(),
+              dashboardDevices.refresh(),
+              dashboardSafeShield.refresh(),
+              updates.refresh(),
+            ])
+          }
+          safeshield={dashboardSafeShield.data}
+          safeshieldError={dashboardSafeShield.error}
+          safeshieldLoading={dashboardSafeShield.loading}
           updates={updates.data}
+          updatesError={updates.error}
+          updatesLoading={updates.loading}
         />
       );
   }
 
   const refreshCurrent = () => {
+    if (route === 'home') {
+      void Promise.all([
+        status.refresh(),
+        dashboardDevices.refresh(),
+        dashboardSafeShield.refresh(),
+        updates.refresh(),
+      ]);
+      return;
+    }
+
     if (route === 'system') {
       void Promise.all([status.refresh(), updates.refresh()]);
       return;
@@ -178,6 +205,10 @@ export function App() {
       onRefresh={refreshCurrent}
       refreshing={
         current.refreshing ||
+        (route === 'home' &&
+          (dashboardDevices.refreshing ||
+            dashboardSafeShield.refreshing ||
+            updates.refreshing)) ||
         (route === 'system' && updates.refreshing) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
