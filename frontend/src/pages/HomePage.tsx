@@ -10,9 +10,10 @@ import {
   ShieldIcon,
   UpdateIcon,
 } from '../components/Icons';
+import { DashboardSafeShieldActivity } from '../components/DashboardSafeShieldActivity';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { ConnectedDevicesSummary } from '../types/devices';
-import type { SafeShieldStatus } from '../types/safeshield';
+import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
 import {
@@ -36,6 +37,10 @@ interface HomePageProps {
   safeshield: SafeShieldStatus | null;
   safeshieldError: string | null;
   safeshieldLoading: boolean;
+  statistics: SafeShieldStatistics | null;
+  statisticsError: string | null;
+  statisticsLoading: boolean;
+  statisticsRefreshing: boolean;
   updates: SoftwareUpdateStatus | null;
   updatesError: string | null;
   updatesLoading: boolean;
@@ -212,6 +217,10 @@ export function HomePage({
   safeshield,
   safeshieldError,
   safeshieldLoading,
+  statistics,
+  statisticsError,
+  statisticsLoading,
+  statisticsRefreshing,
   updates,
   updatesError,
   updatesLoading,
@@ -321,6 +330,83 @@ export function HomePage({
             }
             value={updateValue}
           />
+        </div>
+      </section>
+
+      <section aria-labelledby="dashboard-activity-title">
+        <SectionHeading
+          description="최근 SafeShield 차단 활동과 현재 네트워크 연결 구성을 함께 확인합니다."
+          eyebrow="Activity"
+          id="dashboard-activity-title"
+          title="네트워크 보호 활동"
+        />
+        <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,0.65fr)]">
+          <DashboardSafeShieldActivity
+            data={statistics}
+            error={statisticsError}
+            loading={statisticsLoading}
+            refreshing={statisticsRefreshing}
+          />
+
+          <article class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                  Network
+                </p>
+                <h3 class="mt-2 mb-0 text-xl font-black text-slate-950">연결 상태</h3>
+              </div>
+              <span
+                class={`grid size-10 shrink-0 place-items-center rounded-xl ${
+                  data.network.up
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                <GlobeIcon class="size-5" />
+              </span>
+            </div>
+
+            <dl class="mt-4 mb-0">
+              <DetailRow
+                label="인터넷"
+                value={data.network.up ? '정상 연결' : '연결 확인'}
+              />
+              <DetailRow
+                label="WAN IP"
+                value={data.network.ipv4Address || '할당되지 않음'}
+              />
+              <DetailRow
+                label="프로토콜"
+                value={data.network.protocol || '확인되지 않음'}
+              />
+              <DetailRow
+                label="연결 기기"
+                value={
+                  devices
+                    ? `${formatNumber(devices.totals.online)}대`
+                    : devicesLoading
+                      ? '확인 중'
+                      : '확인 필요'
+                }
+              />
+              <DetailRow
+                label="Wi-Fi"
+                value={devices ? `${formatNumber(devices.totals.wireless)}대` : '-'}
+              />
+              <DetailRow
+                label="유선/기타"
+                value={devices ? `${formatNumber(devices.totals.ethernet)}대` : '-'}
+              />
+            </dl>
+
+            <a
+              class="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-extrabold text-slate-700 no-underline transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+              href="#devices"
+            >
+              연결된 기기 보기
+            </a>
+          </article>
         </div>
       </section>
 

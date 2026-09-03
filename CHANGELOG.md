@@ -4,6 +4,22 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.8-r12] - 2026-09-03
+
+### 추가
+
+- Dashboard에 SafeShield 최근 24시간 차단 활동 차트를 추가해 보호 동작 추이를 첫 화면에서 바로 확인할 수 있도록 했습니다.
+- 차트와 함께 최근 24시간 DNS 요청, 차단 수와 차단율을 요약하고 현재 WAN/연결 기기 구성을 나란히 표시하는 네트워크 보호 활동 영역을 추가했습니다.
+
+### 변경
+
+- Dashboard의 SafeShield statistics 조회는 진입 시 한 번만 수행하고 사용자가 새로고침할 때만 다시 조회하도록 구성해 상세 SafeShield 페이지의 60초 polling이 Dashboard로 확장되지 않도록 했습니다.
+- 연결 기기 one-shot 조회가 `exactOptionalPropertyTypes` 설정과 호환되도록 polling 비활성화 시 `pollInterval` 프로퍼티 자체를 생략하도록 정리했습니다.
+
+### 테스트
+
+- Dashboard 차트 재사용, SafeShield statistics one-shot 조회, 통합 새로고침과 polling 비활성화 계약을 검증하도록 Dashboard UI contract 테스트를 보강했습니다.
+
 ## [0.2.8-r11] - 2026-09-03
 
 ### 변경

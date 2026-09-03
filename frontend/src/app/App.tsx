@@ -26,6 +26,7 @@ export function App() {
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
   const dashboardSafeShield = useSafeShieldStatus(route === 'home');
+  const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);
   const safeshield = useSafeShieldStatus(route === 'safeshield');
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
@@ -162,12 +163,17 @@ export function App() {
               status.refresh(),
               dashboardDevices.refresh(),
               dashboardSafeShield.refresh(),
+              dashboardSafeShieldStatistics.refresh(),
               updates.refresh(),
             ])
           }
           safeshield={dashboardSafeShield.data}
           safeshieldError={dashboardSafeShield.error}
           safeshieldLoading={dashboardSafeShield.loading}
+          statistics={dashboardSafeShieldStatistics.data}
+          statisticsError={dashboardSafeShieldStatistics.error}
+          statisticsLoading={dashboardSafeShieldStatistics.loading}
+          statisticsRefreshing={dashboardSafeShieldStatistics.refreshing}
           updates={updates.data}
           updatesError={updates.error}
           updatesLoading={updates.loading}
@@ -181,6 +187,7 @@ export function App() {
         status.refresh(),
         dashboardDevices.refresh(),
         dashboardSafeShield.refresh(),
+        dashboardSafeShieldStatistics.refresh(),
         updates.refresh(),
       ]);
       return;
@@ -208,6 +215,7 @@ export function App() {
         (route === 'home' &&
           (dashboardDevices.refreshing ||
             dashboardSafeShield.refreshing ||
+            dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing)) ||
         (route === 'system' && updates.refreshing) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
