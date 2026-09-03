@@ -60,6 +60,17 @@ grep -Fq 'export function EyeIcon' "$ICONS" || \
 	fail 'login password control must provide an eye icon'
 grep -Fq 'export function EyeOffIcon' "$ICONS" || \
 	fail 'login password control must provide an eye-off icon'
+grep -Fq 'class="ssh-login-field-icon"' "$LOGIN" || \
+	fail 'login credential icons must use a dedicated icon tile'
+grep -Fq '.ssh-login-field-icon {' "$STYLES" || \
+	fail 'login credential icon tile must have explicit styling'
+grep -Fq 'width: 2.35rem;' "$STYLES" || \
+	fail 'password visibility icon must use a compact icon-button footprint'
+if grep -Fq 'border-left: 1px solid var(--ssh-login-border);' "$STYLES"; then
+	fail 'password visibility icon must not render as a full-height split input cell'
+fi
+grep -Fq 'input:-webkit-autofill' "$STYLES" || \
+	fail 'browser autofill must preserve the SmartSafeHub login field surface'
 grep -Fq 'border: 2px solid var(--ssh-login-border-strong);' "$STYLES" || \
 	fail 'login text inputs must use the same strong product form-control border'
 grep -Fq ".ssh-login-page[data-theme='dark']" "$STYLES" || \

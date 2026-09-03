@@ -218,7 +218,9 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
                 <label class="ssh-login-field" for="smartsafehub-username">
                   <span class="ssh-login-label">사용자 이름</span>
                   <span class="ssh-login-input-wrap">
-                    <UserIcon aria-hidden="true" />
+                    <span class="ssh-login-field-icon" aria-hidden="true">
+                      <UserIcon />
+                    </span>
                     <input
                       autoCapitalize="none"
                       autoComplete="username"
@@ -239,7 +241,9 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
                 <label class="ssh-login-field" for="smartsafehub-password">
                   <span class="ssh-login-label">비밀번호</span>
                   <span class="ssh-login-input-wrap">
-                    <KeyIcon aria-hidden="true" />
+                    <span class="ssh-login-field-icon" aria-hidden="true">
+                      <KeyIcon />
+                    </span>
                     <input
                       autoComplete="current-password"
                       disabled={busy}
