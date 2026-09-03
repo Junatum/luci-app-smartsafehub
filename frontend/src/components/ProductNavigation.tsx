@@ -12,6 +12,7 @@ import {
   MoonIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
+  RefreshIcon,
   SettingsIcon,
   ShieldIcon,
   SunIcon,
@@ -22,8 +23,11 @@ import {
 
 interface ProductNavigationProps {
   collapsed: boolean;
+  loading: boolean;
+  onRefresh: () => void;
   onToggleCollapsed: () => void;
   onToggleTheme: () => void;
+  refreshing: boolean;
   route: AppRoute;
   theme: 'dark' | 'light';
   title: string;
@@ -146,8 +150,11 @@ function NavigationItems({
 
 export function ProductNavigation({
   collapsed,
+  loading,
+  onRefresh,
   onToggleCollapsed,
   onToggleTheme,
+  refreshing,
   route,
   theme,
   title,
@@ -200,6 +207,19 @@ export function ProductNavigation({
               type="button"
             >
               <ThemeIcon theme={theme} />
+            </button>
+            <button
+              aria-busy={refreshing}
+              aria-label={refreshing ? '새로고침 중' : '현재 화면 새로고침'}
+              class={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white transition hover:border-slate-300 hover:bg-slate-50 hover:text-teal-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-wait disabled:opacity-60 ${
+                refreshing ? 'text-teal-700' : 'text-slate-600'
+              }`}
+              disabled={loading || refreshing}
+              onClick={onRefresh}
+              title={refreshing ? '새로고침 중' : '새로고침'}
+              type="button"
+            >
+              <RefreshIcon class={`size-5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               aria-controls="smartsafehub-mobile-menu"

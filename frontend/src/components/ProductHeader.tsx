@@ -47,16 +47,17 @@ export function ProductHeader({
             {theme === 'dark' ? <SunIcon class="size-4.5" /> : <MoonIcon class="size-4.5" />}
           </button>
           <button
+            aria-busy={refreshing}
             aria-label={refreshing ? '새로고침 중' : '현재 화면 새로고침'}
-            class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-bold text-slate-700 shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+            class={`hidden size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-teal-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-wait disabled:opacity-60 md:inline-flex ${
+              refreshing ? 'text-teal-700' : 'text-slate-600'
+            }`}
             disabled={loading || refreshing}
             onClick={onRefresh}
+            title={refreshing ? '새로고침 중' : '새로고침'}
             type="button"
           >
-            <RefreshIcon class={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span class="hidden sm:inline">
-              {refreshing ? '새로고침 중' : '새로고침'}
-            </span>
+            <RefreshIcon class={`size-4.5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>

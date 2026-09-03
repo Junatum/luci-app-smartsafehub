@@ -70,8 +70,11 @@ export function AppShell({
     >
       <ProductNavigation
         collapsed={sidebarCollapsed}
+        loading={loading}
+        onRefresh={onRefresh}
         onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}
         onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+        refreshing={refreshing}
         route={route}
         theme={theme}
         title={copy.title}

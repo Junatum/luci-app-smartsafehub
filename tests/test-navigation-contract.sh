@@ -64,8 +64,34 @@ grep -Fq "theme === 'dark' ? <SunIcon" "$HEADER" || \
 	fail 'desktop header theme toggle must switch between sun and moon icons'
 grep -Fq "onToggleTheme={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}" "$APP_SHELL" || \
 	fail 'AppShell must wire the desktop header theme action'
+[ "$(grep -Fc 'onRefresh={onRefresh}' "$APP_SHELL")" -eq 2 ] || \
+	fail 'AppShell must wire refresh actions into both mobile navigation and desktop header'
+grep -Fq 'loading={loading}' "$APP_SHELL" || \
+	fail 'AppShell must pass loading state to mobile refresh control'
+grep -Fq 'refreshing={refreshing}' "$APP_SHELL" || \
+	fail 'AppShell must pass refreshing state to mobile refresh control'
 [ "$(grep -Fc 'aria-label={`${themeLabel}로 전환`}' "$NAVIGATION")" -eq 1 ] || \
 	fail 'theme action must not remain duplicated inside sidebar or mobile drawer menus'
+[ "$(grep -Fc 'onClick={onRefresh}' "$HEADER")" -eq 1 ] || \
+	fail 'desktop product header must expose exactly one refresh action'
+grep -Fq 'class={`hidden size-10 shrink-0 items-center justify-center rounded-xl' "$HEADER" || \
+	fail 'desktop refresh action must be an icon-only header button'
+grep -Fq "size-4.5 \${refreshing ? 'animate-spin' : ''}" "$HEADER" || \
+	fail 'desktop refresh icon must animate while refreshing'
+if grep -Fq '<span class="hidden sm:inline">' "$HEADER"; then
+	fail 'desktop refresh action must not restore a visible text label'
+fi
+[ "$(grep -Fc 'onClick={onRefresh}' "$NAVIGATION")" -eq 1 ] || \
+	fail 'mobile top navigation must expose exactly one refresh action'
+grep -Fq 'disabled={loading || refreshing}' "$NAVIGATION" || \
+	fail 'mobile refresh action must prevent duplicate requests while loading or refreshing'
+grep -Fq "size-5 \${refreshing ? 'animate-spin' : ''}" "$NAVIGATION" || \
+	fail 'mobile refresh icon must animate while refreshing'
+theme_action_line="$(grep -n 'onClick={onToggleTheme}' "$NAVIGATION" | cut -d: -f1)"
+refresh_action_line="$(grep -n 'onClick={onRefresh}' "$NAVIGATION" | cut -d: -f1)"
+menu_action_line="$(grep -n 'aria-controls="smartsafehub-mobile-menu"' "$NAVIGATION" | head -n 1 | cut -d: -f1)"
+[ "$theme_action_line" -lt "$refresh_action_line" ] && [ "$refresh_action_line" -lt "$menu_action_line" ] || \
+	fail 'mobile header actions must remain ordered as theme, refresh, then hamburger menu'
 grep -Fq 'class="ssh-mobile-navigation' "$NAVIGATION" || \
 	fail 'mobile navigation drawer must remain available'
 
