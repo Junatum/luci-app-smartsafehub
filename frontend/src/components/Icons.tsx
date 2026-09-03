@@ -180,6 +180,26 @@ export function KeyIcon(props: IconProps) {
   );
 }
 
+export function EyeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </IconBase>
+  );
+}
+
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m3 3 18 18" />
+      <path d="M10.6 6.2A8.8 8.8 0 0 1 12 6c6 0 9.5 6 9.5 6a15.5 15.5 0 0 1-2.6 3.2" />
+      <path d="M6.2 6.3C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a9.8 9.8 0 0 0 3.1-.5" />
+      <path d="M10.3 10.3a2.5 2.5 0 0 0 3.4 3.4" />
+    </IconBase>
+  );
+}
+
 export function CalendarIcon(props: IconProps) {
   return (
     <IconBase {...props}>

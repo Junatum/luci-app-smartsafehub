@@ -7,13 +7,14 @@ APP_SHELL="$ROOT_DIR/frontend/src/components/AppShell.tsx"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
 ICONS="$ROOT_DIR/frontend/src/components/Icons.tsx"
 STYLES="$ROOT_DIR/frontend/src/styles/app.css"
+THEME="$ROOT_DIR/frontend/src/utils/theme.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP_SHELL" "$NAVIGATION" "$ICONS" "$STYLES"; do
+for file in "$APP_SHELL" "$NAVIGATION" "$ICONS" "$STYLES" "$THEME"; do
 	[ -f "$file" ] || fail "missing frontend navigation source: ${file#$ROOT_DIR/}"
 done
 
@@ -23,10 +24,10 @@ grep -Fq 'window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)' "$APP_SHEL
 	fail 'AppShell must restore the collapsed sidebar preference'
 grep -Fq 'window.localStorage.setItem(' "$APP_SHELL" || \
 	fail 'AppShell must persist the collapsed sidebar preference'
-grep -Fq "const THEME_STORAGE_KEY = 'smartsafehub.theme';" "$APP_SHELL" || \
-	fail 'AppShell must define the persistent theme preference key'
-grep -Fq "window.matchMedia('(prefers-color-scheme: dark)')" "$APP_SHELL" || \
-	fail 'AppShell must use the system color preference as the initial theme'
+grep -Fq "export const THEME_STORAGE_KEY = 'smartsafehub.theme';" "$THEME" || \
+	fail 'theme utility must define the persistent theme preference key'
+grep -Fq "window.matchMedia('(prefers-color-scheme: dark)')" "$THEME" || \
+	fail 'theme utility must use the system color preference as the initial theme'
 grep -Fq 'data-theme={theme}' "$APP_SHELL" || \
 	fail 'AppShell must expose the active color theme'
 grep -Fq "'md:grid-cols-[5rem_minmax(0,1fr)]'" "$APP_SHELL" || \

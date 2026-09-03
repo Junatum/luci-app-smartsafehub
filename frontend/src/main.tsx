@@ -4,6 +4,7 @@ import { probeLuciSession } from './auth/session';
 import { App } from './app/App';
 import { LoginApp } from './login/LoginApp';
 import { luciUrl, smartSafeHubPublicUrl } from './utils/luci';
+import { applyDocumentTheme, readColorTheme } from './utils/theme';
 import './styles/app.css';
 
 const ENTRY_HOST_ID = 'smartsafehub-entry-root';
@@ -30,7 +31,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.8-r12',
+    assetVersion: host.dataset.assetVersion ?? '0.2.8-r13',
     locale: document.documentElement.lang || 'ko',
   });
 }
@@ -103,6 +104,8 @@ function renderLogin(host: HTMLElement, mountPoint: HTMLElement): void {
 }
 
 async function bootstrapEntry(): Promise<void> {
+  applyDocumentTheme(readColorTheme());
+
   const host = document.getElementById(ENTRY_HOST_ID);
 
   if (!host) {

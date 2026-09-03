@@ -6,13 +6,14 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 STATE_PANELS="$ROOT_DIR/frontend/src/components/StatePanels.tsx"
 APP_SHELL="$ROOT_DIR/frontend/src/components/AppShell.tsx"
 LOGIN_TEMPLATE="$ROOT_DIR/root/usr/share/ucode/luci/template/smartsafehub/login.ut"
+THEME="$ROOT_DIR/frontend/src/utils/theme.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$STATE_PANELS" "$APP_SHELL" "$LOGIN_TEMPLATE"; do
+for file in "$STATE_PANELS" "$APP_SHELL" "$LOGIN_TEMPLATE" "$THEME"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -40,9 +41,9 @@ grep -Fq '<meta name="description" content="SmartSafeHub에서 네트워크, Wi-
 	fail 'document must provide a product description'
 grep -Fq '<meta name="robots" content="noindex,nofollow,noarchive">' "$LOGIN_TEMPLATE" || \
 	fail 'router administration UI must opt out of search indexing'
-grep -Fq "'meta[name=\"theme-color\"]'" "$APP_SHELL" || \
-	fail 'AppShell must locate the theme-color metadata'
-grep -Fq "theme === 'dark' ? '#0f172a' : '#f8fafc'" "$APP_SHELL" || \
+grep -Fq "'meta[name=\"theme-color\"]'" "$THEME" || \
+	fail 'theme utility must locate the theme-color metadata'
+grep -Fq "theme === 'dark' ? '#0f172a' : '#f8fafc'" "$THEME" || \
 	fail 'theme-color metadata must follow the selected UI theme'
 
 echo 'PASS: document metadata and loading panel contracts are consistent'

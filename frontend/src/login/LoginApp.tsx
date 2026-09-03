@@ -5,7 +5,22 @@ import {
   authenticateLuciSession,
   luciSessionUrl,
 } from '../auth/session';
-import { KeyIcon, ShieldIcon, UserIcon, WifiIcon } from '../components/Icons';
+import {
+  EyeIcon,
+  EyeOffIcon,
+  KeyIcon,
+  MoonIcon,
+  ShieldIcon,
+  SunIcon,
+  UserIcon,
+  WifiIcon,
+} from '../components/Icons';
+import {
+  applyDocumentTheme,
+  persistColorTheme,
+  readColorTheme,
+} from '../utils/theme';
+import type { ColorTheme } from '../utils/theme';
 
 type LoginPhase = 'ready' | 'submitting';
 
@@ -36,8 +51,13 @@ function LoginFeature({
   );
 }
 
+function ThemeIcon({ theme }: { theme: ColorTheme }) {
+  return theme === 'dark' ? <SunIcon /> : <MoonIcon />;
+}
+
 export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
   const fallbackUrl = useMemo(luciSessionUrl, []);
+  const usernameInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
   const [username, setUsername] = useState('root');
   const [password, setPassword] = useState('');
@@ -46,8 +66,15 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
   const [showFallback, setShowFallback] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  const [theme, setTheme] = useState<ColorTheme>(readColorTheme);
 
   const busy = phase === 'submitting';
+  const themeLabel = theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환';
+
+  useEffect(() => {
+    persistColorTheme(theme);
+    applyDocumentTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (probing) {
@@ -73,9 +100,15 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
 
     if (!user || !secret) {
       setError('사용자 이름과 비밀번호를 입력해 주세요.');
-      if (user) {
+
+      window.requestAnimationFrame(() => {
+        if (!user) {
+          usernameInput.current?.focus();
+          return;
+        }
+
         passwordInput.current?.focus();
-      }
+      });
       return;
     }
 
@@ -106,7 +139,7 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
   };
 
   return (
-    <main class="ssh-login-page">
+    <main class="ssh-login-page" data-theme={theme}>
       <section class="ssh-login-brand" aria-labelledby="ssh-login-brand-title">
         <div class="ssh-login-brand-orb ssh-login-brand-orb-one" aria-hidden="true" />
         <div class="ssh-login-brand-orb ssh-login-brand-orb-two" aria-hidden="true" />
@@ -118,31 +151,41 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
           <p class="ssh-login-eyebrow">SMART NETWORK PROTECTION</p>
           <h1 id="ssh-login-brand-title">SmartSafeHub</h1>
           <p class="ssh-login-brand-description">
-            가족의 인터넷을 더 안전하고 간편하게 관리하세요. 보호 상태부터 Wi-Fi와
-            연결 기기까지 한 곳에서 확인할 수 있습니다.
+            네트워크와 보안을 하나의 허브에서 관리하세요. SafeShield 보호 상태부터
+            Wi-Fi와 연결 기기까지 로컬에서 빠르게 확인할 수 있습니다.
           </p>
 
           <div class="ssh-login-features" aria-label="SmartSafeHub 주요 기능">
             <LoginFeature
-              description="DNS 기반 보호와 로컬 차단 규칙을 빠르게 관리합니다."
+              description="DNS 기반 광고·피싱 차단과 사용자 보호 정책을 관리합니다."
               icon={<ShieldIcon />}
               title="SafeShield 보호"
             />
             <LoginFeature
-              description="무선 네트워크와 연결된 기기의 상태를 쉽게 확인합니다."
+              description="Wi-Fi 설정과 현재 연결된 기기의 상태를 한눈에 확인합니다."
               icon={<WifiIcon />}
-              title="간편한 네트워크 관리"
+              title="네트워크 관리"
             />
             <LoginFeature
-              description="현재 공유기의 LuCI 인증과 세션 정책을 그대로 사용합니다."
+              description="관리 기능과 인증은 현재 SmartSafeHub 장치에서 직접 처리됩니다."
               icon={<KeyIcon />}
-              title="장치 내 인증"
+              title="로컬 우선 관리"
             />
           </div>
         </div>
       </section>
 
       <section class="ssh-login-panel" aria-labelledby="ssh-login-title">
+        <button
+          aria-label={themeLabel}
+          class="ssh-login-theme-toggle"
+          onClick={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+          title={themeLabel}
+          type="button"
+        >
+          <ThemeIcon theme={theme} />
+        </button>
+
         <div class="ssh-login-panel-inner">
           {probing ? (
             <div class="ssh-login-probe" role="status" aria-live="polite">
@@ -152,15 +195,21 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
             </div>
           ) : (
             <div class="ssh-login-card">
-              <span class="ssh-login-mobile-mark" aria-hidden="true">
-                <ShieldIcon />
-              </span>
-              <p class="ssh-login-kicker">SmartSafeHub 관리</p>
-              <h2 id="ssh-login-title">다시 오신 것을 환영합니다</h2>
-              <p class="ssh-login-subtitle">공유기 관리 계정으로 로그인해 주세요.</p>
+              <div class="ssh-login-card-heading">
+                <span class="ssh-login-mobile-mark" aria-hidden="true">
+                  <ShieldIcon />
+                </span>
+                <div>
+                  <p class="ssh-login-kicker">SMARTSAFEHUB ACCESS</p>
+                  <h2 id="ssh-login-title">SmartSafeHub에 로그인</h2>
+                  <p class="ssh-login-subtitle">
+                    공유기 관리자 계정의 사용자 이름과 비밀번호를 입력해 주세요.
+                  </p>
+                </div>
+              </div>
 
               {error ? (
-                <div class="ssh-login-alert" role="alert" aria-live="polite">
+                <div class="ssh-login-alert" id="ssh-login-error" role="alert" aria-live="polite">
                   {error}
                 </div>
               ) : null}
@@ -175,7 +224,10 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
                       autoComplete="username"
                       disabled={busy}
                       id="smartsafehub-username"
+                      name="username"
                       onInput={(event) => setUsername(event.currentTarget.value)}
+                      placeholder="관리자 계정"
+                      ref={usernameInput}
                       required
                       spellcheck={false}
                       type="text"
@@ -192,10 +244,12 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
                       autoComplete="current-password"
                       disabled={busy}
                       id="smartsafehub-password"
+                      name="password"
                       onBlur={() => setCapsLock(false)}
                       onInput={(event) => setPassword(event.currentTarget.value)}
                       onKeyDown={updateCapsLock}
                       onKeyUp={updateCapsLock}
+                      placeholder="관리자 비밀번호"
                       ref={passwordInput}
                       required
                       type={showPassword ? 'text' : 'password'}
@@ -210,9 +264,10 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
                         setShowPassword((visible) => !visible);
                         window.requestAnimationFrame(() => passwordInput.current?.focus());
                       }}
+                      title={showPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
                       type="button"
                     >
-                      {showPassword ? '숨김' : '보기'}
+                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                     </button>
                   </span>
                 </label>
@@ -231,7 +286,7 @@ export function LoginApp({ onAuthenticated, probing = false }: LoginAppProps) {
 
               <div class="ssh-login-security-note">
                 <ShieldIcon aria-hidden="true" />
-                <span>인증 정보는 현재 공유기의 LuCI 세션 경로로만 전송됩니다.</span>
+                <span>입력한 계정 정보는 현재 공유기의 LuCI 인증 경로로만 전송됩니다.</span>
               </div>
 
               {showFallback ? (

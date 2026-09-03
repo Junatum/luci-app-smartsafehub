@@ -3,13 +3,12 @@ import { useEffect, useState } from 'preact/hooks';
 
 import { ROUTE_BY_NAME } from '../app/routes';
 import type { AppRoute } from '../app/routes';
+import { applyDocumentTheme, persistColorTheme, readColorTheme } from '../utils/theme';
+import type { ColorTheme } from '../utils/theme';
 import { ProductHeader } from './ProductHeader';
 import { ProductNavigation } from './ProductNavigation';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'smartsafehub.sidebar.collapsed';
-const THEME_STORAGE_KEY = 'smartsafehub.theme';
-
-type ColorTheme = 'dark' | 'light';
 
 interface AppShellProps {
   children: ComponentChildren;
@@ -30,26 +29,6 @@ function readSidebarCollapsed(): boolean {
   } catch {
     return false;
   }
-}
-
-function readColorTheme(): ColorTheme {
-  if (typeof window === 'undefined') {
-    return 'light';
-  }
-
-  try {
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-
-    if (storedTheme === 'dark' || storedTheme === 'light') {
-      return storedTheme;
-    }
-  } catch {
-    // Storage can be unavailable in privacy-restricted browser contexts.
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
 }
 
 export function AppShell({
@@ -76,19 +55,8 @@ export function AppShell({
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      // Storage can be unavailable in privacy-restricted browser contexts.
-    }
-
-    const themeColor = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]',
-    );
-
-    if (themeColor) {
-      themeColor.content = theme === 'dark' ? '#0f172a' : '#f8fafc';
-    }
+    persistColorTheme(theme);
+    applyDocumentTheme(theme);
   }, [theme]);
 
   return (
