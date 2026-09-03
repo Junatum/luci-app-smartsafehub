@@ -186,7 +186,7 @@ function WifiNetworkCard({
         <label class="block">
           <span class="text-sm font-extrabold text-slate-800">보안 방식</span>
           <select
-            class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
+            class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
             disabled={busy}
             onChange={(event) => {
               const next = event.currentTarget.value as WifiSecurityChoice;

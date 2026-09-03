@@ -22,6 +22,13 @@ grep -Fq 'shadow-inner' "$WIFI_PAGE" || \
 grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$WIFI_PAGE" || \
 	fail 'Wi-Fi text inputs must use the shared teal focus treatment'
 
+# Wi-Fi security select should use the same visual surface as text inputs.
+grep -Fq 'cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold' "$WIFI_PAGE" || \
+	fail 'Wi-Fi security select must use the emphasized form-control surface'
+
+grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$WIFI_PAGE" || \
+	fail 'Wi-Fi security select must use the shared teal focus treatment'
+
 # Connected-device search follows the same search-input and icon alignment contract as custom rules.
 grep -Fq 'absolute inset-y-0 left-0 flex w-11 items-center justify-center' "$DEVICES_PAGE" || \
 	fail 'connected-device search icon must use a vertically centered flex wrapper'

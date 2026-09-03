@@ -8,6 +8,7 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 ### 수정
 
+- Wi-Fi 보안 방식 선택 상자에도 SSID/비밀번호 입력과 동일한 2px 테두리, 배경 대비, inset shadow와 teal focus 상태를 적용해 form control 표현을 통일했습니다.
 - Wi-Fi의 SSID/비밀번호 입력 필드와 연결된 기기 검색창에도 사용자 규칙과 동일한 2px 테두리, 배경 대비, inset shadow와 teal focus 상태를 적용해 text input 표현을 통일했습니다.
 - 연결된 기기 검색창의 돋보기 아이콘을 transform 기반 위치 계산 대신 고정 폭 flex 래퍼로 수직 중앙 정렬했습니다.
 - 사용자 규칙의 새 도메인 입력 필드에 SafeShield 라이선스 입력과 동일한 2px 테두리, 배경 대비, inset shadow와 focus 상태를 적용해 입력 필드임을 더 명확하게 표시합니다.
