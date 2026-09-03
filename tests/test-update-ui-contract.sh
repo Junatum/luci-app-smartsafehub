@@ -4,14 +4,15 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 UPDATES_CARD="$ROOT_DIR/frontend/src/components/SoftwareUpdatesCard.tsx"
-SYSTEM_PAGE="$ROOT_DIR/frontend/src/pages/SystemPage.tsx"
+UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
+SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$SYSTEM_PAGE"; do
+for file in "$UPDATES_CARD" "$UPDATE_PAGE" "$SETTINGS_PAGE"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -53,13 +54,15 @@ if grep -Fq '<p class="mt-1 mb-0 break-all text-xs text-slate-500">{item.name}</
 	fail 'internal package name must not be rendered in the product update UI'
 fi
 
-# The update experience should be the first primary section on the update/system page.
-update_line="$(grep -n '<SoftwareUpdatesCard' "$SYSTEM_PAGE" | head -n1 | cut -d: -f1)"
-system_line="$(grep -n '시스템 상태' "$SYSTEM_PAGE" | head -n1 | cut -d: -f1)"
-[ -n "$update_line" ] && [ -n "$system_line" ] || fail 'unable to locate update/system page hierarchy'
-[ "$update_line" -lt "$system_line" ] || fail 'software update section must appear before system status'
+# Update and device/system management are separate product pages.
+grep -Fq '<SoftwareUpdatesCard' "$UPDATE_PAGE" || \
+	fail 'update page must render the software update experience'
+if grep -Fq '시스템 상태' "$UPDATE_PAGE" || grep -Fq '시스템 관리' "$UPDATE_PAGE"; then
+	fail 'update page must not mix system status or management controls'
+fi
+grep -Fq '시스템 상태' "$SETTINGS_PAGE" || \
+	fail 'settings page must own system status'
+grep -Fq '시스템 관리' "$SETTINGS_PAGE" || \
+	fail 'settings page must own system management actions'
 
-grep -Fq '시스템 관리' "$SYSTEM_PAGE" || \
-	fail 'system management actions must be grouped under a dedicated section'
-
-echo 'PASS: product update summary, actions, form controls, switches and page hierarchy are consistent'
+echo 'PASS: product update summary, actions, form controls, switches and page separation are consistent'

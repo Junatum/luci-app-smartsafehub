@@ -9,6 +9,7 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
   '#safeshield': 'safeshield',
   '#rules': 'rules',
   '#system': 'system',
+  '#settings': 'settings',
 };
 
 function routeFromHash(): AppRoute {

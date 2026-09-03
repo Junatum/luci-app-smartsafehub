@@ -4,7 +4,8 @@ export type AppRoute =
   | 'devices'
   | 'safeshield'
   | 'rules'
-  | 'system';
+  | 'system'
+  | 'settings';
 
 export interface RouteDefinition {
   route: AppRoute;
@@ -54,8 +55,15 @@ export const ROUTES: readonly RouteDefinition[] = [
     route: 'system',
     hash: '#system',
     label: '업데이트',
-    title: '업데이트 및 시스템',
-    description: 'SmartSafeHub 소프트웨어 업데이트, 펌웨어, 진단과 시스템 작업을 관리합니다.',
+    title: '업데이트',
+    description: 'SmartSafeHub 소프트웨어 업데이트 상태와 자동 설치 일정을 관리합니다.',
+  },
+  {
+    route: 'settings',
+    hash: '#settings',
+    label: '설정',
+    title: '설정',
+    description: '시스템 상태를 확인하고 장치 관리와 고급 설정 진입점을 관리합니다.',
   },
 ] as const;
 

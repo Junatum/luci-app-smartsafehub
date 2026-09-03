@@ -83,7 +83,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - full Hub refresh와의 직렬화, debounce, 중복 apply 억제는 SafeShield 엔진이 담당
 - `safeshield.status.timestamps.last_local_apply`를 확인한 뒤 DNS 적용 완료로 표시
 
-### 업데이트 및 시스템
+### 업데이트
 
 - `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전 표시
 - 새 버전의 릴리즈 요약, 배포일과 섹션별 변경 사항 표시
@@ -91,15 +91,18 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치 설정
 - 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
 - 릴리즈 노트는 같은 SmartSafeHub 저장소 channel의 `releases/luci-app-smartsafehub/index.json`에서 릴리즈 순서를 확인한 뒤 현재 설치 버전 이후의 `<version>.json`을 표시용으로 사용하며, 일부 또는 전체 조회 실패가 업데이트 설치를 막지 않음
+
+### 설정
+
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
 - OpenWrt의 검증된 펌웨어 업그레이드·백업·복원 화면으로 이동
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
 - 진단 파일에는 호스트명, WAN IPv4와 Wi-Fi SSID가 포함될 수 있으므로 외부 전달 전 확인 필요
 - 명시적인 확인 절차가 포함된 공유기 재부팅
-- 기존 LuCI 고급 시스템 설정과 시스템 로그로 이동
+- SmartSafeHub에서 아직 제공하지 않는 항목만 설정 화면의 보조 동작을 통해 LuCI 고급 설정과 시스템 로그로 이동
 
-진단 파일은 시스템 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
+진단 파일은 설정 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
 
 ### 모바일 지원
 
@@ -114,7 +117,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 동일 리소스의 중복 RPC 요청을 single-flight 방식으로 합칩니다.
 - 폴링은 이전 요청이 완료된 다음 예약해 느린 공유기에서 요청이 겹치지 않습니다.
 - 숨겨진 브라우저 탭에서는 폴링을 멈추고 다시 보일 때 갱신합니다.
-- 메뉴를 다시 열면 해당 리소스를 새로 조회하고 홈·시스템 상태는 활성 상태에서 60초마다 갱신합니다.
+- 메뉴를 다시 열면 해당 리소스를 새로 조회하고 홈·설정의 시스템 상태는 활성 상태에서 60초마다 갱신합니다.
 - RPC는 기본 20초, Wi-Fi 변경은 35초 후 중단하며 JSON-RPC ID·결과·상태 코드 형식을 검증합니다.
 - 연결 기기 조회는 `network.wireless`에 station 정보가 없을 때만 hostapd를 추가 호출합니다.
 - Wi-Fi 변경 검증은 UCI 설정을 기준으로 수행해 불필요한 런타임 전체 조회를 피합니다.
@@ -404,7 +407,7 @@ ubus call smartsafehub wifi_summary '{}'
 ubus call smartsafehub connected_devices '{}'
 ```
 
-브라우저에서는 홈, Wi-Fi 조회·변경, Wi-Fi reload 뒤 상태 재조회, 연결 기기, SafeShield 상태·갱신, 사용자 규칙, 진단 다운로드, 메뉴 재진입 데이터 갱신, 다른 LuCI 화면 이동 뒤 폴링 종료, 자산 로드 실패 화면, 고급 설정 링크와 모바일 메뉴를 확인합니다. 재부팅은 테스트 장치에서만 실행합니다.
+브라우저에서는 홈, Wi-Fi 조회·변경, Wi-Fi reload 뒤 상태 재조회, 연결 기기, SafeShield 상태·갱신, 사용자 규칙, 진단 다운로드, 메뉴 재진입 데이터 갱신, 다른 LuCI 화면 이동 뒤 폴링 종료, 자산 로드 실패 화면, 설정 메뉴의 LuCI 보조 진입점과 모바일 메뉴를 확인합니다. 재부팅은 테스트 장치에서만 실행합니다.
 
 ## 버전 관리 원칙
 

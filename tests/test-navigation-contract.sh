@@ -95,6 +95,24 @@ menu_action_line="$(grep -n 'aria-controls="smartsafehub-mobile-menu"' "$NAVIGAT
 grep -Fq 'class="ssh-mobile-navigation' "$NAVIGATION" || \
 	fail 'mobile navigation drawer must remain available'
 
+
+ROUTES="$ROOT_DIR/frontend/src/app/routes.ts"
+HASH_ROUTE="$ROOT_DIR/frontend/src/hooks/useHashRoute.ts"
+
+grep -Fq "{ label: 'System', routes: ['system', 'settings'] }" "$NAVIGATION" || \
+	fail 'System navigation group must place settings directly below updates'
+grep -Fq "case 'settings':" "$NAVIGATION" || \
+	fail 'settings navigation item must have a dedicated icon'
+grep -Fq "route: 'settings'" "$ROUTES" || \
+	fail 'settings route must be registered'
+grep -Fq "hash: '#settings'" "$ROUTES" || \
+	fail 'settings route must expose the #settings hash'
+grep -Fq "'#settings': 'settings'" "$HASH_ROUTE" || \
+	fail 'hash router must resolve #settings'
+if grep -Fq "href={luciAdminUrl('/admin/system')}" "$NAVIGATION"; then
+	fail 'sidebar/mobile navigation must not expose a direct LuCI advanced-settings link'
+fi
+
 grep -Fq 'export function PanelLeftCloseIcon' "$ICONS" || \
 	fail 'collapsed navigation must provide a collapse icon'
 grep -Fq 'export function PanelLeftOpenIcon' "$ICONS" || \

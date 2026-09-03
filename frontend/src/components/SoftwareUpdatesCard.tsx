@@ -189,7 +189,7 @@ export function SoftwareUpdatesCard({
                   SmartSafeHub 업데이트
                 </h2>
                 <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-                  SmartSafeHub 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다. OpenWrt 펌웨어 전체 업그레이드는 아래 펌웨어 관리에서 별도로 진행합니다.
+                  SmartSafeHub 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다. OpenWrt 펌웨어 전체 업그레이드와 장치 관리는 설정 화면에서 진행합니다.
                 </p>
               </div>
             </div>

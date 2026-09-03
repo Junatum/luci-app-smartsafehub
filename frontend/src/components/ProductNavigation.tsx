@@ -41,7 +41,7 @@ const NAVIGATION_GROUPS: readonly {
   { label: 'Overview', routes: ['home'] },
   { label: 'Network', routes: ['wifi', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
-  { label: 'System', routes: ['system'] },
+  { label: 'System', routes: ['system', 'settings'] },
 ];
 
 function NavigationIcon({ route }: { route: AppRoute }) {
@@ -58,6 +58,8 @@ function NavigationIcon({ route }: { route: AppRoute }) {
       return <UserIcon class="size-5" />;
     case 'system':
       return <UpdateIcon class="size-5" />;
+    case 'settings':
+      return <SettingsIcon class="size-5" />;
   }
 }
 
@@ -238,12 +240,6 @@ export function ProductNavigation({
           <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
             <NavigationItems route={route} updateCount={updateCount} />
             <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
-              <a class={navigationClass(false)} href={luciAdminUrl('/admin/system')}>
-                <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                  <SettingsIcon class="size-5" />
-                </span>
-                고급 설정
-              </a>
               <a
                 class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
                 href={luciAdminUrl('/admin/logout')}
@@ -314,17 +310,6 @@ export function ProductNavigation({
             <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
-            <a
-              aria-label={collapsed ? '고급 설정' : undefined}
-              class={navigationClass(false, collapsed)}
-              href={luciAdminUrl('/admin/system')}
-              title={collapsed ? '고급 설정' : undefined}
-            >
-              <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                <SettingsIcon class="size-5" />
-              </span>
-              {collapsed ? null : '고급 설정'}
-            </a>
             <a
               aria-label="SmartSafeHub에서 로그아웃"
               class={`${navigationClass(false, collapsed)} mt-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800`}

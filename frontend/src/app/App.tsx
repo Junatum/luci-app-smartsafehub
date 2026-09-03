@@ -15,12 +15,13 @@ import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
-import { SystemPage } from '../pages/SystemPage';
+import { SettingsPage } from '../pages/SettingsPage';
+import { UpdatePage } from '../pages/UpdatePage';
 import { WifiPage } from '../pages/WifiPage';
 
 export function App() {
   const route = useHashRoute();
-  const status = useStatus(route === 'home' || route === 'system');
+  const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
@@ -45,7 +46,9 @@ export function App() {
           ? safeshield
           : route === 'rules'
             ? rules
-            : status;
+            : route === 'system'
+              ? updates
+              : status;
 
   let content: ComponentChildren;
 
@@ -78,7 +81,25 @@ export function App() {
 
     case 'system':
       content = (
-        <SystemPage
+        <UpdatePage
+          action={updates.action}
+          actionError={updates.actionError}
+          data={updates.data}
+          error={updates.error}
+          loading={updates.loading}
+          message={updates.message}
+          onCheck={() => void updates.check()}
+          onDismissFeedback={updates.dismissFeedback}
+          onInstall={() => void updates.install()}
+          onRetry={() => void updates.refresh()}
+          onSaveSettings={updates.saveSettings}
+        />
+      );
+      break;
+
+    case 'settings':
+      content = (
+        <SettingsPage
           action={systemActions.action}
           data={status.data}
           error={status.error}
@@ -90,17 +111,6 @@ export function App() {
           onReboot={() => void systemActions.reboot()}
           onRetry={() => void status.refresh()}
           rebootAccepted={systemActions.rebootAccepted}
-          updateAction={updates.action}
-          updateActionError={updates.actionError}
-          updateData={updates.data}
-          updateError={updates.error}
-          updateLoading={updates.loading}
-          updateMessage={updates.message}
-          onCheckUpdates={() => void updates.check()}
-          onDismissUpdateFeedback={updates.dismissFeedback}
-          onInstallUpdates={() => void updates.install()}
-          onRetryUpdates={() => void updates.refresh()}
-          onSaveUpdateSettings={updates.saveSettings}
         />
       );
       break;
@@ -194,7 +204,12 @@ export function App() {
     }
 
     if (route === 'system') {
-      void Promise.all([status.refresh(), updates.refresh()]);
+      void updates.refresh();
+      return;
+    }
+
+    if (route === 'settings') {
+      void status.refresh();
       return;
     }
 
@@ -217,7 +232,6 @@ export function App() {
             dashboardSafeShield.refreshing ||
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing)) ||
-        (route === 'system' && updates.refreshing) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}

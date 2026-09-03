@@ -186,7 +186,8 @@ Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 
 | `devices` | `#devices` | 연결된 기기 |
 | `safeshield` | `#safeshield` | SafeShield |
 | `rules` | `#rules` | 사용자 규칙 |
-| `system` | `#system` | 업데이트 및 시스템 |
+| `system` | `#system` | 업데이트 |
+| `settings` | `#settings` | 시스템 상태와 설정 |
 
 `App.tsx`는 route와 데이터 hook을 조합하는 composition root입니다.
 
@@ -197,7 +198,7 @@ AppShell.tsx
 ```
 
 - `ProductHeader`: 제품명, 화면 제목, 설명, 새로고침 버튼
-- `ProductNavigation`: 데스크톱·모바일 메뉴, 고급 설정, 로그아웃
+- `ProductNavigation`: 데스크톱·모바일 제품 메뉴와 로그아웃. LuCI 고급 설정 진입점은 `SettingsPage` 안에서만 제공
 - `AppShell`: 공통 제품 chrome과 페이지 콘텐츠 조합
 
 ### 4.4 데이터 계층
@@ -261,7 +262,7 @@ SafeShield 상세 상태는 기존 `safeshield.status`의 원시 응답을 프�
 - `document.visibilityState === 'hidden'`이면 타이머 중단
 - 탭이 다시 표시되면 즉시 한 번 갱신한 뒤 폴링 재개
 - unmount 후 상태 변경 방지
-- 홈·시스템 상태는 활성 상태에서 60초 간격으로 갱신
+- 홈·설정의 시스템 상태는 활성 상태에서 60초 간격으로 갱신
 
 이 구조는 CPU와 네트워크가 느린 공유기에서 요청이 누적되는 문제를 방지합니다.
 
@@ -270,7 +271,7 @@ SafeShield 상세 상태는 기존 `safeshield.status`의 원시 응답을 프�
 진단은 프런트엔드 `useSystemActions()`에서 생성합니다.
 
 ```text
-SystemPage에 이미 로드된 smartsafehub.status
+SettingsPage에 이미 로드된 smartsafehub.status
         │
         ├─ Promise.allSettled(smartsafehub.wifi_summary)
         └─ Promise.allSettled(safeshield.status)
@@ -466,7 +467,7 @@ SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 ### 7.1 장치 상태
 
 ```text
-HomePage 또는 SystemPage
+HomePage 또는 SettingsPage
   → useStatus
   → fetchStatus
   → smartsafehub.status
@@ -542,7 +543,7 @@ SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지�
 ### 7.6 진단 파일
 
 ```text
-SystemPage의 기존 system snapshot
+SettingsPage의 기존 system snapshot
   → wifi_summary와 safeshield.status 병렬 호출
   → fulfilled 결과만 사용
   → 실패 섹션은 unavailable 기본값
