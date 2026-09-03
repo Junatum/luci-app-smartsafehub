@@ -304,9 +304,11 @@ export function ConnectedDevicesPage({
           </div>
           <label class="relative block w-full lg:max-w-sm">
             <span class="sr-only">기기 검색</span>
-            <SearchIcon class="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-slate-400" />
+            <span class="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-slate-400">
+              <SearchIcon class="size-5" />
+            </span>
             <input
-              class="min-h-11 w-full rounded-xl border border-slate-300 bg-white pr-4 pl-11 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+              class="min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100"
               onInput={(event: JSX.TargetedEvent<HTMLInputElement>) =>
                 setQuery(event.currentTarget.value)
               }

@@ -165,7 +165,7 @@ function RuleListCard({
               aria-describedby={validationError ? `${kind}-domain-error` : undefined}
               aria-invalid={validationError ? true : undefined}
               autocomplete="off"
-              class="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
+              class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
               disabled={busy}
               id={`${kind}-domain`}
               onInput={(event: JSX.TargetedEvent<HTMLInputElement, InputEvent>) =>
@@ -198,9 +198,11 @@ function RuleListCard({
       <div class="p-4 sm:p-6">
         <label class="relative block" for={`${kind}-search`}>
           <span class="sr-only">{theme.label} 검색</span>
-          <SearchIcon class="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-slate-400" />
+          <span class="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-slate-400">
+            <SearchIcon class="size-4" />
+          </span>
           <input
-            class="min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pr-3.5 pl-10 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100"
+            class="min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100"
             id={`${kind}-search`}
             onInput={(event: JSX.TargetedEvent<HTMLInputElement, InputEvent>) =>
               setSearch(event.currentTarget.value)

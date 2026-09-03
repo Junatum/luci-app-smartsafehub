@@ -175,7 +175,7 @@ function WifiNetworkCard({
           <span class="text-sm font-extrabold text-slate-800">Wi-Fi 이름 (SSID)</span>
           <input
             autocomplete="off"
-            class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
+            class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
             disabled={busy}
             maxLength={32}
             onInput={(event) => setSsid(event.currentTarget.value)}
@@ -215,7 +215,7 @@ function WifiNetworkCard({
           <span class="text-sm font-extrabold text-slate-800">새 비밀번호</span>
           <input
             autocomplete="new-password"
-            class="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:bg-slate-100"
+            class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
             disabled={busy || security === 'none' || keepsCustomSecurity}
             onInput={(event) => setPassword(event.currentTarget.value)}
             placeholder={
