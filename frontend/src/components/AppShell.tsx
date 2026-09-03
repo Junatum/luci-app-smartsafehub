@@ -81,6 +81,14 @@ export function AppShell({
     } catch {
       // Storage can be unavailable in privacy-restricted browser contexts.
     }
+
+    const themeColor = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+
+    if (themeColor) {
+      themeColor.content = theme === 'dark' ? '#0f172a' : '#f8fafc';
+    }
   }, [theme]);
 
   return (
@@ -109,7 +117,13 @@ export function AppShell({
           refreshing={refreshing}
           title={copy.title}
         />
-        <main class="ssh-product-main mx-auto w-full max-w-[1600px] bg-slate-50 px-4 pb-8 pt-5 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 lg:pt-8 xl:px-10">
+        <main
+          class={`ssh-product-main mx-auto w-full max-w-[1600px] bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8 lg:pb-12 xl:px-10 ${
+            loading
+              ? 'pt-2 sm:pt-2 lg:pt-3'
+              : 'pt-5 sm:pt-6 lg:pt-8'
+          }`}
+        >
           {children}
         </main>
       </div>

@@ -9,6 +9,7 @@ PACKAGE_LOCK="$ROOT_DIR/frontend/package-lock.json"
 CONFIG_FILE="$ROOT_DIR/root/etc/config/smartsafehub"
 LOGIN_TEMPLATE="$ROOT_DIR/root/usr/share/ucode/luci/template/smartsafehub/login.ut"
 FRONTEND_ENTRY="$ROOT_DIR/frontend/src/main.tsx"
+FAVICON_FILE="$ROOT_DIR/root/www/luci-static/smartsafehub/favicon.svg"
 
 fail() {
 	echo "FAIL: $*" >&2
@@ -34,12 +35,14 @@ require_file "$PACKAGE_LOCK"
 require_file "$CONFIG_FILE"
 require_file "$LOGIN_TEMPLATE"
 require_file "$FRONTEND_ENTRY"
+require_file "$FAVICON_FILE"
 
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 require_executable "$ROOT_DIR/tests/run.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
 require_executable "$ROOT_DIR/tests/test-package-contract.sh"
+require_executable "$ROOT_DIR/tests/test-document-ui-contract.sh"
 require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 
@@ -69,6 +72,10 @@ grep -Fq "data-asset-version=\"$package_release_version\"" "$LOGIN_TEMPLATE" || 
 	fail "login template asset version must be $package_release_version"
 grep -Fq "app.js?v=$package_release_version" "$LOGIN_TEMPLATE" || \
 	fail "login template app.js cache key must be $package_release_version"
+grep -Fq 'rel="icon" type="image/svg+xml"' "$LOGIN_TEMPLATE" || \
+	fail 'login template must register the SmartSafeHub SVG favicon'
+grep -Fq "favicon.svg?v=$package_release_version" "$LOGIN_TEMPLATE" || \
+	fail "favicon cache key must be $package_release_version"
 grep -Fq "assetVersion: host.dataset.assetVersion ?? '$package_release_version'" "$FRONTEND_ENTRY" || \
 	fail "frontend fallback asset version must be $package_release_version"
 

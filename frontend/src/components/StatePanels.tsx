@@ -5,15 +5,19 @@ export function LoadingPanel() {
     <section
       aria-busy="true"
       aria-live="polite"
-      class="rounded-2xl border border-slate-200 bg-white p-5 text-center sm:p-8 shadow-sm shadow-slate-900/5"
+      class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
     >
-      <span class="mx-auto block size-9 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
-      <h2 class="mt-5 mb-0 text-lg font-extrabold text-slate-950">
-        장치 상태를 확인하고 있습니다
-      </h2>
-      <p class="mt-2 mb-0 text-sm text-slate-600">
-        OpenWrt의 rpcd API에서 정보를 불러오는 중입니다.
-      </p>
+      <div class="flex items-center gap-4">
+        <span class="block size-8 shrink-0 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
+        <div class="min-w-0 text-left">
+          <h2 class="m-0 text-lg font-extrabold text-slate-950">
+            장치 상태를 확인하고 있습니다
+          </h2>
+          <p class="mt-1 mb-0 text-sm leading-6 text-slate-600">
+            OpenWrt의 rpcd API에서 정보를 불러오는 중입니다.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }

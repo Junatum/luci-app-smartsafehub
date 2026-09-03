@@ -4,6 +4,23 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.8-r10] - 2026-09-03
+
+### 추가
+
+- 브라우저 탭과 북마크에서 SmartSafeHub를 식별할 수 있도록 제품 로고의 shield/check 디자인을 재사용한 SVG favicon을 추가했습니다.
+- 로그인 전/후 동일한 SmartSafeHub 문서에서 favicon이 적용되도록 public entry template의 `<head>`에 favicon을 등록하고 패키지 revision 기반 cache key를 적용했습니다.
+
+### 변경
+
+- `LoadingPanel`을 spinner 위주의 세로 레이아웃에서 compact 가로 레이아웃으로 변경해 로딩 문구 위에 과도한 공간이 생기던 문제를 수정했습니다.
+- public entry template에 SmartSafeHub 설명, application name, 검색 엔진 비노출 정책과 light/dark color scheme 메타데이터를 추가했습니다.
+- 브라우저의 주소창/탭 UI가 현재 SmartSafeHub 테마와 자연스럽게 어울리도록 `theme-color`를 추가하고 앱의 Light/Dark Mode 전환과 동기화했습니다.
+
+### 테스트
+
+- LoadingPanel의 compact layout과 필수 document metadata 및 theme-color 동기화를 contract 테스트로 검증합니다.
+
 ## [0.2.8-r9] - 2026-09-03
 
 ### 변경

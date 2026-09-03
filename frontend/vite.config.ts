@@ -10,6 +10,7 @@ const outputDirectory = fileURLToPath(
 
 export default defineConfig({
   base: '/luci-static/smartsafehub/',
+  publicDir: 'public',
   plugins: [preact(), tailwindcss()],
   build: {
     target: 'es2020',
