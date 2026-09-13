@@ -30,7 +30,7 @@ grep -Fq "if (route === 'settings')" "$APP" || fail 'settings refresh branch mus
 grep -Fq 'void status.refresh();' "$APP" || fail 'settings refresh must refresh system state'
 
 grep -Fq "label: '설정'" "$ROUTES" || fail 'settings route must be visible in product navigation'
-grep -Fq "description: '기기의 펌웨어와 SmartSafeHub 소프트웨어 업데이트를 관리합니다.'" "$ROUTES" || \
+grep -Fq "description: '기기의 펌웨어와 관리 소프트웨어 업데이트를 관리합니다.'" "$ROUTES" || \
 	fail 'update route description must be update-only'
 
 grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \

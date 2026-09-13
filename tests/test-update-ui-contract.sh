@@ -22,9 +22,14 @@ for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD"
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
-# Update status should read as a product summary instead of a package-manager panel.
-grep -Fq 'SmartSafeHub 업데이트' "$UPDATES_CARD" || \
-	fail 'software update card must use the SmartSafeHub product heading'
+# Firmware and management software must read as separate update products.
+grep -Fq '관리 소프트웨어 업데이트' "$UPDATES_CARD" || \
+	fail 'software update card must use the management-software product heading'
+grep -Fq 'Management software' "$UPDATES_CARD" || \
+	fail 'software update card must use the management-software eyebrow'
+if grep -Fq '>SmartSafeHub 업데이트</h2>' "$UPDATES_CARD"; then
+	fail 'SmartSafeHub product name must not be used as the software update category heading'
+fi
 for label in Installed Available 'Last check' 'Auto install'; do
 	grep -Fq "$label" "$UPDATES_CARD" || \
 		fail "update summary must include $label"
@@ -40,23 +45,36 @@ fi
 grep -Fq '업데이트 설치' "$UPDATES_CARD" || \
 	fail 'update card must provide an explicit install action'
 
-# Desktop should use the available width for software status and settings without making every card full-width.
-grep -Fq "grid xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" "$UPDATES_CARD" || \
-	fail 'software update area must become a two-column layout on wide screens'
+# Management-software status and automatic settings belong to one responsive card.
+grep -Fq 'data-component="management-software-update-card"' "$UPDATES_CARD" || \
+	fail 'management software must render as one product card'
+grep -Fq 'data-layout="management-software-sections"' "$UPDATES_CARD" || \
+	fail 'management software card must declare its responsive status/settings layout'
+grep -Fq "xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" "$UPDATES_CARD" || \
+	fail 'management software card must become a two-column layout on wide screens'
 grep -Fq 'data-section="software-update-status"' "$UPDATES_CARD" || \
-	fail 'software update status card must remain a distinct responsive section'
+	fail 'management software card must contain a current-status section'
+grep -Fq '>현재 상태</h3>' "$UPDATES_CARD" || \
+	fail 'management software status section must have a customer-facing title'
 grep -Fq 'data-section="software-update-settings"' "$UPDATES_CARD" || \
-	fail 'software automatic-update settings must remain a distinct responsive section'
-grep -Fq '>SmartSafeHub 자동 업데이트</h3>' "$UPDATES_CARD" || \
-	fail 'automatic update settings must clearly identify the SmartSafeHub scope'
-grep -Fq 'data-section="software-update-scope"' "$UPDATES_CARD" || \
-	fail 'automatic update settings must include an explicit scope notice'
-grep -Fq '이 설정은 SmartSafeHub 업데이트에만 적용됩니다. 펌웨어는 자동으로 설치되지 않습니다.' "$UPDATES_CARD" || \
-	fail 'automatic update settings must explicitly exclude firmware auto-install'
-software_result_line="$(grep -n -m1 'data-section="software-update-result"' "$UPDATES_CARD" | cut -d: -f1)"
-software_card_close_line="$(grep -n -m1 '</article>' "$UPDATES_CARD" | cut -d: -f1)"
-[ "$software_result_line" -lt "$software_card_close_line" ] || \
-	fail 'software update result must stay inside the SmartSafeHub update card'
+	fail 'management software card must contain automatic-update settings'
+grep -Fq '>자동 업데이트</h3>' "$UPDATES_CARD" || \
+	fail 'automatic update can use the short title only inside the management-software card'
+if grep -Fq 'data-section="software-update-scope"' "$UPDATES_CARD"; then
+	fail 'scope warning should not be needed once automatic update is nested under management software'
+fi
+if grep -Fq 'SmartSafeHub 자동 업데이트' "$UPDATES_CARD"; then
+	fail 'automatic update title must not reuse the SmartSafeHub product name as an update category'
+fi
+software_status_line="$(grep -n -m1 'data-section="software-update-status"' "$UPDATES_CARD" | cut -d: -f1)"
+software_settings_line="$(grep -n -m1 'data-section="software-update-settings"' "$UPDATES_CARD" | cut -d: -f1)"
+software_card_close_line="$(grep -n '</article>' "$UPDATES_CARD" | tail -1 | cut -d: -f1)"
+[ "$software_status_line" -lt "$software_settings_line" ] || \
+	fail 'management software status must precede automatic-update settings'
+[ "$software_settings_line" -lt "$software_card_close_line" ] || \
+	fail 'automatic-update settings must stay inside the management-software card'
+grep -Fq 'data-section="software-update-result"' "$UPDATES_CARD" || \
+	fail 'management software card must keep the latest/not-checked result inline'
 
 # Busy update work should have persistent visual feedback rather than relying on hover text.
 grep -Fq "const installing = action === 'install' || data?.phase === 'installing';" "$UPDATES_CARD" || \
@@ -213,8 +231,8 @@ firmware_line="$(grep -n -m1 '<FirmwareUpdatesCard' "$UPDATE_PAGE" | cut -d: -f1
 software_line="$(grep -n -m1 '<SoftwareUpdatesCard' "$UPDATE_PAGE" | cut -d: -f1)"
 [ "$firmware_line" -lt "$software_line" ] || \
 	fail 'firmware update must be shown before SmartSafeHub software updates'
-grep -Fq '>펌웨어</h2>' "$FIRMWARE_CARD" || \
-	fail 'firmware card must use the customer-facing firmware heading'
+grep -Fq '>펌웨어 업데이트</h2>' "$FIRMWARE_CARD" || \
+	fail 'firmware card must use the customer-facing firmware-update heading'
 if grep -Fq 'OpenWrt 펌웨어' "$FIRMWARE_CARD"; then
 	fail 'firmware card must not expose OpenWrt as the customer-facing firmware product name'
 fi

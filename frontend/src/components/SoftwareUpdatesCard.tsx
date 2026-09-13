@@ -82,7 +82,7 @@ function updateErrorSummary(error: SoftwareUpdateError): { title: string; descri
 
   if (error.code === 'UPDATES_INSTALL_FAILED') {
     return {
-      title: 'SmartSafeHub 업데이트 설치에 실패했습니다.',
+      title: '관리 소프트웨어 업데이트 설치에 실패했습니다.',
       description:
         '패키지 설치가 완료되지 않았습니다. 네트워크 연결과 저장 공간을 확인한 뒤 다시 시도해 주세요.',
     };
@@ -230,8 +230,12 @@ export function SoftwareUpdatesCard({
   };
 
   return (
-    <div class={`min-w-0 gap-4 ${data ? 'grid xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : 'space-y-4'}`}>
-      <article class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5" data-section="software-update-status">
+    <article
+      class={`min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5 ${data ? 'grid xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : ''}`}
+      data-component="management-software-update-card"
+      data-layout="management-software-sections"
+    >
+      <section class="min-w-0 xl:col-start-1 xl:row-start-1" data-section="software-update-status">
         <div class="p-5 sm:p-6">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div class="flex min-w-0 gap-4">
@@ -241,7 +245,7 @@ export function SoftwareUpdatesCard({
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-                    Software update
+                    Management software
                   </p>
                   {data ? (
                     <span
@@ -253,10 +257,10 @@ export function SoftwareUpdatesCard({
                   ) : null}
                 </div>
                 <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">
-                  SmartSafeHub 업데이트
+                  관리 소프트웨어 업데이트
                 </h2>
                 <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-                  SmartSafeHub 관리 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.
+                  SmartSafeHub 관리 화면과 관련 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.
                 </p>
               </div>
             </div>
@@ -323,7 +327,7 @@ export function SoftwareUpdatesCard({
                 </span>
                 <div class="min-w-0">
                   <h3 class="m-0 text-sm font-black text-sky-950">
-                    업데이트를 설치하고 있습니다.
+                    관리 소프트웨어를 업데이트하고 있습니다.
                   </h3>
                   <p class="mt-1 mb-0 text-sm leading-6 text-sky-800">
                     설치가 완료되면 이 화면이 자동으로 갱신됩니다. 작업 중에는 웹 연결이 잠시 끊길 수 있습니다.
@@ -355,7 +359,7 @@ export function SoftwareUpdatesCard({
               <span class="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-teal-700 ring-1 ring-inset ring-slate-200">
                 <ReloadIcon aria-hidden="true" class="size-4 animate-spin" />
               </span>
-              <span>업데이트 상태를 확인하고 있습니다.</span>
+              <span>관리 소프트웨어 업데이트 상태를 확인하고 있습니다.</span>
             </div>
           ) : data ? (
             <>
@@ -400,10 +404,10 @@ export function SoftwareUpdatesCard({
                 <div class="mt-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <strong class="block text-sm font-black text-amber-900">
-                      SmartSafeHub를 지금 업데이트할까요?
+                      관리 소프트웨어를 지금 업데이트할까요?
                     </strong>
                     <span class="mt-1 block text-xs leading-5 text-amber-800">
-                      설치 중 웹 화면 연결이 잠시 끊길 수 있습니다.
+                      설치 중 SmartSafeHub 웹 화면 연결이 잠시 끊길 수 있습니다.
                     </span>
                   </div>
                   <div class="flex shrink-0 gap-2">
@@ -435,6 +439,7 @@ export function SoftwareUpdatesCard({
 
         {data ? (
           <div class="px-5 pb-5 sm:px-6 sm:pb-6">
+            <h3 class="mb-3 text-sm font-black text-slate-950">현재 상태</h3>
             <dl class="grid overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2">
               <div class="bg-white p-4">
                 <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -525,100 +530,12 @@ export function SoftwareUpdatesCard({
             </div>
           </section>
         ) : null}
-      </article>
+      </section>
 
       {data ? (
         <>
-          {data.updateCount > 0 ? (
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:col-start-1">
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <div>
-                  <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-                    Release notes
-                  </p>
-                  <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">업데이트 내용</h3>
-                  <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-                    현재 설치된 버전 이후 포함되는 주요 변경 사항입니다.
-                  </p>
-                </div>
-                {data.releaseNotes.length ? (
-                  <span class="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600">
-                    {data.releaseNotes.length === 1
-                      ? '1개 릴리즈'
-                      : `${data.releaseNotes.length}개 릴리즈`}
-                  </span>
-                ) : null}
-              </div>
-
-              {data.releaseNotes.length ? (
-                <div class="mt-5 grid gap-3">
-                  {data.releaseNotes.map((releaseNote) => (
-                    <article
-                      class="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
-                      key={releaseNote.version}
-                    >
-                      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <strong class="break-all text-sm font-black text-slate-950">
-                          {releaseNote.version}
-                        </strong>
-                        {releaseNote.date ? (
-                          <span class="text-xs font-bold text-slate-500">
-                            {releaseNote.date}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {releaseNote.summary ? (
-                        <p class="mt-3 mb-0 text-sm leading-6 text-slate-700">
-                          {releaseNote.summary}
-                        </p>
-                      ) : null}
-
-                      {releaseNote.sections.length ? (
-                        <details
-                          class="mt-4 rounded-lg border border-slate-200 bg-white p-3"
-                          open={data.releaseNotes.length === 1}
-                        >
-                          <summary class="cursor-pointer text-xs font-extrabold text-slate-800">
-                            자세한 변경 사항
-                          </summary>
-                          <div class="mt-3 grid gap-4">
-                            {releaseNote.sections.map((section) => (
-                              <section key={`${releaseNote.version}-${section.title}`}>
-                                <h4 class="m-0 text-xs font-extrabold text-slate-700">
-                                  {section.title}
-                                </h4>
-                                <ul class="mt-2 mb-0 space-y-1.5 pl-5 text-xs leading-5 text-slate-600">
-                                  {section.items.map((item, index) => (
-                                    <li key={`${releaseNote.version}-${section.title}-${index}`}>
-                                      {item}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </section>
-                            ))}
-                          </div>
-                        </details>
-                      ) : null}
-                    </article>
-                  ))}
-
-                  {!data.releaseNotesComplete ? (
-                    <p class="m-0 rounded-xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
-                      일부 릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                <p class="mt-4 mb-0 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                  릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
-                </p>
-              )}
-            </section>
-          ) : null}
-
           <section
-            class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-start"
+            class="min-w-0 border-t border-slate-200 p-5 sm:p-6 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-stretch xl:border-t-0 xl:border-l"
             data-section="software-update-settings"
           >
             <div class="flex gap-4">
@@ -629,19 +546,12 @@ export function SoftwareUpdatesCard({
                 <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
                   Settings
                 </p>
-                <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">SmartSafeHub 자동 업데이트</h3>
+                <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">자동 업데이트</h3>
                 <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-                  SmartSafeHub 관리 소프트웨어의 업데이트 확인 및 자동 설치를 설정합니다.
+                  관리 소프트웨어의 자동 확인과 자동 설치를 설정합니다.
                 </p>
               </div>
             </div>
-
-            <p
-              class="mt-5 mb-0 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-xs font-bold leading-5 text-teal-800"
-              data-section="software-update-scope"
-            >
-              이 설정은 SmartSafeHub 업데이트에만 적용됩니다. 펌웨어는 자동으로 설치되지 않습니다.
-            </p>
 
             <div class="mt-4 grid gap-4 lg:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-4 sm:p-5 lg:col-span-2">
@@ -649,7 +559,7 @@ export function SoftwareUpdatesCard({
                   <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">업데이트 채널</strong>
                     <span class="mt-1 block text-xs leading-5 text-slate-500">
-                      현재 SmartSafeHub 업데이트를 확인하는 배포 채널입니다.
+                      현재 관리 소프트웨어 업데이트를 확인하는 배포 채널입니다.
                     </span>
                   </div>
                   <span
@@ -666,7 +576,7 @@ export function SoftwareUpdatesCard({
                   <div>
                     <strong class="block text-sm font-black text-slate-950">자동으로 업데이트 확인</strong>
                     <span class="mt-1 block text-xs leading-5 text-slate-500">
-                      선택한 주기에 새 SmartSafeHub 버전을 확인합니다.
+                      선택한 주기에 새 관리 소프트웨어 버전을 확인합니다.
                     </span>
                   </div>
                   <SettingSwitch
@@ -758,8 +668,100 @@ export function SoftwareUpdatesCard({
               </button>
             </div>
           </section>
+
+          {data.updateCount > 0 ? (
+            <section
+              class="border-t border-slate-200 p-5 sm:p-6 xl:col-start-1 xl:row-start-2"
+              data-section="software-update-release-notes"
+            >
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div>
+                  <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
+                    Release notes
+                  </p>
+                  <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">업데이트 내용</h3>
+                  <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
+                    현재 설치된 버전 이후 포함되는 주요 변경 사항입니다.
+                  </p>
+                </div>
+                {data.releaseNotes.length ? (
+                  <span class="shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600">
+                    {data.releaseNotes.length === 1
+                      ? '1개 릴리즈'
+                      : `${data.releaseNotes.length}개 릴리즈`}
+                  </span>
+                ) : null}
+              </div>
+
+              {data.releaseNotes.length ? (
+                <div class="mt-5 grid gap-3">
+                  {data.releaseNotes.map((releaseNote) => (
+                    <article
+                      class="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5"
+                      key={releaseNote.version}
+                    >
+                      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <strong class="break-all text-sm font-black text-slate-950">
+                          {releaseNote.version}
+                        </strong>
+                        {releaseNote.date ? (
+                          <span class="text-xs font-bold text-slate-500">
+                            {releaseNote.date}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {releaseNote.summary ? (
+                        <p class="mt-3 mb-0 text-sm leading-6 text-slate-700">
+                          {releaseNote.summary}
+                        </p>
+                      ) : null}
+
+                      {releaseNote.sections.length ? (
+                        <details
+                          class="mt-4 rounded-lg border border-slate-200 bg-white p-3"
+                          open={data.releaseNotes.length === 1}
+                        >
+                          <summary class="cursor-pointer text-xs font-extrabold text-slate-800">
+                            자세한 변경 사항
+                          </summary>
+                          <div class="mt-3 grid gap-4">
+                            {releaseNote.sections.map((section) => (
+                              <section key={`${releaseNote.version}-${section.title}`}>
+                                <h4 class="m-0 text-xs font-extrabold text-slate-700">
+                                  {section.title}
+                                </h4>
+                                <ul class="mt-2 mb-0 space-y-1.5 pl-5 text-xs leading-5 text-slate-600">
+                                  {section.items.map((item, index) => (
+                                    <li key={`${releaseNote.version}-${section.title}-${index}`}>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </section>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </article>
+                  ))}
+
+                  {!data.releaseNotesComplete ? (
+                    <p class="m-0 rounded-xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+                      일부 릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p class="mt-4 mb-0 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  릴리즈 노트를 불러오지 못했습니다. 업데이트 확인과 설치는 계속 사용할 수 있습니다.
+                </p>
+              )}
+            </section>
+          ) : null}
+
         </>
       ) : null}
-    </div>
+    </article>
   );
 }

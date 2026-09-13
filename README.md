@@ -87,11 +87,11 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ### 업데이트
 
-- 하나의 SmartSafeHub 업데이트 페이지에서 기기 펌웨어와 SmartSafeHub 애플리케이션 업데이트를 함께 관리하며, 펌웨어를 최상단의 주요 업데이트 영역으로 표시
-- 데스크톱에서는 SmartSafeHub 업데이트 상태와 `SmartSafeHub 자동 업데이트` 설정을 2열로 배치하고, 모바일에서는 동일 정보를 1열로 순차 표시
+- 하나의 업데이트 페이지에서 `펌웨어 업데이트`와 `관리 소프트웨어 업데이트`를 독립된 두 영역으로 관리하며, 펌웨어를 최상단의 주요 업데이트 영역으로 표시
+- 관리 소프트웨어 업데이트는 하나의 카드 안에서 현재 상태와 자동 업데이트 설정을 데스크톱 2열·모바일 1열로 구성해 펌웨어 업데이트와의 범위를 시각적으로 구분
 - `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전, 새 버전의 릴리즈 요약과 배포일 표시
 - 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 SmartSafeHub 애플리케이션 업데이트 표시
-- `SmartSafeHub 자동 업데이트`는 SmartSafeHub 관리 소프트웨어에만 적용되며 펌웨어를 자동 설치하지 않습니다. 애플리케이션은 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치를 지원하고, 명시적 설정이 없는 신규 설치에서는 Stable 채널만 자동 설치를 기본 활성화하고 Beta 채널은 비활성화
+- 관리 소프트웨어는 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치를 지원하고, 명시적 설정이 없는 신규 설치에서는 Stable 채널만 자동 설치를 기본 활성화하고 Beta 채널은 비활성화. 펌웨어는 별도의 업데이트 영역에서 확인하며 자동 설치하지 않음
 - 기존 장치에 `auto_install` 값이 이미 저장되어 있으면 그 사용자의 선택을 그대로 유지
 - 애플리케이션 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
 - 로컬 APK 설치로 SmartSafeHub 또는 SafeShield가 `/etc/apk/world`의 identity hash에 고정된 경우 해당 두 항목만 일반 패키지 항목으로 정규화한 뒤 `apk upgrade luci-app-smartsafehub`를 실행합니다. identity pin 해제를 위해 `apk add --upgrade --latest`나 전역 `apk upgrade --available`을 사용하지 않아 관계없는 OpenWrt 패키지와 커널 모듈을 갱신 범위에 포함시키지 않습니다.
@@ -119,7 +119,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 ### 설정
 
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
-- 기기 펌웨어와 SmartSafeHub 소프트웨어 업데이트 화면으로 이동
+- 기기 펌웨어와 관리 소프트웨어 업데이트 화면으로 이동
 - 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 고급 기능은 LuCI 고급 설정을 fallback으로 사용
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음

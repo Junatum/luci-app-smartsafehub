@@ -195,7 +195,7 @@ export function SettingsPage({
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <ActionCard
             title="업데이트 관리"
-            description="기기 펌웨어와 SmartSafeHub 소프트웨어 업데이트는 제품 업데이트 페이지에서 함께 관리합니다."
+            description="기기 펌웨어와 관리 소프트웨어 업데이트는 제품 업데이트 페이지에서 함께 관리합니다."
           >
             <a
               class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white no-underline transition hover:bg-teal-800 sm:w-auto"
