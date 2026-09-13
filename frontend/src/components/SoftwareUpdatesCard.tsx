@@ -253,7 +253,7 @@ export function SoftwareUpdatesCard({
                   ) : null}
                 </div>
                 <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">
-                  SmartSafeHub 소프트웨어
+                  SmartSafeHub 업데이트
                 </h2>
                 <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
                   SmartSafeHub 관리 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.
@@ -477,6 +477,54 @@ export function SoftwareUpdatesCard({
             </dl>
           </div>
         ) : null}
+        {data && data.updateCount === 0 && data.lastCheckAt ? (
+          <section
+            class="mx-5 mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mx-6 sm:mb-6 sm:p-5"
+            data-section="software-update-result"
+          >
+            <div class="flex gap-3">
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700">
+                <CheckCircleIcon class="size-5" />
+              </span>
+              <div>
+                <h3 class="m-0 text-base font-black text-emerald-950">최신 버전을 사용 중입니다.</h3>
+                <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
+                  마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {data && data.updateCount === 0 && !data.lastCheckAt ? (
+          <section
+            class="mx-5 mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:mx-6 sm:mb-6 sm:p-5"
+            data-section="software-update-result"
+          >
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex min-w-0 gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-500 ring-1 ring-inset ring-slate-200">
+                  <ReloadIcon class="size-5" />
+                </span>
+                <div class="min-w-0">
+                  <h3 class="m-0 text-base font-black text-slate-900">업데이트 상태를 아직 확인하지 않았습니다.</h3>
+                  <p class="mt-1 mb-0 text-sm leading-6 text-slate-600">
+                    업데이트 확인을 실행하면 현재 설치 버전과 사용 가능한 최신 버전을 확인합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-800 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-wait disabled:opacity-60"
+                disabled={busy}
+                onClick={onCheck}
+                type="button"
+              >
+                <ReloadIcon class="size-4" />
+                지금 확인
+              </button>
+            </div>
+          </section>
+        ) : null}
       </article>
 
       {data ? (
@@ -567,46 +615,7 @@ export function SoftwareUpdatesCard({
                 </p>
               )}
             </section>
-          ) : data.lastCheckAt ? (
-            <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-6 xl:col-start-1">
-              <div class="flex gap-3">
-                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700">
-                  <CheckCircleIcon class="size-5" />
-                </span>
-                <div>
-                  <h3 class="m-0 text-base font-black text-emerald-950">최신 버전을 사용 중입니다.</h3>
-                  <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
-                    마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
-                  </p>
-                </div>
-              </div>
-            </section>
-          ) : (
-            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 xl:col-start-1">
-              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex min-w-0 gap-3">
-                  <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-500 ring-1 ring-inset ring-slate-200">
-                    <ReloadIcon class="size-5" />
-                  </span>
-                  <div class="min-w-0">
-                    <h3 class="m-0 text-base font-black text-slate-900">업데이트 상태를 아직 확인하지 않았습니다.</h3>
-                    <p class="mt-1 mb-0 text-sm leading-6 text-slate-600">
-                      업데이트 확인을 실행하면 현재 설치 버전과 사용 가능한 최신 버전을 확인합니다.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  class="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-800 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-wait disabled:opacity-60"
-                  disabled={busy}
-                  onClick={onCheck}
-                  type="button"
-                >
-                  <ReloadIcon class="size-4" />
-                  지금 확인
-                </button>
-              </div>
-            </section>
-          )}
+          ) : null}
 
           <section
             class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-start"
@@ -620,14 +629,21 @@ export function SoftwareUpdatesCard({
                 <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
                   Settings
                 </p>
-                <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">자동 업데이트</h3>
+                <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">SmartSafeHub 자동 업데이트</h3>
                 <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-                  업데이트 확인과 설치 일정은 공유기에서 실행되므로 브라우저를 닫아도 설정이 유지됩니다.
+                  SmartSafeHub 관리 소프트웨어의 업데이트 확인 및 자동 설치를 설정합니다.
                 </p>
               </div>
             </div>
 
-            <div class="mt-5 grid gap-4 lg:grid-cols-2">
+            <p
+              class="mt-5 mb-0 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-xs font-bold leading-5 text-teal-800"
+              data-section="software-update-scope"
+            >
+              이 설정은 SmartSafeHub 업데이트에만 적용됩니다. 펌웨어는 자동으로 설치되지 않습니다.
+            </p>
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-4 sm:p-5 lg:col-span-2">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">

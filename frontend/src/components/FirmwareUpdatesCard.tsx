@@ -480,10 +480,11 @@ export function FirmwareUpdatesCard({
       </div>
 
       <details
-        class="group border-t border-slate-200 bg-slate-50/70"
+        class="group mx-5 mb-5 rounded-xl border border-slate-200 bg-slate-50/70 sm:mx-6 sm:mb-6"
+        data-layout="firmware-card-subsection"
         data-section="manual-firmware"
       >
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6 sm:py-5 [&::-webkit-details-marker]:hidden">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 sm:px-5 [&::-webkit-details-marker]:hidden">
           <div class="flex min-w-0 items-center gap-3">
             <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-600 ring-1 ring-inset ring-slate-200">
               <DownloadIcon class="size-5 rotate-180" />

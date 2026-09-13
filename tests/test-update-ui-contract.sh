@@ -23,8 +23,8 @@ for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD"
 done
 
 # Update status should read as a product summary instead of a package-manager panel.
-grep -Fq 'SmartSafeHub 소프트웨어' "$UPDATES_CARD" || \
-	fail 'software update card must use a product-specific software heading'
+grep -Fq 'SmartSafeHub 업데이트' "$UPDATES_CARD" || \
+	fail 'software update card must use the SmartSafeHub product heading'
 for label in Installed Available 'Last check' 'Auto install'; do
 	grep -Fq "$label" "$UPDATES_CARD" || \
 		fail "update summary must include $label"
@@ -47,6 +47,16 @@ grep -Fq 'data-section="software-update-status"' "$UPDATES_CARD" || \
 	fail 'software update status card must remain a distinct responsive section'
 grep -Fq 'data-section="software-update-settings"' "$UPDATES_CARD" || \
 	fail 'software automatic-update settings must remain a distinct responsive section'
+grep -Fq '>SmartSafeHub 자동 업데이트</h3>' "$UPDATES_CARD" || \
+	fail 'automatic update settings must clearly identify the SmartSafeHub scope'
+grep -Fq 'data-section="software-update-scope"' "$UPDATES_CARD" || \
+	fail 'automatic update settings must include an explicit scope notice'
+grep -Fq '이 설정은 SmartSafeHub 업데이트에만 적용됩니다. 펌웨어는 자동으로 설치되지 않습니다.' "$UPDATES_CARD" || \
+	fail 'automatic update settings must explicitly exclude firmware auto-install'
+software_result_line="$(grep -n -m1 'data-section="software-update-result"' "$UPDATES_CARD" | cut -d: -f1)"
+software_card_close_line="$(grep -n -m1 '</article>' "$UPDATES_CARD" | cut -d: -f1)"
+[ "$software_result_line" -lt "$software_card_close_line" ] || \
+	fail 'software update result must stay inside the SmartSafeHub update card'
 
 # Busy update work should have persistent visual feedback rather than relying on hover text.
 grep -Fq "const installing = action === 'install' || data?.phase === 'installing';" "$UPDATES_CARD" || \
@@ -92,7 +102,7 @@ grep -Fq "data.lastError?.code === 'UPDATES_INDEX_REFRESH_FAILED'" "$UPDATES_CAR
 	fail 'repository refresh failure must keep unavailable version information explicitly unknown'
 grep -Fq "repositoryCheckFailed && !currentPackage?.updateAvailable" "$UPDATES_CARD" || \
 	fail 'failed repository refresh must not present an unknown available version as current'
-grep -Fq ') : data.lastCheckAt ? (' "$UPDATES_CARD" || \
+grep -Fq 'data && data.updateCount === 0 && data.lastCheckAt ? (' "$UPDATES_CARD" || \
 	fail 'current-version success notice must require a completed update check'
 grep -Fq '업데이트 상태를 아직 확인하지 않았습니다.' "$UPDATES_CARD" || \
 	fail 'unchecked update state must render a neutral explanatory notice'
@@ -218,8 +228,13 @@ card_close_line="$(grep -n '</article>' "$FIRMWARE_CARD" | tail -1 | cut -d: -f1
 	fail 'manual firmware install must stay inside the primary firmware card'
 grep -Fq '수동 펌웨어 설치' "$FIRMWARE_CARD" || \
 	fail 'firmware card must expose a clear manual install fallback'
-grep -Fq 'group border-t border-slate-200 bg-slate-50/70' "$FIRMWARE_CARD" || \
-	fail 'manual firmware fallback must be compact and collapsible by default'
+grep -Fq 'group mx-5 mb-5 rounded-xl border border-slate-200 bg-slate-50/70 sm:mx-6 sm:mb-6' "$FIRMWARE_CARD" || \
+	fail 'manual firmware fallback must render as an inset panel inside the firmware card'
+grep -Fq 'data-layout="firmware-card-subsection"' "$FIRMWARE_CARD" || \
+	fail 'manual firmware fallback must declare its firmware-card subsection layout'
+if grep -Fq 'group border-t border-slate-200 bg-slate-50/70' "$FIRMWARE_CARD"; then
+	fail 'manual firmware fallback must not look like a full-width card continuation outside the firmware surface'
+fi
 grep -Fq '현재 펌웨어의 버전 정보를 완전히 확인할 수 없습니다.' "$FIRMWARE_CARD" || \
 	fail 'missing build metadata must use customer-friendly warning copy'
 grep -Fq '기술 상세 보기' "$FIRMWARE_CARD" || \
