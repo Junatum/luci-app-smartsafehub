@@ -878,18 +878,20 @@ export function SafeShieldPage({
               </span>
             </div>
 
-            <div class="mt-5 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3">
-              <PlanBadge compact plan={planName} />
-              <span class="text-xs font-semibold text-slate-500">
-                {data.license.status || (data.license.configured ? '라이선스 연결됨' : '라이선스 미설정')}
-              </span>
+            <div class="ssh-safeshield-license-summary mt-5">
+              <div class="ssh-safeshield-license-summary-main">
+                <PlanBadge compact plan={planName} />
+                {!data.license.configured ? (
+                  <span class="ssh-safeshield-license-summary-status">라이선스 미설정</span>
+                ) : null}
+              </div>
               {data.license.configured && data.license.keyMasked ? (
-                <span class="ml-auto text-xs font-bold text-slate-400">{data.license.keyMasked}</span>
+                <span class="ssh-safeshield-license-key-mask">{data.license.keyMasked}</span>
               ) : null}
             </div>
 
             <form
-              class="mt-5 grid gap-3"
+              class="ssh-safeshield-license-editor mt-5"
               onSubmit={(event) => {
                 event.preventDefault();
                 void onUpdateLicense(licenseKey).then((updated) => {
@@ -899,14 +901,21 @@ export function SafeShieldPage({
                 });
               }}
             >
-              <label class="text-xs font-bold text-slate-600" for="safeshield-license-key">
-                {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
-              </label>
-              <div class="flex flex-col gap-2 sm:flex-row">
+              <div class="ssh-safeshield-license-editor-header">
+                <label class="ssh-safeshield-license-editor-label" for="safeshield-license-key">
+                  {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
+                </label>
+                <span class="ssh-safeshield-license-editor-hint">
+                  {data.license.configured
+                    ? '현재 키를 확인하거나 새 키로 교체할 수 있습니다.'
+                    : '새 라이선스 키를 등록해 프리미엄 기능을 준비하세요.'}
+                </span>
+              </div>
+              <div class="ssh-safeshield-license-input-row">
                 <input
                   autocomplete="off"
                   autocapitalize="none"
-                  class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-900 shadow-inner outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  class="ssh-safeshield-license-input"
                   data-1p-ignore
                   data-bwignore="true"
                   data-lpignore="true"
@@ -922,7 +931,7 @@ export function SafeShieldPage({
                   value={licenseKey}
                 />
                 <button
-                  class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-xs font-extrabold text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:opacity-70"
+                  class="ssh-safeshield-license-secondary-action"
                   disabled={actionBusy || licenseKey.length > 0 || !data.license.configured}
                   onClick={() => void handleLoadCurrentLicense()}
                   type="button"
@@ -935,9 +944,9 @@ export function SafeShieldPage({
                       : '현재 키 불러오기'}
                 </button>
               </div>
-              <div class="grid gap-2 sm:grid-cols-2">
+              <div class="ssh-safeshield-license-actions">
                 <button
-                  class="inline-flex min-h-11 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-extrabold text-white transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="ssh-safeshield-license-primary-action"
                   disabled={actionBusy || licenseKey.trim().length === 0}
                   type="submit"
                 >
@@ -949,7 +958,7 @@ export function SafeShieldPage({
                 </button>
                 {data.license.configured ? (
                   <button
-                    class="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-700 transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="ssh-safeshield-license-danger-action"
                     disabled={actionBusy}
                     onClick={handleRemoveLicense}
                     type="button"

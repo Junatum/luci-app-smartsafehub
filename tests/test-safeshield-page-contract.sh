@@ -40,9 +40,13 @@ grep -Fq 'px-5 pb-5 sm:px-6 sm:pb-6' "$PAGE" || \
 	fail 'SafeShield summary facts must remain visually inside the protection card'
 grep -Fq 'class="bg-white px-5 py-4 sm:px-6"' "$PAGE" || \
 	fail 'SafeShield summary fact cells must use the protection card surface color'
-grep -Fq 'border-2 border-slate-300 bg-slate-50' "$PAGE" || \
+grep -Fq 'ssh-safeshield-license-summary' "$PAGE" || \
+	fail 'SafeShield settings must render the refined license summary container'
+grep -Fq 'ssh-safeshield-license-editor' "$PAGE" || \
+	fail 'SafeShield settings must render the refined license editor card'
+grep -Fq 'ssh-safeshield-license-input' "$PAGE" || \
 	fail 'SafeShield license key field must remain visually recognizable as an input'
-grep -Fq 'border border-slate-300 bg-slate-100' "$PAGE" || \
+grep -Fq 'ssh-safeshield-license-secondary-action' "$PAGE" || \
 	fail 'SafeShield current license key action must remain recognizable as a button'
 grep -Fq 'border border-teal-700 bg-teal-700' "$PAGE" || \
 	fail 'SafeShield custom rules action must remain recognizable as a primary button'
@@ -127,6 +131,11 @@ grep -Fq "planName === 'FREE' ? <FreePlanUpgrade /> : null" "$PAGE" || \
 	fail 'SafeShield pricing CTA must be shown only for the FREE plan'
 grep -Fq 'https://www.smartsafehub.com/pricing/' "$PAGE" || \
 	fail 'SafeShield FREE plan CTA must link to the SmartSafeHub pricing page'
+grep -Fq '라이선스 미설정' "$PAGE" || \
+	fail 'SafeShield license summary must provide a localized unconfigured label'
+if grep -Fq 'data.license.status ||' "$PAGE"; then
+	fail 'SafeShield license summary must not expose raw backend status strings directly'
+fi
 grep -Fq 'rel="noopener noreferrer"' "$PAGE" || \
 	fail 'SafeShield pricing link must isolate the new browsing context'
 grep -Fq 'target="_blank"' "$PAGE" || \
@@ -167,6 +176,10 @@ grep -Fq '.ssh-safeshield-plan-caption[data-tier=ultimate]' "$ASSET_CSS" || \
 	fail 'checked-in app.css must include the tier-colored paid membership status caption'
 grep -Fq '.ssh-safeshield-upgrade-card' "$ASSET_CSS" || \
 	fail 'checked-in app.css must include the FREE upgrade CTA treatment'
+grep -Fq '.ssh-safeshield-license-summary' "$ASSET_CSS" || \
+	fail 'checked-in app.css must include the refined SafeShield license summary styles'
+grep -Fq 'ssh-safeshield-license-editor' "$ASSET_JS" || \
+	fail 'checked-in app.js must include the refined SafeShield license editor markup'
 grep -Fq '.ssh-safeshield-refresh-loader-svg' "$ASSET_CSS" || \
 	fail 'checked-in app.css must include the SafeShield round loader styles'
 grep -Fq '@keyframes ssh-safeshield-refresh-loader-rotate' "$ASSET_CSS" || \
