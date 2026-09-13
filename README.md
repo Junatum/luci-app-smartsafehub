@@ -73,7 +73,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 수동 갱신 요청의 성공 안내 배너는 유지하지 않고 실제 진행 상태를 보호 카드의 단계 UI로 표시하며, 실패한 경우에만 오류 피드백을 유지
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
 - 라이선스, 플랜, 아티팩트와 차단 목록 상태 표시
-- 유료 플랜은 PRO/ULTIMATE 등급별 고대비 premium badge와 활성 상태 표시로 강조하고, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시
+- 유료 플랜은 PRO/ULTIMATE 등급별 고대비 premium badge의 아이콘과 색상만으로 간결하게 강조하고, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시
 - 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
 - DHCP 식별 정보를 이용한 기기별 DNS 요청·차단 수·차단율과 IP/MAC 표시
 - 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지

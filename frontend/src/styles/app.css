@@ -1342,38 +1342,6 @@
   white-space: nowrap;
 }
 
-.ssh-safeshield-plan-caption[data-tier='pro'],
-.ssh-safeshield-plan-caption[data-tier='ultimate'],
-.ssh-safeshield-plan-caption[data-tier='paid'] {
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  padding: 0.18rem 0.46rem;
-  background: rgb(255 255 255 / 0.62);
-}
-
-.ssh-safeshield-plan-caption[data-tier='pro'] {
-  color: #0f766e;
-}
-
-.ssh-safeshield-plan-caption[data-tier='ultimate'] {
-  color: #b45309;
-}
-
-.ssh-safeshield-plan-caption[data-tier='paid'] {
-  color: #1d4ed8;
-}
-
-.ssh-safeshield-plan-caption[data-tier='pro']::before,
-.ssh-safeshield-plan-caption[data-tier='ultimate']::before,
-.ssh-safeshield-plan-caption[data-tier='paid']::before {
-  width: 0.4rem;
-  height: 0.4rem;
-  content: '';
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 8px currentColor;
-}
-
 @keyframes ssh-safeshield-premium-shine {
   0%,
   72% {
@@ -1440,24 +1408,6 @@
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption {
   color: #94a3b8;
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption[data-tier='pro'] {
-  border-color: rgb(94 234 212 / 0.5);
-  background: rgb(13 148 136 / 0.12);
-  color: #5eead4;
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption[data-tier='ultimate'] {
-  border-color: rgb(252 211 77 / 0.52);
-  background: rgb(180 83 9 / 0.14);
-  color: #fde68a;
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption[data-tier='paid'] {
-  border-color: rgb(125 211 252 / 0.46);
-  background: rgb(37 99 235 / 0.12);
-  color: #bae6fd;
 }
 
 @media (prefers-reduced-motion: reduce) {

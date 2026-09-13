@@ -125,8 +125,11 @@ grep -Fq 'function PlanBadge' "$PAGE" || \
 	fail 'SafeShield paid plans must use the shared premium membership badge'
 grep -Fq 'data-tier={tone}' "$PAGE" || \
 	fail 'SafeShield plan badges must expose a tier-specific visual treatment'
-grep -Fq 'class="ssh-safeshield-plan-caption" data-tier={tone}' "$PAGE" || \
-	fail 'SafeShield paid membership caption must expose the plan tier for premium status styling'
+grep -Fq '{free ? <span class="ssh-safeshield-plan-caption">기본 플랜</span> : null}' "$PAGE" || \
+	fail 'SafeShield FREE plan may keep its basic-plan caption while paid plans rely on the premium badge alone'
+if grep -Fq "'멤버십 활성'" "$PAGE"; then
+	fail 'SafeShield paid plan summary must not duplicate active status beside the premium badge'
+fi
 grep -Fq "planName === 'FREE' ? <FreePlanUpgrade /> : null" "$PAGE" || \
 	fail 'SafeShield pricing CTA must be shown only for the FREE plan'
 grep -Fq 'https://www.smartsafehub.com/pricing/' "$PAGE" || \
@@ -172,8 +175,12 @@ grep -Fq 'linear-gradient(122deg,#1c1917 0%,#451a03 22%,#92400e 48%,#f59e0b 76%,
 	fail 'light-theme ULTIMATE badge must keep the high-contrast dark-gold premium gradient'
 grep -Fq '@keyframes ssh-safeshield-premium-shine' "$ASSET_CSS" || \
 	fail 'checked-in app.css must include the restrained ULTIMATE shine animation'
-grep -Fq '.ssh-safeshield-plan-caption[data-tier=ultimate]' "$ASSET_CSS" || \
-	fail 'checked-in app.css must include the tier-colored paid membership status caption'
+if grep -Fq '.ssh-safeshield-plan-caption[data-tier=' "$ASSET_CSS"; then
+	fail 'checked-in app.css must not retain paid membership status-caption styling'
+fi
+if grep -Fq '멤버십 활성' "$ASSET_JS"; then
+	fail 'checked-in app.js must not render the redundant paid membership active label'
+fi
 grep -Fq '.ssh-safeshield-upgrade-card' "$ASSET_CSS" || \
 	fail 'checked-in app.css must include the FREE upgrade CTA treatment'
 grep -Fq '.ssh-safeshield-license-summary' "$ASSET_CSS" || \
