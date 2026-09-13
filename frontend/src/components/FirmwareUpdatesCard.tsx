@@ -508,21 +508,60 @@ export function FirmwareUpdatesCard({
           <p class="mt-0 mb-4 max-w-3xl text-xs leading-5 text-slate-500">
             이 장치에 맞는 Sysupgrade 이미지(.bin)만 사용하세요. 업로드한 파일은 이미지 검증과 `sysupgrade --test`를 모두 통과해야 설치할 수 있으며 강제 설치는 제공하지 않습니다.
           </p>
-          <div class="rounded-xl border border-dashed border-slate-300 bg-white p-4 sm:p-5">
+          <div
+            class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+            data-layout="firmware-file-picker"
+          >
             <input
               accept=".bin,application/octet-stream"
-              class="block w-full text-sm font-semibold text-slate-700 file:mr-4 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-50 file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-slate-800 file:ring-1 file:ring-inset file:ring-slate-300"
+              aria-label="펌웨어 파일 선택"
+              class="sr-only"
               disabled={busy || prepared !== null}
               onChange={(event) => setSelectedFile(event.currentTarget.files?.[0] ?? null)}
               ref={fileInput}
               type="file"
             />
-            {selectedFile ? (
-              <p class="mt-3 mb-0 text-xs font-bold text-slate-600">{selectedFile.name} · {formatBytes(selectedFile.size)}</p>
-            ) : null}
+
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex min-w-0 items-center gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200">
+                  <DownloadIcon class="size-5 rotate-180" />
+                </span>
+                <div class="min-w-0">
+                  <strong class="block truncate text-sm font-black text-slate-900">
+                    {selectedFile ? selectedFile.name : '펌웨어 파일을 선택하세요'}
+                  </strong>
+                  <span class="mt-1 block text-xs leading-5 text-slate-500">
+                    {selectedFile
+                      ? `${formatBytes(selectedFile.size)} · Sysupgrade 이미지 (.bin)`
+                      : '이 장치에 맞는 Sysupgrade 이미지 (.bin)를 선택합니다.'}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                <button
+                  class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={busy || prepared !== null}
+                  onClick={() => fileInput.current?.click()}
+                  type="button"
+                >
+                  {selectedFile ? '다른 파일 선택' : '파일 선택'}
+                </button>
+                <button
+                  class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!selectedFile || busy || prepared !== null}
+                  onClick={() => void uploadSelected()}
+                  type="button"
+                >
+                  {uploading ? <ReloadIcon class="size-4 animate-spin" /> : <DownloadIcon class="size-4 rotate-180" />}
+                  {uploading ? '처리 중...' : '업로드 및 검증'}
+                </button>
+              </div>
+            </div>
 
             {uploadProgress !== null ? (
-              <div class="mt-4">
+              <div class="mt-4 border-t border-slate-100 pt-4">
                 <div class="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-slate-600">
                   <span>업로드 중</span>
                   <span>{uploadProgress}%</span>
@@ -535,18 +574,6 @@ export function FirmwareUpdatesCard({
                 </div>
               </div>
             ) : null}
-
-            <div class="mt-4 flex justify-end">
-              <button
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!selectedFile || busy || prepared !== null}
-                onClick={() => void uploadSelected()}
-                type="button"
-              >
-                {uploading ? <ReloadIcon class="size-4 animate-spin" /> : <DownloadIcon class="size-4 rotate-180" />}
-                {uploading ? '처리 중...' : '업로드 및 검증'}
-              </button>
-            </div>
           </div>
         </div>
       </details>

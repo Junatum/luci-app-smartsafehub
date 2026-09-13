@@ -250,6 +250,21 @@ grep -Fq 'group mx-5 mb-5 rounded-xl border border-slate-200 bg-slate-50/70 sm:m
 	fail 'manual firmware fallback must render as an inset panel inside the firmware card'
 grep -Fq 'data-layout="firmware-card-subsection"' "$FIRMWARE_CARD" || \
 	fail 'manual firmware fallback must declare its firmware-card subsection layout'
+grep -Fq 'data-layout="firmware-file-picker"' "$FIRMWARE_CARD" || \
+	fail 'manual firmware upload must use the SmartSafeHub file-picker layout'
+grep -Fq 'aria-label="펌웨어 파일 선택"' "$FIRMWARE_CARD" || \
+	fail 'manual firmware file input must retain an accessible Korean label'
+grep -Fq 'class="sr-only"' "$FIRMWARE_CARD" || \
+	fail 'native browser file input must be visually hidden behind the custom file picker'
+grep -Fq "{selectedFile ? '다른 파일 선택' : '파일 선택'}" "$FIRMWARE_CARD" || \
+	fail 'custom firmware file picker must expose localized select and reselect actions'
+grep -Fq "{selectedFile ? selectedFile.name : '펌웨어 파일을 선택하세요'}" "$FIRMWARE_CARD" || \
+	fail 'custom firmware file picker must show a localized empty state and selected filename'
+grep -Fq 'onClick={() => fileInput.current?.click()}' "$FIRMWARE_CARD" || \
+	fail 'custom firmware file-picker button must activate the hidden input'
+if grep -Fq 'file:mr-4' "$FIRMWARE_CARD" || grep -Fq 'file:cursor-pointer' "$FIRMWARE_CARD"; then
+	fail 'manual firmware upload must not rely on browser-native file input chrome'
+fi
 if grep -Fq 'group border-t border-slate-200 bg-slate-50/70' "$FIRMWARE_CARD"; then
 	fail 'manual firmware fallback must not look like a full-width card continuation outside the firmware surface'
 fi
