@@ -7,6 +7,14 @@ import {
 	reboot_system
 } from './smartsafehub/system.uc';
 import {
+	check_firmware,
+	discard_firmware,
+	install_firmware,
+	prepare_firmware,
+	read_firmware_status,
+	validate_uploaded_firmware
+} from './smartsafehub/firmware.uc';
+import {
 	check_updates,
 	install_updates,
 	read_updates_status,
@@ -72,6 +80,43 @@ const methods = {
 		},
 		call: function(request) {
 			return update_update_settings(request);
+		},
+	},
+	firmware_status: {
+		call: function(request) {
+			return read_firmware_status(request);
+		},
+	},
+	firmware_check: {
+		call: function(request) {
+			return check_firmware(request);
+		},
+	},
+	firmware_prepare: {
+		call: function(request) {
+			return prepare_firmware(request);
+		},
+	},
+	firmware_validate_upload: {
+		args: {
+			filename: 'firmware.bin',
+		},
+		call: function(request) {
+			return validate_uploaded_firmware(request);
+		},
+	},
+	firmware_install: {
+		args: {
+			confirm: '',
+			keep_settings: true,
+		},
+		call: function(request) {
+			return install_firmware(request);
+		},
+	},
+	firmware_discard: {
+		call: function(request) {
+			return discard_firmware(request);
 		},
 	},
 	system_reboot: {

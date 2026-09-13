@@ -87,18 +87,39 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ### 업데이트
 
-- `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전 표시
-- 새 버전의 릴리즈 요약, 배포일과 섹션별 변경 사항 표시
-- 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 업데이트 표시
-- 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치 설정
-- 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
+- 하나의 SmartSafeHub 업데이트 페이지에서 애플리케이션 패키지 업데이트와 OpenWrt 펌웨어 업데이트를 함께 관리
+- `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전, 새 버전의 릴리즈 요약과 배포일 표시
+- 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 SmartSafeHub 애플리케이션 업데이트 표시
+- 애플리케이션은 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치를 지원하며, 명시적 설정이 없는 신규 설치에서는 Stable 채널만 자동 설치를 기본 활성화하고 Beta 채널은 비활성화
+- 기존 장치에 `auto_install` 값이 이미 저장되어 있으면 그 사용자의 선택을 그대로 유지
+- 애플리케이션 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
 - 로컬 APK 설치로 SmartSafeHub 또는 SafeShield가 `/etc/apk/world`의 identity hash에 고정된 경우 해당 두 항목만 일반 패키지 항목으로 정규화한 뒤 `apk upgrade luci-app-smartsafehub`를 실행합니다. identity pin 해제를 위해 `apk add --upgrade --latest`나 전역 `apk upgrade --available`을 사용하지 않아 관계없는 OpenWrt 패키지와 커널 모듈을 갱신 범위에 포함시키지 않습니다.
-- 릴리즈 노트는 같은 SmartSafeHub 저장소 channel의 `releases/luci-app-smartsafehub/index.json`에서 릴리즈 순서를 확인한 뒤 현재 설치 버전 이후의 `<version>.json`을 표시용으로 사용하며, 일부 또는 전체 조회 실패가 업데이트 설치를 막지 않음
+- 애플리케이션 릴리즈 노트는 같은 SmartSafeHub 저장소 channel의 `releases/luci-app-smartsafehub/index.json`에서 릴리즈 순서를 확인한 뒤 현재 설치 버전 이후의 `<version>.json`을 표시용으로 사용하며, 일부 또는 전체 조회 실패가 업데이트 설치를 막지 않음
+- 펌웨어는 현재 패키지 저장소 channel과 장치 코드를 사용해 Hub의 `POST /api/v1/firmware/resolve` API에서 이 장치용 최신 Sysupgrade 배포를 확인
+- 펌웨어 자동 확인은 기본 활성화되어 6시간 간격으로 수행하며, 실제 펌웨어 자동 설치는 제공하지 않고 사용자의 명시적인 최종 확인이 있어야 설치
+- 온라인 펌웨어는 Hub가 제공한 파일 크기와 SHA-256을 검증한 뒤 OpenWrt `system.validate_firmware_image`와 `sysupgrade --test`를 모두 통과한 경우에만 설치 준비 완료로 표시
+- `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용
+- 설정 유지가 가능한 이미지에서는 기본적으로 현재 설정을 유지하고, 검증 결과가 설정 보존을 허용하지 않는 이미지는 해당 선택을 비활성화
+- 강제 `sysupgrade`는 SmartSafeHub UI와 helper에서 제공하지 않음
+- 지원 장치 코드는 `iptime-ax3000sm`, `gl-mt300n-v2`, `xiaomi-ax3000t`이며 빌드 이미지에는 정확한 현재 빌드를 식별할 수 있도록 `/usr/share/smartsafehub/firmware.json`을 포함하는 것을 권장
+
+권장 펌웨어 메타데이터 예시는 다음과 같습니다. `build_id`는 Hub의 펌웨어 배포 `build_id`와 동일해야 합니다. 메타데이터가 없는 기존 이미지는 보드 이름으로 장치 종류를 식별할 수 있지만 현재 빌드 비교 정확도가 낮아질 수 있습니다.
+
+```json
+{
+  "schema": 1,
+  "device_code": "iptime-ax3000sm",
+  "build_id": "20260913T070000Z-abcdef123456",
+  "channel": "stable",
+  "openwrt_version": "25.12.4"
+}
+```
 
 ### 설정
 
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
-- OpenWrt의 검증된 펌웨어 업그레이드·백업·복원 화면으로 이동
+- SmartSafeHub 소프트웨어와 OpenWrt 펌웨어 업데이트 화면으로 이동
+- 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 고급 기능은 LuCI 고급 설정을 fallback으로 사용
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
 - 진단 파일에는 호스트명, WAN IPv4와 Wi-Fi SSID가 포함될 수 있으므로 외부 전달 전 확인 필요
@@ -140,6 +161,8 @@ ucode-mod-ubus
 ucode-mod-fs
 ucode-mod-uci
 procd
+uclient-fetch
+jsonfilter
 safeshield (>= 0.3.20)
 ```
 
@@ -179,7 +202,9 @@ luci-app-smartsafehub/
 ├── root/
 │   ├── etc/config/smartsafehub
 │   ├── etc/init.d/smartsafehub-updater
+│   ├── etc/init.d/smartsafehub-firmware
 │   ├── usr/libexec/smartsafehub-updater
+│   ├── usr/libexec/smartsafehub-firmware
 │   ├── usr/share/luci/menu.d/
 │   ├── usr/share/rpcd/acl.d/
 │   ├── usr/share/rpcd/ucode/
@@ -188,6 +213,7 @@ luci-app-smartsafehub/
 │   │       ├── core.uc
 │   │       ├── devices.uc
 │   │       ├── system.uc
+│   │       ├── firmware.uc
 │   │       ├── updates.uc
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc

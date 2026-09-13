@@ -1,4 +1,8 @@
 import type { ConnectedDevicesSummary } from '../types/devices';
+import type {
+  FirmwareAccepted,
+  FirmwareStatus,
+} from '../types/firmware';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SystemRebootResult } from '../types/system';
 import type {
@@ -26,6 +30,37 @@ export function fetchStatus(): Promise<SmartSafeHubStatus> {
 
 export function fetchSoftwareUpdates(): Promise<SoftwareUpdateStatus> {
   return callApi(API_OBJECT, 'updates_status');
+}
+
+export function fetchFirmwareStatus(): Promise<FirmwareStatus> {
+  return callApi(API_OBJECT, 'firmware_status');
+}
+
+export function requestFirmwareCheck(): Promise<FirmwareAccepted> {
+  return callApi(API_OBJECT, 'firmware_check');
+}
+
+export function requestFirmwarePrepare(): Promise<FirmwareAccepted> {
+  return callApi(API_OBJECT, 'firmware_prepare');
+}
+
+export function requestFirmwareUploadValidation(
+  filename: string,
+): Promise<FirmwareAccepted> {
+  return callApi(API_OBJECT, 'firmware_validate_upload', { filename });
+}
+
+export function requestFirmwareInstall(
+  keepSettings: boolean,
+): Promise<FirmwareAccepted> {
+  return callApi(API_OBJECT, 'firmware_install', {
+    confirm: 'install',
+    keep_settings: keepSettings,
+  });
+}
+
+export function requestFirmwareDiscard(): Promise<FirmwareAccepted> {
+  return callApi(API_OBJECT, 'firmware_discard');
 }
 
 export function requestSoftwareUpdateCheck(): Promise<SoftwareUpdateAccepted> {

@@ -1,0 +1,536 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+import type { FirmwareAction } from '../hooks/useFirmwareUpdates';
+import type { FirmwareStatus } from '../types/firmware';
+import {
+  AlertIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  DownloadIcon,
+  ReloadIcon,
+  RouterIcon,
+  UpdateIcon,
+} from './Icons';
+
+interface FirmwareUpdatesCardProps {
+  action: FirmwareAction;
+  actionError: string | null;
+  data: FirmwareStatus | null;
+  error: string | null;
+  loading: boolean;
+  message: string | null;
+  reconnecting: boolean;
+  uploadProgress: number | null;
+  onCheck: () => void;
+  onDiscard: () => Promise<boolean>;
+  onDismissFeedback: () => void;
+  onInstall: (keepSettings: boolean) => Promise<boolean>;
+  onPrepare: () => void;
+  onRetry: () => void;
+  onUpload: (file: File) => Promise<boolean>;
+}
+
+function formatBytes(value: number | null | undefined): string {
+  if (!value || value <= 0) {
+    return '미확인';
+  }
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(value / 1024).toFixed(1)} KB`;
+}
+
+function formatTimestamp(value: number | null): string {
+  if (!value) {
+    return '아직 없음';
+  }
+  return new Date(value * 1000).toLocaleString('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function phaseLabel(data: FirmwareStatus): string {
+  switch (data.phase) {
+    case 'checking':
+      return '확인 중';
+    case 'downloading':
+      return '다운로드 중';
+    case 'verifying':
+      return '검증 중';
+    case 'ready':
+      return '설치 준비 완료';
+    case 'flashing':
+      return '설치 중';
+    case 'error':
+      return '확인 필요';
+    default:
+      return data.updateAvailable ? '업데이트 가능' : data.lastCheckAt ? '최신 상태' : '확인 전';
+  }
+}
+
+function phaseClass(data: FirmwareStatus): string {
+  if (data.phase === 'error') {
+    return 'bg-rose-50 text-rose-700 ring-rose-200';
+  }
+  if (
+    data.phase === 'checking' ||
+    data.phase === 'downloading' ||
+    data.phase === 'verifying' ||
+    data.phase === 'flashing'
+  ) {
+    return 'bg-sky-50 text-sky-700 ring-sky-200';
+  }
+  if (data.phase === 'ready' || data.updateAvailable) {
+    return 'bg-amber-50 text-amber-800 ring-amber-200';
+  }
+  if (!data.lastCheckAt) {
+    return 'bg-slate-100 text-slate-600 ring-slate-200';
+  }
+  return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+}
+
+function phaseIcon(data: FirmwareStatus) {
+  if (
+    data.phase === 'checking' ||
+    data.phase === 'downloading' ||
+    data.phase === 'verifying' ||
+    data.phase === 'flashing'
+  ) {
+    return <ReloadIcon class="size-3.5 animate-spin" />;
+  }
+  if (data.phase === 'error') {
+    return <AlertIcon class="size-3.5" />;
+  }
+  if (data.phase === 'ready' || data.updateAvailable) {
+    return <DownloadIcon class="size-3.5" />;
+  }
+  if (!data.lastCheckAt) {
+    return <ClockIcon class="size-3.5" />;
+  }
+  return <CheckCircleIcon class="size-3.5" />;
+}
+
+function KeepSettingsSwitch({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <button
+      aria-checked={checked}
+      aria-label="현재 설정 유지"
+      class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? 'border-teal-600 bg-teal-600' : 'border-slate-300 bg-slate-200'
+      }`}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      role="switch"
+      type="button"
+    >
+      <span
+        aria-hidden="true"
+        class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+          checked ? 'left-6' : 'left-1'
+        }`}
+      />
+    </button>
+  );
+}
+
+export function FirmwareUpdatesCard({
+  action,
+  actionError,
+  data,
+  error,
+  loading,
+  message,
+  reconnecting,
+  uploadProgress,
+  onCheck,
+  onDiscard,
+  onDismissFeedback,
+  onInstall,
+  onPrepare,
+  onRetry,
+  onUpload,
+}: FirmwareUpdatesCardProps) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [keepSettings, setKeepSettings] = useState(true);
+  const [confirmingInstall, setConfirmingInstall] = useState(false);
+
+  useEffect(() => {
+    if (data?.prepared) {
+      setKeepSettings(data.prepared.allowBackup);
+    }
+  }, [data?.prepared]);
+
+  const busy =
+    action !== null ||
+    data?.phase === 'checking' ||
+    data?.phase === 'downloading' ||
+    data?.phase === 'verifying' ||
+    data?.phase === 'flashing';
+  const prepared = data?.phase === 'ready' ? data.prepared : null;
+  const checking = action === 'check' || data?.phase === 'checking';
+  const preparing = action === 'prepare' || data?.phase === 'downloading' || data?.phase === 'verifying';
+  const uploading = action === 'upload' || action === 'validate-upload';
+
+  const uploadSelected = async () => {
+    if (!selectedFile) {
+      return;
+    }
+    const accepted = await onUpload(selectedFile);
+    if (accepted) {
+      setSelectedFile(null);
+      if (fileInput.current) {
+        fileInput.current.value = '';
+      }
+    }
+  };
+
+  return (
+    <div class="min-w-0 space-y-4">
+      <article class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
+        <div class="p-5 sm:p-6">
+          <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div class="flex min-w-0 gap-4">
+              <span class="grid size-12 shrink-0 place-items-center rounded-2xl bg-sky-50 text-sky-700">
+                <RouterIcon class="size-6" />
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">
+                    Firmware update
+                  </p>
+                  {data ? (
+                    <span
+                      class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset ${phaseClass(data)}`}
+                    >
+                      {phaseIcon(data)}
+                      {phaseLabel(data)}
+                    </span>
+                  ) : null}
+                </div>
+                <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">
+                  OpenWrt 펌웨어
+                </h2>
+                <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
+                  SmartSafeHub 서버에서 이 장치용 Sysupgrade 이미지를 확인하거나 직접 파일을 업로드해 펌웨어를 교체합니다. 강제 설치는 제공하지 않으며 이미지 검증을 통과한 경우에만 설치할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            {data ? (
+              <div class="flex shrink-0 flex-col gap-2 sm:flex-row lg:justify-end">
+                <button
+                  class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                  disabled={busy || prepared !== null}
+                  onClick={onCheck}
+                  type="button"
+                >
+                  <ReloadIcon class={`size-4 ${checking ? 'animate-spin' : ''}`} />
+                  {checking ? '확인 중...' : '펌웨어 확인'}
+                </button>
+
+                {data.updateAvailable && !prepared ? (
+                  <button
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-sky-800 disabled:cursor-wait disabled:opacity-60"
+                    disabled={busy}
+                    onClick={onPrepare}
+                    type="button"
+                  >
+                    {preparing ? (
+                      <ReloadIcon class="size-4 animate-spin" />
+                    ) : (
+                      <DownloadIcon class="size-4" />
+                    )}
+                    {preparing ? '준비 중...' : '다운로드 및 검증'}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {(actionError || message) ? (
+            <div
+              class={`mt-5 flex flex-col gap-3 rounded-xl border px-4 py-3 text-sm font-bold sm:flex-row sm:items-center sm:justify-between ${
+                actionError
+                  ? 'border-rose-200 bg-rose-50 text-rose-800'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              }`}
+            >
+              <span>{actionError || message}</span>
+              <button
+                class="shrink-0 self-start rounded-lg px-3 py-1.5 text-xs font-extrabold hover:bg-black/5 sm:self-auto"
+                onClick={onDismissFeedback}
+                type="button"
+              >
+                닫기
+              </button>
+            </div>
+          ) : null}
+
+          {reconnecting || data?.phase === 'flashing' ? (
+            <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5" role="status">
+              <div class="flex gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-amber-700 ring-1 ring-inset ring-amber-200">
+                  <ReloadIcon class="size-5 animate-spin" />
+                </span>
+                <div>
+                  <strong class="block text-sm font-black text-amber-950">펌웨어를 설치하고 재부팅하고 있습니다.</strong>
+                  <p class="mt-1 mb-0 text-sm leading-6 text-amber-800">
+                    전원을 끄지 마세요. 현재 주소에서 공유기가 다시 응답하면 SmartSafeHub가 자동으로 새로고침됩니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {error && !data ? (
+            <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              <p class="m-0 font-bold">{error}</p>
+              <button
+                class="mt-3 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700"
+                onClick={onRetry}
+                type="button"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : loading && !data ? (
+            <div class="mt-5 flex items-center gap-3 rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+              <ReloadIcon class="size-4 animate-spin" />
+              펌웨어 상태를 확인하고 있습니다.
+            </div>
+          ) : data ? (
+            <>
+              {data.lastError ? (
+                <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4 sm:p-5">
+                  <div class="flex gap-3">
+                    <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-rose-700 ring-1 ring-inset ring-rose-200">
+                      <AlertIcon class="size-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <strong class="block text-sm font-black text-rose-950">펌웨어 작업을 완료하지 못했습니다.</strong>
+                      <p class="mt-1 mb-0 text-sm leading-6 text-rose-800">{data.lastError.message}</p>
+                      <details class="mt-3 rounded-lg border border-rose-200 bg-white p-3">
+                        <summary class="cursor-pointer text-xs font-extrabold text-rose-800">상세 정보 보기</summary>
+                        <p class="mt-2 mb-0 break-all font-mono text-[11px] text-slate-600">{data.lastError.code}</p>
+                      </details>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {!data.current.metadataAvailable ? (
+                <p class="mt-5 mb-0 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+                  현재 펌웨어 이미지에 SmartSafeHub build ID 메타데이터가 없습니다. 온라인 펌웨어를 설정 유지 방식으로 한 번 설치하면 설치 대상 build ID를 로컬 설정에 기록하며, 향후 펌웨어 이미지에는 `/usr/share/smartsafehub/firmware.json`을 포함하는 것을 권장합니다.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+
+        {data ? (
+          <div class="px-5 pb-5 sm:px-6 sm:pb-6">
+            <dl class="grid overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+              <div class="bg-white p-4">
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Device</dt>
+                <dd class="mt-2 mb-0 ml-0 break-all text-sm font-black text-slate-950">
+                  {data.current.deviceCode || data.current.boardName || '미확인'}
+                </dd>
+              </div>
+              <div class="bg-white p-4">
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Installed</dt>
+                <dd class="mt-2 mb-0 ml-0 break-all text-sm font-black text-slate-950">
+                  {data.current.buildId || data.current.openwrtVersion || '미확인'}
+                </dd>
+              </div>
+              <div class="bg-white p-4">
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Available</dt>
+                <dd class={`mt-2 mb-0 ml-0 break-all text-sm font-black ${data.updateAvailable ? 'text-amber-700' : 'text-slate-950'}`}>
+                  {!data.lastCheckAt
+                    ? '미확인'
+                    : data.updateAvailable
+                      ? data.release?.buildId || data.release?.version || '새 펌웨어'
+                      : '최신 버전'}
+                </dd>
+              </div>
+              <div class="bg-white p-4">
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Last check</dt>
+                <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">{formatTimestamp(data.lastCheckAt)}</dd>
+              </div>
+            </dl>
+          </div>
+        ) : null}
+      </article>
+
+      {data?.updateAvailable && data.release ? (
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <div>
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">Available firmware</p>
+              <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">새 펌웨어가 있습니다.</h3>
+              <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
+                OpenWrt {data.release.openwrtVersion || '버전 미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {data.settings.channel === 'beta' ? 'Beta' : 'Stable'}
+              </p>
+            </div>
+            <span class="shrink-0 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">
+              {data.release.version || data.release.buildId || 'Latest'}
+            </span>
+          </div>
+          {data.release.releaseNotes.length ? (
+            <ul class="mt-4 mb-0 space-y-2 rounded-xl bg-slate-50 p-4 pl-9 text-sm leading-6 text-slate-700">
+              {data.release.releaseNotes.map((note, index) => (
+                <li key={`${index}-${note}`}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
+      {prepared ? (
+        <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <div class="flex gap-4">
+            <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-white text-amber-700 ring-1 ring-inset ring-amber-200">
+              <CheckCircleIcon class="size-5" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-amber-700">Verified image</p>
+              <h3 class="mt-2 mb-0 text-lg font-black text-amber-950">설치할 펌웨어가 준비되었습니다.</h3>
+              <p class="mt-2 mb-0 break-all text-sm leading-6 text-amber-900">
+                {prepared.filename || 'firmware.bin'} · {formatBytes(prepared.sizeBytes)}
+              </p>
+              {prepared.sha256 ? (
+                <p class="mt-2 mb-0 break-all font-mono text-[11px] leading-5 text-amber-800">SHA-256 {prepared.sha256}</p>
+              ) : null}
+
+              <div class="mt-5 flex items-start justify-between gap-4 rounded-xl border border-amber-200 bg-white p-4">
+                <div>
+                  <strong class="block text-sm font-black text-slate-950">현재 설정 유지</strong>
+                  <span class="mt-1 block text-xs leading-5 text-slate-500">
+                    Wi-Fi, SafeShield, SmartSafeHub 설정을 유지합니다.
+                  </span>
+                  {!prepared.allowBackup ? (
+                    <span class="mt-2 block text-xs font-bold text-rose-700">이 이미지는 설정 유지 업그레이드를 지원하지 않습니다.</span>
+                  ) : null}
+                </div>
+                <KeepSettingsSwitch
+                  checked={keepSettings}
+                  disabled={!prepared.allowBackup}
+                  onChange={setKeepSettings}
+                />
+              </div>
+
+              {confirmingInstall ? (
+                <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <strong class="block text-sm font-black text-rose-950">펌웨어 설치를 시작할까요?</strong>
+                  <p class="mt-1 mb-0 text-xs leading-5 text-rose-800">
+                    설치 중 전원을 끄면 장치가 복구 불가능한 상태가 될 수 있습니다. 이미지 검증은 설치 직전에 다시 수행됩니다.
+                  </p>
+                  <div class="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                      class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-700"
+                      onClick={() => setConfirmingInstall(false)}
+                      type="button"
+                    >
+                      취소
+                    </button>
+                    <button
+                      class="min-h-10 rounded-lg bg-rose-700 px-3 py-2 text-xs font-extrabold text-white"
+                      onClick={() => {
+                        setConfirmingInstall(false);
+                        void onInstall(keepSettings);
+                      }}
+                      type="button"
+                    >
+                      설치 시작
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div class="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    class="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-700"
+                    disabled={action === 'discard'}
+                    onClick={() => void onDiscard()}
+                    type="button"
+                  >
+                    파일 삭제
+                  </button>
+                  <button
+                    class="inline-flex min-h-10 items-center gap-2 rounded-lg bg-rose-700 px-4 py-2 text-xs font-extrabold text-white"
+                    onClick={() => setConfirmingInstall(true)}
+                    type="button"
+                  >
+                    <UpdateIcon class="size-4" />
+                    펌웨어 설치
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+        <div class="flex gap-4">
+          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">
+            <DownloadIcon class="size-5 rotate-180" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Manual firmware</p>
+            <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">펌웨어 파일 직접 업로드</h3>
+            <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
+              이 장치용 OpenWrt Sysupgrade 이미지(.bin)를 직접 선택할 수 있습니다. 업로드 후 OpenWrt 이미지 검증과 `sysupgrade --test`를 모두 통과해야 설치할 수 있습니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:p-5">
+          <input
+            accept=".bin,application/octet-stream"
+            class="block w-full text-sm font-semibold text-slate-700 file:mr-4 file:min-h-10 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white file:px-4 file:py-2 file:text-xs file:font-extrabold file:text-slate-800 file:ring-1 file:ring-inset file:ring-slate-300"
+            disabled={busy || prepared !== null}
+            onChange={(event) => setSelectedFile(event.currentTarget.files?.[0] ?? null)}
+            ref={fileInput}
+            type="file"
+          />
+          {selectedFile ? (
+            <p class="mt-3 mb-0 text-xs font-bold text-slate-600">{selectedFile.name} · {formatBytes(selectedFile.size)}</p>
+          ) : null}
+
+          {uploadProgress !== null ? (
+            <div class="mt-4">
+              <div class="mb-2 flex items-center justify-between text-xs font-bold text-slate-600">
+                <span>{uploading ? '업로드 및 검증 중' : '업로드 중'}</span>
+                <span>{Math.round(uploadProgress)}%</span>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-slate-200">
+                <div class="h-full rounded-full bg-sky-600 transition-[width]" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          ) : null}
+
+          <div class="mt-4 flex justify-end">
+            <button
+              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedFile || busy || prepared !== null}
+              onClick={() => void uploadSelected()}
+              type="button"
+            >
+              {uploading ? <ReloadIcon class="size-4 animate-spin" /> : <DownloadIcon class="size-4 rotate-180" />}
+              {uploading ? '처리 중...' : '업로드 및 검증'}
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

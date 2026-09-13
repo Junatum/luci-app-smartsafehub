@@ -4,6 +4,9 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 UPDATES_CARD="$ROOT_DIR/frontend/src/components/SoftwareUpdatesCard.tsx"
+FIRMWARE_CARD="$ROOT_DIR/frontend/src/components/FirmwareUpdatesCard.tsx"
+FIRMWARE_HOOK="$ROOT_DIR/frontend/src/hooks/useFirmwareUpdates.ts"
+FIRMWARE_UPLOAD="$ROOT_DIR/frontend/src/api/firmwareUpload.ts"
 UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
 SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
@@ -15,7 +18,7 @@ fail() {
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -183,9 +186,31 @@ if grep -Fq 'resource.data?.lastInstallAt ?? null' "$UPDATES_HOOK"; then
 	fail 'data=null must not be converted into a fake lastInstallAt baseline'
 fi
 
-# Update and device/system management are separate product pages.
+# Software and OpenWrt firmware updates share the product update page while remaining separate subsystems.
 grep -Fq '<SoftwareUpdatesCard' "$UPDATE_PAGE" || \
 	fail 'update page must render the software update experience'
+grep -Fq '<FirmwareUpdatesCard' "$UPDATE_PAGE" || \
+	fail 'update page must render the OpenWrt firmware update experience'
+grep -Fq 'OpenWrt 펌웨어' "$FIRMWARE_CARD" || \
+	fail 'firmware card must expose a dedicated OpenWrt firmware heading'
+grep -Fq '다운로드 및 검증' "$FIRMWARE_CARD" || \
+	fail 'online firmware updates must download and verify before installation'
+grep -Fq '펌웨어 파일 직접 업로드' "$FIRMWARE_CARD" || \
+	fail 'firmware card must support manual sysupgrade image upload'
+grep -Fq '현재 설정 유지' "$FIRMWARE_CARD" || \
+	fail 'firmware install confirmation must expose the keep-settings choice'
+grep -Fq '강제 설치는 제공하지 않으며' "$FIRMWARE_CARD" || \
+	fail 'firmware UI must clearly avoid force-upgrade behavior'
+grep -Fq "const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload must use the dedicated temporary image path'
+grep -Fq "request.open('POST', luciUrl('/cgi-upload'));" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload must use LuCI cgi-upload with the active session'
+grep -Fq 'const ACTIVE_POLL_INTERVAL_MS = 1_000;' "$FIRMWARE_HOOK" || \
+	fail 'firmware check/download/validation phases must be actively polled'
+grep -Fq 'const RECONNECT_INITIAL_DELAY_MS = 15_000;' "$FIRMWARE_HOOK" || \
+	fail 'firmware install must wait for sysupgrade reboot before probing the router'
+grep -Fq 'window.location.reload();' "$FIRMWARE_HOOK" || \
+	fail 'firmware install must reload the UI after the router becomes reachable again'
 if grep -Fq '시스템 상태' "$UPDATE_PAGE" || grep -Fq '시스템 관리' "$UPDATE_PAGE"; then
 	fail 'update page must not mix system status or management controls'
 fi

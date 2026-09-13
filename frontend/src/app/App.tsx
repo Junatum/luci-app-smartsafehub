@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 
 import { AppShell } from '../components/AppShell';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
+import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
@@ -23,6 +24,7 @@ export function App() {
   const route = useHashRoute();
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
+  const firmware = useFirmwareUpdates(route === 'system');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -86,6 +88,7 @@ export function App() {
           actionError={updates.actionError}
           data={updates.data}
           error={updates.error}
+          firmware={firmware}
           loading={updates.loading}
           message={updates.message}
           onCheck={() => void updates.check()}
@@ -204,7 +207,7 @@ export function App() {
     }
 
     if (route === 'system') {
-      void updates.refresh();
+      void Promise.all([updates.refresh(), firmware.refresh()]);
       return;
     }
 
@@ -232,6 +235,7 @@ export function App() {
             dashboardSafeShield.refreshing ||
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing)) ||
+        (route === 'system' && firmware.refreshing) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}

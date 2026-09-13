@@ -7,7 +7,8 @@
           "status",
           "connected_devices",
           "wifi_summary",
-          "updates_status"
+          "updates_status",
+          "firmware_status"
         ],
         "safeshield": [
           "status",
@@ -24,7 +25,12 @@
           "system_reboot",
           "updates_check",
           "updates_install",
-          "updates_settings_update"
+          "updates_settings_update",
+          "firmware_check",
+          "firmware_prepare",
+          "firmware_validate_upload",
+          "firmware_install",
+          "firmware_discard"
         ],
         "safeshield": [
           "set_enabled",
@@ -34,6 +40,14 @@
           "rule_delete",
           "license_get",
           "license_update"
+        ]
+      },
+      "cgi-io": [
+        "upload"
+      ],
+      "file": {
+        "/tmp/smartsafehub-firmware.bin": [
+          "write"
         ]
       }
     }

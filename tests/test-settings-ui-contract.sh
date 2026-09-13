@@ -25,12 +25,12 @@ grep -Fq '<UpdatePage' "$APP" || fail 'system/update route must render UpdatePag
 grep -Fq "case 'settings':" "$APP" || fail 'settings route must be registered in App'
 grep -Fq '<SettingsPage' "$APP" || fail 'settings route must render SettingsPage'
 grep -Fq "if (route === 'system')" "$APP" || fail 'update refresh branch must exist'
-grep -Fq 'void updates.refresh();' "$APP" || fail 'update refresh must only refresh updater state'
+grep -Fq 'void Promise.all([updates.refresh(), firmware.refresh()]);' "$APP" || fail 'update refresh must refresh software and firmware updater state together'
 grep -Fq "if (route === 'settings')" "$APP" || fail 'settings refresh branch must exist'
 grep -Fq 'void status.refresh();' "$APP" || fail 'settings refresh must refresh system state'
 
 grep -Fq "label: '설정'" "$ROUTES" || fail 'settings route must be visible in product navigation'
-grep -Fq "description: 'SmartSafeHub 소프트웨어 업데이트 상태와 자동 설치 일정을 관리합니다.'" "$ROUTES" || \
+grep -Fq "description: 'SmartSafeHub 소프트웨어와 OpenWrt 펌웨어 업데이트를 관리합니다.'" "$ROUTES" || \
 	fail 'update route description must be update-only'
 
 grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \
@@ -41,6 +41,13 @@ grep -Fq 'LuCI 고급 설정 열기' "$SETTINGS_PAGE" || \
 	fail 'LuCI fallback must be explicitly presented as an advanced action'
 grep -Fq 'SmartSafeHub에서 아직 제공하지 않는' "$SETTINGS_PAGE" || \
 	fail 'settings page must explain why LuCI fallback still exists'
+grep -Fq 'title="업데이트 관리"' "$SETTINGS_PAGE" || \
+	fail 'settings page must point users to the integrated update page'
+grep -Fq 'href="#system"' "$SETTINGS_PAGE" || \
+	fail 'settings update action must route to the SmartSafeHub update page'
+if grep -Fq "luciAdminUrl('/admin/system/flash')" "$SETTINGS_PAGE"; then
+	fail 'settings page must not send firmware upgrades to the stock LuCI flash page'
+fi
 if grep -Fq '고급 설정' "$NAVIGATION"; then
 	fail 'navigation chrome must not keep the old standalone advanced-settings menu'
 fi

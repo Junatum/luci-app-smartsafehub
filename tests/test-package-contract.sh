@@ -45,9 +45,12 @@ require_file "$SHELLSPEC_CONTRACTS"
 [ ! -e "$ROOT_DIR/tests/run.sh" ] || fail 'tests/run.sh must not be used; run shellspec directly'
 
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
+require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
+require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 require_executable "$ROOT_DIR/tests/test-static-validation.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
+require_executable "$ROOT_DIR/tests/test-firmware-updater.sh"
 require_executable "$ROOT_DIR/tests/test-package-contract.sh"
 require_executable "$ROOT_DIR/tests/test-document-ui-contract.sh"
 require_executable "$ROOT_DIR/tests/test-reload-safety.sh"
@@ -91,6 +94,8 @@ grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+safeshield([[:space:]]|$)' "$MAKEFIL
 	fail 'LUCI_DEPENDS must include +safeshield'
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+uclient-fetch([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +uclient-fetch for release note downloads'
+grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+jsonfilter([[:space:]]|$)' "$MAKEFILE" || \
+	fail 'LUCI_DEPENDS must include +jsonfilter for firmware metadata validation'
 grep -Eq '^LUCI_EXTRA_DEPENDS:=safeshield \(>=[0-9]+\.[0-9]+\.[0-9]+([._~+-][A-Za-z0-9._~+-]+)?\)$' "$MAKEFILE" || \
 	fail 'LUCI_EXTRA_DEPENDS must require a minimum safeshield version'
 

@@ -116,7 +116,6 @@ export function SettingsPage({
   const memoryUsage = memory ? getMemoryUsage(memory) : null;
   const usedMemory = memoryUsage?.used ?? 0;
   const memoryPercent = Math.round(memoryUsage?.percent ?? 0);
-  const firmwareUrl = luciAdminUrl('/admin/system/flash');
   const advancedSystemUrl = luciAdminUrl('/admin/system');
   const logsUrl = luciAdminUrl('/admin/status/logs');
 
@@ -195,17 +194,17 @@ export function SettingsPage({
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <ActionCard
-            title="펌웨어 업데이트"
-            description="펌웨어 파일 검증과 업로드는 OpenWrt의 검증된 시스템 업그레이드 화면에서 진행합니다."
+            title="업데이트 관리"
+            description="SmartSafeHub 소프트웨어와 OpenWrt 펌웨어 업데이트는 제품 업데이트 페이지에서 함께 관리합니다."
           >
             <a
               class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white no-underline transition hover:bg-teal-800 sm:w-auto"
-              href={firmwareUrl}
+              href="#system"
             >
-              펌웨어 관리 열기
+              업데이트 페이지 열기
             </a>
             <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              같은 화면에서 설정 백업 다운로드와 백업 파일 복원도 수행할 수 있습니다.
+              온라인 Sysupgrade 다운로드와 수동 펌웨어 업로드 모두 SmartSafeHub에서 검증한 뒤 설치합니다.
             </p>
           </ActionCard>
 

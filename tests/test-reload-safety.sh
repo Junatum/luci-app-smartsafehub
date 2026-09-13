@@ -4,6 +4,7 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
+FIRMWARE_HOOK="$ROOT_DIR/frontend/src/hooks/useFirmwareUpdates.ts"
 ASYNC_RESOURCE="$ROOT_DIR/frontend/src/hooks/useAsyncResource.ts"
 RPC="$ROOT_DIR/frontend/src/api/rpc.ts"
 SESSION="$ROOT_DIR/frontend/src/auth/session.ts"
@@ -21,6 +22,7 @@ fail() {
 
 for file in \
 	"$UPDATES_HOOK" \
+	"$FIRMWARE_HOOK" \
 	"$ASYNC_RESOURCE" \
 	"$RPC" \
 	"$SESSION" \
@@ -52,11 +54,15 @@ done
 if grep -Eq 'resource\.error.*(reload|location)|(reload|location).*resource\.error' "$UPDATES_HOOK"; then
 	fail 'software-update resource errors must never be connected to a document reload'
 fi
+if grep -Eq 'resource\.error.*(reload|location)|(reload|location).*resource\.error' "$FIRMWARE_HOOK"; then
+	fail 'firmware resource errors must never be connected to a document reload'
+fi
 
-# The built artifact must not contain multiple full-page reload sites either.
+# The built artifact must contain only the two guarded reload sites: software
+# self-update completion and firmware reboot reconnect.
 built_reload_count="$(grep -o 'location\.reload(' "$BUILT_JS" | wc -l | tr -d '[:space:]')"
-[ "$built_reload_count" = '1' ] || \
-	fail "built frontend must contain exactly one guarded reload site (found $built_reload_count)"
+[ "$built_reload_count" = '2' ] || \
+	fail "built frontend must contain exactly two guarded reload sites (found $built_reload_count)"
 
 # Execute the actual source body of the self-update effect across the historical failure scenarios.
 run_node_typescript() {

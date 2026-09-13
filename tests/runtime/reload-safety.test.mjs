@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = fileURLToPath(new URL('../..', import.meta.url));
 const updatesHookPath = join(rootDir, 'frontend/src/hooks/useSoftwareUpdates.ts');
+const firmwareHookPath = join(rootDir, 'frontend/src/hooks/useFirmwareUpdates.ts');
 const updatesHook = readFileSync(updatesHookPath, 'utf8');
+const firmwareHook = readFileSync(firmwareHookPath, 'utf8');
 
 function collectSourceFiles(directory) {
   const files = [];
@@ -52,8 +54,25 @@ for (const file of collectSourceFiles(join(rootDir, 'frontend/src'))) {
 
 assert.deepEqual(
   navigationSites,
-  [{ file: 'frontend/src/hooks/useSoftwareUpdates.ts', method: 'reload' }],
-  'full-document navigation must stay restricted to the guarded self-update reload path',
+  [
+    { file: 'frontend/src/hooks/useFirmwareUpdates.ts', method: 'reload' },
+    { file: 'frontend/src/hooks/useSoftwareUpdates.ts', method: 'reload' },
+  ],
+  'full-document navigation must stay restricted to guarded software-update and firmware-reconnect paths',
+);
+
+assert.ok(
+  firmwareHook.includes('const RECONNECT_INITIAL_DELAY_MS = 15_000;'),
+  'firmware reconnect must wait before probing the router after sysupgrade starts',
+);
+assert.ok(
+  firmwareHook.includes('if (response.ok) {\n          window.location.reload();'),
+  'firmware reload must only occur after the router responds successfully again',
+);
+assert.equal(
+  (firmwareHook.match(/window\.location\.reload\(\);/g) ?? []).length,
+  1,
+  'firmware reconnect path must contain exactly one reload call',
 );
 
 const effectStartMarker = '  useEffect(() => {';

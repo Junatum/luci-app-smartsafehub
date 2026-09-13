@@ -47,6 +47,27 @@ uci_get() {
 	"$UCI_BIN" -q get "smartsafehub.updates.$1" 2>/dev/null || true
 }
 
+default_auto_install() {
+	local line
+	[ -f "$REPOSITORY_FILE" ] || { printf '0'; return 0; }
+
+	while IFS= read -r line || [ -n "$line" ]; do
+		case "$line" in
+			''|'#'*) continue ;;
+			*/stable/packages/*)
+				printf '1'
+				return 0
+				;;
+			*/beta/packages/*)
+				printf '0'
+				return 0
+				;;
+		esac
+	done < "$REPOSITORY_FILE"
+
+	printf '0'
+}
+
 load_settings() {
 	local value
 
@@ -63,7 +84,11 @@ load_settings() {
 	CHECK_INTERVAL_S="$value"
 
 	value="$(uci_get auto_install)"
-	[ "$value" = "1" ] && AUTO_INSTALL=1 || AUTO_INSTALL=0
+	case "$value" in
+		1) AUTO_INSTALL=1 ;;
+		0) AUTO_INSTALL=0 ;;
+		*) AUTO_INSTALL="$(default_auto_install)" ;;
+	esac
 
 	value="$(uci_get auto_install_time)"
 	case "$value" in

@@ -4,6 +4,27 @@ SmartSafeHub LuCI 애플리케이션의 정식 배포 변경 사항을 기록합
 
 버전은 애플리케이션 버전과 OpenWrt 패키지 릴리스를 함께 표기합니다. 예를 들어 `0.2.0-r1`은 애플리케이션 버전 `0.2.0`, 패키지 릴리스 `1`을 의미합니다.
 
+## [0.2.14-r2] - 2026-09-13
+
+### 기능
+
+- SmartSafeHub 업데이트 페이지에 OpenWrt 펌웨어 업데이트 영역을 추가했습니다. Hub의 `POST /api/v1/firmware/resolve`를 이용해 현재 장치·채널·빌드 기준 최신 Sysupgrade를 확인하고, 온라인 다운로드 또는 `.bin` 파일 직접 업로드 후 자체 화면에서 설치할 수 있습니다.
+- 펌웨어 확인 전용 `smartsafehub-firmware` helper와 procd daemon, rpcd ucode API를 추가했습니다. 펌웨어 자동 확인은 기본 활성화하고 6시간 간격으로 실행하지만 펌웨어 자동 설치는 제공하지 않습니다.
+- 신규 Stable 설치에서 SmartSafeHub 애플리케이션 자동 설치를 기본 활성화하고 Beta에서는 기본 비활성화했습니다. 기존 장치에 명시적으로 저장된 `auto_install` 값은 그대로 유지합니다.
+- 업데이트 페이지에서 소프트웨어 업데이트와 펌웨어 업데이트를 함께 새로고침하도록 통합하고, 설정 페이지의 기존 LuCI 펌웨어 화면 링크는 자체 업데이트 페이지 링크로 교체했습니다.
+
+### 보안 및 안정성
+
+- 온라인 펌웨어는 Hub의 장치 코드·채널·빌드 식별자를 재검증하고 HTTPS 다운로드, 정확한 파일 크기, SHA-256, `system.validate_firmware_image`, `sysupgrade --test`를 모두 통과한 경우에만 설치할 수 있습니다. 설치 직전에도 SHA-256과 OpenWrt 검증을 다시 수행합니다. 펌웨어 확인이 실패하면 이전 resolve 응답을 즉시 폐기해 오래된 배포 정보를 재사용하지 않습니다.
+- 수동 업로드도 온라인 이미지와 같은 OpenWrt 검증 경로를 사용하며, 강제 `sysupgrade` 옵션은 UI와 helper에서 제공하지 않습니다.
+- 검증 결과가 설정 보존을 허용하는 경우에만 현재 설정 유지 설치를 허용하고, 펌웨어 설치 시작 뒤에는 공유기가 다시 응답할 때까지 현재 주소를 안전하게 재확인한 후 화면을 새로고침합니다.
+- 지원 장치 식별을 `iptime-ax3000sm`, `gl-mt300n-v2`, `xiaomi-ax3000t`로 제한하고 `/usr/share/smartsafehub/firmware.json`의 `device_code`와 `build_id`를 우선 사용하도록 했습니다.
+
+### 테스트
+
+- Hub resolve 요청, 온라인 다운로드 무결성 검증, OpenWrt 이미지 검증, 수동 업로드, 준비 파일 정리와 강제 업그레이드 금지 동작을 mock 기반 shell 테스트로 추가했습니다.
+- firmware RPC/ACL, 패키지 의존성, 업데이트 UI, 재부팅 후 reconnect/reload 안전성, Stable/Beta 자동 설치 기본값을 contract 테스트에 추가했습니다.
+
 ## [0.2.14-r1] - 2026-09-13
 
 ### 개선

@@ -72,15 +72,16 @@ function read_update_settings() {
 	}
 
 	const auto_install_time = string_value(section?.auto_install_time, '03:00');
+	const channel = read_update_channel();
 
 	return {
 		checkEnabled: boolean_option(section?.check_enabled, true),
 		checkIntervalSeconds: interval,
-		autoInstall: boolean_option(section?.auto_install, false),
+		autoInstall: boolean_option(section?.auto_install, channel == 'stable'),
 		autoInstallTime: match(auto_install_time, /^([01][0-9]|2[0-3]):[0-5][0-9]$/) != null
 			? auto_install_time
 			: '03:00',
-		channel: read_update_channel(),
+		channel: channel,
 		repositoryHost: string_value(section?.repository_host, 'repo.smartsafehub.com'),
 		updatePackage: UPDATE_PACKAGE,
 	};

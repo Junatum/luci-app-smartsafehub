@@ -1,4 +1,6 @@
+import { FirmwareUpdatesCard } from '../components/FirmwareUpdatesCard';
 import { SoftwareUpdatesCard } from '../components/SoftwareUpdatesCard';
+import type { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import type { SoftwareUpdateAction } from '../hooks/useSoftwareUpdates';
 import type {
   SoftwareUpdateSettingsInput,
@@ -10,6 +12,7 @@ interface UpdatePageProps {
   actionError: string | null;
   data: SoftwareUpdateStatus | null;
   error: string | null;
+  firmware: ReturnType<typeof useFirmwareUpdates>;
   loading: boolean;
   message: string | null;
   onCheck: () => void;
@@ -24,6 +27,7 @@ export function UpdatePage({
   actionError,
   data,
   error,
+  firmware,
   loading,
   message,
   onCheck,
@@ -33,7 +37,7 @@ export function UpdatePage({
   onSaveSettings,
 }: UpdatePageProps) {
   return (
-    <section class="min-w-0">
+    <section class="min-w-0 space-y-5">
       <SoftwareUpdatesCard
         action={action}
         actionError={actionError}
@@ -46,6 +50,23 @@ export function UpdatePage({
         onInstall={onInstall}
         onRetry={onRetry}
         onSaveSettings={onSaveSettings}
+      />
+      <FirmwareUpdatesCard
+        action={firmware.action}
+        actionError={firmware.actionError}
+        data={firmware.data}
+        error={firmware.error}
+        loading={firmware.loading}
+        message={firmware.message}
+        reconnecting={firmware.reconnecting}
+        uploadProgress={firmware.uploadProgress}
+        onCheck={() => void firmware.check()}
+        onDiscard={firmware.discard}
+        onDismissFeedback={firmware.dismissFeedback}
+        onInstall={firmware.install}
+        onPrepare={() => void firmware.prepare()}
+        onRetry={() => void firmware.refresh()}
+        onUpload={firmware.upload}
       />
     </section>
   );

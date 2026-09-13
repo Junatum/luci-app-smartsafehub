@@ -112,4 +112,11 @@ Describe 'SmartSafeHub shell contract suite'
     The output should start with 'PASS:'
     The error should be blank
   End
+
+  It 'passes firmware updater contract'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-firmware-updater.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
 End
