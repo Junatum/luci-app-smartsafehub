@@ -56,7 +56,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     hash: '#system',
     label: '업데이트',
     title: '업데이트',
-    description: 'SmartSafeHub 소프트웨어와 OpenWrt 펌웨어 업데이트를 관리합니다.',
+    description: '기기의 펌웨어와 SmartSafeHub 소프트웨어 업데이트를 관리합니다.',
   },
   {
     route: 'settings',

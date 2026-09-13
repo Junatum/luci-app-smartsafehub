@@ -23,8 +23,8 @@ for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD"
 done
 
 # Update status should read as a product summary instead of a package-manager panel.
-grep -Fq 'SmartSafeHub 업데이트' "$UPDATES_CARD" || \
-	fail 'update card must expose the SmartSafeHub update heading'
+grep -Fq 'SmartSafeHub 소프트웨어' "$UPDATES_CARD" || \
+	fail 'software update card must use a product-specific software heading'
 for label in Installed Available 'Last check' 'Auto install'; do
 	grep -Fq "$label" "$UPDATES_CARD" || \
 		fail "update summary must include $label"
@@ -39,6 +39,14 @@ if grep -Fq 'LoaderIcon' "$UPDATES_CARD" || grep -Fq 'RefreshIcon' "$UPDATES_CAR
 fi
 grep -Fq '업데이트 설치' "$UPDATES_CARD" || \
 	fail 'update card must provide an explicit install action'
+
+# Desktop should use the available width for software status and settings without making every card full-width.
+grep -Fq "grid xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" "$UPDATES_CARD" || \
+	fail 'software update area must become a two-column layout on wide screens'
+grep -Fq 'data-section="software-update-status"' "$UPDATES_CARD" || \
+	fail 'software update status card must remain a distinct responsive section'
+grep -Fq 'data-section="software-update-settings"' "$UPDATES_CARD" || \
+	fail 'software automatic-update settings must remain a distinct responsive section'
 
 # Busy update work should have persistent visual feedback rather than relying on hover text.
 grep -Fq "const installing = action === 'install' || data?.phase === 'installing';" "$UPDATES_CARD" || \
@@ -186,20 +194,41 @@ if grep -Fq 'resource.data?.lastInstallAt ?? null' "$UPDATES_HOOK"; then
 	fail 'data=null must not be converted into a fake lastInstallAt baseline'
 fi
 
-# Software and OpenWrt firmware updates share the product update page while remaining separate subsystems.
+# Firmware is the primary update experience and manual install stays inside the same card.
 grep -Fq '<SoftwareUpdatesCard' "$UPDATE_PAGE" || \
 	fail 'update page must render the software update experience'
 grep -Fq '<FirmwareUpdatesCard' "$UPDATE_PAGE" || \
-	fail 'update page must render the OpenWrt firmware update experience'
-grep -Fq 'OpenWrt 펌웨어' "$FIRMWARE_CARD" || \
-	fail 'firmware card must expose a dedicated OpenWrt firmware heading'
+	fail 'update page must render the firmware update experience'
+firmware_line="$(grep -n -m1 '<FirmwareUpdatesCard' "$UPDATE_PAGE" | cut -d: -f1)"
+software_line="$(grep -n -m1 '<SoftwareUpdatesCard' "$UPDATE_PAGE" | cut -d: -f1)"
+[ "$firmware_line" -lt "$software_line" ] || \
+	fail 'firmware update must be shown before SmartSafeHub software updates'
+grep -Fq '>펌웨어</h2>' "$FIRMWARE_CARD" || \
+	fail 'firmware card must use the customer-facing firmware heading'
+if grep -Fq 'OpenWrt 펌웨어' "$FIRMWARE_CARD"; then
+	fail 'firmware card must not expose OpenWrt as the customer-facing firmware product name'
+fi
+grep -Fq 'data-component="firmware-update-card"' "$FIRMWARE_CARD" || \
+	fail 'firmware update must have one primary product card'
+grep -Fq 'data-section="manual-firmware"' "$FIRMWARE_CARD" || \
+	fail 'manual firmware install must be grouped into the primary firmware card'
+manual_line="$(grep -n -m1 'data-section="manual-firmware"' "$FIRMWARE_CARD" | cut -d: -f1)"
+card_close_line="$(grep -n '</article>' "$FIRMWARE_CARD" | tail -1 | cut -d: -f1)"
+[ "$manual_line" -lt "$card_close_line" ] || \
+	fail 'manual firmware install must stay inside the primary firmware card'
+grep -Fq '수동 펌웨어 설치' "$FIRMWARE_CARD" || \
+	fail 'firmware card must expose a clear manual install fallback'
+grep -Fq 'group border-t border-slate-200 bg-slate-50/70' "$FIRMWARE_CARD" || \
+	fail 'manual firmware fallback must be compact and collapsible by default'
+grep -Fq '현재 펌웨어의 버전 정보를 완전히 확인할 수 없습니다.' "$FIRMWARE_CARD" || \
+	fail 'missing build metadata must use customer-friendly warning copy'
+grep -Fq '기술 상세 보기' "$FIRMWARE_CARD" || \
+	fail 'technical firmware metadata details must stay behind a disclosure'
 grep -Fq '다운로드 및 검증' "$FIRMWARE_CARD" || \
 	fail 'online firmware updates must download and verify before installation'
-grep -Fq '펌웨어 파일 직접 업로드' "$FIRMWARE_CARD" || \
-	fail 'firmware card must support manual sysupgrade image upload'
 grep -Fq '현재 설정 유지' "$FIRMWARE_CARD" || \
 	fail 'firmware install confirmation must expose the keep-settings choice'
-grep -Fq '강제 설치는 제공하지 않으며' "$FIRMWARE_CARD" || \
+grep -Fq '강제 설치는 제공하지 않습니다.' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must clearly avoid force-upgrade behavior'
 grep -Fq "const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';" "$FIRMWARE_UPLOAD" || \
 	fail 'manual firmware upload must use the dedicated temporary image path'

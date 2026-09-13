@@ -230,8 +230,8 @@ export function SoftwareUpdatesCard({
   };
 
   return (
-    <div class="min-w-0 space-y-4 lg:col-span-2">
-      <article class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
+    <div class={`min-w-0 gap-4 ${data ? 'grid xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]' : 'space-y-4'}`}>
+      <article class="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5" data-section="software-update-status">
         <div class="p-5 sm:p-6">
           <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div class="flex min-w-0 gap-4">
@@ -253,10 +253,10 @@ export function SoftwareUpdatesCard({
                   ) : null}
                 </div>
                 <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">
-                  SmartSafeHub 업데이트
+                  SmartSafeHub 소프트웨어
                 </h2>
                 <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-                  SmartSafeHub 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다. OpenWrt 기반 펌웨어는 아래 펌웨어 영역에서 별도로 확인하고 설치할 수 있습니다.
+                  SmartSafeHub 관리 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.
                 </p>
               </div>
             </div>
@@ -435,7 +435,7 @@ export function SoftwareUpdatesCard({
 
         {data ? (
           <div class="px-5 pb-5 sm:px-6 sm:pb-6">
-            <dl class="grid overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+            <dl class="grid overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2">
               <div class="bg-white p-4">
                 <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
                   Installed
@@ -482,7 +482,7 @@ export function SoftwareUpdatesCard({
       {data ? (
         <>
           {data.updateCount > 0 ? (
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:col-start-1">
               <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div>
                   <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
@@ -568,7 +568,7 @@ export function SoftwareUpdatesCard({
               )}
             </section>
           ) : data.lastCheckAt ? (
-            <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-6">
+            <section class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:p-6 xl:col-start-1">
               <div class="flex gap-3">
                 <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700">
                   <CheckCircleIcon class="size-5" />
@@ -582,7 +582,7 @@ export function SoftwareUpdatesCard({
               </div>
             </section>
           ) : (
-            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
+            <section class="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6 xl:col-start-1">
               <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex min-w-0 gap-3">
                   <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-slate-500 ring-1 ring-inset ring-slate-200">
@@ -608,7 +608,10 @@ export function SoftwareUpdatesCard({
             </section>
           )}
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-start"
+            data-section="software-update-settings"
+          >
             <div class="flex gap-4">
               <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">
                 <SettingsIcon class="size-5" />

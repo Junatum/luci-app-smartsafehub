@@ -87,7 +87,8 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ### 업데이트
 
-- 하나의 SmartSafeHub 업데이트 페이지에서 애플리케이션 패키지 업데이트와 OpenWrt 펌웨어 업데이트를 함께 관리
+- 하나의 SmartSafeHub 업데이트 페이지에서 기기 펌웨어와 SmartSafeHub 애플리케이션 업데이트를 함께 관리하며, 펌웨어를 최상단의 주요 업데이트 영역으로 표시
+- 데스크톱에서는 SmartSafeHub 소프트웨어 상태와 자동 업데이트 설정을 2열로 배치하고, 모바일에서는 동일 정보를 1열로 순차 표시
 - `luci-app-smartsafehub`의 설치 버전과 저장소 업데이트 버전, 새 버전의 릴리즈 요약과 배포일 표시
 - 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 SmartSafeHub 애플리케이션 업데이트 표시
 - 애플리케이션은 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치를 지원하며, 명시적 설정이 없는 신규 설치에서는 Stable 채널만 자동 설치를 기본 활성화하고 Beta 채널은 비활성화
@@ -98,7 +99,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 펌웨어는 현재 패키지 저장소 channel과 장치 코드를 사용해 Hub의 `POST /api/v1/firmware/resolve` API에서 이 장치용 최신 Sysupgrade 배포를 확인
 - 펌웨어 자동 확인은 기본 활성화되어 6시간 간격으로 수행하며, 실제 펌웨어 자동 설치는 제공하지 않고 사용자의 명시적인 최종 확인이 있어야 설치
 - 온라인 펌웨어는 Hub가 제공한 파일 크기와 SHA-256을 검증한 뒤 OpenWrt `system.validate_firmware_image`와 `sysupgrade --test`를 모두 통과한 경우에만 설치 준비 완료로 표시
-- `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용
+- `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용. 수동 설치는 온라인 펌웨어 업데이트와 같은 카드 안의 접이식 보조 영역으로 제공
 - 설정 유지가 가능한 이미지에서는 기본적으로 현재 설정을 유지하고, 검증 결과가 설정 보존을 허용하지 않는 이미지는 해당 선택을 비활성화
 - 강제 `sysupgrade`는 SmartSafeHub UI와 helper에서 제공하지 않음
 - 지원 장치 코드는 `iptime-ax3000sm`, `gl-mt300n-v2`, `xiaomi-ax3000t`이며 빌드 이미지에는 정확한 현재 빌드를 식별할 수 있도록 `/usr/share/smartsafehub/firmware.json`을 포함하는 것을 권장
@@ -118,7 +119,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 ### 설정
 
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
-- SmartSafeHub 소프트웨어와 OpenWrt 펌웨어 업데이트 화면으로 이동
+- 기기 펌웨어와 SmartSafeHub 소프트웨어 업데이트 화면으로 이동
 - 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 고급 기능은 LuCI 고급 설정을 fallback으로 사용
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
