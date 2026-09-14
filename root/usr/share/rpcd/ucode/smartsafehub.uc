@@ -4,7 +4,9 @@
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
 	read_status,
-	reboot_system
+	read_time_settings,
+	reboot_system,
+	update_timezone
 } from './smartsafehub/system.uc';
 import {
 	check_firmware,
@@ -117,6 +119,19 @@ const methods = {
 	firmware_discard: {
 		call: function(request) {
 			return discard_firmware(request);
+		},
+	},
+	system_time_settings: {
+		call: function(request) {
+			return read_time_settings(request);
+		},
+	},
+	system_timezone_update: {
+		args: {
+			zonename: '',
+		},
+		call: function(request) {
+			return update_timezone(request);
 		},
 	},
 	system_reboot: {

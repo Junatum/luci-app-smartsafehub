@@ -71,6 +71,13 @@ Describe 'SmartSafeHub shell contract suite'
     The error should be blank
   End
 
+  It 'passes system timezone contract'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-system-time-contract.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'passes ucode import contract'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-ucode-imports.sh"
     The status should be success

@@ -11,6 +11,7 @@ import { useSafeShieldStatus } from '../hooks/useSafeShieldStatus';
 import { useSoftwareUpdates } from '../hooks/useSoftwareUpdates';
 import { useStatus } from '../hooks/useStatus';
 import { useSystemActions } from '../hooks/useSystemActions';
+import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useWifi } from '../hooks/useWifi';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
@@ -34,6 +35,7 @@ export function App() {
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
+  const systemTime = useSystemTimeSettings(route === 'settings');
   const safeshieldActions = useSafeShieldActions(
     safeshield.refresh,
     safeshieldStatistics.refresh,
@@ -110,10 +112,18 @@ export function App() {
           feedbackMessage={systemActions.message}
           loading={status.loading}
           onDismissFeedback={systemActions.dismissFeedback}
+          onDismissTimeFeedback={systemTime.dismissSaveFeedback}
           onDownloadDiagnostics={() => void systemActions.downloadDiagnostics()}
           onReboot={() => void systemActions.reboot()}
-          onRetry={() => void status.refresh()}
+          onRetry={() => void Promise.all([status.refresh(), systemTime.refresh()])}
+          onSaveTimezone={systemTime.saveTimezone}
           rebootAccepted={systemActions.rebootAccepted}
+          timeData={systemTime.data}
+          timeError={systemTime.error}
+          timeLoading={systemTime.loading}
+          timeSaveError={systemTime.saveError}
+          timeSaveMessage={systemTime.saveMessage}
+          timeSaving={systemTime.saving}
         />
       );
       break;
@@ -212,7 +222,7 @@ export function App() {
     }
 
     if (route === 'settings') {
-      void status.refresh();
+      void Promise.all([status.refresh(), systemTime.refresh()]);
       return;
     }
 
@@ -236,6 +246,7 @@ export function App() {
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
+        (route === 'settings' && systemTime.refreshing) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}

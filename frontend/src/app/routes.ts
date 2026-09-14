@@ -63,7 +63,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     hash: '#settings',
     label: '설정',
     title: '설정',
-    description: '시스템 상태를 확인하고 장치 관리와 고급 설정 진입점을 관리합니다.',
+    description: '시스템 상태와 시간대를 확인하고 장치 관리 및 진단 기능을 설정합니다.',
   },
 ] as const;
 

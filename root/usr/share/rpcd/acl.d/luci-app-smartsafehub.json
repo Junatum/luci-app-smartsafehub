@@ -8,7 +8,8 @@
           "connected_devices",
           "wifi_summary",
           "updates_status",
-          "firmware_status"
+          "firmware_status",
+          "system_time_settings"
         ],
         "safeshield": [
           "status",
@@ -22,6 +23,7 @@
       "ubus": {
         "smartsafehub": [
           "wifi_update",
+          "system_timezone_update",
           "system_reboot",
           "updates_check",
           "updates_install",

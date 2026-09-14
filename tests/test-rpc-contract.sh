@@ -30,7 +30,8 @@ assert_acl_method() {
 }
 
 for method in updates_status updates_check updates_install updates_settings_update \
-	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard; do
+	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
+	system_time_settings system_timezone_update; do
 	assert_rpc_method "$method"
 done
 
@@ -46,6 +47,8 @@ assert_acl_method read firmware_status
 for method in firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard; do
 	assert_acl_method write "$method"
 done
+assert_acl_method read system_time_settings
+assert_acl_method write system_timezone_update
 
 jq -e '."luci-app-smartsafehub".write."cgi-io" | index("upload") != null' "$ACL" >/dev/null || \
 	fail 'firmware upload must be allowed through cgi-io upload ACL'

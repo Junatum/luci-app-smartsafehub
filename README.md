@@ -119,13 +119,18 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 ### 설정
 
 - 현재 펌웨어, 실행 시간, 메모리와 부하 표시
-- 기기 펌웨어와 관리 소프트웨어 업데이트 화면으로 이동
-- 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 고급 기능은 LuCI 고급 설정을 fallback으로 사용
+- 장치의 현재 시간, IANA 시간대와 NTP 자동 동기화 사용 상태 표시
+- OpenWrt/LuCI의 실제 시간대 데이터베이스를 사용해 `system.@system[0].zonename`과 대응하는 `timezone` 값을 함께 저장하고 즉시 적용
+- 브라우저 시간대가 장치에서 지원되는 경우 `브라우저 시간대 사용`으로 빠르게 선택 가능
+- 시간대 변경 시 관리 소프트웨어 자동 설치의 날짜·시각 marker를 초기화하고 updater를 다시 시작해 새 로컬 시간 기준으로 일정을 재계산
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
 - 진단 파일에는 호스트명, WAN IPv4와 Wi-Fi SSID가 포함될 수 있으므로 외부 전달 전 확인 필요
 - 명시적인 확인 절차가 포함된 공유기 재부팅
-- SmartSafeHub에서 아직 제공하지 않는 항목만 설정 화면의 보조 동작을 통해 LuCI 고급 설정과 시스템 로그로 이동
+- 업데이트 관리는 전용 `업데이트` 메뉴에만 두고 설정 화면의 중복 업데이트 진입점은 제공하지 않음
+- 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 항목만 LuCI 고급 설정과 시스템 로그를 fallback으로 사용
+
+시간대 설정은 로그와 통계뿐 아니라 관리 소프트웨어의 예약 설치 시각에도 영향을 줍니다. 저장 시 LuCI가 제공하는 시간대 목록에서 선택 값을 검증하고 IANA `zonename`과 POSIX `timezone`을 함께 기록합니다. 런타임 적용에 실패하면 이전 UCI 값을 복원합니다.
 
 진단 파일은 설정 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
 
@@ -322,6 +327,7 @@ ubus call smartsafehub status '{}'
 ```bash
 ubus call smartsafehub wifi_summary '{}'
 ubus call smartsafehub connected_devices '{}'
+ubus call smartsafehub system_time_settings '{}'
 ubus call safeshield status '{}'
 ubus call safeshield config '{}'
 ubus call safeshield rules_list '{}'
@@ -434,9 +440,10 @@ ubus -v list smartsafehub
 ubus call smartsafehub status '{}'
 ubus call smartsafehub wifi_summary '{}'
 ubus call smartsafehub connected_devices '{}'
+ubus call smartsafehub system_time_settings '{}'
 ```
 
-브라우저에서는 홈, Wi-Fi 조회·변경, Wi-Fi reload 뒤 상태 재조회, 연결 기기, SafeShield 상태·갱신, 사용자 규칙, 진단 다운로드, 메뉴 재진입 데이터 갱신, 다른 LuCI 화면 이동 뒤 폴링 종료, 자산 로드 실패 화면, 설정 메뉴의 LuCI 보조 진입점과 모바일 메뉴를 확인합니다. 재부팅은 테스트 장치에서만 실행합니다.
+브라우저에서는 홈, Wi-Fi 조회·변경, Wi-Fi reload 뒤 상태 재조회, 연결 기기, SafeShield 상태·갱신, 사용자 규칙, 진단 다운로드, 시간대 조회·변경과 현재 시간 표시, 메뉴 재진입 데이터 갱신, 다른 LuCI 화면 이동 뒤 폴링 종료, 자산 로드 실패 화면, 설정 메뉴의 LuCI 보조 진입점과 모바일 메뉴를 확인합니다. 재부팅과 실제 시간대 변경은 테스트 장치에서만 실행합니다.
 
 생성된 `app.js` 계약 테스트는 minify 과정에서 변경될 수 있는 TypeScript 식별자 이름에 의존하지 않고, 사용자 동작에 필요한 값과 결과물이 실제 번들에 포함되었는지를 검증합니다.
 

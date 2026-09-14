@@ -55,6 +55,7 @@ require_executable "$ROOT_DIR/tests/test-package-contract.sh"
 require_executable "$ROOT_DIR/tests/test-document-ui-contract.sh"
 require_executable "$ROOT_DIR/tests/test-reload-safety.sh"
 require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"
+require_executable "$ROOT_DIR/tests/test-system-time-contract.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 
 pkg_version="$(make_value PKG_VERSION)"

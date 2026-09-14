@@ -4,7 +4,10 @@ import type {
   FirmwareStatus,
 } from '../types/firmware';
 import type { SmartSafeHubStatus } from '../types/status';
-import type { SystemRebootResult } from '../types/system';
+import type {
+  SystemRebootResult,
+  SystemTimeSettings,
+} from '../types/system';
 import type {
   SoftwareUpdateAccepted,
   SoftwareUpdateSettings,
@@ -80,6 +83,16 @@ export function updateSoftwareUpdateSettings(
     auto_install: input.autoInstall,
     auto_install_time: input.autoInstallTime,
   });
+}
+
+export function fetchSystemTimeSettings(): Promise<SystemTimeSettings> {
+  return callApi(API_OBJECT, 'system_time_settings');
+}
+
+export function updateSystemTimezone(
+  zonename: string,
+): Promise<SystemTimeSettings> {
+  return callApi(API_OBJECT, 'system_timezone_update', { zonename });
 }
 
 export function requestSystemReboot(): Promise<SystemRebootResult> {

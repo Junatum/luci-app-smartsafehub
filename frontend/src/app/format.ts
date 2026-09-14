@@ -72,6 +72,27 @@ export function formatTimestamp(timestamp: number): string {
   return TIMESTAMP_FORMATTER.format(new Date(timestamp * 1000));
 }
 
+export function formatTimestampInTimezone(
+  timestamp: number,
+  zonename: string,
+): string {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return '확인 불가';
+  }
+
+  const normalizedZonename = zonename.replaceAll(' ', '_');
+
+  try {
+    return new Intl.DateTimeFormat('ko-KR', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: normalizedZonename,
+    }).format(new Date(timestamp * 1000));
+  } catch {
+    return TIMESTAMP_FORMATTER.format(new Date(timestamp * 1000));
+  }
+}
+
 export function formatInterval(totalSeconds: number): string {
   if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
     return '확인 불가';

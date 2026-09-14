@@ -27,6 +27,7 @@ for script in \
 	tests/test-update-ui-contract.sh \
 	tests/test-reload-safety.sh \
 	tests/test-settings-ui-contract.sh \
+	tests/test-system-time-contract.sh \
 	tests/test-rpc-contract.sh \
 	tests/test-rules-ui-contract.sh \
 	tests/test-safeshield-page-contract.sh \

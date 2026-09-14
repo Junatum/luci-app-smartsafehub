@@ -1,14 +1,22 @@
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 import {
   formatBytes,
   formatLoadAverage,
+  formatTimestampInTimezone,
   formatUptime,
   getMemoryUsage,
 } from '../app/format';
+import {
+  ClockIcon,
+  DownloadIcon,
+  PowerIcon,
+  SettingsIcon,
+} from '../components/Icons';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { SmartSafeHubStatus } from '../types/status';
+import type { SystemTimeSettings } from '../types/system';
 import { luciAdminUrl } from '../utils/luci';
 
 interface SettingsPageProps {
@@ -19,10 +27,18 @@ interface SettingsPageProps {
   feedbackMessage: string | null;
   loading: boolean;
   rebootAccepted: boolean;
+  timeData: SystemTimeSettings | null;
+  timeError: string | null;
+  timeLoading: boolean;
+  timeSaveError: string | null;
+  timeSaveMessage: string | null;
+  timeSaving: boolean;
   onDismissFeedback: () => void;
+  onDismissTimeFeedback: () => void;
   onDownloadDiagnostics: () => void;
   onReboot: () => void;
   onRetry: () => void;
+  onSaveTimezone: (zonename: string) => Promise<boolean>;
 }
 
 function InfoCard(props: { label: string; value: string; description: string }) {
@@ -42,6 +58,7 @@ function InfoCard(props: { label: string; value: string; description: string }) 
 function ActionCard(props: {
   title: string;
   description: string;
+  icon: ComponentChildren;
   children?: ComponentChildren;
   danger?: boolean;
 }) {
@@ -51,22 +68,224 @@ function ActionCard(props: {
         props.danger ? 'border-rose-200' : 'border-slate-200'
       }`}
     >
-      <h2
-        class={`m-0 text-xl font-black ${
-          props.danger ? 'text-rose-950' : 'text-slate-950'
-        }`}
-      >
-        {props.title}
-      </h2>
-      <p
-        class={`mt-2 mb-0 text-sm leading-6 ${
-          props.danger ? 'text-rose-700' : 'text-slate-500'
-        }`}
-      >
-        {props.description}
-      </p>
+      <div class="flex min-w-0 items-start gap-4">
+        <div
+          class={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+            props.danger
+              ? 'bg-rose-50 text-rose-700'
+              : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          {props.icon}
+        </div>
+        <div class="min-w-0">
+          <h2
+            class={`m-0 text-lg font-black ${
+              props.danger ? 'text-rose-950' : 'text-slate-950'
+            }`}
+          >
+            {props.title}
+          </h2>
+          <p
+            class={`mt-1.5 mb-0 text-sm leading-6 ${
+              props.danger ? 'text-rose-700' : 'text-slate-500'
+            }`}
+          >
+            {props.description}
+          </p>
+        </div>
+      </div>
       <div class="mt-5">{props.children}</div>
     </article>
+  );
+}
+
+function browserTimezone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
+function TimeSettingsCard(props: {
+  localtime: number;
+  data: SystemTimeSettings | null;
+  error: string | null;
+  loading: boolean;
+  saveError: string | null;
+  saveMessage: string | null;
+  saving: boolean;
+  onDismissFeedback: () => void;
+  onRetry: () => void;
+  onSave: (zonename: string) => Promise<boolean>;
+}) {
+  const [selectedTimezone, setSelectedTimezone] = useState('');
+  const [displayedLocaltime, setDisplayedLocaltime] = useState(props.localtime);
+  const detectedBrowserTimezone = browserTimezone();
+
+  useEffect(() => {
+    if (props.data?.zonename) {
+      setSelectedTimezone(props.data.zonename);
+    }
+  }, [props.data?.zonename]);
+
+  useEffect(() => {
+    const baseLocaltime = props.localtime;
+    const startedAt = Date.now();
+    setDisplayedLocaltime(baseLocaltime);
+
+    if (!Number.isFinite(baseLocaltime) || baseLocaltime <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setDisplayedLocaltime(
+        baseLocaltime + Math.floor((Date.now() - startedAt) / 1000),
+      );
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [props.localtime]);
+
+  const zones = props.data
+    ? Object.keys(props.data.timezones).sort((left, right) =>
+        left.localeCompare(right),
+      )
+    : [];
+  const currentTimezone = props.data?.zonename ?? 'UTC';
+  const currentTime = formatTimestampInTimezone(
+    displayedLocaltime,
+    currentTimezone,
+  );
+  const browserTimezoneAvailable =
+    detectedBrowserTimezone !== null &&
+    props.data?.timezones[detectedBrowserTimezone] !== undefined;
+  const changed =
+    props.data !== null &&
+    selectedTimezone.length > 0 &&
+    selectedTimezone !== props.data.zonename;
+
+  return (
+    <ActionCard
+      description="공유기의 기준 시간대를 설정합니다. 로그, 통계와 예약된 자동 설치 시각도 이 시간대를 기준으로 동작합니다."
+      icon={<ClockIcon class="size-5" />}
+      title="시간 및 시간대"
+    >
+      {(props.saveError || props.saveMessage) && (
+        <div
+          class={`mb-5 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+            props.saveError
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          <span class="min-w-0">{props.saveError || props.saveMessage}</span>
+          <button
+            class="shrink-0 rounded-lg px-2 py-1 text-xs font-extrabold hover:bg-black/5"
+            onClick={props.onDismissFeedback}
+            type="button"
+          >
+            닫기
+          </button>
+        </div>
+      )}
+
+      {props.error && !props.data ? (
+        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <p class="m-0 text-sm font-bold text-rose-800">{props.error}</p>
+          <button
+            class="mt-3 inline-flex min-h-10 items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100"
+            onClick={props.onRetry}
+            type="button"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      ) : (
+        <>
+          <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="rounded-xl bg-slate-50 p-4">
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">
+                현재 시간
+              </p>
+              <p class="mt-2 mb-0 text-sm font-extrabold leading-6 text-slate-900">
+                {currentTime}
+              </p>
+              <p class="mt-1 mb-0 break-words text-xs leading-5 text-slate-500">
+                {props.data?.zonename ?? '시간대 확인 중'}
+              </p>
+            </div>
+            <div class="rounded-xl bg-slate-50 p-4">
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">
+                시간 동기화
+              </p>
+              <p
+                class={`mt-2 mb-0 text-sm font-extrabold ${
+                  props.data?.ntpEnabled ? 'text-emerald-700' : 'text-amber-700'
+                }`}
+              >
+                {props.data?.ntpEnabled ? '자동 동기화 설정됨' : '자동 동기화 꺼짐'}
+              </p>
+              <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                장치의 기본 NTP 설정 상태입니다.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-5">
+            <label
+              class="mb-2 block text-sm font-extrabold text-slate-800"
+              for="smartsafehub-timezone"
+            >
+              시간대
+            </label>
+            <select
+              aria-label="시간대"
+              class="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+              disabled={props.loading || props.saving || !props.data}
+              id="smartsafehub-timezone"
+              onChange={(event) =>
+                setSelectedTimezone(event.currentTarget.value)
+              }
+              value={selectedTimezone}
+            >
+              {!props.data && <option value="">시간대 불러오는 중</option>}
+              {zones.map((zone) => (
+                <option key={zone} value={zone}>
+                  {zone}
+                </option>
+              ))}
+            </select>
+            <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
+              시간대를 변경하면 시스템에 즉시 적용되며 관리 소프트웨어의 자동 설치 일정도 새 기준 시간으로 다시 계산합니다.
+            </p>
+          </div>
+
+          <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+            {browserTimezoneAvailable &&
+              detectedBrowserTimezone !== selectedTimezone && (
+                <button
+                  class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
+                  disabled={props.saving}
+                  onClick={() => setSelectedTimezone(detectedBrowserTimezone)}
+                  type="button"
+                >
+                  브라우저 시간대 사용
+                </button>
+              )}
+            <button
+              class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              disabled={!changed || props.saving}
+              onClick={() => void props.onSave(selectedTimezone)}
+              type="button"
+            >
+              {props.saving ? '시간대 저장 중' : '시간대 저장'}
+            </button>
+          </div>
+        </>
+      )}
+    </ActionCard>
   );
 }
 
@@ -78,10 +297,18 @@ export function SettingsPage({
   feedbackMessage,
   loading,
   rebootAccepted,
+  timeData,
+  timeError,
+  timeLoading,
+  timeSaveError,
+  timeSaveMessage,
+  timeSaving,
   onDismissFeedback,
+  onDismissTimeFeedback,
   onDownloadDiagnostics,
   onReboot,
   onRetry,
+  onSaveTimezone,
 }: SettingsPageProps) {
   const [confirmingReboot, setConfirmingReboot] = useState(false);
 
@@ -120,7 +347,7 @@ export function SettingsPage({
   const logsUrl = luciAdminUrl('/admin/status/logs');
 
   return (
-    <section class="min-w-0 space-y-6">
+    <section class="min-w-0 space-y-7">
       {(feedbackError || feedbackMessage) && (
         <div
           class={`flex min-w-0 flex-col gap-3 rounded-xl border px-4 py-3 text-sm font-bold sm:flex-row sm:items-center sm:justify-between ${
@@ -185,32 +412,31 @@ export function SettingsPage({
       <section class="min-w-0">
         <div class="mb-4">
           <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-            Device management
+            Device settings
           </p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
+          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">장치 설정</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            자주 사용하는 시스템 작업은 SmartSafeHub에서 처리하고, 아직 제공하지 않는 상세 항목만 LuCI를 사용합니다.
+            시간 기준과 진단 정보를 SmartSafeHub에서 직접 관리합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-          <ActionCard
-            title="업데이트 관리"
-            description="기기 펌웨어와 관리 소프트웨어 업데이트는 제품 업데이트 페이지에서 함께 관리합니다."
-          >
-            <a
-              class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white no-underline transition hover:bg-teal-800 sm:w-auto"
-              href="#system"
-            >
-              업데이트 페이지 열기
-            </a>
-            <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              온라인 Sysupgrade 다운로드와 수동 펌웨어 업로드 모두 SmartSafeHub에서 검증한 뒤 설치합니다.
-            </p>
-          </ActionCard>
+          <TimeSettingsCard
+            data={timeData}
+            error={timeError}
+            loading={timeLoading}
+            localtime={data?.runtime.localtime ?? 0}
+            onDismissFeedback={onDismissTimeFeedback}
+            onRetry={onRetry}
+            onSave={onSaveTimezone}
+            saveError={timeSaveError}
+            saveMessage={timeSaveMessage}
+            saving={timeSaving}
+          />
 
           <ActionCard
-            title="진단 정보"
-            description="장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않지만 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보는 포함됩니다."
+            description="장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않습니다."
+            icon={<DownloadIcon class="size-5" />}
+            title="진단 및 지원"
           >
             <button
               class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
@@ -221,37 +447,28 @@ export function SettingsPage({
               {action === 'diagnostics' ? '진단 정보 생성 중' : '진단 정보 다운로드'}
             </button>
             <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              지원 담당자에게 전달하기 전에 파일에 포함된 네트워크 식별 정보를 확인해 주세요.
+              진단 파일에는 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보가 포함될 수 있으므로 외부 전달 전에 내용을 확인해 주세요.
             </p>
           </ActionCard>
+        </div>
+      </section>
 
-          <ActionCard
-            title="고급 설정"
-            description="SmartSafeHub에서 아직 제공하지 않는 상세 시스템 설정과 원본 로그가 필요한 경우에만 LuCI 관리 화면을 사용합니다."
-          >
-            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <a
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
-                href={advancedSystemUrl}
-              >
-                LuCI 고급 설정 열기
-              </a>
-              <a
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
-                href={logsUrl}
-              >
-                시스템 로그 열기
-              </a>
-            </div>
-            <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              SmartSafeHub에서 제공하는 설정 범위를 계속 확대해 LuCI로 이동해야 하는 경우를 줄일 예정입니다.
-            </p>
-          </ActionCard>
-
+      <section class="min-w-0">
+        <div class="mb-4">
+          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
+            System management
+          </p>
+          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
+          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
+            장치 재부팅과 SmartSafeHub에서 아직 제공하지 않는 고급 설정을 관리합니다.
+          </p>
+        </div>
+        <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <ActionCard
             danger
-            title="공유기 재부팅"
             description="재부팅하는 동안 인터넷과 Wi-Fi 연결이 잠시 중단됩니다. 저장되지 않은 LuCI 설정이 있다면 먼저 저장해 주세요."
+            icon={<PowerIcon class="size-5" />}
+            title="공유기 재부팅"
           >
             {!confirmingReboot ? (
               <button
@@ -288,12 +505,32 @@ export function SettingsPage({
               </div>
             )}
           </ActionCard>
+
+          <ActionCard
+            description="SmartSafeHub에서 아직 제공하지 않는 상세 시스템 설정이나 원본 로그가 필요한 경우에만 LuCI 관리 화면을 사용합니다."
+            icon={<SettingsIcon class="size-5" />}
+            title="고급 설정"
+          >
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <a
+                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
+                href={advancedSystemUrl}
+              >
+                LuCI 고급 설정 열기
+              </a>
+              <a
+                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
+                href={logsUrl}
+              >
+                시스템 로그 열기
+              </a>
+            </div>
+            <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+              설정 백업·복원 등 아직 SmartSafeHub에서 제공하지 않는 기능은 이 고급 설정에서 사용할 수 있습니다.
+            </p>
+          </ActionCard>
         </div>
       </section>
-
-      <p class="m-0 text-xs leading-5 text-slate-500">
-        펌웨어 업로드, 백업 및 복원처럼 장치 전체에 영향을 주는 작업은 검증된 OpenWrt 절차를 유지합니다. 그 외 자주 사용하는 관리 기능은 SmartSafeHub 안에서 제공하는 것을 목표로 합니다.
-      </p>
     </section>
   );
 }
