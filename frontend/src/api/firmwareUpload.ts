@@ -1,8 +1,9 @@
 import type { FirmwareUploadReply } from '../types/firmware';
 import { RpcError } from './rpc';
-import { luciUrl } from '../utils/luci';
+import { cgiUrl } from '../utils/luci';
 
 const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';
+const FIRMWARE_UPLOAD_ENDPOINT = '/cgi-upload';
 
 export function uploadFirmwareFile(
   file: File,
@@ -23,7 +24,9 @@ export function uploadFirmwareFile(
     data.append('filename', FIRMWARE_UPLOAD_PATH);
     data.append('filedata', file);
 
-    request.open('POST', luciUrl('/cgi-upload'));
+    const uploadUrl = cgiUrl(FIRMWARE_UPLOAD_ENDPOINT);
+
+    request.open('POST', uploadUrl);
     request.timeout = 0;
 
     request.upload.addEventListener('progress', (event) => {
@@ -34,15 +37,37 @@ export function uploadFirmwareFile(
     });
 
     request.addEventListener('error', () => {
-      reject(new RpcError('FIRMWARE_UPLOAD_FAILED', '펌웨어 파일 업로드에 실패했습니다.'));
+      console.error('[SmartSafeHub] firmware upload network error', {
+        endpoint: uploadUrl,
+        destination: FIRMWARE_UPLOAD_PATH,
+        fileName: file.name,
+        fileSize: file.size,
+        readyState: request.readyState,
+        status: request.status,
+      });
+      reject(
+        new RpcError(
+          'FIRMWARE_UPLOAD_FAILED',
+          `펌웨어 파일 업로드에 실패했습니다. (${uploadUrl}, 네트워크 오류)`,
+        ),
+      );
     });
 
     request.addEventListener('load', () => {
       if (request.status < 200 || request.status >= 300) {
+        console.error('[SmartSafeHub] firmware upload HTTP error', {
+          endpoint: uploadUrl,
+          destination: FIRMWARE_UPLOAD_PATH,
+          fileName: file.name,
+          fileSize: file.size,
+          readyState: request.readyState,
+          status: request.status,
+          response: request.responseText,
+        });
         reject(
           new RpcError(
             'FIRMWARE_UPLOAD_HTTP_ERROR',
-            `펌웨어 업로드가 HTTP ${request.status} 오류를 반환했습니다.`,
+            `펌웨어 업로드가 HTTP ${request.status} 오류를 반환했습니다. (${uploadUrl})`,
           ),
         );
         return;
@@ -52,10 +77,19 @@ export function uploadFirmwareFile(
       try {
         reply = JSON.parse(request.responseText) as FirmwareUploadReply;
       } catch {
+        console.error('[SmartSafeHub] firmware upload returned invalid JSON', {
+          endpoint: uploadUrl,
+          destination: FIRMWARE_UPLOAD_PATH,
+          fileName: file.name,
+          fileSize: file.size,
+          readyState: request.readyState,
+          status: request.status,
+          response: request.responseText,
+        });
         reject(
           new RpcError(
             'FIRMWARE_UPLOAD_INVALID_RESPONSE',
-            '펌웨어 업로드 응답을 확인하지 못했습니다.',
+            `펌웨어 업로드 응답을 확인하지 못했습니다. (${uploadUrl})`,
           ),
         );
         return;

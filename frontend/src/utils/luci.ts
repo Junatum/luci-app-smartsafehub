@@ -1,4 +1,5 @@
-const DEFAULT_LUCI_BASE = '/cgi-bin/luci';
+const DEFAULT_CGI_BASE = '/cgi-bin';
+const DEFAULT_LUCI_BASE = `${DEFAULT_CGI_BASE}/luci`;
 
 export function luciBaseUrl(): string {
   const marker = '/cgi-bin/luci';
@@ -10,6 +11,22 @@ export function luciBaseUrl(): string {
   }
 
   return DEFAULT_LUCI_BASE;
+}
+
+export function cgiBaseUrl(): string {
+  const luciBase = luciBaseUrl();
+  const suffix = '/luci';
+
+  if (luciBase.endsWith(suffix)) {
+    return luciBase.slice(0, -suffix.length);
+  }
+
+  return DEFAULT_CGI_BASE;
+}
+
+export function cgiUrl(route: string): string {
+  const normalizedRoute = route.startsWith('/') ? route : `/${route}`;
+  return `${cgiBaseUrl()}${normalizedRoute}`;
 }
 
 export function luciUrl(route: string): string {

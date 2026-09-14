@@ -7,6 +7,7 @@ UPDATES_CARD="$ROOT_DIR/frontend/src/components/SoftwareUpdatesCard.tsx"
 FIRMWARE_CARD="$ROOT_DIR/frontend/src/components/FirmwareUpdatesCard.tsx"
 FIRMWARE_HOOK="$ROOT_DIR/frontend/src/hooks/useFirmwareUpdates.ts"
 FIRMWARE_UPLOAD="$ROOT_DIR/frontend/src/api/firmwareUpload.ts"
+LUCI_UTIL="$ROOT_DIR/frontend/src/utils/luci.ts"
 UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
 SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
@@ -280,8 +281,27 @@ grep -Fq '강제 설치는 제공하지 않습니다.' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must clearly avoid force-upgrade behavior'
 grep -Fq "const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';" "$FIRMWARE_UPLOAD" || \
 	fail 'manual firmware upload must use the dedicated temporary image path'
-grep -Fq "request.open('POST', luciUrl('/cgi-upload'));" "$FIRMWARE_UPLOAD" || \
-	fail 'manual firmware upload must use LuCI cgi-upload with the active session'
+grep -Fq "const FIRMWARE_UPLOAD_ENDPOINT = '/cgi-upload';" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload must declare the raw cgi-upload endpoint'
+grep -Fq "const DEFAULT_CGI_BASE = '/cgi-bin';" "$LUCI_UTIL" || \
+	fail 'LuCI URL utilities must declare the CGI base separately from the LuCI dispatcher'
+grep -Fq 'return luciBase.slice(0, -suffix.length);' "$LUCI_UTIL" || \
+	fail 'CGI URL resolution must preserve any deployment prefix while removing the /luci dispatcher suffix'
+grep -Fq 'return `${cgiBaseUrl()}${normalizedRoute}`;' "$LUCI_UTIL" || \
+	fail 'CGI URL resolution must build routes from /cgi-bin rather than /cgi-bin/luci'
+grep -Fq "const uploadUrl = cgiUrl(FIRMWARE_UPLOAD_ENDPOINT);" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload must resolve cgi-upload outside the LuCI dispatcher prefix'
+grep -Fq "request.open('POST', uploadUrl);" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload must POST to the resolved CGI endpoint'
+if grep -Fq "luciUrl('/cgi-upload')" "$FIRMWARE_UPLOAD"; then
+	fail 'manual firmware upload must not route cgi-upload through /cgi-bin/luci'
+fi
+grep -Fq "firmware upload network error" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload failures must log network diagnostics'
+grep -Fq "firmware upload HTTP error" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload failures must log HTTP diagnostics'
+grep -Fq "firmware upload returned invalid JSON" "$FIRMWARE_UPLOAD" || \
+	fail 'manual firmware upload failures must log invalid-response diagnostics'
 grep -Fq 'const ACTIVE_POLL_INTERVAL_MS = 1_000;' "$FIRMWARE_HOOK" || \
 	fail 'firmware check/download/validation phases must be actively polled'
 grep -Fq 'const RECONNECT_INITIAL_DELAY_MS = 15_000;' "$FIRMWARE_HOOK" || \

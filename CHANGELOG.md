@@ -1,5 +1,20 @@
 # 변경 기록
 
+## [0.2.14-r10] - 2026-09-14
+
+### 수정
+
+- 수동 펌웨어 업로드가 LuCI dispatcher 경로인 `/cgi-bin/luci/cgi-upload`로 잘못 전송되던 문제를 수정했습니다. `cgi-upload`는 dispatcher route가 아닌 CGI endpoint이므로 이제 `/cgi-bin/cgi-upload`로 요청합니다.
+- `/cgi-bin/luci`가 경로 prefix 아래에 배치된 환경에서도 동일한 prefix를 유지하면서 CGI base를 계산하도록 `cgiBaseUrl()`/`cgiUrl()` URL helper를 분리했습니다.
+
+### 개선
+
+- 펌웨어 업로드의 네트워크 오류, HTTP 오류, 올바르지 않은 JSON 응답을 브라우저 콘솔에 endpoint·destination·파일명·파일 크기·HTTP 상태와 함께 기록해 현장 장애 원인을 구분하기 쉽게 했습니다. 사용자 오류 메시지에도 실제 업로드 endpoint와 HTTP 상태를 포함합니다.
+
+### 테스트
+
+- 수동 펌웨어 업로드가 `luciUrl('/cgi-upload')`를 다시 사용하지 않는지, `/cgi-bin` CGI base를 통해 업로드하는지와 업로드 실패 진단 로그가 유지되는지 update UI contract 테스트를 보강했습니다.
+
 ## [0.2.14-r9] - 2026-09-14
 
 ### 기능
