@@ -24,8 +24,15 @@ export type FirmwareAction =
 
 const BACKGROUND_POLL_INTERVAL_MS = 5 * 60_000;
 const ACTIVE_POLL_INTERVAL_MS = 1_000;
+const VALIDATION_STATUS_POLL_INTERVAL_MS = 500;
+const VALIDATION_STALE_STATE_GRACE_MS = 3_000;
+const VALIDATION_STATUS_TIMEOUT_MS = 30_000;
 const RECONNECT_INITIAL_DELAY_MS = 15_000;
 const RECONNECT_INTERVAL_MS = 5_000;
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
 
 function isActivePhase(phase: FirmwareStatus['phase'] | undefined): boolean {
   return (
@@ -120,6 +127,54 @@ export function useFirmwareUpdates(active = true) {
     [startAcceptedAction],
   );
 
+  const waitForUploadValidation = useCallback(async (): Promise<FirmwareStatus> => {
+    const startedAt = Date.now();
+    let lastFetchError: unknown = null;
+
+    while (Date.now() - startedAt < VALIDATION_STATUS_TIMEOUT_MS) {
+      await sleep(VALIDATION_STATUS_POLL_INTERVAL_MS);
+
+      try {
+        const status = await fetchFirmwareStatus();
+        const elapsed = Date.now() - startedAt;
+
+        if (status.phase === 'ready') {
+          resource.replaceData(status);
+          return status;
+        }
+
+        if (status.phase === 'verifying') {
+          resource.replaceData(status);
+          continue;
+        }
+
+        if (status.phase === 'error') {
+          // The background validator is started asynchronously. Immediately after
+          // accepting the request the state file may still contain the previous
+          // terminal error for a short time. Do not let that stale snapshot replace
+          // the optimistic `verifying` state and stop active polling.
+          if (elapsed < VALIDATION_STALE_STATE_GRACE_MS) {
+            continue;
+          }
+
+          resource.replaceData(status);
+          return status;
+        }
+
+        // idle/checking/downloading can be a snapshot from the previous operation
+        // before the validator has written its first state. Keep the optimistic
+        // validating UI until the validator acknowledges the new request.
+      } catch (error) {
+        lastFetchError = error;
+      }
+    }
+
+    if (lastFetchError) {
+      throw lastFetchError;
+    }
+    throw new Error('펌웨어 검증 상태 확인 시간이 초과되었습니다. 다시 시도해 주세요.');
+  }, [resource]);
+
   const upload = useCallback(
     async (file: File): Promise<boolean> => {
       setAction('upload');
@@ -135,9 +190,18 @@ export function useFirmwareUpdates(active = true) {
           throw new Error('업로드한 펌웨어 검증 요청이 접수되지 않았습니다.');
         }
         markPhase('verifying');
-        setAction(null);
         setUploadProgress(null);
-        window.setTimeout(() => void resource.refresh(), 400);
+
+        const status = await waitForUploadValidation();
+        setAction(null);
+        if (status.phase === 'error') {
+          return false;
+        }
+        if (!status.prepared) {
+          throw new Error('검증된 펌웨어의 설치 준비 정보를 확인하지 못했습니다. 다시 시도해 주세요.');
+        }
+
+        setMessage('펌웨어 검증이 완료되었습니다. 설치 옵션을 확인해 주세요.');
         return true;
       } catch (error) {
         setAction(null);
@@ -146,7 +210,7 @@ export function useFirmwareUpdates(active = true) {
         return false;
       }
     },
-    [markPhase, resource],
+    [markPhase, waitForUploadValidation],
   );
 
   const scheduleReconnect = useCallback(() => {

@@ -304,6 +304,30 @@ grep -Fq "firmware upload returned invalid JSON" "$FIRMWARE_UPLOAD" || \
 	fail 'manual firmware upload failures must log invalid-response diagnostics'
 grep -Fq 'const ACTIVE_POLL_INTERVAL_MS = 1_000;' "$FIRMWARE_HOOK" || \
 	fail 'firmware check/download/validation phases must be actively polled'
+grep -Fq 'const VALIDATION_STATUS_POLL_INTERVAL_MS = 500;' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation must use a short dedicated status polling interval'
+grep -Fq 'const VALIDATION_STALE_STATE_GRACE_MS = 3_000;' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation must tolerate the previous terminal state while the helper starts'
+grep -Fq 'const VALIDATION_STATUS_TIMEOUT_MS = 30_000;' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation polling must have a bounded timeout'
+grep -Fq 'const waitForUploadValidation = useCallback(async (): Promise<FirmwareStatus>' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware upload must track the asynchronous backend validation result'
+grep -Fq "if (status.phase === 'ready')" "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation must explicitly recognize the ready terminal state'
+grep -Fq "if (status.phase === 'error')" "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation must explicitly recognize the error terminal state'
+grep -Fq 'if (elapsed < VALIDATION_STALE_STATE_GRACE_MS)' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware validation must not replace optimistic validation state with an immediate stale error'
+grep -Fq 'const status = await waitForUploadValidation();' "$FIRMWARE_HOOK" || \
+	fail 'manual firmware upload must await backend validation instead of scheduling a single delayed refresh'
+grep -Fq "setMessage('펌웨어 검증이 완료되었습니다. 설치 옵션을 확인해 주세요.');" "$FIRMWARE_HOOK" || \
+	fail 'successful manual validation must surface install-ready feedback'
+grep -Fq "throw new Error('검증된 펌웨어의 설치 준비 정보를 확인하지 못했습니다. 다시 시도해 주세요.');" "$FIRMWARE_HOOK" || \
+	fail 'ready validation without prepared metadata must fail closed'
+grep -Fq 'data-section="prepared-firmware"' "$FIRMWARE_CARD" || \
+	fail 'ready firmware state must render a dedicated install-preparation panel'
+grep -Fq 'onClick={() => setConfirmingInstall(true)}' "$FIRMWARE_CARD" || \
+	fail 'prepared firmware panel must expose the firmware install confirmation action'
 grep -Fq 'const RECONNECT_INITIAL_DELAY_MS = 15_000;' "$FIRMWARE_HOOK" || \
 	fail 'firmware install must wait for sysupgrade reboot before probing the router'
 grep -Fq 'window.location.reload();' "$FIRMWARE_HOOK" || \
