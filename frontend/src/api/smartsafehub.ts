@@ -5,6 +5,8 @@ import type {
 } from '../types/firmware';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
+  ScheduledRebootSettings,
+  ScheduledRebootSettingsInput,
   SystemRebootResult,
   SystemTimeSettings,
   SystemTimeSyncResult,
@@ -98,6 +100,21 @@ export function updateSystemTimezone(
 
 export function requestSystemTimeSync(): Promise<SystemTimeSyncResult> {
   return callApi(API_OBJECT, 'system_time_sync');
+}
+
+export function fetchScheduledRebootSettings(): Promise<ScheduledRebootSettings> {
+  return callApi(API_OBJECT, 'system_scheduled_reboot_settings');
+}
+
+export function updateScheduledRebootSettings(
+  input: ScheduledRebootSettingsInput,
+): Promise<ScheduledRebootSettings> {
+  return callApi(API_OBJECT, 'system_scheduled_reboot_update', {
+    enabled: input.enabled,
+    frequency: input.frequency,
+    day_of_week: input.dayOfWeek,
+    time: input.time,
+  });
 }
 
 export function requestSystemReboot(): Promise<SystemRebootResult> {

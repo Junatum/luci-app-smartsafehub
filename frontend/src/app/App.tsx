@@ -10,6 +10,7 @@ import { useSafeShieldStatistics } from '../hooks/useSafeShieldStatistics';
 import { useSafeShieldStatus } from '../hooks/useSafeShieldStatus';
 import { useSoftwareUpdates } from '../hooks/useSoftwareUpdates';
 import { useStatus } from '../hooks/useStatus';
+import { useScheduledRebootSettings } from '../hooks/useScheduledRebootSettings';
 import { useSystemActions } from '../hooks/useSystemActions';
 import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useWifi } from '../hooks/useWifi';
@@ -35,6 +36,7 @@ export function App() {
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
+  const scheduledReboot = useScheduledRebootSettings(route === 'settings');
   const systemTime = useSystemTimeSettings(route === 'settings');
   const safeshieldActions = useSafeShieldActions(
     safeshield.refresh,
@@ -115,10 +117,24 @@ export function App() {
           onDismissTimeFeedback={systemTime.dismissSaveFeedback}
           onDownloadDiagnostics={() => void systemActions.downloadDiagnostics()}
           onReboot={() => void systemActions.reboot()}
-          onRetry={() => void Promise.all([status.refresh(), systemTime.refresh()])}
+          onRetry={() =>
+            void Promise.all([
+              status.refresh(),
+              systemTime.refresh(),
+              scheduledReboot.refresh(),
+            ])
+          }
+          onDismissScheduledRebootFeedback={scheduledReboot.dismissSaveFeedback}
+          onSaveScheduledReboot={scheduledReboot.saveSettings}
           onSaveTimezone={systemTime.saveTimezone}
           onSyncTime={systemTime.syncTime}
           rebootAccepted={systemActions.rebootAccepted}
+          scheduledRebootData={scheduledReboot.data}
+          scheduledRebootError={scheduledReboot.error}
+          scheduledRebootLoading={scheduledReboot.loading}
+          scheduledRebootSaveError={scheduledReboot.saveError}
+          scheduledRebootSaveMessage={scheduledReboot.saveMessage}
+          scheduledRebootSaving={scheduledReboot.saving}
           timeData={systemTime.data}
           timeError={systemTime.error}
           timeLoading={systemTime.loading}
@@ -224,7 +240,11 @@ export function App() {
     }
 
     if (route === 'settings') {
-      void Promise.all([status.refresh(), systemTime.refresh()]);
+      void Promise.all([
+        status.refresh(),
+        systemTime.refresh(),
+        scheduledReboot.refresh(),
+      ]);
       return;
     }
 
@@ -248,7 +268,8 @@ export function App() {
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
-        (route === 'settings' && systemTime.refreshing) ||
+        (route === 'settings' &&
+          (systemTime.refreshing || scheduledReboot.refreshing)) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}

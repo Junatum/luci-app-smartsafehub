@@ -14,8 +14,10 @@ command -v jq >/dev/null 2>&1 || fail 'jq is required to validate JSON files'
 for script in \
 	root/etc/init.d/smartsafehub-updater \
 	root/etc/init.d/smartsafehub-firmware \
+	root/etc/init.d/smartsafehub-maintenance \
 	root/usr/libexec/smartsafehub-updater \
 	root/usr/libexec/smartsafehub-firmware \
+	root/usr/libexec/smartsafehub-maintenance \
 	spec/contracts_spec.sh \
 	tests/test-static-validation.sh \
 	tests/test-package-contract.sh \
@@ -28,6 +30,7 @@ for script in \
 	tests/test-reload-safety.sh \
 	tests/test-settings-ui-contract.sh \
 	tests/test-system-time-contract.sh \
+	tests/test-scheduled-reboot.sh \
 	tests/test-rpc-contract.sh \
 	tests/test-rules-ui-contract.sh \
 	tests/test-safeshield-page-contract.sh \

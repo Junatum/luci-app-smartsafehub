@@ -3,10 +3,12 @@
 
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
+	read_scheduled_reboot_settings,
 	read_status,
 	read_time_settings,
 	reboot_system,
 	sync_time,
+	update_scheduled_reboot_settings,
 	update_timezone
 } from './smartsafehub/system.uc';
 import {
@@ -130,6 +132,22 @@ const methods = {
 	system_time_sync: {
 		call: function(request) {
 			return sync_time(request);
+		},
+	},
+	system_scheduled_reboot_settings: {
+		call: function(request) {
+			return read_scheduled_reboot_settings(request);
+		},
+	},
+	system_scheduled_reboot_update: {
+		args: {
+			enabled: false,
+			frequency: 'weekly',
+			day_of_week: 'sun',
+			time: '04:00',
+		},
+		call: function(request) {
+			return update_scheduled_reboot_settings(request);
 		},
 	},
 	system_timezone_update: {

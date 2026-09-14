@@ -9,13 +9,14 @@ SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
 TIME_HOOK="$ROOT_DIR/frontend/src/hooks/useSystemTimeSettings.ts"
+SCHEDULE_HOOK="$ROOT_DIR/frontend/src/hooks/useScheduledRebootSettings.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK"; do
+for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK" "$SCHEDULE_HOOK"; do
 	[ -f "$file" ] || fail "missing settings split source: ${file#$ROOT_DIR/}"
 done
 
@@ -23,6 +24,8 @@ grep -Fq "const status = useStatus(route === 'home' || route === 'settings');" "
 	fail 'system status polling must remain active on settings'
 grep -Fq "const systemTime = useSystemTimeSettings(route === 'settings');" "$APP" || \
 	fail 'settings route must load dedicated timezone settings'
+grep -Fq "const scheduledReboot = useScheduledRebootSettings(route === 'settings');" "$APP" || \
+	fail 'settings route must load scheduled reboot settings'
 grep -Fq "case 'system':" "$APP" || fail 'update route must remain registered in App'
 grep -Fq '<UpdatePage' "$APP" || fail 'system/update route must render UpdatePage'
 grep -Fq "case 'settings':" "$APP" || fail 'settings route must be registered in App'
@@ -30,8 +33,8 @@ grep -Fq '<SettingsPage' "$APP" || fail 'settings route must render SettingsPage
 grep -Fq "if (route === 'system')" "$APP" || fail 'update refresh branch must exist'
 grep -Fq 'void Promise.all([updates.refresh(), firmware.refresh()]);' "$APP" || fail 'update refresh must refresh software and firmware updater state together'
 grep -Fq "if (route === 'settings')" "$APP" || fail 'settings refresh branch must exist'
-grep -Fq 'void Promise.all([status.refresh(), systemTime.refresh()]);' "$APP" || \
-	fail 'settings refresh must refresh both system state and timezone settings'
+grep -Fq 'scheduledReboot.refresh(),' "$APP" || \
+	fail 'settings refresh must refresh scheduled reboot settings together with system/time state'
 
 grep -Fq "label: '설정'" "$ROUTES" || fail 'settings route must be visible in product navigation'
 grep -Fq "description: '기기의 펌웨어와 관리 소프트웨어 업데이트를 관리합니다.'" "$ROUTES" || \
@@ -51,6 +54,8 @@ grep -Fq "'지금 동기화'" "$SETTINGS_PAGE" || \
 	fail 'settings page must expose immediate NTP synchronization'
 grep -Fq 'title="진단 및 지원"' "$SETTINGS_PAGE" || \
 	fail 'diagnostic download must be grouped as diagnostic and support functionality'
+grep -Fq 'title="예약 재부팅"' "$SETTINGS_PAGE" || \
+	fail 'settings page must expose scheduled reboot management'
 grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE" || \
 	fail 'router reboot must remain a first-class system management action'
 grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \
@@ -78,4 +83,4 @@ grep -Fq 'System management' "$SETTINGS_PAGE" || \
 grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
 	fail 'settings action groups must use responsive two-column layout on desktop'
 
-echo 'PASS: settings page keeps timezone-focused device settings with immediate NTP synchronization'
+echo 'PASS: settings page keeps timezone/device management with safe scheduled reboot controls'

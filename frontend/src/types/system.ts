@@ -9,6 +9,32 @@ export interface SystemTimeSettings {
   timezones: Record<string, string>;
 }
 
+
+export type ScheduledRebootFrequency = 'daily' | 'weekly';
+export type ScheduledRebootDayOfWeek =
+  | 'mon'
+  | 'tue'
+  | 'wed'
+  | 'thu'
+  | 'fri'
+  | 'sat'
+  | 'sun';
+
+export interface ScheduledRebootSettings {
+  enabled: boolean;
+  frequency: ScheduledRebootFrequency;
+  dayOfWeek: ScheduledRebootDayOfWeek;
+  time: string;
+  timezone: string;
+}
+
+export interface ScheduledRebootSettingsInput {
+  enabled: boolean;
+  frequency: ScheduledRebootFrequency;
+  dayOfWeek: ScheduledRebootDayOfWeek;
+  time: string;
+}
+
 export interface SafeShieldDiagnosticStatus {
   enabled: boolean | null;
   status: string | null;

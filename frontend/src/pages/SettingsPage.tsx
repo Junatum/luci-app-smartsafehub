@@ -9,6 +9,7 @@ import {
   getMemoryUsage,
 } from '../app/format';
 import {
+  CalendarIcon,
   ClockIcon,
   DownloadIcon,
   PowerIcon,
@@ -16,7 +17,13 @@ import {
 } from '../components/Icons';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { SmartSafeHubStatus } from '../types/status';
-import type { SystemTimeSettings } from '../types/system';
+import type {
+  ScheduledRebootDayOfWeek,
+  ScheduledRebootFrequency,
+  ScheduledRebootSettings,
+  ScheduledRebootSettingsInput,
+  SystemTimeSettings,
+} from '../types/system';
 import { luciAdminUrl } from '../utils/luci';
 
 interface SettingsPageProps {
@@ -27,6 +34,12 @@ interface SettingsPageProps {
   feedbackMessage: string | null;
   loading: boolean;
   rebootAccepted: boolean;
+  scheduledRebootData: ScheduledRebootSettings | null;
+  scheduledRebootError: string | null;
+  scheduledRebootLoading: boolean;
+  scheduledRebootSaveError: string | null;
+  scheduledRebootSaveMessage: string | null;
+  scheduledRebootSaving: boolean;
   timeData: SystemTimeSettings | null;
   timeError: string | null;
   timeLoading: boolean;
@@ -39,6 +52,8 @@ interface SettingsPageProps {
   onDownloadDiagnostics: () => void;
   onReboot: () => void;
   onRetry: () => void;
+  onDismissScheduledRebootFeedback: () => void;
+  onSaveScheduledReboot: (input: ScheduledRebootSettingsInput) => Promise<boolean>;
   onSaveTimezone: (zonename: string) => Promise<boolean>;
   onSyncTime: () => Promise<boolean>;
 }
@@ -63,12 +78,13 @@ function ActionCard(props: {
   icon: ComponentChildren;
   children?: ComponentChildren;
   danger?: boolean;
+  className?: string;
 }) {
   return (
     <article
       class={`min-w-0 rounded-2xl border bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 ${
         props.danger ? 'border-rose-200' : 'border-slate-200'
-      }`}
+      } ${props.className ?? ''}`}
     >
       <div class="flex min-w-0 items-start gap-4">
         <div
@@ -173,7 +189,7 @@ function TimeSettingsCard(props: {
 
   return (
     <ActionCard
-      description="공유기의 기준 시간대를 설정합니다. 로그, 통계와 예약된 자동 설치 시각도 이 시간대를 기준으로 동작합니다."
+      description="공유기의 기준 시간대를 설정합니다. 로그, 통계, 자동 설치와 예약 재부팅 시각도 이 시간대를 기준으로 동작합니다."
       icon={<ClockIcon class="size-5" />}
       title="시간 및 시간대"
     >
@@ -271,7 +287,7 @@ function TimeSettingsCard(props: {
               ))}
             </select>
             <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
-              시간대를 변경하면 시스템에 즉시 적용되며 관리 소프트웨어의 자동 설치 일정도 새 기준 시간으로 다시 계산합니다.
+              시간대를 변경하면 시스템에 즉시 적용되며 자동 설치와 예약 재부팅 일정도 새 기준 시간으로 다시 계산합니다.
             </p>
           </div>
 
@@ -302,6 +318,224 @@ function TimeSettingsCard(props: {
   );
 }
 
+
+const scheduledRebootDays: Array<{
+  value: ScheduledRebootDayOfWeek;
+  label: string;
+}> = [
+  { value: 'mon', label: '월요일' },
+  { value: 'tue', label: '화요일' },
+  { value: 'wed', label: '수요일' },
+  { value: 'thu', label: '목요일' },
+  { value: 'fri', label: '금요일' },
+  { value: 'sat', label: '토요일' },
+  { value: 'sun', label: '일요일' },
+];
+
+function ScheduledRebootCard(props: {
+  data: ScheduledRebootSettings | null;
+  error: string | null;
+  loading: boolean;
+  saveError: string | null;
+  saveMessage: string | null;
+  saving: boolean;
+  onDismissFeedback: () => void;
+  onRetry: () => void;
+  onSave: (input: ScheduledRebootSettingsInput) => Promise<boolean>;
+}) {
+  const [enabled, setEnabled] = useState(false);
+  const [frequency, setFrequency] = useState<ScheduledRebootFrequency>('weekly');
+  const [dayOfWeek, setDayOfWeek] = useState<ScheduledRebootDayOfWeek>('sun');
+  const [rebootTime, setRebootTime] = useState('04:00');
+
+  useEffect(() => {
+    if (!props.data) {
+      return;
+    }
+    setEnabled(props.data.enabled);
+    setFrequency(props.data.frequency);
+    setDayOfWeek(props.data.dayOfWeek);
+    setRebootTime(props.data.time);
+  }, [
+    props.data?.dayOfWeek,
+    props.data?.enabled,
+    props.data?.frequency,
+    props.data?.time,
+  ]);
+
+  const changed =
+    props.data !== null &&
+    (enabled !== props.data.enabled ||
+      frequency !== props.data.frequency ||
+      dayOfWeek !== props.data.dayOfWeek ||
+      rebootTime !== props.data.time);
+  const selectedDay = scheduledRebootDays.find((item) => item.value === dayOfWeek);
+  const scheduleSummary = enabled
+    ? frequency === 'daily'
+      ? `매일 ${rebootTime}`
+      : `매주 ${selectedDay?.label ?? '일요일'} ${rebootTime}`
+    : '예약 재부팅 꺼짐';
+
+  return (
+    <ActionCard
+      className="lg:col-span-2"
+      description="공유기를 정해진 시간에 자동으로 재부팅합니다. 장기간 연속 사용 중 발생할 수 있는 일시적인 장애를 완화하는 운영 안전장치입니다."
+      icon={<CalendarIcon class="size-5" />}
+      title="예약 재부팅"
+    >
+      {(props.saveError || props.saveMessage) && (
+        <div
+          class={`mb-5 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+            props.saveError
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          <span class="min-w-0">{props.saveError || props.saveMessage}</span>
+          <button
+            class="shrink-0 rounded-lg px-2 py-1 text-xs font-extrabold hover:bg-black/5"
+            onClick={props.onDismissFeedback}
+            type="button"
+          >
+            닫기
+          </button>
+        </div>
+      )}
+
+      {props.error && !props.data ? (
+        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <p class="m-0 text-sm font-bold text-rose-800">{props.error}</p>
+          <button
+            class="mt-3 inline-flex min-h-10 items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100"
+            onClick={props.onRetry}
+            type="button"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      ) : (
+        <>
+          <div class="flex flex-col gap-4 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <p class="m-0 text-sm font-extrabold text-slate-900">예약 재부팅 사용</p>
+              <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                기본값은 꺼짐입니다. 필요한 장치에서만 일정에 맞춰 사용하세요.
+              </p>
+            </div>
+            <button
+              aria-checked={enabled}
+              aria-label="예약 재부팅 사용"
+              class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+                enabled
+                  ? 'border-teal-600 bg-teal-600'
+                  : 'border-slate-300 bg-slate-200'
+              }`}
+              disabled={props.loading || props.saving || !props.data}
+              onClick={() => setEnabled((current) => !current)}
+              role="switch"
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+                  enabled ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div class="mt-5 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-frequency">
+                주기
+              </label>
+              <select
+                aria-label="예약 재부팅 주기"
+                class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!enabled || props.saving || !props.data}
+                id="scheduled-reboot-frequency"
+                onChange={(event) =>
+                  setFrequency(event.currentTarget.value as ScheduledRebootFrequency)
+                }
+                value={frequency}
+              >
+                <option value="weekly">매주</option>
+                <option value="daily">매일</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-day">
+                요일
+              </label>
+              <select
+                aria-label="예약 재부팅 요일"
+                class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!enabled || frequency !== 'weekly' || props.saving || !props.data}
+                id="scheduled-reboot-day"
+                onChange={(event) =>
+                  setDayOfWeek(event.currentTarget.value as ScheduledRebootDayOfWeek)
+                }
+                value={dayOfWeek}
+              >
+                {scheduledRebootDays.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-time">
+                재부팅 시간
+              </label>
+              <input
+                aria-label="예약 재부팅 시간"
+                class="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!enabled || props.saving || !props.data}
+                id="scheduled-reboot-time"
+                onInput={(event) => setRebootTime(event.currentTarget.value)}
+                type="time"
+                value={rebootTime}
+              />
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+            <div class="min-w-0">
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">
+                예약 일정
+              </p>
+              <p class="mt-2 mb-0 text-sm font-extrabold text-slate-900">
+                {scheduleSummary}
+              </p>
+              <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                {props.data?.timezone ?? '장치 시간대'} 기준 · 업데이트 작업 중이면 15분 단위로 최대 2시간 연기합니다.
+              </p>
+            </div>
+            <button
+              class="inline-flex min-h-11 w-full shrink-0 items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              disabled={!changed || props.saving || !props.data}
+              onClick={() =>
+                void props.onSave({
+                  enabled,
+                  frequency,
+                  dayOfWeek,
+                  time: rebootTime,
+                })
+              }
+              type="button"
+            >
+              {props.saving ? '예약 저장 중' : '예약 저장'}
+            </button>
+          </div>
+        </>
+      )}
+    </ActionCard>
+  );
+}
+
 export function SettingsPage({
   action,
   data,
@@ -310,6 +544,12 @@ export function SettingsPage({
   feedbackMessage,
   loading,
   rebootAccepted,
+  scheduledRebootData,
+  scheduledRebootError,
+  scheduledRebootLoading,
+  scheduledRebootSaveError,
+  scheduledRebootSaveMessage,
+  scheduledRebootSaving,
   timeData,
   timeError,
   timeLoading,
@@ -322,6 +562,8 @@ export function SettingsPage({
   onDownloadDiagnostics,
   onReboot,
   onRetry,
+  onDismissScheduledRebootFeedback,
+  onSaveScheduledReboot,
   onSaveTimezone,
   onSyncTime,
 }: SettingsPageProps) {
@@ -476,10 +718,22 @@ export function SettingsPage({
           </p>
           <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            장치 재부팅과 SmartSafeHub에서 아직 제공하지 않는 고급 설정을 관리합니다.
+            예약 재부팅, 즉시 재부팅과 SmartSafeHub에서 아직 제공하지 않는 고급 설정을 관리합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+          <ScheduledRebootCard
+            data={scheduledRebootData}
+            error={scheduledRebootError}
+            loading={scheduledRebootLoading}
+            onDismissFeedback={onDismissScheduledRebootFeedback}
+            onRetry={onRetry}
+            onSave={onSaveScheduledReboot}
+            saveError={scheduledRebootSaveError}
+            saveMessage={scheduledRebootSaveMessage}
+            saving={scheduledRebootSaving}
+          />
+
           <ActionCard
             danger
             description="재부팅하는 동안 인터넷과 Wi-Fi 연결이 잠시 중단됩니다. 저장되지 않은 LuCI 설정이 있다면 먼저 저장해 주세요."

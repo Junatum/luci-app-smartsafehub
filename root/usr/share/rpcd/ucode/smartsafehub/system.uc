@@ -17,6 +17,8 @@ import {
 const AUTO_INSTALL_MARKER = '/tmp/smartsafehub-updater-auto-date';
 const AUTO_RETRY_MARKER = '/tmp/smartsafehub-updater-auto-retry-at';
 const AUTO_RETRY_COUNT_MARKER = '/tmp/smartsafehub-updater-auto-retry-count';
+const MAINTENANCE_HELPER = '/usr/libexec/smartsafehub-maintenance';
+const MAINTENANCE_INIT = '/etc/init.d/smartsafehub-maintenance';
 
 function first_system_section(ctx) {
 	let found = null;
@@ -104,6 +106,11 @@ function reset_automatic_update_schedule() {
 		'-c',
 		'/etc/init.d/smartsafehub-updater restart >/dev/null 2>&1 </dev/null &',
 	], 2000);
+
+	// Reserved reboot schedules also use the router's local timezone. Restart
+	// the lightweight maintenance daemon so a timezone change is reflected
+	// immediately instead of waiting for its next configuration reload.
+	run_command([ MAINTENANCE_INIT, 'restart' ], 5000);
 }
 
 function apply_timezone(request, timezones) {
@@ -256,6 +263,107 @@ export function sync_time(request) {
 		accepted: true,
 		requestedAt: time(),
 	});
+};
+
+function scheduled_reboot_frequency(value) {
+	return value == 'daily' || value == 'weekly' ? value : 'weekly';
+}
+
+function scheduled_reboot_day(value) {
+	return (
+		value == 'mon' ||
+		value == 'tue' ||
+		value == 'wed' ||
+		value == 'thu' ||
+		value == 'fri' ||
+		value == 'sat' ||
+		value == 'sun'
+	) ? value : 'sun';
+}
+
+function scheduled_reboot_time(value) {
+	return type(value) == 'string' && match(value, /^([01][0-9]|2[0-3]):[0-5][0-9]$/) != null
+		? value
+		: '04:00';
+}
+
+function scheduled_reboot_payload() {
+	const ctx = new_uci_cursor();
+	if (!ctx) {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_CONFIG_UNAVAILABLE',
+			'예약 재부팅 설정을 읽지 못했습니다.'
+		);
+	}
+
+	const maintenance = ctx.get_all('smartsafehub', 'maintenance') ?? {};
+	const system_section = first_system_section(ctx);
+	const zonename = string_value(system_section?.zonename, 'UTC');
+
+	return success({
+		enabled: string_value(maintenance?.scheduled_reboot_enabled, '0') == '1',
+		frequency: scheduled_reboot_frequency(maintenance?.scheduled_reboot_frequency),
+		dayOfWeek: scheduled_reboot_day(maintenance?.scheduled_reboot_day),
+		time: scheduled_reboot_time(maintenance?.scheduled_reboot_time),
+		timezone: zonename,
+	});
+}
+
+export function read_scheduled_reboot_settings(request) {
+	return scheduled_reboot_payload();
+};
+
+export function update_scheduled_reboot_settings(request) {
+	const enabled = request.args.enabled;
+	const frequency = request.args.frequency;
+	const day = request.args.day_of_week;
+	const reboot_time = request.args.time;
+
+	if (type(enabled) != 'bool') {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_ARGUMENT_INVALID',
+			'예약 재부팅 사용 여부가 올바르지 않습니다.'
+		);
+	}
+	if (frequency != 'daily' && frequency != 'weekly') {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_FREQUENCY_INVALID',
+			'예약 재부팅 주기가 올바르지 않습니다.'
+		);
+	}
+	if (scheduled_reboot_day(day) != day) {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_DAY_INVALID',
+			'예약 재부팅 요일이 올바르지 않습니다.'
+		);
+	}
+	if (type(reboot_time) != 'string' || scheduled_reboot_time(reboot_time) != reboot_time) {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_TIME_INVALID',
+			'예약 재부팅 시간을 HH:MM 형식으로 선택해 주세요.'
+		);
+	}
+
+	if (!run_command([
+		MAINTENANCE_HELPER,
+		'configure',
+		enabled ? '1' : '0',
+		frequency,
+		day,
+		reboot_time,
+	], 5000)) {
+		return failure(
+			'SYSTEM_SCHEDULED_REBOOT_SAVE_FAILED',
+			'예약 재부팅 설정을 저장하지 못했습니다.'
+		);
+	}
+
+	// The package registers a procd UCI reload trigger, but restarting here
+	// also makes a newly saved schedule effective immediately on older rpcd/
+	// procd combinations where trigger delivery can be delayed.
+	run_command([ MAINTENANCE_INIT, 'restart' ], 5000);
+
+	return scheduled_reboot_payload();
 };
 
 export function reboot_system(request) {

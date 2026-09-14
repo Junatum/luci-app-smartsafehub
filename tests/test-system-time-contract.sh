@@ -45,6 +45,8 @@ grep -Fq "fs.unlink(AUTO_RETRY_MARKER);" "$SYSTEM_MODULE" || \
 	fail 'timezone changes must clear stale auto-install retry timestamps'
 grep -Fq '/etc/init.d/smartsafehub-updater restart' "$SYSTEM_MODULE" || \
 	fail 'timezone changes must restart the software updater so schedules use the new local time'
+grep -Fq "run_command([ MAINTENANCE_INIT, 'restart' ], 5000);" "$SYSTEM_MODULE" || \
+	fail 'timezone changes must restart scheduled reboot maintenance so local-time schedules are recalculated immediately'
 
 grep -Fq "export function sync_time(request)" "$SYSTEM_MODULE" || \
 	fail 'system time module must expose an immediate NTP synchronization action'
@@ -91,7 +93,7 @@ grep -Fq 'aria-label="시간대"' "$SETTINGS_PAGE" || \
 	fail 'timezone selector must have an accessible label'
 grep -Fq '브라우저 시간대 사용' "$SETTINGS_PAGE" || \
 	fail 'settings UI must offer the matching browser timezone as a convenience'
-grep -Fq '자동 설치 일정도 새 기준 시간으로 다시 계산합니다.' "$SETTINGS_PAGE" || \
+grep -Fq '자동 설치와 예약 재부팅 일정도 새 기준 시간으로 다시 계산합니다.' "$SETTINGS_PAGE" || \
 	fail 'timezone UI must explain the effect on scheduled software updates'
 grep -Fq "props.data?.ntpEnabled ? '자동 동기화 설정됨' : '자동 동기화 꺼짐'" "$SETTINGS_PAGE" || \
 	fail 'timezone UI must surface NTP synchronization state'

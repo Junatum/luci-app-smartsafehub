@@ -9,7 +9,8 @@
           "wifi_summary",
           "updates_status",
           "firmware_status",
-          "system_time_settings"
+          "system_time_settings",
+          "system_scheduled_reboot_settings"
         ],
         "safeshield": [
           "status",
@@ -25,6 +26,7 @@
           "wifi_update",
           "system_timezone_update",
           "system_time_sync",
+          "system_scheduled_reboot_update",
           "system_reboot",
           "updates_check",
           "updates_install",

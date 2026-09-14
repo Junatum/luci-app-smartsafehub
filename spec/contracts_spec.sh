@@ -78,6 +78,13 @@ Describe 'SmartSafeHub shell contract suite'
     The error should be blank
   End
 
+  It 'passes scheduled reboot contract'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-scheduled-reboot.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'passes ucode import contract'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-ucode-imports.sh"
     The status should be success
