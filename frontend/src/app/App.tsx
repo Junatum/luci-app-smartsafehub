@@ -117,6 +117,7 @@ export function App() {
           onReboot={() => void systemActions.reboot()}
           onRetry={() => void Promise.all([status.refresh(), systemTime.refresh()])}
           onSaveTimezone={systemTime.saveTimezone}
+          onSyncTime={systemTime.syncTime}
           rebootAccepted={systemActions.rebootAccepted}
           timeData={systemTime.data}
           timeError={systemTime.error}
@@ -124,6 +125,7 @@ export function App() {
           timeSaveError={systemTime.saveError}
           timeSaveMessage={systemTime.saveMessage}
           timeSaving={systemTime.saving}
+          timeSyncing={systemTime.syncing}
         />
       );
       break;

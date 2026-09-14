@@ -33,12 +33,14 @@ interface SettingsPageProps {
   timeSaveError: string | null;
   timeSaveMessage: string | null;
   timeSaving: boolean;
+  timeSyncing: boolean;
   onDismissFeedback: () => void;
   onDismissTimeFeedback: () => void;
   onDownloadDiagnostics: () => void;
   onReboot: () => void;
   onRetry: () => void;
   onSaveTimezone: (zonename: string) => Promise<boolean>;
+  onSyncTime: () => Promise<boolean>;
 }
 
 function InfoCard(props: { label: string; value: string; description: string }) {
@@ -109,19 +111,22 @@ function browserTimezone(): string | null {
 }
 
 function TimeSettingsCard(props: {
-  localtime: number;
   data: SystemTimeSettings | null;
   error: string | null;
   loading: boolean;
   saveError: string | null;
   saveMessage: string | null;
   saving: boolean;
+  syncing: boolean;
   onDismissFeedback: () => void;
   onRetry: () => void;
   onSave: (zonename: string) => Promise<boolean>;
+  onSync: () => Promise<boolean>;
 }) {
   const [selectedTimezone, setSelectedTimezone] = useState('');
-  const [displayedLocaltime, setDisplayedLocaltime] = useState(props.localtime);
+  const [displayedLocaltime, setDisplayedLocaltime] = useState(
+    props.data?.localtime ?? 0,
+  );
   const detectedBrowserTimezone = browserTimezone();
 
   useEffect(() => {
@@ -131,7 +136,7 @@ function TimeSettingsCard(props: {
   }, [props.data?.zonename]);
 
   useEffect(() => {
-    const baseLocaltime = props.localtime;
+    const baseLocaltime = props.data?.localtime ?? 0;
     const startedAt = Date.now();
     setDisplayedLocaltime(baseLocaltime);
 
@@ -146,7 +151,7 @@ function TimeSettingsCard(props: {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [props.localtime]);
+  }, [props.data?.localtime]);
 
   const zones = props.data
     ? Object.keys(props.data.timezones).sort((left, right) =>
@@ -230,6 +235,14 @@ function TimeSettingsCard(props: {
               <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
                 장치의 기본 NTP 설정 상태입니다.
               </p>
+              <button
+                class="mt-3 inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!props.data?.ntpEnabled || props.saving || props.syncing}
+                onClick={() => void props.onSync()}
+                type="button"
+              >
+                {props.syncing ? '동기화 요청 중' : '지금 동기화'}
+              </button>
             </div>
           </div>
 
@@ -242,8 +255,8 @@ function TimeSettingsCard(props: {
             </label>
             <select
               aria-label="시간대"
-              class="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
-              disabled={props.loading || props.saving || !props.data}
+              class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+              disabled={props.loading || props.saving || props.syncing || !props.data}
               id="smartsafehub-timezone"
               onChange={(event) =>
                 setSelectedTimezone(event.currentTarget.value)
@@ -267,7 +280,7 @@ function TimeSettingsCard(props: {
               detectedBrowserTimezone !== selectedTimezone && (
                 <button
                   class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
-                  disabled={props.saving}
+                  disabled={props.saving || props.syncing}
                   onClick={() => setSelectedTimezone(detectedBrowserTimezone)}
                   type="button"
                 >
@@ -276,7 +289,7 @@ function TimeSettingsCard(props: {
               )}
             <button
               class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-              disabled={!changed || props.saving}
+              disabled={!changed || props.saving || props.syncing}
               onClick={() => void props.onSave(selectedTimezone)}
               type="button"
             >
@@ -303,12 +316,14 @@ export function SettingsPage({
   timeSaveError,
   timeSaveMessage,
   timeSaving,
+  timeSyncing,
   onDismissFeedback,
   onDismissTimeFeedback,
   onDownloadDiagnostics,
   onReboot,
   onRetry,
   onSaveTimezone,
+  onSyncTime,
 }: SettingsPageProps) {
   const [confirmingReboot, setConfirmingReboot] = useState(false);
 
@@ -424,13 +439,14 @@ export function SettingsPage({
             data={timeData}
             error={timeError}
             loading={timeLoading}
-            localtime={data?.runtime.localtime ?? 0}
             onDismissFeedback={onDismissTimeFeedback}
             onRetry={onRetry}
             onSave={onSaveTimezone}
+            onSync={onSyncTime}
             saveError={timeSaveError}
             saveMessage={timeSaveMessage}
             saving={timeSaving}
+            syncing={timeSyncing}
           />
 
           <ActionCard

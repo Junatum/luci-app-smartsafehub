@@ -72,6 +72,7 @@ function time_settings_payload(timezones) {
 	const ntp = ctx.get_all('system', 'ntp');
 
 	return success({
+		localtime: time(),
 		zonename: zonename,
 		timezone: timezone,
 		ntpEnabled: ntp != null && string_value(ntp?.enabled, '1') != '0',
@@ -224,6 +225,37 @@ export function update_timezone(request) {
 	}
 
 	return timezone_request;
+};
+
+export function sync_time(request) {
+	const ctx = new_uci_cursor();
+	if (!ctx) {
+		return failure('SYSTEM_TIME_CONFIG_UNAVAILABLE', '시간 동기화 설정을 읽지 못했습니다.');
+	}
+
+	const ntp = ctx.get_all('system', 'ntp');
+	const ntp_enabled = ntp != null && string_value(ntp?.enabled, '1') != '0';
+	if (!ntp_enabled) {
+		return failure(
+			'SYSTEM_NTP_DISABLED',
+			'NTP 자동 동기화가 꺼져 있어 지금 동기화할 수 없습니다.'
+		);
+	}
+
+	// OpenWrt sysntpd starts BusyBox ntpd immediately with the configured
+	// peers. Restarting it forces a fresh NTP request without changing the
+	// user's persistent NTP configuration.
+	if (!run_command([ '/etc/init.d/sysntpd', 'restart' ], 5000)) {
+		return failure(
+			'SYSTEM_TIME_SYNC_FAILED',
+			'NTP 시간 동기화를 시작하지 못했습니다.'
+		);
+	}
+
+	return success({
+		accepted: true,
+		requestedAt: time(),
+	});
 };
 
 export function reboot_system(request) {

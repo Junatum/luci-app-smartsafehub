@@ -7,6 +7,7 @@ import type { SmartSafeHubStatus } from '../types/status';
 import type {
   SystemRebootResult,
   SystemTimeSettings,
+  SystemTimeSyncResult,
 } from '../types/system';
 import type {
   SoftwareUpdateAccepted,
@@ -93,6 +94,10 @@ export function updateSystemTimezone(
   zonename: string,
 ): Promise<SystemTimeSettings> {
   return callApi(API_OBJECT, 'system_timezone_update', { zonename });
+}
+
+export function requestSystemTimeSync(): Promise<SystemTimeSyncResult> {
+  return callApi(API_OBJECT, 'system_time_sync');
 }
 
 export function requestSystemReboot(): Promise<SystemRebootResult> {

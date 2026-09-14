@@ -2,6 +2,7 @@ import type { SmartSafeHubStatus } from './status';
 import type { WifiSummary } from './wifi';
 
 export interface SystemTimeSettings {
+  localtime: number;
   zonename: string;
   timezone: string;
   ntpEnabled: boolean;
@@ -22,6 +23,11 @@ export interface SystemDiagnostics {
   system: SmartSafeHubStatus;
   wifi: WifiSummary;
   safeshield: SafeShieldDiagnosticStatus;
+}
+
+export interface SystemTimeSyncResult {
+  accepted: boolean;
+  requestedAt: number;
 }
 
 export interface SystemRebootResult {

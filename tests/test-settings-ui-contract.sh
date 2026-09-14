@@ -47,6 +47,8 @@ if grep -Fq 'href="#system"' "$SETTINGS_PAGE"; then
 fi
 grep -Fq 'title="시간 및 시간대"' "$SETTINGS_PAGE" || \
 	fail 'settings page must expose time and timezone controls'
+grep -Fq "'지금 동기화'" "$SETTINGS_PAGE" || \
+	fail 'settings page must expose immediate NTP synchronization'
 grep -Fq 'title="진단 및 지원"' "$SETTINGS_PAGE" || \
 	fail 'diagnostic download must be grouped as diagnostic and support functionality'
 grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE" || \
@@ -76,4 +78,4 @@ grep -Fq 'System management' "$SETTINGS_PAGE" || \
 grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
 	fail 'settings action groups must use responsive two-column layout on desktop'
 
-echo 'PASS: settings page removes duplicate update navigation and adds timezone-focused device settings'
+echo 'PASS: settings page keeps timezone-focused device settings with immediate NTP synchronization'

@@ -24,6 +24,7 @@
         "smartsafehub": [
           "wifi_update",
           "system_timezone_update",
+          "system_time_sync",
           "system_reboot",
           "updates_check",
           "updates_install",

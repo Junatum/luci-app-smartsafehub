@@ -9,18 +9,21 @@ ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 API="$ROOT_DIR/frontend/src/api/smartsafehub.ts"
 HOOK="$ROOT_DIR/frontend/src/hooks/useSystemTimeSettings.ts"
 SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
+APP_STYLE="$ROOT_DIR/frontend/src/styles/app.css"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$SYSTEM_MODULE" "$RPC_ENTRY" "$ACL" "$API" "$HOOK" "$SETTINGS_PAGE"; do
+for file in "$SYSTEM_MODULE" "$RPC_ENTRY" "$ACL" "$API" "$HOOK" "$SETTINGS_PAGE" "$APP_STYLE"; do
 	[ -f "$file" ] || fail "missing system time source: ${file#$ROOT_DIR/}"
 done
 
 grep -Fq "defer_call('luci', 'getTimezones'" "$SYSTEM_MODULE" || \
 	fail 'timezone choices must come from the OpenWrt/LuCI timezone database'
+grep -Fq 'localtime: time(),' "$SYSTEM_MODULE" || \
+	fail 'time settings must return a fresh router epoch for immediate-sync refreshes'
 grep -Fq "ctx.set('system', section_name, 'zonename', requested_zonename)" "$SYSTEM_MODULE" || \
 	fail 'timezone update must persist the IANA zonename'
 grep -Fq "ctx.set('system', section_name, 'timezone', requested_timezone)" "$SYSTEM_MODULE" || \
@@ -43,23 +46,44 @@ grep -Fq "fs.unlink(AUTO_RETRY_MARKER);" "$SYSTEM_MODULE" || \
 grep -Fq '/etc/init.d/smartsafehub-updater restart' "$SYSTEM_MODULE" || \
 	fail 'timezone changes must restart the software updater so schedules use the new local time'
 
+grep -Fq "export function sync_time(request)" "$SYSTEM_MODULE" || \
+	fail 'system time module must expose an immediate NTP synchronization action'
+grep -Fq "SYSTEM_NTP_DISABLED" "$SYSTEM_MODULE" || \
+	fail 'immediate synchronization must fail clearly when NTP is disabled'
+grep -Fq "run_command([ '/etc/init.d/sysntpd', 'restart' ], 5000)" "$SYSTEM_MODULE" || \
+	fail 'immediate synchronization must restart OpenWrt sysntpd to trigger a fresh NTP request'
+grep -Fq "SYSTEM_TIME_SYNC_FAILED" "$SYSTEM_MODULE" || \
+	fail 'immediate synchronization must surface sysntpd restart failures'
+
 grep -Eq '^[[:space:]]*system_time_settings:[[:space:]]*\{' "$RPC_ENTRY" || \
 	fail 'system_time_settings RPC must be registered'
 grep -Eq '^[[:space:]]*system_timezone_update:[[:space:]]*\{' "$RPC_ENTRY" || \
 	fail 'system_timezone_update RPC must be registered'
+grep -Eq '^[[:space:]]*system_time_sync:[[:space:]]*\{' "$RPC_ENTRY" || \
+	fail 'system_time_sync RPC must be registered'
 jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("system_time_settings") != null' "$ACL" >/dev/null || \
 	fail 'system_time_settings must be granted read ACL access'
 jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("system_timezone_update") != null' "$ACL" >/dev/null || \
 	fail 'system_timezone_update must be granted write ACL access'
+jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("system_time_sync") != null' "$ACL" >/dev/null || \
+	fail 'system_time_sync must be granted write ACL access'
 
 grep -Fq "callApi(API_OBJECT, 'system_time_settings')" "$API" || \
 	fail 'frontend must read timezone settings through the SmartSafeHub RPC API'
 grep -Fq "callApi(API_OBJECT, 'system_timezone_update', { zonename })" "$API" || \
 	fail 'frontend must update timezone through the SmartSafeHub RPC API'
+grep -Fq "callApi(API_OBJECT, 'system_time_sync')" "$API" || \
+	fail 'frontend must request immediate NTP synchronization through SmartSafeHub RPC'
 grep -Fq 'export function useSystemTimeSettings(active: boolean)' "$HOOK" || \
 	fail 'timezone settings need a dedicated frontend resource hook'
 grep -Fq 'resource.replaceData(result);' "$HOOK" || \
 	fail 'successful timezone writes must refresh local timezone state without a page reload'
+grep -Fq 'await requestSystemTimeSync();' "$HOOK" || \
+	fail 'system time hook must expose immediate NTP synchronization'
+grep -Fq 'window.setTimeout(resolve, 1500);' "$HOOK" || \
+	fail 'system time hook must allow the restarted NTP client time to refresh the clock before rereading it'
+grep -Fq 'const result = await fetchSystemTimeSettings();' "$HOOK" || \
+	fail 'immediate synchronization must reread the router clock after the NTP request'
 
 grep -Fq 'title="시간 및 시간대"' "$SETTINGS_PAGE" || \
 	fail 'settings UI must expose a dedicated time and timezone card'
@@ -71,5 +95,18 @@ grep -Fq '자동 설치 일정도 새 기준 시간으로 다시 계산합니다
 	fail 'timezone UI must explain the effect on scheduled software updates'
 grep -Fq "props.data?.ntpEnabled ? '자동 동기화 설정됨' : '자동 동기화 꺼짐'" "$SETTINGS_PAGE" || \
 	fail 'timezone UI must surface NTP synchronization state'
+grep -Fq "{props.syncing ? '동기화 요청 중' : '지금 동기화'}" "$SETTINGS_PAGE" || \
+	fail 'timezone UI must expose an explicit immediate synchronization action'
+grep -Fq 'disabled={!props.data?.ntpEnabled || props.saving || props.syncing}' "$SETTINGS_PAGE" || \
+	fail 'immediate synchronization must be unavailable when NTP is disabled or another time mutation is active'
 
-echo 'PASS: timezone selection, runtime apply, rollback and scheduled-update recalculation contracts are consistent'
+grep -Fq '.ssh-app select {' "$APP_STYLE" || \
+	fail 'all SmartSafeHub select controls must share a normalized disclosure arrow style'
+grep -Fq 'appearance: none;' "$APP_STYLE" || \
+	fail 'shared select styling must replace inconsistent browser-native arrows'
+grep -Fq 'background-position: right 1rem center;' "$APP_STYLE" || \
+	fail 'shared select arrow must be inset from the right edge'
+grep -Fq 'padding-right: 3rem;' "$APP_STYLE" || \
+	fail 'shared select controls must reserve room for the inset arrow'
+
+echo 'PASS: timezone selection, immediate NTP sync, inset select arrows and scheduled-update recalculation contracts are consistent'

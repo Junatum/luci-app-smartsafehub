@@ -6,6 +6,7 @@ import {
 	read_status,
 	read_time_settings,
 	reboot_system,
+	sync_time,
 	update_timezone
 } from './smartsafehub/system.uc';
 import {
@@ -124,6 +125,11 @@ const methods = {
 	system_time_settings: {
 		call: function(request) {
 			return read_time_settings(request);
+		},
+	},
+	system_time_sync: {
+		call: function(request) {
+			return sync_time(request);
 		},
 	},
 	system_timezone_update: {
