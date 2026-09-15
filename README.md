@@ -188,7 +188,7 @@ ucode-mod-uci
 procd
 uclient-fetch
 jsonfilter
-safeshield (>= 0.3.20)
+safeshield (>= 0.3.23)
 ```
 
 `LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `EXTRA_DEPENDS:=safeshield (>= 0.3.20)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.

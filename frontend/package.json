@@ -1,7 +1,7 @@
 {
   "name": "luci-app-smartsafehub-frontend",
   "private": true,
-  "version": "0.2.14",
+  "version": "0.2.15",
   "type": "module",
   "engines": {
     "node": ">=24.0"
