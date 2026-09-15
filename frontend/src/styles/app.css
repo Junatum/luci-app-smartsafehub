@@ -707,6 +707,10 @@
   line-height: 0.98;
 }
 
+.ssh-password-setup-brand-title-line {
+  display: block;
+}
+
 .ssh-login-brand-description {
   max-width: 39rem;
   margin: 1.6rem 0 0;

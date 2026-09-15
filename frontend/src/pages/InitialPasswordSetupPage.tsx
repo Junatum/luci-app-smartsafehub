@@ -138,7 +138,10 @@ export function InitialPasswordSetupPage({
             <ShieldIcon />
           </span>
           <p class="ssh-login-eyebrow">FIRST SECURITY SETUP</p>
-          <h1 id="ssh-password-setup-brand-title">SmartSafeHub 보호 시작</h1>
+          <h1 id="ssh-password-setup-brand-title">
+            <span class="ssh-password-setup-brand-title-line">SmartSafeHub</span>
+            <span class="ssh-password-setup-brand-title-line">보호 시작</span>
+          </h1>
           <p class="ssh-login-brand-description">
             관리자 비밀번호가 없는 상태에서는 SmartSafeHub 관리 기능을 사용할 수 없습니다.
             먼저 이 공유기의 root 관리자 비밀번호를 설정해 주세요.
@@ -277,7 +280,7 @@ export function InitialPasswordSetupPage({
 
             <div class="ssh-login-security-note">
               <ShieldIcon aria-hidden="true" />
-              <span>비밀번호는 현재 공유기의 root 계정에 직접 설정되며 외부 서버로 전송되지 않습니다.</span>
+              <span>비밀번호는 현재 공유기에 직접 설정되며 외부 서버로 전송되지 않습니다.</span>
             </div>
           </div>
 

@@ -99,6 +99,18 @@ grep -Fq "redirect: 'manual'" "$SESSION" || \
 grep -Fq '새 비밀번호로 다시 로그인' "$SETUP_PAGE" || \
 	fail 'initial setup UI must explain the required re-login'
 
+grep -Fq '<span class="ssh-password-setup-brand-title-line">SmartSafeHub</span>' "$SETUP_PAGE" || \
+	fail 'initial setup hero must keep SmartSafeHub on its own title line'
+grep -Fq '<span class="ssh-password-setup-brand-title-line">보호 시작</span>' "$SETUP_PAGE" || \
+	fail 'initial setup hero must render protection start on the next title line'
+grep -Fq '.ssh-password-setup-brand-title-line {' "$STYLES" || \
+	fail 'initial setup hero title lines must have dedicated block styling'
+grep -Fq '비밀번호는 현재 공유기에 직접 설정되며 외부 서버로 전송되지 않습니다.' "$SETUP_PAGE" || \
+	fail 'initial setup security note must use product-facing administrator wording'
+if grep -Fq '비밀번호는 현재 공유기의 root 계정에 직접 설정되며 외부 서버로 전송되지 않습니다.' "$SETUP_PAGE"; then
+	fail 'initial setup security note must not expose the root account name'
+fi
+
 grep -Fq '.ssh-password-requirements {' "$STYLES" || \
 	fail 'password policy status must have dedicated styling'
 grep -Fq '.ssh-password-setup-summary {' "$STYLES" || \
