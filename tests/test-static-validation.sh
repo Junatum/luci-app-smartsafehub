@@ -25,6 +25,7 @@ for script in \
 	tests/test-navigation-contract.sh \
 	tests/test-document-ui-contract.sh \
 	tests/test-login-ui-contract.sh \
+	tests/test-initial-password-setup.sh \
 	tests/test-dashboard-ui-contract.sh \
 	tests/test-network-input-contract.sh \
 	tests/test-update-ui-contract.sh \

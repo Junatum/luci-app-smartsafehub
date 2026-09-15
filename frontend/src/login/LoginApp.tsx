@@ -116,8 +116,12 @@ export function LoginApp({
     setError(null);
     setShowFallback(false);
 
-    if (!user || !secret) {
-      setError('사용자 이름과 비밀번호를 입력해 주세요.');
+    if (!user || (!secret && user !== 'root')) {
+      setError(
+        !user
+          ? '사용자 이름을 입력해 주세요.'
+          : '비밀번호를 입력해 주세요.',
+      );
 
       window.requestAnimationFrame(() => {
         if (!user) {
@@ -285,7 +289,6 @@ export function LoginApp({
                       onKeyUp={updateCapsLock}
                       placeholder="관리자 비밀번호"
                       ref={passwordInput}
-                      required
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                     />
@@ -305,6 +308,12 @@ export function LoginApp({
                     </button>
                   </span>
                 </label>
+
+                {username.trim() === 'root' && password.length === 0 ? (
+                  <p class="ssh-login-password-hint">
+                    초기 설정 전 root 계정은 비밀번호가 비어 있을 수 있습니다.
+                  </p>
+                ) : null}
 
                 {capsLock ? (
                   <p class="ssh-login-caps" role="status">

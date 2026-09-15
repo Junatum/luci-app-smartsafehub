@@ -6,7 +6,7 @@ import {
   SESSION_EXPIRED_EVENT,
   SESSION_EXPIRED_MESSAGE,
 } from './auth/sessionEvents';
-import { App } from './app/App';
+import { AuthenticatedEntry } from './app/AuthenticatedEntry';
 import { LoginApp } from './login/LoginApp';
 import { luciUrl, smartSafeHubPublicUrl } from './utils/luci';
 import { applyDocumentTheme, readColorTheme } from './utils/theme';
@@ -37,7 +37,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.14-r13',
+    assetVersion: host.dataset.assetVersion ?? '0.2.14-r14',
     locale: document.documentElement.lang || 'ko',
   });
 }
@@ -93,7 +93,18 @@ function renderAuthenticated(
 ): void {
   installBootstrap(sessionId, host);
   mountPoint.className = 'smartsafehub-shadow-root';
-  render(<App />, mountPoint);
+  render(
+    <AuthenticatedEntry
+      onPasswordConfigured={() => {
+        renderLogin(
+          host,
+          mountPoint,
+          '관리자 비밀번호가 설정되었습니다. 새 비밀번호로 다시 로그인해 주세요.',
+        );
+      }}
+    />,
+    mountPoint,
+  );
 }
 
 function renderLogin(

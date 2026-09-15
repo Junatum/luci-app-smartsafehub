@@ -34,6 +34,8 @@ grep -Fq 'autoComplete="current-password"' "$LOGIN" || \
 	fail 'password field must expose current-password autocomplete'
 grep -Fq 'name="password"' "$LOGIN" || \
 	fail 'password field must expose a stable form name for password managers'
+grep -Fq "if (!user || (!secret && user !== 'root'))" "$LOGIN" || \
+	fail 'login must allow the factory-default root account to reach forced password setup with an empty password'
 grep -Fq '<ReloadIcon class="ssh-login-probe-spinner" aria-hidden="true" />' "$LOGIN" || \
 	fail 'login session probe must spin the shared reload icon'
 grep -Fq '<ReloadIcon class="ssh-login-submit-spinner" aria-hidden="true" />' "$LOGIN" || \

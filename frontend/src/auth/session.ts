@@ -56,6 +56,14 @@ export function probeLuciSession(): Promise<string | null> {
   return fetchSession();
 }
 
+export async function logoutLuciSession(): Promise<void> {
+  await fetch(luciUrl('/admin/logout'), {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    redirect: 'manual',
+  });
+}
+
 export function authenticateLuciSession(
   username: string,
   password: string,

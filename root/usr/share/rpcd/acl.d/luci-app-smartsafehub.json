@@ -4,6 +4,7 @@
     "read": {
       "ubus": {
         "smartsafehub": [
+          "system_root_password_status",
           "status",
           "connected_devices",
           "wifi_summary",
@@ -26,6 +27,7 @@
     "write": {
       "ubus": {
         "smartsafehub": [
+          "system_root_password_set",
           "wifi_update",
           "system_timezone_update",
           "system_time_sync",

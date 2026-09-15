@@ -36,6 +36,13 @@ Describe 'SmartSafeHub shell contract suite'
     The error should be blank
   End
 
+  It 'passes initial root password setup contract'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-initial-password-setup.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'passes dashboard UI contract'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-dashboard-ui-contract.sh"
     The status should be success

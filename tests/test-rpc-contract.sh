@@ -9,6 +9,7 @@ FIRMWARE_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc"
 FIRMWARE_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 BACKUP_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/backup.uc"
 BACKUP_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
+SECURITY_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/security.uc"
 UPDATER="$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 
@@ -31,7 +32,8 @@ assert_acl_method() {
 		"$ACL" >/dev/null || fail "$method is missing from $access ACL"
 }
 
-for method in updates_status updates_check updates_install updates_settings_update \
+for method in system_root_password_status system_root_password_set \
+	updates_status updates_check updates_install updates_settings_update \
 	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
 	system_time_settings system_timezone_update system_time_sync \
 	system_scheduled_reboot_settings system_scheduled_reboot_update \
@@ -43,6 +45,8 @@ jq -e \
 	'.["luci-app-smartsafehub"].read.ubus.safeshield | index("statistics") != null' \
 	"$ACL" >/dev/null || fail 'safeshield statistics is missing from read ACL'
 
+assert_acl_method read system_root_password_status
+assert_acl_method write system_root_password_set
 assert_acl_method read updates_status
 assert_acl_method write updates_check
 assert_acl_method write updates_install
@@ -118,6 +122,15 @@ if grep -Eq '(--force|-F)[[:space:]]+"?\$IMAGE_FILE' "$FIRMWARE_HELPER"; then
 	fail 'SmartSafeHub firmware updater must not expose forced sysupgrade'
 fi
 
+
+grep -Fq "const SHADOW_FILE = '/etc/shadow';" "$SECURITY_MODULE" || \
+	fail 'initial security setup must inspect the root shadow password state'
+grep -Fq "defer_call('luci', 'setPassword'" "$SECURITY_MODULE" || \
+	fail 'initial security setup must delegate password writes to LuCI'
+grep -Fq "defer_call('session', 'destroy'" "$SECURITY_MODULE" || \
+	fail 'initial security setup must invalidate the bootstrap session after setting a password'
+grep -Fq "'SYSTEM_ROOT_PASSWORD_REQUIRED'" "$RPC_ENTRY" || \
+	fail 'normal SmartSafeHub RPC methods must enforce the root password setup gate'
 
 grep -Fq "const BACKUP_HELPER = '/usr/libexec/smartsafehub-backup';" "$BACKUP_MODULE" || \
 	fail 'configuration restore RPC must delegate privileged work to the dedicated backup helper'

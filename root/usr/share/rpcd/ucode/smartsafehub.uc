@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
+import { failure } from './smartsafehub/core.uc';
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
 	discard_uploaded_backup,
 	restore_uploaded_backup,
 	validate_uploaded_backup
 } from './smartsafehub/backup.uc';
+import {
+	read_root_password_status,
+	root_password_configured,
+	set_initial_root_password
+} from './smartsafehub/security.uc';
 import {
 	read_scheduled_reboot_settings,
 	read_status,
@@ -35,21 +41,55 @@ import {
 	update_wifi
 } from './smartsafehub/wifi-management.uc';
 
+function require_root_password(handler) {
+	return function(request) {
+		const configured = root_password_configured();
+
+		if (configured == null) {
+			return failure(
+				'SYSTEM_ROOT_PASSWORD_STATUS_UNAVAILABLE',
+				'root 비밀번호 설정 상태를 확인하지 못했습니다.'
+			);
+		}
+		if (!configured) {
+			return failure(
+				'SYSTEM_ROOT_PASSWORD_REQUIRED',
+				'SmartSafeHub를 사용하기 전에 root 관리자 비밀번호를 설정해 주세요.'
+			);
+		}
+
+		return handler(request);
+	};
+}
+
 const methods = {
-	status: {
+	system_root_password_status: {
 		call: function(request) {
-			return read_status(request);
+			return read_root_password_status(request);
 		},
+	},
+	system_root_password_set: {
+		args: {
+			password: '',
+		},
+		call: function(request) {
+			return set_initial_root_password(request);
+		},
+	},
+	status: {
+		call: require_root_password(function(request) {
+			return read_status(request);
+		}),
 	},
 	connected_devices: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_connected_devices();
-		},
+		}),
 	},
 	wifi_summary: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_wifi_summary();
-		},
+		}),
 	},
 	wifi_update: {
 		args: {
@@ -59,27 +99,27 @@ const methods = {
 			password: '',
 			enabled: true,
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return update_wifi(request);
-		},
+		}),
 	},
 	updates_status: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_updates_status(request);
-		},
+		}),
 	},
 	updates_check: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return check_updates(request);
-		},
+		}),
 	},
 	updates_install: {
 		args: {
 			confirm: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return install_updates(request);
-		},
+		}),
 	},
 	updates_settings_update: {
 		args: {
@@ -88,61 +128,61 @@ const methods = {
 			auto_install: false,
 			auto_install_time: '03:00',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return update_update_settings(request);
-		},
+		}),
 	},
 	firmware_status: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_firmware_status(request);
-		},
+		}),
 	},
 	firmware_check: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return check_firmware(request);
-		},
+		}),
 	},
 	firmware_prepare: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return prepare_firmware(request);
-		},
+		}),
 	},
 	firmware_validate_upload: {
 		args: {
 			filename: 'firmware.bin',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return validate_uploaded_firmware(request);
-		},
+		}),
 	},
 	firmware_install: {
 		args: {
 			confirm: '',
 			keep_settings: true,
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return install_firmware(request);
-		},
+		}),
 	},
 	firmware_discard: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return discard_firmware(request);
-		},
+		}),
 	},
 	system_time_settings: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_time_settings(request);
-		},
+		}),
 	},
 	system_time_sync: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return sync_time(request);
-		},
+		}),
 	},
 	system_scheduled_reboot_settings: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_scheduled_reboot_settings(request);
-		},
+		}),
 	},
 	system_scheduled_reboot_update: {
 		args: {
@@ -151,46 +191,46 @@ const methods = {
 			day_of_week: 'sun',
 			time: '04:00',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return update_scheduled_reboot_settings(request);
-		},
+		}),
 	},
 	system_timezone_update: {
 		args: {
 			zonename: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return update_timezone(request);
-		},
+		}),
 	},
 	system_backup_validate: {
 		args: {
 			filename: 'backup.tar.gz',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return validate_uploaded_backup(request);
-		},
+		}),
 	},
 	system_backup_restore: {
 		args: {
 			confirm: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return restore_uploaded_backup(request);
-		},
+		}),
 	},
 	system_backup_discard: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return discard_uploaded_backup(request);
-		},
+		}),
 	},
 	system_reboot: {
 		args: {
 			confirm: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return reboot_system(request);
-		},
+		}),
 	},
 };
 

@@ -61,6 +61,7 @@ require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"
 require_executable "$ROOT_DIR/tests/test-system-time-contract.sh"
 require_executable "$ROOT_DIR/tests/test-scheduled-reboot.sh"
 require_executable "$ROOT_DIR/tests/test-backup-restore.sh"
+require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 
 pkg_version="$(make_value PKG_VERSION)"

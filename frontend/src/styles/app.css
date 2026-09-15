@@ -474,6 +474,59 @@
   border-color: #475569;
 }
 
+.ssh-initial-setup-probe {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 1.5rem;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.ssh-initial-setup-probe-card {
+  display: grid;
+  width: min(100%, 28rem);
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 2.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1.25rem;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 20px 55px rgb(15 23 42 / 0.08);
+}
+
+.ssh-initial-setup-probe-card > svg {
+  width: 2rem;
+  height: 2rem;
+  color: #0f766e;
+}
+
+.ssh-initial-setup-probe-card strong {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.ssh-initial-setup-probe-card span {
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.ssh-initial-setup-probe-card button {
+  min-height: 2.75rem;
+  margin-top: 0.4rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 0.8rem;
+  background: #0f766e;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 /* SmartSafeHub public login. It is mounted into its own shadow root so these
  * styles remain isolated from LuCI themes and from the authenticated product. */
 .smartsafehub-login-shadow-root {
@@ -984,6 +1037,86 @@
 .ssh-login-fallback:focus-visible {
   outline: 3px solid var(--ssh-login-accent-ring);
   outline-offset: 2px;
+}
+
+.ssh-login-password-hint {
+  margin: -0.55rem 0 -0.15rem;
+  color: var(--ssh-login-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.ssh-password-requirements {
+  display: grid;
+  margin: -0.25rem 0 0;
+  padding: 0;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.ssh-password-requirement {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ssh-login-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ssh-password-requirement svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  color: var(--ssh-login-muted-soft);
+}
+
+.ssh-password-requirement.is-met,
+.ssh-password-requirement.is-met svg,
+.ssh-password-match.is-met {
+  color: var(--ssh-login-accent);
+}
+
+.ssh-password-match {
+  margin: -0.5rem 0 -0.1rem;
+  color: #be123c;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ssh-password-setup-summary {
+  display: flex;
+  max-width: 40rem;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-top: 2.4rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgb(94 234 212 / 0.18);
+  border-radius: 1rem;
+  background: rgb(20 184 166 / 0.09);
+}
+
+.ssh-password-setup-summary > svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-top: 0.1rem;
+  flex: 0 0 auto;
+  color: #5eead4;
+}
+
+.ssh-password-setup-summary > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ssh-password-setup-summary strong {
+  color: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.ssh-password-setup-summary span {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .ssh-login-caps {
