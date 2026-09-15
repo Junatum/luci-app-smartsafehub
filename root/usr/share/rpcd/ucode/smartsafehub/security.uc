@@ -107,11 +107,12 @@ export function set_initial_root_password(request) {
 		return policy_error;
 	}
 
+	// OpenWrt 25.12 exposes luci.setPassword with only username/password.
+	// Keep the request to that common contract so the same call also remains
+	// compatible with newer LuCI versions where additional args are optional.
 	const password_request = defer_call('luci', 'setPassword', {
 		username: 'root',
 		password: request.args.password,
-		oldpassword: '',
-		rpcd: false,
 	}, function(code, response) {
 		if (code != 0 || response?.result != true) {
 			request.reply(failure(

@@ -39,6 +39,14 @@ grep -Fq "defer_call('luci', 'setPassword'" "$SECURITY_MODULE" || \
 	fail 'root password setup must delegate to the LuCI setPassword implementation'
 grep -Fq "username: 'root'" "$SECURITY_MODULE" || \
 	fail 'initial password setup must only target the root account'
+grep -Fq 'password: request.args.password' "$SECURITY_MODULE" || \
+	fail 'initial password setup must pass the requested password to LuCI'
+if grep -Fq 'oldpassword:' "$SECURITY_MODULE"; then
+	fail 'OpenWrt 25.12 luci.setPassword compatibility must not send the newer oldpassword argument'
+fi
+if grep -Fq 'rpcd:' "$SECURITY_MODULE"; then
+	fail 'OpenWrt 25.12 luci.setPassword compatibility must not send the newer rpcd argument'
+fi
 grep -Fq 'root_password_configured() != true' "$SECURITY_MODULE" || \
 	fail 'password setup must verify the shadow state after LuCI reports success'
 grep -Fq "defer_call('session', 'destroy'" "$SECURITY_MODULE" || \

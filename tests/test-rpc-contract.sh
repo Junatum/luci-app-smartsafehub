@@ -127,6 +127,9 @@ grep -Fq "const SHADOW_FILE = '/etc/shadow';" "$SECURITY_MODULE" || \
 	fail 'initial security setup must inspect the root shadow password state'
 grep -Fq "defer_call('luci', 'setPassword'" "$SECURITY_MODULE" || \
 	fail 'initial security setup must delegate password writes to LuCI'
+if grep -Fq 'oldpassword:' "$SECURITY_MODULE" || grep -Fq 'rpcd:' "$SECURITY_MODULE"; then
+	fail 'initial security setup must use the OpenWrt 25.12 username/password-only luci.setPassword contract'
+fi
 grep -Fq "defer_call('session', 'destroy'" "$SECURITY_MODULE" || \
 	fail 'initial security setup must invalidate the bootstrap session after setting a password'
 grep -Fq "'SYSTEM_ROOT_PASSWORD_REQUIRED'" "$RPC_ENTRY" || \
