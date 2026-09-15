@@ -1,5 +1,24 @@
 # 변경 기록
 
+## [0.2.14-r13] - 2026-09-15
+
+### 기능
+
+- 설정의 `시스템 관리` 영역에 `설정 백업 및 복원` 기능을 추가했습니다. 현재 OpenWrt가 보존 대상으로 관리하는 네트워크, Wi-Fi, 시스템, SmartSafeHub와 SafeShield 설정을 표준 `sysupgrade` `.tar.gz` 형식으로 다운로드할 수 있습니다.
+- SmartSafeHub 또는 기본 LuCI에서 생성한 OpenWrt 설정 백업을 업로드해 검증한 뒤 복원할 수 있으며, 복원이 완료되면 변경된 네트워크·서비스 설정을 안전하게 적용하기 위해 공유기를 자동 재부팅합니다.
+
+### 안전성
+
+- 복원 업로드는 `/tmp/smartsafehub-config-backup.tar.gz` 고정 경로와 16MB 상한을 사용하고, gzip/tar 구조, `/etc/config` 포함 여부와 위험한 절대/상위 경로를 확인한 뒤에만 `sysupgrade --restore-backup`을 실행합니다.
+- 관리 소프트웨어 업데이트 또는 펌웨어 확인·다운로드·검증·설치가 진행 중이거나 펌웨어 이미지가 준비된 상태에서는 설정 복원을 거부해 동시에 실행되는 시스템 변경 작업을 막습니다.
+- 이전 펌웨어에서 만든 백업에 과거 `current_build_id`가 포함되어 있어도 복원 직후 현재 이미지의 `/usr/share/smartsafehub/firmware.json`을 다시 읽어 실제 설치된 펌웨어 build ID로 재동기화합니다.
+- 복원 전에는 LAN 주소, Wi-Fi와 관리자 접속 정보가 바뀌어 연결이 끊길 수 있음을 명시적으로 다시 확인하며, 백업 파일에 Wi-Fi 비밀번호·관리자 설정·VPN 키·라이선스 정보 등 민감한 값이 들어갈 수 있음을 안내합니다.
+
+### 테스트
+
+- 정상 OpenWrt 백업 검증, 잘못된 gzip/설정 없는 archive 거부, `sysupgrade --restore-backup` 위임, 펌웨어 build ID 재동기화, 복원 후 재부팅, 업데이트/펌웨어 busy 차단, 실패 시 백업 보존과 재부팅 금지를 검증하는 shell 회귀 테스트를 추가했습니다.
+- backup/restore RPC·ACL, `cgi-backup`/`cgi-upload` 경로, 프런트엔드 업로드→검증→최종 확인 계약과 설정 화면 노출을 기존 contract 테스트에 추가했습니다.
+
 ## [0.2.14-r12] - 2026-09-15
 
 ### 기능

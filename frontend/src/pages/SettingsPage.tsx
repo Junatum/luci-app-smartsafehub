@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 
 import {
   formatBytes,
@@ -11,11 +11,14 @@ import {
 import {
   CalendarIcon,
   ClockIcon,
+  DatabaseIcon,
   DownloadIcon,
   PowerIcon,
   SettingsIcon,
 } from '../components/Icons';
+import type { ConfigurationBackupAction } from '../hooks/useConfigurationBackup';
 import type { SystemAction } from '../hooks/useSystemActions';
+import type { ConfigurationBackupValidation } from '../types/backup';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
   ScheduledRebootDayOfWeek,
@@ -28,6 +31,12 @@ import { luciAdminUrl } from '../utils/luci';
 
 interface SettingsPageProps {
   action: SystemAction;
+  backupAction: ConfigurationBackupAction;
+  backupError: string | null;
+  backupMessage: string | null;
+  backupRestoreAccepted: boolean;
+  backupUploadProgress: number | null;
+  backupValidated: ConfigurationBackupValidation | null;
   data: SmartSafeHubStatus | null;
   error: string | null;
   feedbackError: string | null;
@@ -47,6 +56,11 @@ interface SettingsPageProps {
   timeSaveMessage: string | null;
   timeSaving: boolean;
   timeSyncing: boolean;
+  onBackupDiscard: () => Promise<boolean>;
+  onBackupDownload: () => void;
+  onBackupRestore: () => Promise<boolean>;
+  onBackupUpload: (file: File) => Promise<boolean>;
+  onDismissBackupFeedback: () => void;
   onDismissFeedback: () => void;
   onDismissTimeFeedback: () => void;
   onDownloadDiagnostics: () => void;
@@ -319,6 +333,214 @@ function TimeSettingsCard(props: {
 }
 
 
+function ConfigurationBackupCard(props: {
+  action: ConfigurationBackupAction;
+  error: string | null;
+  message: string | null;
+  restoreAccepted: boolean;
+  uploadProgress: number | null;
+  validated: ConfigurationBackupValidation | null;
+  onDiscard: () => Promise<boolean>;
+  onDismissFeedback: () => void;
+  onDownload: () => void;
+  onRestore: () => Promise<boolean>;
+  onUpload: (file: File) => Promise<boolean>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const busy = props.action !== null;
+
+  useEffect(() => {
+    if (!props.validated) {
+      setConfirmingRestore(false);
+    }
+  }, [props.validated]);
+
+  const chooseFile = () => {
+    if (!busy && !props.restoreAccepted) {
+      inputRef.current?.click();
+    }
+  };
+
+  const uploadSelectedFile = async () => {
+    if (!selectedFile) {
+      return;
+    }
+    if (await props.onUpload(selectedFile)) {
+      setSelectedFile(null);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+    }
+  };
+
+  return (
+    <ActionCard
+      className="lg:col-span-2"
+      description="펌웨어 업데이트나 복구 전에 현재 OpenWrt 설정을 표준 백업 파일로 저장하고, 필요할 때 검증 후 복원합니다."
+      icon={<DatabaseIcon class="size-5" />}
+      title="설정 백업 및 복원"
+    >
+      {(props.error || props.message) && (
+        <div
+          class={`mb-5 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+            props.error
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          <span class="min-w-0">{props.error || props.message}</span>
+          {!props.restoreAccepted && (
+            <button
+              class="shrink-0 rounded-lg px-2 py-1 text-xs font-extrabold hover:bg-black/5"
+              onClick={props.onDismissFeedback}
+              type="button"
+            >
+              닫기
+            </button>
+          )}
+        </div>
+      )}
+
+      <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+          <p class="m-0 text-sm font-black text-slate-900">현재 설정 백업</p>
+          <p class="mt-2 mb-0 text-xs leading-5 text-slate-600">
+            네트워크, Wi-Fi, 시스템, SmartSafeHub와 SafeShield 등 OpenWrt가 보존 대상으로 관리하는 설정을 백업합니다. 펌웨어 이미지와 설치 패키지 자체는 포함하지 않습니다.
+          </p>
+          <button
+            class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+            disabled={busy || props.restoreAccepted}
+            onClick={props.onDownload}
+            type="button"
+          >
+            <DownloadIcon class="size-4" />
+            {props.action === 'download' ? '백업 생성 중' : '설정 백업 다운로드'}
+          </button>
+          <p class="mt-3 mb-0 text-xs font-bold leading-5 text-amber-700">
+            백업에는 Wi-Fi 비밀번호, 관리자 설정, VPN 키나 라이선스 정보 같은 민감한 값이 포함될 수 있으므로 안전한 위치에 보관해 주세요.
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <p class="m-0 text-sm font-black text-slate-900">설정 복원</p>
+          <p class="mt-2 mb-0 text-xs leading-5 text-slate-600">
+            SmartSafeHub 또는 OpenWrt에서 생성한 설정 백업을 업로드합니다. 최대 16MB이며, 압축 구조와 OpenWrt 설정 파일 구성을 검증한 뒤에만 복원할 수 있습니다.
+          </p>
+
+          {!props.validated ? (
+            <>
+              <input
+                accept=".tar.gz,.tgz,application/gzip,application/x-gzip"
+                class="sr-only"
+                disabled={busy || props.restoreAccepted}
+                onChange={(event) =>
+                  setSelectedFile(event.currentTarget.files?.[0] ?? null)
+                }
+                ref={inputRef}
+                type="file"
+              />
+              <button
+                class="mt-4 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:border-teal-400 hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60"
+                disabled={busy || props.restoreAccepted}
+                onClick={chooseFile}
+                type="button"
+              >
+                <span class="min-w-0 truncate">
+                  {selectedFile?.name ?? '복원할 백업 파일 선택'}
+                </span>
+                <span class="shrink-0 text-xs font-extrabold text-teal-700">찾아보기</span>
+              </button>
+              {selectedFile && (
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span class="text-xs font-bold text-slate-500">
+                    {formatBytes(selectedFile.size)}
+                  </span>
+                  <button
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-teal-300 bg-white px-4 py-2 text-sm font-extrabold text-teal-800 transition hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                    disabled={busy || props.restoreAccepted}
+                    onClick={() => void uploadSelectedFile()}
+                    type="button"
+                  >
+                    {props.action === 'upload'
+                      ? `업로드 중 ${Math.round(props.uploadProgress ?? 0)}%`
+                      : props.action === 'validate'
+                        ? '백업 검증 중'
+                        : '업로드 및 검증'}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <div class="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                  <p class="m-0 break-words text-sm font-extrabold text-emerald-900">
+                    {props.validated.filename}
+                  </p>
+                  <p class="mt-1 mb-0 text-xs font-bold text-emerald-700">
+                    {formatBytes(props.validated.sizeBytes)} · 검증 완료
+                  </p>
+                </div>
+              </div>
+
+              {!confirmingRestore ? (
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <button
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
+                    disabled={busy || props.restoreAccepted}
+                    onClick={() => void props.onDiscard()}
+                    type="button"
+                  >
+                    {props.action === 'discard' ? '파일 삭제 중' : '파일 삭제'}
+                  </button>
+                  <button
+                    class="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-amber-700 disabled:opacity-60 sm:w-auto"
+                    disabled={busy || props.restoreAccepted}
+                    onClick={() => setConfirmingRestore(true)}
+                    type="button"
+                  >
+                    복원 준비
+                  </button>
+                </div>
+              ) : (
+                <div class="mt-4 rounded-xl border border-rose-200 bg-white p-4">
+                  <p class="m-0 text-sm font-black text-rose-900">
+                    현재 설정을 백업 파일의 내용으로 덮어쓰시겠습니까?
+                  </p>
+                  <p class="mt-2 mb-0 text-xs leading-5 text-rose-700">
+                    LAN 주소, Wi-Fi, 관리자 접속 정보가 바뀌어 현재 연결이 끊길 수 있습니다. 복원 직후 공유기가 자동으로 재부팅됩니다. 같은 장치와 호환되는 백업만 사용해 주세요.
+                  </p>
+                  <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <button
+                      class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
+                      disabled={busy}
+                      onClick={() => setConfirmingRestore(false)}
+                      type="button"
+                    >
+                      취소
+                    </button>
+                    <button
+                      class="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-rose-700 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                      disabled={busy}
+                      onClick={() => void props.onRestore()}
+                      type="button"
+                    >
+                      {props.action === 'restore' ? '설정 복원 중' : '설정 복원 및 재부팅'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </ActionCard>
+  );
+}
+
+
 const scheduledRebootDays: Array<{
   value: ScheduledRebootDayOfWeek;
   label: string;
@@ -538,6 +760,12 @@ function ScheduledRebootCard(props: {
 
 export function SettingsPage({
   action,
+  backupAction,
+  backupError,
+  backupMessage,
+  backupRestoreAccepted,
+  backupUploadProgress,
+  backupValidated,
   data,
   error,
   feedbackError,
@@ -557,6 +785,11 @@ export function SettingsPage({
   timeSaveMessage,
   timeSaving,
   timeSyncing,
+  onBackupDiscard,
+  onBackupDownload,
+  onBackupRestore,
+  onBackupUpload,
+  onDismissBackupFeedback,
   onDismissFeedback,
   onDismissTimeFeedback,
   onDownloadDiagnostics,
@@ -718,10 +951,24 @@ export function SettingsPage({
           </p>
           <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            예약 재부팅, 즉시 재부팅과 SmartSafeHub에서 아직 제공하지 않는 고급 설정을 관리합니다.
+            설정 백업·복원, 예약 재부팅, 즉시 재부팅과 고급 시스템 관리 기능을 제공합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+          <ConfigurationBackupCard
+            action={backupAction}
+            error={backupError}
+            message={backupMessage}
+            onDiscard={onBackupDiscard}
+            onDismissFeedback={onDismissBackupFeedback}
+            onDownload={onBackupDownload}
+            onRestore={onBackupRestore}
+            onUpload={onBackupUpload}
+            restoreAccepted={backupRestoreAccepted}
+            uploadProgress={backupUploadProgress}
+            validated={backupValidated}
+          />
+
           <ScheduledRebootCard
             data={scheduledRebootData}
             error={scheduledRebootError}
@@ -796,7 +1043,7 @@ export function SettingsPage({
               </a>
             </div>
             <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              설정 백업·복원 등 아직 SmartSafeHub에서 제공하지 않는 기능은 이 고급 설정에서 사용할 수 있습니다.
+              SmartSafeHub에서 아직 제공하지 않는 상세 시스템 기능이나 원본 로그가 필요할 때만 사용해 주세요.
             </p>
           </ActionCard>
         </div>

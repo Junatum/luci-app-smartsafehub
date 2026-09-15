@@ -1,3 +1,8 @@
+import type {
+  ConfigurationBackupDiscardResult,
+  ConfigurationBackupRestoreResult,
+  ConfigurationBackupValidation,
+} from '../types/backup';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type {
   FirmwareAccepted,
@@ -115,6 +120,25 @@ export function updateScheduledRebootSettings(
     day_of_week: input.dayOfWeek,
     time: input.time,
   });
+}
+
+export function requestConfigurationBackupValidation(
+  filename: string,
+): Promise<ConfigurationBackupValidation> {
+  return callApi(API_OBJECT, 'system_backup_validate', { filename });
+}
+
+export function requestConfigurationBackupRestore(): Promise<ConfigurationBackupRestoreResult> {
+  return callApi(
+    API_OBJECT,
+    'system_backup_restore',
+    { confirm: 'restore' },
+    { timeoutMs: 35_000 },
+  );
+}
+
+export function requestConfigurationBackupDiscard(): Promise<ConfigurationBackupDiscardResult> {
+  return callApi(API_OBJECT, 'system_backup_discard');
 }
 
 export function requestSystemReboot(): Promise<SystemRebootResult> {

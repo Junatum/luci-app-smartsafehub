@@ -18,6 +18,7 @@ for script in \
 	root/usr/libexec/smartsafehub-updater \
 	root/usr/libexec/smartsafehub-firmware \
 	root/usr/libexec/smartsafehub-maintenance \
+	root/usr/libexec/smartsafehub-backup \
 	spec/contracts_spec.sh \
 	tests/test-static-validation.sh \
 	tests/test-package-contract.sh \
@@ -31,6 +32,7 @@ for script in \
 	tests/test-settings-ui-contract.sh \
 	tests/test-system-time-contract.sh \
 	tests/test-scheduled-reboot.sh \
+	tests/test-backup-restore.sh \
 	tests/test-rpc-contract.sh \
 	tests/test-rules-ui-contract.sh \
 	tests/test-safeshield-page-contract.sh \

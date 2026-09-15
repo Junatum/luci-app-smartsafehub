@@ -7,6 +7,8 @@ RPC_ENTRY="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub.uc"
 UPDATES_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/updates.uc"
 FIRMWARE_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc"
 FIRMWARE_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
+BACKUP_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/backup.uc"
+BACKUP_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 UPDATER="$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 
@@ -32,7 +34,8 @@ assert_acl_method() {
 for method in updates_status updates_check updates_install updates_settings_update \
 	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
 	system_time_settings system_timezone_update system_time_sync \
-	system_scheduled_reboot_settings system_scheduled_reboot_update; do
+	system_scheduled_reboot_settings system_scheduled_reboot_update \
+	system_backup_validate system_backup_restore system_backup_discard; do
 	assert_rpc_method "$method"
 done
 
@@ -53,11 +56,18 @@ assert_acl_method write system_timezone_update
 assert_acl_method write system_time_sync
 assert_acl_method read system_scheduled_reboot_settings
 assert_acl_method write system_scheduled_reboot_update
+for method in system_backup_validate system_backup_restore system_backup_discard; do
+	assert_acl_method write "$method"
+done
 
+jq -e '."luci-app-smartsafehub".read."cgi-io" | index("backup") != null' "$ACL" >/dev/null || \
+	fail 'configuration backup download must be allowed through cgi-io backup ACL'
 jq -e '."luci-app-smartsafehub".write."cgi-io" | index("upload") != null' "$ACL" >/dev/null || \
-	fail 'firmware upload must be allowed through cgi-io upload ACL'
+	fail 'firmware and configuration backup uploads must be allowed through cgi-io upload ACL'
 jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub-firmware.bin"] | index("write") != null' "$ACL" >/dev/null || \
-	fail 'firmware upload ACL must only grant write access to the dedicated temporary image path'
+	fail 'firmware upload ACL must grant write access to the dedicated temporary image path'
+jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub-config-backup.tar.gz"] | index("write") != null' "$ACL" >/dev/null || \
+	fail 'configuration restore upload ACL must grant write access only to the dedicated temporary backup path'
 
 jq -e \
 	'.["luci-app-smartsafehub"].write.ubus.smartsafehub | index("updates_status") == null' \
@@ -108,6 +118,20 @@ if grep -Eq '(--force|-F)[[:space:]]+"?\$IMAGE_FILE' "$FIRMWARE_HELPER"; then
 	fail 'SmartSafeHub firmware updater must not expose forced sysupgrade'
 fi
 
+
+grep -Fq "const BACKUP_HELPER = '/usr/libexec/smartsafehub-backup';" "$BACKUP_MODULE" || \
+	fail 'configuration restore RPC must delegate privileged work to the dedicated backup helper'
+grep -Fq "request.args.confirm != 'restore'" "$BACKUP_MODULE" || \
+	fail 'configuration restore RPC must require an explicit confirmation token'
+grep -Fq "status == 75" "$BACKUP_MODULE" || \
+	fail 'configuration restore RPC must expose update/firmware busy state separately'
+grep -Fq '"$SYSUPGRADE_BIN" --restore-backup "$BACKUP_FILE"' "$BACKUP_HELPER" || \
+	fail 'configuration restore helper must use the OpenWrt sysupgrade restore path'
+grep -Fq 'restore_is_busy && return 75' "$BACKUP_HELPER" || \
+	fail 'configuration restore must not run while firmware or management update work is active'
+grep -Fq 'current_build_id="$build_id"' "$BACKUP_HELPER" || \
+	fail 'configuration restore must re-sync current firmware identity after applying an older backup'
+
 if grep -Eq '^[[:space:]]*(apk|"\$APK_BIN"|\$APK_BIN)[[:space:]]+upgrade([[:space:]]|$)' "$UPDATER"; then
 	fail 'full-system apk upgrade must not be used by SmartSafeHub updater'
 fi
@@ -115,4 +139,4 @@ fi
 grep -Fq '"$APK_BIN" upgrade "$UPDATE_PACKAGE"' "$UPDATER" || \
 	fail 'updater must use targeted apk upgrade for luci-app-smartsafehub'
 
-echo 'PASS: rpc registration, ACL permissions and targeted package update contract are consistent'
+echo 'PASS: rpc registration, ACL permissions, backup restore and targeted package update contracts are consistent'

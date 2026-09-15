@@ -135,13 +135,19 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
 - 진단 파일에는 호스트명, WAN IPv4와 Wi-Fi SSID가 포함될 수 있으므로 외부 전달 전 확인 필요
+- OpenWrt 표준 `sysupgrade` 설정 백업을 SmartSafeHub에서 직접 다운로드하고, SmartSafeHub 또는 기본 LuCI에서 만든 `.tar.gz` 백업을 업로드·검증한 뒤 복원 가능
+- 복원 archive는 16MB로 제한하고 gzip/tar 구조, `/etc/config` 포함 여부와 위험한 경로를 검사하며, 업데이트나 펌웨어 작업 중에는 복원을 차단
+- 설정 복원 후 현재 펌웨어 이미지의 `firmware.json`을 기준으로 `current_build_id`를 다시 동기화하고 자동 재부팅해 이전 백업의 펌웨어 identity가 남지 않도록 처리
+- 설정 백업에는 Wi-Fi 비밀번호, 관리자 설정, VPN 키와 라이선스 정보 등 민감한 설정이 포함될 수 있으므로 안전한 위치에 보관해야 하며, 펌웨어 이미지와 설치 패키지 자체는 포함하지 않음
 - 명시적인 확인 절차가 포함된 공유기 재부팅
 - 업데이트 관리는 전용 `업데이트` 메뉴에만 두고 설정 화면의 중복 업데이트 진입점은 제공하지 않음
-- 설정 백업·복원처럼 SmartSafeHub에서 아직 제공하지 않는 항목만 LuCI 고급 설정과 시스템 로그를 fallback으로 사용
+- SmartSafeHub에서 아직 제공하지 않는 상세 시스템 기능과 원본 로그만 LuCI 고급 설정을 fallback으로 사용
 
 시간대 설정은 로그와 통계뿐 아니라 관리 소프트웨어의 예약 설치 시각과 예약 재부팅 시각에도 영향을 줍니다. 저장 시 LuCI가 제공하는 시간대 목록에서 선택 값을 검증하고 IANA `zonename`과 POSIX `timezone`을 함께 기록합니다. 런타임 적용에 실패하면 이전 UCI 값을 복원합니다. NTP가 활성화되어 있으면 설정 화면에서 `지금 동기화`를 실행해 OpenWrt `sysntpd`를 즉시 다시 시작하고 잠시 뒤 장치 시간을 재조회할 수 있습니다.
 
 예약 재부팅은 `/usr/libexec/smartsafehub-maintenance`와 `smartsafehub-maintenance` procd service가 담당합니다. 단순 cron reboot를 사용하지 않고 SmartSafeHub updater와 firmware updater의 상태/lock을 확인한 뒤 안전한 경우에만 재부팅합니다. 업데이트 작업과 겹치면 15분 뒤 재시도하며 최대 2시간이 지나도 안전하지 않으면 해당 예약은 건너뜁니다.
+
+설정 백업 다운로드는 LuCI의 인증된 `/cgi-bin/cgi-backup` 경로를 통해 OpenWrt `sysupgrade --create-backup` 형식을 그대로 사용합니다. 복원은 `/cgi-bin/cgi-upload`로 전용 `/tmp/smartsafehub-config-backup.tar.gz` 경로에만 업로드한 뒤 `/usr/libexec/smartsafehub-backup`이 archive 구조와 업데이트 충돌 여부를 확인하고 `sysupgrade --restore-backup`을 실행합니다. 따라서 SmartSafeHub 백업은 기본 LuCI/CLI와 상호 호환되며 별도의 독자 백업 포맷을 만들지 않습니다.
 
 진단 파일은 설정 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
 
@@ -224,12 +230,14 @@ luci-app-smartsafehub/
 │   ├── usr/libexec/smartsafehub-updater
 │   ├── usr/libexec/smartsafehub-firmware
 │   ├── usr/libexec/smartsafehub-maintenance
+│   ├── usr/libexec/smartsafehub-backup
 │   ├── usr/share/luci/menu.d/
 │   ├── usr/share/rpcd/acl.d/
 │   ├── usr/share/rpcd/ucode/
 │   │   ├── smartsafehub.uc
 │   │   └── smartsafehub/
 │   │       ├── core.uc
+│   │       ├── backup.uc
 │   │       ├── devices.uc
 │   │       ├── system.uc
 │   │       ├── firmware.uc

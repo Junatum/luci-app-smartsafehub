@@ -3,6 +3,11 @@
 
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
+	discard_uploaded_backup,
+	restore_uploaded_backup,
+	validate_uploaded_backup
+} from './smartsafehub/backup.uc';
+import {
 	read_scheduled_reboot_settings,
 	read_status,
 	read_time_settings,
@@ -156,6 +161,27 @@ const methods = {
 		},
 		call: function(request) {
 			return update_timezone(request);
+		},
+	},
+	system_backup_validate: {
+		args: {
+			filename: 'backup.tar.gz',
+		},
+		call: function(request) {
+			return validate_uploaded_backup(request);
+		},
+	},
+	system_backup_restore: {
+		args: {
+			confirm: '',
+		},
+		call: function(request) {
+			return restore_uploaded_backup(request);
+		},
+	},
+	system_backup_discard: {
+		call: function(request) {
+			return discard_uploaded_backup(request);
 		},
 	},
 	system_reboot: {

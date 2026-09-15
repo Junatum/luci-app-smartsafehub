@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 
 import { AppShell } from '../components/AppShell';
+import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { useHashRoute } from '../hooks/useHashRoute';
@@ -24,6 +25,7 @@ import { WifiPage } from '../pages/WifiPage';
 
 export function App() {
   const route = useHashRoute();
+  const configurationBackup = useConfigurationBackup();
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
   const firmware = useFirmwareUpdates(route === 'system');
@@ -108,11 +110,22 @@ export function App() {
       content = (
         <SettingsPage
           action={systemActions.action}
+          backupAction={configurationBackup.action}
+          backupError={configurationBackup.error}
+          backupMessage={configurationBackup.message}
+          backupRestoreAccepted={configurationBackup.restoreAccepted}
+          backupUploadProgress={configurationBackup.uploadProgress}
+          backupValidated={configurationBackup.validated}
           data={status.data}
           error={status.error}
           feedbackError={systemActions.error}
           feedbackMessage={systemActions.message}
           loading={status.loading}
+          onBackupDiscard={configurationBackup.discard}
+          onBackupDownload={() => void configurationBackup.download()}
+          onBackupRestore={configurationBackup.restore}
+          onBackupUpload={configurationBackup.upload}
+          onDismissBackupFeedback={configurationBackup.dismissFeedback}
           onDismissFeedback={systemActions.dismissFeedback}
           onDismissTimeFeedback={systemTime.dismissSaveFeedback}
           onDownloadDiagnostics={() => void systemActions.downloadDiagnostics()}

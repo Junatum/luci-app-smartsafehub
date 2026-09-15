@@ -18,7 +18,10 @@
           "config",
           "rules_list"
         ]
-      }
+      },
+      "cgi-io": [
+        "backup"
+      ]
     },
     "write": {
       "ubus": {
@@ -35,7 +38,10 @@
           "firmware_prepare",
           "firmware_validate_upload",
           "firmware_install",
-          "firmware_discard"
+          "firmware_discard",
+          "system_backup_validate",
+          "system_backup_restore",
+          "system_backup_discard"
         ],
         "safeshield": [
           "set_enabled",
@@ -52,6 +58,9 @@
       ],
       "file": {
         "/tmp/smartsafehub-firmware.bin": [
+          "write"
+        ],
+        "/tmp/smartsafehub-config-backup.tar.gz": [
           "write"
         ]
       }
