@@ -347,19 +347,30 @@ export function FirmwareUpdatesCard({
                 </dd>
               </div>
               <div class="bg-white p-4">
-                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Installed</dt>
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Current version</dt>
                 <dd class="mt-2 mb-0 ml-0 break-all text-sm font-black text-slate-950">
-                  {data.current.buildId || data.current.openwrtVersion || '미확인'}
+                  {data.current.releaseVersion || '미확인'}
                 </dd>
+                {data.current.buildId ? (
+                  <span class="mt-1 block break-all text-[11px] leading-5 text-slate-400">
+                    Build {data.current.buildId}
+                  </span>
+                ) : data.current.openwrtVersion ? (
+                  <span class="mt-1 block text-[11px] leading-5 text-slate-400">
+                    OpenWrt {data.current.openwrtVersion}
+                  </span>
+                ) : null}
               </div>
               <div class="bg-white p-4">
-                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Available</dt>
+                <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Available version</dt>
                 <dd class={`mt-2 mb-0 ml-0 break-all text-sm font-black ${data.updateAvailable ? 'text-amber-700' : 'text-slate-950'}`}>
                   {!data.lastCheckAt
                     ? '미확인'
-                    : data.updateAvailable
-                      ? data.release?.buildId || data.release?.version || '새 펌웨어'
-                      : '최신 버전'}
+                    : data.release?.version
+                      ? `${data.release.version}${data.updateAvailable ? '' : ' · 최신'}`
+                      : data.updateAvailable
+                        ? '새 펌웨어'
+                        : '최신 버전'}
                 </dd>
               </div>
               <div class="bg-white p-4">
@@ -377,11 +388,11 @@ export function FirmwareUpdatesCard({
                 <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">Available firmware</p>
                 <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">새 펌웨어가 있습니다.</h3>
                 <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">
-                  버전 {data.release.openwrtVersion || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {data.settings.channel === 'beta' ? 'Beta' : 'Stable'}
+                  펌웨어 {data.release.version || '미확인'} · OpenWrt {data.release.openwrtVersion || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {data.settings.channel === 'beta' ? 'Beta' : 'Stable'}
                 </p>
               </div>
               <span class="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">
-                {data.release.version || data.release.buildId || 'Latest'}
+                {data.release.version || 'Latest'}
               </span>
             </div>
             {data.release.releaseNotes.length ? (

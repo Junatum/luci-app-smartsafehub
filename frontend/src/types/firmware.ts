@@ -19,6 +19,7 @@ export interface FirmwareCurrent {
   deviceCode: string | null;
   boardName: string | null;
   buildId: string | null;
+  releaseVersion: string | null;
   openwrtVersion: string | null;
   metadataAvailable: boolean;
 }

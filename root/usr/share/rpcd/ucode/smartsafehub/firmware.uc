@@ -255,17 +255,22 @@ function sanitize_release(document, current) {
 		document?.device_code != current.deviceCode ||
 		document?.channel != read_update_channel()
 	) {
-		return { updateAvailable: false, release: null };
+		return { currentVersion: null, updateAvailable: false, release: null };
 	}
 
+	const current_version = limited_string(document?.current_version, 32);
 	if (document?.release == null) {
-		return { updateAvailable: false, release: null };
+		return {
+			currentVersion: current_version,
+			updateAvailable: false,
+			release: null,
+		};
 	}
 
 	const release = document.release;
 	const image = release?.sysupgrade;
 	if (type(release) != 'object' || type(image) != 'object') {
-		return { updateAvailable: false, release: null };
+		return { currentVersion: current_version, updateAvailable: false, release: null };
 	}
 
 	let notes = [];
@@ -280,11 +285,12 @@ function sanitize_release(document, current) {
 
 	const size = integer_value(image?.size_bytes, 0);
 	return {
+		currentVersion: current_version,
 		updateAvailable: document.update_available == true,
 		release: {
 			id: integer_value(release?.id, 0),
 			buildId: limited_string(release?.build_id, 80),
-			version: limited_string(release?.version, 120),
+			version: limited_string(release?.version, 32),
 			deviceCode: limited_string(release?.device_code, 80),
 			channel: limited_string(release?.channel, 16),
 			target: limited_string(release?.target, 120),
@@ -307,6 +313,7 @@ export function read_firmware_status() {
 	const state = read_state();
 	const resolved = sanitize_release(read_json_file(FIRMWARE_RESOLVE_FILE, 262144), current);
 
+	current.releaseVersion = resolved.currentVersion;
 	state.current = current;
 	state.updateAvailable = resolved.updateAvailable;
 	state.release = resolved.release;

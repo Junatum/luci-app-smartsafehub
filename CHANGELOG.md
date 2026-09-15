@@ -1,5 +1,21 @@
 # 변경 기록
 
+## [0.2.14-r12] - 2026-09-15
+
+### 기능
+
+- Hub의 펌웨어 `release_version` 연동을 추가했습니다. 공유기는 기존처럼 `/usr/share/smartsafehub/firmware.json`의 immutable `build_id`만 서버에 보내며, `POST /api/v1/firmware/resolve` 응답의 `current_version`과 `release.version`을 제품 펌웨어 버전으로 사용합니다.
+
+### 개선
+
+- 펌웨어 업데이트 화면의 `Current version`과 `Available version`에 `1.0.2` 형식의 제품 릴리즈 버전을 우선 표시하고, build ID와 OpenWrt 기반 버전은 별도의 진단 정보로 구분했습니다.
+- 최신 펌웨어가 있는 경우 제품 펌웨어 버전, OpenWrt 기반 버전, 이미지 크기와 채널을 서로 구분해 표시합니다.
+- 릴리즈 버전을 펌웨어 이미지 메타데이터에서 읽지 않도록 유지해, 관리자가 검증 후 게시 시점에 버전을 부여하더라도 테스트한 펌웨어 artifact와 SHA-256이 변경되지 않습니다.
+
+### 테스트
+
+- firmware resolve 응답의 `current_version`/`release.version` 보존, RPC의 현재 릴리즈 버전 매핑, UI의 제품 버전 우선 표시와 `firmware.json`에 release version을 의존하지 않는 계약을 회귀 테스트에 추가했습니다.
+
 ## [0.2.14-r11] - 2026-09-14
 
 ### 수정

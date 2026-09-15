@@ -21,6 +21,15 @@ assert_contains() {
 mkdir -p "$TMP/bin" "$TMP/sysinfo" "$TMP/repo"
 printf '%s\n' 'iptime,ax3000sm' > "$TMP/sysinfo/board_name"
 printf '%s\n' 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb' > "$TMP/repo/smartsafehub.list"
+cat > "$TMP/firmware.json" <<'EOF2'
+{
+  "schema": 1,
+  "device_code": "iptime-ax3000sm",
+  "build_id": "current-build",
+  "channel": "stable",
+  "openwrt_version": "25.12.4"
+}
+EOF2
 printf '%s' 'mock-sysupgrade-image-v1' > "$TMP/server-image.bin"
 IMAGE_SIZE="$(wc -c < "$TMP/server-image.bin" | tr -d '[:space:]')"
 IMAGE_SHA="$(sha256sum "$TMP/server-image.bin" | awk '{ print $1 }')"
@@ -30,12 +39,13 @@ cat > "$TMP/resolve.json" <<EOF2
   "schema": 1,
   "device_code": "iptime-ax3000sm",
   "channel": "stable",
-  "current_build_id": "",
+  "current_build_id": "current-build",
+  "current_version": "1.1.0",
   "update_available": true,
   "release": {
     "id": 21,
     "build_id": "20260913T070000Z-test1234",
-    "version": "2026.09.13",
+    "version": "1.2.0",
     "device_code": "iptime-ax3000sm",
     "channel": "stable",
     "target": "mediatek/filogic",
@@ -151,7 +161,7 @@ export SMARTSAFEHUB_FIRMWARE_STATE_FILE="$TMP/firmware.state"
 export SMARTSAFEHUB_FIRMWARE_RESOLVE_FILE="$TMP/resolved.json"
 export SMARTSAFEHUB_FIRMWARE_IMAGE_FILE="$TMP/firmware.bin"
 export SMARTSAFEHUB_FIRMWARE_LOCK_DIR="$TMP/firmware.lock"
-export SMARTSAFEHUB_FIRMWARE_METADATA_FILE="$TMP/missing-firmware.json"
+export SMARTSAFEHUB_FIRMWARE_METADATA_FILE="$TMP/firmware.json"
 export SMARTSAFEHUB_FIRMWARE_BOARD_NAME_FILE="$TMP/sysinfo/board_name"
 export SMARTSAFEHUB_FIRMWARE_REPOSITORY_FILE="$TMP/repo/smartsafehub.list"
 export SMARTSAFEHUB_FIRMWARE_UCI_BIN="$TMP/bin/uci"
@@ -162,9 +172,14 @@ export SMARTSAFEHUB_FIRMWARE_UBUS_BIN="$TMP/bin/ubus"
 export SMARTSAFEHUB_FIRMWARE_SYSUPGRADE_BIN="$TMP/bin/sysupgrade"
 
 "$FIRMWARE" check
-jq -e '.schema == 1 and .device_code == "iptime-ax3000sm" and .channel == "stable" and .current_build_id == ""' "$TMP/request.json" >/dev/null || \
-	fail 'resolve request must contain schema, exact device code, channel and current build id'
+jq -e '.schema == 1 and .device_code == "iptime-ax3000sm" and .channel == "stable" and .current_build_id == "current-build"' "$TMP/request.json" >/dev/null || \
+	fail 'resolve request must contain schema, exact device code, channel and immutable current build id'
 assert_contains "$TMP/fetch.log" 'https://www.smartsafehub.com/api/v1/firmware/resolve'
+jq -e '.current_version == "1.1.0" and .release.version == "1.2.0"' "$TMP/resolved.json" >/dev/null || \
+	fail 'resolved firmware must preserve server-assigned current and available release versions'
+if jq -e 'has("release_version")' "$TMP/firmware.json" >/dev/null; then
+	fail 'immutable firmware metadata must not embed an administrator-assigned release version'
+fi
 TAB="$(printf '\t')"
 assert_contains "$TMP/firmware.state" "phase${TAB}idle"
 

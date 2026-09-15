@@ -7,6 +7,8 @@ UPDATES_CARD="$ROOT_DIR/frontend/src/components/SoftwareUpdatesCard.tsx"
 FIRMWARE_CARD="$ROOT_DIR/frontend/src/components/FirmwareUpdatesCard.tsx"
 FIRMWARE_HOOK="$ROOT_DIR/frontend/src/hooks/useFirmwareUpdates.ts"
 FIRMWARE_UPLOAD="$ROOT_DIR/frontend/src/api/firmwareUpload.ts"
+FIRMWARE_TYPES="$ROOT_DIR/frontend/src/types/firmware.ts"
+FIRMWARE_RPC="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc"
 LUCI_UTIL="$ROOT_DIR/frontend/src/utils/luci.ts"
 UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
 SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
@@ -19,7 +21,7 @@ fail() {
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -234,6 +236,23 @@ software_line="$(grep -n -m1 '<SoftwareUpdatesCard' "$UPDATE_PAGE" | cut -d: -f1
 	fail 'firmware update must be shown before SmartSafeHub software updates'
 grep -Fq '>펌웨어 업데이트</h2>' "$FIRMWARE_CARD" || \
 	fail 'firmware card must use the customer-facing firmware-update heading'
+grep -Fq 'releaseVersion: string | null;' "$FIRMWARE_TYPES" || \
+	fail 'firmware status must expose the Hub-resolved current release version separately from build metadata'
+grep -Fq 'const current_version = limited_string(document?.current_version, 32);' "$FIRMWARE_RPC" || \
+	fail 'firmware RPC must sanitize current_version returned by the Hub resolve API'
+grep -Fq 'current.releaseVersion = resolved.currentVersion;' "$FIRMWARE_RPC" || \
+	fail 'firmware RPC must attach the Hub-resolved release version to the current firmware status'
+grep -Fq "{data.current.releaseVersion || '미확인'}" "$FIRMWARE_CARD" || \
+	fail 'firmware UI must display the product release version as the current version'
+grep -Fq 'Build {data.current.buildId}' "$FIRMWARE_CARD" || \
+	fail 'firmware UI must keep build_id as secondary diagnostic identity'
+grep -Fq 'data.release?.version' "$FIRMWARE_CARD" || \
+	fail 'firmware UI must use the Hub release version for the available firmware version'
+grep -Fq "펌웨어 {data.release.version || '미확인'} · OpenWrt" "$FIRMWARE_CARD" || \
+	fail 'available firmware details must distinguish product firmware version from the OpenWrt base version'
+if grep -Fq 'metadata?.release_version' "$FIRMWARE_RPC"; then
+	fail 'firmware release version must not be read from immutable firmware.json build metadata'
+fi
 if grep -Fq 'OpenWrt 펌웨어' "$FIRMWARE_CARD"; then
 	fail 'firmware card must not expose OpenWrt as the customer-facing firmware product name'
 fi
