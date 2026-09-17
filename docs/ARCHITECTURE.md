@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r21`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r22`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -794,3 +794,7 @@ SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 �
 새 버전이 있으면 updater는 SmartSafeHub 전용 `/etc/apk/repositories.d/smartsafehub.list`의 APK repository URL에서 `https://repo.smartsafehub.com/<channel>` base를 유도하고 먼저 `releases/luci-app-smartsafehub/index.json`을 조회합니다. 다른 repository 파일은 release channel 결정에 사용하지 않습니다. index의 newest-first 순서를 이용해 현재 설치 버전 이후부터 APK가 제시한 최신 버전까지의 `<version>.json`만 내려받고 `/tmp/smartsafehub/release-notes.json` 하나의 bundle로 atomic cache합니다. rpcd는 bundle의 설치/최신 버전 범위, 각 릴리즈의 schema·package·version과 크기 제한을 검증한 뒤 `updates_status.releaseNotes`와 `releaseNotesComplete`로 노출합니다. index 또는 일부 릴리즈 노트를 가져오지 못한 경우에도 가능한 노트만 표시하며, 이 메타데이터는 signed APK metadata를 대체하지 않는 표시용 보조 정보이므로 다운로드·파싱 실패는 update check/install 결과에 영향을 주지 않습니다.
 
 자동화 설정은 `/etc/config/smartsafehub`의 `updates` section에 보존됩니다. `smartsafehub-updater` procd 서비스는 기본 6시간 주기로 확인하며, 자동 설치는 기본 비활성화 상태입니다. 자동 설치를 활성화하면 지정 시각의 다음 실행 기회에 하루 한 번만 설치를 시도합니다. 공유기가 예약 시각 이후에 부팅된 경우 그날의 지난 예약을 즉시 소급 실행하지 않고 다음 예약 시각까지 기다립니다.
+
+### LAN 입력 UX 안전장치
+
+LAN 화면은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, DHCP 시작/종료 주소는 공유기 주소의 앞 3개 octet을 읽기 전용 prefix로 사용한다. 공유기 prefix가 바뀌면 DHCP host octet은 유지하면서 같은 prefix로 동기화한다. 이 프런트엔드 제약은 사용자 입력 오류를 줄이기 위한 것이며, 최종 subnet·DHCP 범위 검증은 계속 `network-management.uc` backend가 담당한다.

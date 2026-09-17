@@ -293,7 +293,12 @@ cd frontend
 npm ci
 ```
 
-### 개발 서버
+#
+### LAN/DHCP 주소 입력 안전장치
+
+LAN 설정 화면은 공유기 IPv4 주소를 4개의 octet 입력으로 분리해 받습니다. DHCP 시작/종료 주소는 공유기 주소의 앞 3개 octet을 고정해서 표시하고 마지막 octet만 수정할 수 있습니다. 공유기 주소의 앞 3개 octet을 변경하면 DHCP 범위도 같은 prefix로 즉시 동기화되어 서로 다른 대역을 실수로 저장하는 가능성을 줄입니다. 실제 저장 시에는 backend의 subnet/DHCP 범위 검증도 그대로 적용됩니다.
+
+## 개발 서버
 
 ```bash
 npm run dev

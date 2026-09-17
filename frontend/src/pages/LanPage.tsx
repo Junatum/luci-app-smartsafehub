@@ -50,6 +50,123 @@ function isIpv4(value: string): boolean {
   });
 }
 
+
+function splitIpv4(value: string): [string, string, string, string] {
+  const parts = value.split('.');
+  return [parts[0] ?? '', parts[1] ?? '', parts[2] ?? '', parts[3] ?? ''];
+}
+
+function normalizeOctet(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 3);
+}
+
+function lanPrefix(value: string): string | null {
+  const parts = splitIpv4(value);
+  if (parts.slice(0, 3).some((part) => part === '' || Number(part) > 255)) {
+    return null;
+  }
+  return parts.slice(0, 3).join('.');
+}
+
+function hostOctet(value: string): string {
+  return splitIpv4(value)[3];
+}
+
+function Ipv4OctetInput({
+  disabled,
+  value,
+  onChange,
+}: {
+  disabled: boolean;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const octets = splitIpv4(value);
+
+  const updateOctet = (index: number, nextValue: string) => {
+    const next = [...octets] as [string, string, string, string];
+    next[index] = normalizeOctet(nextValue);
+    onChange(next.join('.'));
+  };
+
+  return (
+    <div class="mt-2 flex min-h-11 items-center gap-1.5" aria-label="IPv4 주소 입력">
+      {octets.map((octet, index) => (
+        <div class="contents" key={index}>
+          {index > 0 ? <span class="text-sm font-black text-slate-400">.</span> : null}
+          <input
+            aria-label={`IP 주소 ${index + 1}번째 옥텟`}
+            autocomplete="off"
+            class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-2 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+            disabled={disabled}
+            inputMode="numeric"
+            maxLength={3}
+            onInput={(event) => updateOctet(index, event.currentTarget.value)}
+            pattern="[0-9]*"
+            spellcheck={false}
+            value={octet}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DhcpHostInput({
+  disabled,
+  label,
+  lanAddress,
+  value,
+  onChange,
+}: {
+  disabled: boolean;
+  label: string;
+  lanAddress: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const prefix = lanPrefix(lanAddress);
+  const prefixParts = prefix?.split('.') ?? ['', '', ''];
+  const host = hostOctet(value);
+
+  const updateHost = (nextValue: string) => {
+    const normalized = normalizeOctet(nextValue);
+    onChange(prefix && normalized !== '' ? `${prefix}.${normalized}` : normalized);
+  };
+
+  return (
+    <label class="block">
+      <span class="text-sm font-extrabold text-slate-800">{label}</span>
+      <div class="mt-2 flex min-h-11 items-center gap-1.5" aria-label={`${label} 입력`}>
+        {prefixParts.map((part, index) => (
+          <div class="contents" key={index}>
+            {index > 0 ? <span class="text-sm font-black text-slate-400">.</span> : null}
+            <span class="grid min-h-11 min-w-0 flex-1 place-items-center rounded-xl border border-slate-200 bg-slate-100 px-2 py-2.5 text-center text-sm font-bold text-slate-500">
+              {part || '—'}
+            </span>
+          </div>
+        ))}
+        <span class="text-sm font-black text-slate-400">.</span>
+        <input
+          aria-label={`${label} 마지막 옥텟`}
+          autocomplete="off"
+          class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-2 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+          disabled={disabled || !prefix}
+          inputMode="numeric"
+          maxLength={3}
+          onInput={(event) => updateHost(event.currentTarget.value)}
+          pattern="[0-9]*"
+          spellcheck={false}
+          value={host}
+        />
+      </div>
+      <span class="mt-2 block text-xs text-slate-500">
+        앞 3개 주소는 공유기 IP 주소와 동일하게 유지됩니다.
+      </span>
+    </label>
+  );
+}
+
 function managementUrl(address: string): string {
   return `${window.location.protocol}//${address}${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
@@ -181,6 +298,20 @@ export function LanPage({
   const [leaseTime, setLeaseTime] = useState('12h');
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const updateIpAddress = (nextAddress: string) => {
+    const nextPrefix = lanPrefix(nextAddress);
+    setIpAddress(nextAddress);
+
+    if (!nextPrefix) {
+      return;
+    }
+
+    const startHost = hostOctet(dhcpStart);
+    const endHost = hostOctet(dhcpEnd);
+    setDhcpStart(startHost ? `${nextPrefix}.${startHost}` : '');
+    setDhcpEnd(endHost ? `${nextPrefix}.${endHost}` : '');
+  };
+
   useEffect(() => {
     if (!data) {
       return;
@@ -189,8 +320,11 @@ export function LanPage({
     setIpAddress(data.lan.address);
     setPrefixLength(data.lan.prefixLength);
     setDhcpEnabled(data.dhcp.enabled);
-    setDhcpStart(data.dhcp.start ?? '');
-    setDhcpEnd(data.dhcp.end ?? '');
+    const prefix = lanPrefix(data.lan.address);
+    const startHost = hostOctet(data.dhcp.start ?? '');
+    const endHost = hostOctet(data.dhcp.end ?? '');
+    setDhcpStart(prefix && startHost ? `${prefix}.${startHost}` : (data.dhcp.start ?? ''));
+    setDhcpEnd(prefix && endHost ? `${prefix}.${endHost}` : (data.dhcp.end ?? ''));
     setLeaseTime(data.dhcp.leaseTime);
     setValidationError(null);
   }, [data]);
@@ -329,18 +463,10 @@ export function LanPage({
         </div>
 
         <div class="mt-6 grid gap-5 lg:grid-cols-2">
-          <label class="block">
+          <div class="block">
             <span class="text-sm font-extrabold text-slate-800">공유기 IP 주소</span>
-            <input
-              autocomplete="off"
-              class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-              disabled={busy}
-              inputMode="decimal"
-              onInput={(event) => setIpAddress(event.currentTarget.value)}
-              spellcheck={false}
-              value={ipAddress}
-            />
-          </label>
+            <Ipv4OctetInput disabled={busy} onChange={updateIpAddress} value={ipAddress} />
+          </div>
 
           <div class="block">
             <span class="text-sm font-extrabold text-slate-800">현재 LAN 대역</span>
@@ -352,31 +478,21 @@ export function LanPage({
             </span>
           </div>
 
-          <label class="block">
-            <span class="text-sm font-extrabold text-slate-800">DHCP 시작 주소</span>
-            <input
-              autocomplete="off"
-              class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-              disabled={busy}
-              inputMode="decimal"
-              onInput={(event) => setDhcpStart(event.currentTarget.value)}
-              spellcheck={false}
-              value={dhcpStart}
-            />
-          </label>
+          <DhcpHostInput
+            disabled={busy}
+            label="DHCP 시작 주소"
+            lanAddress={ipAddress}
+            onChange={setDhcpStart}
+            value={dhcpStart}
+          />
 
-          <label class="block">
-            <span class="text-sm font-extrabold text-slate-800">DHCP 종료 주소</span>
-            <input
-              autocomplete="off"
-              class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-              disabled={busy}
-              inputMode="decimal"
-              onInput={(event) => setDhcpEnd(event.currentTarget.value)}
-              spellcheck={false}
-              value={dhcpEnd}
-            />
-          </label>
+          <DhcpHostInput
+            disabled={busy}
+            label="DHCP 종료 주소"
+            lanAddress={ipAddress}
+            onChange={setDhcpEnd}
+            value={dhcpEnd}
+          />
         </div>
 
         <details class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
