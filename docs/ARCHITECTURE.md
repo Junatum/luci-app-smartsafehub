@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r22`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r24`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -578,7 +578,13 @@ WifiPage form
   → lock 해제
 ```
 
-### 7.4 연결 기기
+### 7.4 대시보드 Internet 상태
+
+대시보드는 핵심 `smartsafehub.status`의 WAN 링크/IP/프로토콜과 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 및 충돌 판정을 함께 사용합니다. `INTERNET` 개요 카드는 WAN이 올라와 있고 subnet 충돌이 없을 때 정상 상태를 표시하며, WAN/LAN 대역이 겹치면 연결 자체가 up이어도 `네트워크 충돌` 경고와 `#lan` 해결 링크를 우선 표시합니다. LAN 상태 조회가 실패해도 핵심 대시보드 상태 조회와 렌더링은 유지하고, 대역 관련 메타데이터만 확인 필요 상태로 처리합니다.
+
+`네트워크 보호 활동 > 연결 상태` 카드는 연결 기기 수를 중복 표시하지 않고 WAN IP/프로토콜, 상위 네트워크, LAN 네트워크, 충돌 여부를 보여주는 네트워크 구성 요약 역할을 담당합니다. WAN IPv4가 RFC1918 사설 주소이면 `사설 네트워크`로 표시하되 이를 장애로 취급하지 않습니다. 대시보드 수동 새로고침은 기존 상태 소스와 함께 LAN 상태도 갱신합니다.
+
+### 7.5 연결 기기
 
 대시보드의 연결 기기 카드에서 `generatedAt`은 마지막 목록 확인 시각을 보여주는 정보성 값으로만 사용합니다. 사용자가 대시보드에 머무르는 동안 연결 기기 조회는 주기 polling을 하지 않으므로 시간이 오래되었다는 사실 자체를 장애나 주의 상태로 판단하지 않습니다. 실제 연결 기기 조회가 실패한 경우에만 확인 필요 상태로 표시합니다.
 
@@ -591,7 +597,7 @@ ConnectedDevicesPage
   → MAC 기준 병합·분류·집계
 ```
 
-### 7.4 SafeShield 사용자 규칙
+### 7.6 SafeShield 사용자 규칙
 
 ```text
 SafeShieldRulesPage
@@ -604,7 +610,7 @@ SafeShieldRulesPage
 
 SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지만, 규칙 파일과 적용 lifecycle의 authoritative source는 SafeShield입니다.
 
-### 7.5 SafeShield 라이선스
+### 7.7 SafeShield 라이선스
 
 ```text
 기본 상태 조회
@@ -626,7 +632,7 @@ SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지�
 
 라이선스 입력란은 비밀번호 필드로 취급하지 않고 일반 텍스트 입력으로 사용합니다. 브라우저 비밀번호 관리자 대상이 되지 않도록 autocomplete 및 주요 password-manager ignore 속성을 적용합니다.
 
-### 7.6 진단 파일
+### 7.8 진단 파일
 
 ```text
 SettingsPage의 기존 system snapshot
@@ -636,7 +642,7 @@ SettingsPage의 기존 system snapshot
   → 비밀 정보가 없는 JSON 다운로드
 ```
 
-### 7.7 Health Reporter
+### 7.9 Health Reporter
 
 ```text
 5분 로컬 진단
@@ -654,11 +660,11 @@ SettingsPage의 기존 system snapshot
 
 Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으로 검증해야 합니다. 공유기의 클라이언트 측 gating은 서버 권한 검사를 대신하지 않습니다.
 
-### 7.8 다크 테마 상태 패널
+### 7.10 다크 테마 상태 패널
 
 대시보드 장치 진단은 Tailwind의 반투명 상태 배경(`bg-emerald-50/70`, `bg-amber-50/70`, `bg-rose-50/70`)과 세부 카드(`bg-white/70`, `border-white/80`)를 사용합니다. Shadow DOM 안의 `.ssh-app[data-theme='dark']` 테마 레이어가 이 유틸리티를 어두운 상태색과 slate 계열로 명시적으로 재매핑해 라이트 테마용 밝은 반투명 배경이 다크 모드에 그대로 남지 않도록 합니다.
 
-### 7.9 프런트엔드 자산 갱신
+### 7.11 프런트엔드 자산 갱신
 
 ```text
 PKG_VERSION + PKG_RELEASE

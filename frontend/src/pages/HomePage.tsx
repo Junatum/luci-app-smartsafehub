@@ -17,6 +17,7 @@ import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type { FirmwareStatus } from '../types/firmware';
 import type { HealthSeverity, HealthStatus } from '../types/health';
+import type { LanSettings } from '../types/lan';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
@@ -43,6 +44,9 @@ interface HomePageProps {
   health: HealthStatus | null;
   healthError: string | null;
   healthLoading: boolean;
+  lan: LanSettings | null;
+  lanError: string | null;
+  lanLoading: boolean;
   loading: boolean;
   onRetry: () => void;
   safeshield: SafeShieldStatus | null;
@@ -64,7 +68,9 @@ interface OverviewCardProps {
   eyebrow: string;
   href?: string;
   icon: ComponentChildren;
+  linkLabel?: string;
   meta?: ComponentChildren;
+  metaState?: OverviewState;
   metaWarning?: boolean;
   state?: OverviewState;
   value: string;
@@ -85,7 +91,9 @@ function OverviewCard({
   eyebrow,
   href,
   icon,
+  linkLabel = '자세히 보기 →',
   meta,
+  metaState,
   metaWarning = false,
   state = 'neutral',
   value,
@@ -111,14 +119,18 @@ function OverviewCard({
       {meta ? (
         <p
           class={`mt-3 mb-0 text-xs font-bold ${
-            metaWarning ? 'text-amber-700' : 'text-slate-400'
+            metaState === 'healthy'
+              ? 'text-emerald-700'
+              : metaState === 'warning' || metaWarning
+                ? 'text-amber-700'
+                : 'text-slate-400'
           }`}
         >
           {meta}
         </p>
       ) : null}
       {href ? (
-        <span class="mt-4 inline-flex text-xs font-extrabold text-teal-700">자세히 보기 →</span>
+        <span class="mt-4 inline-flex text-xs font-extrabold text-teal-700">{linkLabel}</span>
       ) : null}
     </>
   );
@@ -188,6 +200,48 @@ function freshnessMeta(
     <span title={formatTimestamp(timestamp)}>
       {label}: {formatRelativeTime(timestamp, nowTimestamp)}
     </span>
+  );
+}
+
+function networkProtocolLabel(protocol: string | null): string | null {
+  if (!protocol) {
+    return null;
+  }
+
+  switch (protocol.toLowerCase()) {
+    case 'dhcp':
+      return 'DHCP';
+    case 'static':
+      return 'Static';
+    case 'pppoe':
+      return 'PPPoE';
+    default:
+      return protocol.toUpperCase();
+  }
+}
+
+function isPrivateIpv4(address: string | null): boolean {
+  if (!address) {
+    return false;
+  }
+
+  const octets = address.split('.').map((value) => Number(value));
+  if (
+    octets.length !== 4 ||
+    octets.some((value) => !Number.isInteger(value) || value < 0 || value > 255)
+  ) {
+    return false;
+  }
+
+  const [firstOctet, secondOctet] = octets;
+  if (firstOctet === undefined || secondOctet === undefined) {
+    return false;
+  }
+
+  return (
+    firstOctet === 10 ||
+    (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) ||
+    (firstOctet === 192 && secondOctet === 168)
   );
 }
 
@@ -421,6 +475,9 @@ export function HomePage({
   health,
   healthError,
   healthLoading,
+  lan,
+  lanError,
+  lanLoading,
   loading,
   onRetry,
   safeshield,
@@ -494,10 +551,48 @@ export function HomePage({
   const devicesDetail = devices
     ? `Wi-Fi ${formatNumber(devices.totals.wireless)}대 · 유선/기타 ${formatNumber(devices.totals.ethernet)}대`
     : devicesError || '연결 기기 요약을 불러오고 있습니다.';
+  const wanProtocol = networkProtocolLabel(data.network.protocol);
   const wanDetail = data.network.available
-    ? [data.network.protocol, data.network.ipv4Address].filter(Boolean).join(' · ') ||
-      '인터페이스 정보 없음'
+    ? data.network.ipv4Address
+      ? `WAN ${data.network.ipv4Address}${wanProtocol ? ` · ${wanProtocol}` : ''}`
+      : wanProtocol
+        ? `${wanProtocol} · WAN 주소를 받지 못했습니다.`
+        : 'WAN 주소를 받지 못했습니다.'
     : 'WAN 인터페이스를 찾을 수 없습니다.';
+  const networkConflict = Boolean(lan?.conflict.detected);
+  const internetState: OverviewState =
+    !data.network.up || networkConflict || (lanError !== null && !lan)
+      ? 'warning'
+      : lan
+        ? 'healthy'
+        : 'neutral';
+  const internetValue = networkConflict
+    ? '네트워크 충돌'
+    : data.network.up
+      ? '정상 연결'
+      : '연결 확인';
+  const internetMeta = !data.network.up
+    ? 'WAN 연결 상태를 확인해 주세요.'
+    : networkConflict
+      ? '⚠ LAN 대역과 충돌합니다'
+      : lanLoading && !lan
+        ? '네트워크 대역 확인 중'
+        : lanError && !lan
+          ? '네트워크 대역을 확인하지 못했습니다.'
+          : lan
+            ? '✓ 네트워크 충돌 없음'
+            : '네트워크 대역 확인 필요';
+  const internetMetaState: OverviewState =
+    !data.network.up || networkConflict || (lanError !== null && !lan)
+      ? 'warning'
+      : lan
+        ? 'healthy'
+        : 'neutral';
+  const wanAddressDetail = data.network.ipv4Address
+    ? isPrivateIpv4(data.network.ipv4Address)
+      ? `${data.network.ipv4Address} · 사설 네트워크`
+      : data.network.ipv4Address
+    : '할당되지 않음';
   const safeShieldRefreshAge = elapsedSeconds(
     safeshield?.timestamps.lastSuccess,
     relativeNow,
@@ -557,9 +652,13 @@ export function HomePage({
           <OverviewCard
             detail={wanDetail}
             eyebrow="Internet"
+            href="#lan"
             icon={<GlobeIcon class="size-5" />}
-            state={data.network.up ? 'healthy' : 'warning'}
-            value={data.network.up ? '정상 연결' : '연결 확인'}
+            linkLabel={networkConflict ? '해결하기 →' : '네트워크 설정 →'}
+            meta={internetMeta}
+            metaState={internetMetaState}
+            state={internetState}
+            value={internetValue}
           />
           <OverviewCard
             detail={safeShieldSummary.detail}
@@ -654,7 +753,7 @@ export function HomePage({
               </div>
               <span
                 class={`grid size-10 shrink-0 place-items-center rounded-xl ${
-                  data.network.up
+                  data.network.up && !networkConflict
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'bg-amber-50 text-amber-800'
                 }`}
@@ -666,41 +765,56 @@ export function HomePage({
             <dl class="mt-4 mb-0">
               <DetailRow
                 label="인터넷"
-                value={data.network.up ? '정상 연결' : '연결 확인'}
+                value={
+                  networkConflict
+                    ? '네트워크 충돌'
+                    : data.network.up
+                      ? '정상 연결'
+                      : '연결 확인'
+                }
               />
-              <DetailRow
-                label="WAN IP"
-                value={data.network.ipv4Address || '할당되지 않음'}
-              />
+              <DetailRow label="WAN IP" value={wanAddressDetail} />
               <DetailRow
                 label="프로토콜"
-                value={data.network.protocol || '확인되지 않음'}
+                value={wanProtocol || '확인되지 않음'}
               />
               <DetailRow
-                label="연결 기기"
+                label="상위 네트워크"
                 value={
-                  devices
-                    ? `${formatNumber(devices.totals.online)}대`
-                    : devicesLoading
-                      ? '확인 중'
-                      : '확인 필요'
+                  lan?.wan.subnet ||
+                  (lanLoading ? '확인 중' : lanError ? '확인 필요' : '확인되지 않음')
                 }
               />
               <DetailRow
-                label="Wi-Fi"
-                value={devices ? `${formatNumber(devices.totals.wireless)}대` : '-'}
+                label="LAN 네트워크"
+                value={
+                  lan?.lan.subnet ||
+                  (lanLoading ? '확인 중' : lanError ? '확인 필요' : '확인되지 않음')
+                }
               />
               <DetailRow
-                label="유선/기타"
-                value={devices ? `${formatNumber(devices.totals.ethernet)}대` : '-'}
+                label="대역 충돌"
+                value={
+                  lan ? (
+                    <span
+                      class={lan.conflict.detected ? 'text-amber-700' : 'text-emerald-700'}
+                    >
+                      {lan.conflict.detected ? '충돌 감지' : '없음'}
+                    </span>
+                  ) : lanLoading ? (
+                    '확인 중'
+                  ) : (
+                    '확인 필요'
+                  )
+                }
               />
             </dl>
 
             <a
               class="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-extrabold text-slate-700 no-underline transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
-              href="#devices"
+              href="#lan"
             >
-              연결된 기기 보기
+              LAN 설정 보기
             </a>
           </article>
         </div>

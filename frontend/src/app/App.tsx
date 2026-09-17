@@ -34,7 +34,7 @@ export function App() {
   const firmware = useFirmwareUpdates(
     route === 'system' || route === 'home' || route === 'settings',
   );
-  const lan = useLan(route === 'lan');
+  const lan = useLan(route === 'home' || route === 'lan');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -257,6 +257,9 @@ export function App() {
           health={health.data}
           healthError={health.error}
           healthLoading={health.loading}
+          lan={lan.data}
+          lanError={lan.error}
+          lanLoading={lan.loading}
           loading={status.loading}
           onRetry={() =>
             void Promise.all([
@@ -267,6 +270,7 @@ export function App() {
               updates.refresh(),
               firmware.refresh(),
               health.refresh(),
+              lan.refresh(),
             ])
           }
           safeshield={dashboardSafeShield.data}
@@ -293,6 +297,7 @@ export function App() {
         updates.refresh(),
         firmware.refresh(),
         health.refresh(),
+        lan.refresh(),
       ]);
       return;
     }
@@ -333,7 +338,8 @@ export function App() {
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing ||
             firmware.refreshing ||
-            health.refreshing)) ||
+            health.refreshing ||
+            lan.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
         (route === 'settings' &&
           (firmware.refreshing ||

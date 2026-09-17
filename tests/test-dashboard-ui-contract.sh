@@ -39,12 +39,20 @@ grep -Fq 'firmware={firmware.data}' "$APP" || \
 	fail '대시보드는 SmartSafeHub 펌웨어 상태를 전달받아야 합니다'
 grep -Fq "const health = useHealth(route === 'home' || route === 'settings');" "$APP" || \
 	fail '대시보드와 설정 페이지가 같은 로컬 Health 상태를 조회해야 합니다'
+grep -Fq "const lan = useLan(route === 'home' || route === 'lan');" "$APP" || \
+	fail '대시보드는 LAN/WAN 대역과 충돌 상태를 함께 조회해야 합니다'
 grep -Fq 'health={health.data}' "$APP" || \
 	fail '대시보드에 로컬 Health 진단 데이터를 전달해야 합니다'
 grep -Fq 'healthError={health.error}' "$APP" || \
 	fail '대시보드에 로컬 Health 조회 오류를 전달해야 합니다'
 grep -Fq 'healthLoading={health.loading}' "$APP" || \
 	fail '대시보드에 로컬 Health 로딩 상태를 전달해야 합니다'
+grep -Fq 'lan={lan.data}' "$APP" || \
+	fail '대시보드에 LAN/WAN 대역 데이터를 전달해야 합니다'
+grep -Fq 'lanError={lan.error}' "$APP" || \
+	fail '대시보드에 LAN 대역 조회 오류를 전달해야 합니다'
+grep -Fq 'lanLoading={lan.loading}' "$APP" || \
+	fail '대시보드에 LAN 대역 조회 로딩 상태를 전달해야 합니다'
 grep -Fq 'dashboardDevices.refresh()' "$APP" || \
 	fail '대시보드 새로고침은 연결 기기 정보를 갱신해야 합니다'
 grep -Fq 'dashboardSafeShield.refresh()' "$APP" || \
@@ -55,11 +63,16 @@ grep -Fq 'updates.refresh()' "$APP" || \
 	fail '대시보드 새로고침은 업데이트 정보를 갱신해야 합니다'
 grep -Fq 'firmware.refresh()' "$APP" || \
 	fail '대시보드 새로고침은 펌웨어 식별 정보를 갱신해야 합니다'
+lan_refresh_count="$(grep -Fc 'lan.refresh()' "$APP")"
+[ "$lan_refresh_count" -ge 3 ] || \
+	fail 'LAN 페이지 재시도와 대시보드 재시도·전역 새로고침에 LAN 대역 조회가 포함되어야 합니다'
 home_refresh_count="$(grep -Fc 'health.refresh()' "$APP")"
 [ "$home_refresh_count" -ge 3 ] || \
 	fail '대시보드 재시도·전역 새로고침과 설정 새로고침에 Health 조회가 포함되어야 합니다'
-grep -Fq 'health.refreshing)) ||' "$APP" || \
+grep -Fq 'health.refreshing ||' "$APP" || \
 	fail '대시보드 전역 새로고침 표시가 Health 갱신 상태를 포함해야 합니다'
+grep -Fq 'lan.refreshing)) ||' "$APP" || \
+	fail '대시보드 전역 새로고침 표시가 LAN 대역 갱신 상태를 포함해야 합니다'
 
 grep -Fq 'export function useConnectedDevices(active: boolean, polling = true)' "$DEVICES_HOOK" || \
 	fail '연결 기기 hook은 대시보드의 단발성 조회를 지원해야 합니다'
@@ -91,6 +104,33 @@ grep -Fq 'eyebrow="Connected devices"' "$HOME" || \
 	fail '대시보드는 연결 기기 정보를 표시해야 합니다'
 grep -Fq 'eyebrow="Software update"' "$HOME" || \
 	fail '대시보드는 소프트웨어 업데이트 정보를 표시해야 합니다'
+grep -Fq 'const networkConflict = Boolean(lan?.conflict.detected);' "$HOME" || \
+	fail 'Internet 개요 카드는 WAN/LAN 대역 충돌 상태를 사용해야 합니다'
+grep -Fq 'href="#lan"' "$HOME" || \
+	fail 'Internet 개요와 연결 상태 상세는 LAN 설정으로 연결되어야 합니다'
+grep -Fq "linkLabel={networkConflict ? '해결하기 →' : '네트워크 설정 →'}" "$HOME" || \
+	fail 'Internet 개요 카드는 정상/충돌 상태에 맞는 LAN 이동 문구를 표시해야 합니다'
+grep -Fq "? '⚠ LAN 대역과 충돌합니다'" "$HOME" || \
+	fail 'Internet 개요 카드는 대역 충돌을 명확하게 경고해야 합니다'
+grep -Fq "? '✓ 네트워크 충돌 없음'" "$HOME" || \
+	fail 'Internet 개요 카드는 정상 대역 상태를 간결하게 표시해야 합니다'
+grep -Fq 'label="상위 네트워크"' "$HOME" || \
+	fail '연결 상태 상세에 상위 WAN 네트워크 대역을 표시해야 합니다'
+grep -Fq 'label="LAN 네트워크"' "$HOME" || \
+	fail '연결 상태 상세에 SmartSafeHub LAN 네트워크 대역을 표시해야 합니다'
+grep -Fq 'label="대역 충돌"' "$HOME" || \
+	fail '연결 상태 상세에 WAN/LAN 대역 충돌 결과를 표시해야 합니다'
+grep -Fq '? `${data.network.ipv4Address} · 사설 네트워크`' "$HOME" || \
+	fail '사설 WAN 주소는 상위 NAT 환경임을 구분할 수 있어야 합니다'
+grep -Fq 'const [firstOctet, secondOctet] = octets;' "$HOME" || \
+	fail '사설 WAN 판별은 strict indexed access에서 안전한 octet 변수를 사용해야 합니다'
+grep -Fq 'firstOctet === undefined || secondOctet === undefined' "$HOME" || \
+	fail '사설 WAN 판별은 배열 인덱스가 undefined일 가능성을 명시적으로 차단해야 합니다'
+if grep -Eq 'octets\[1\][[:space:]]*(>=|<=|===|==|>|<)' "$HOME"; then
+	fail '사설 WAN 판별에서 noUncheckedIndexedAccess를 우회하는 직접 배열 비교를 사용하면 안 됩니다'
+fi
+grep -Fq 'LAN 설정 보기' "$HOME" || \
+	fail '연결 상태 상세 카드의 주 동작은 LAN 설정으로 이동해야 합니다'
 grep -Fq 'title="네트워크 보호 활동"' "$HOME" || \
 	fail '대시보드는 네트워크 보호 활동 영역을 표시해야 합니다'
 grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \

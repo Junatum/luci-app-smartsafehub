@@ -167,7 +167,8 @@ grep -Fq "'#lan': 'lan'" "$HASH_ROUTE" || fail '#lan hash router 연결이 필�
 grep -Fq "{ label: 'Network', routes: ['lan', 'wifi', 'devices'] }" "$NAVIGATION" || \
 	fail 'Network 메뉴에서 LAN이 Wi-Fi와 연결된 기기보다 먼저 표시되어야 합니다.'
 grep -Fq "case 'lan':" "$APP" || fail 'App이 LAN 페이지를 렌더링해야 합니다.'
-grep -Fq "const lan = useLan(route === 'lan');" "$APP" || fail 'LAN route에서만 LAN 데이터를 조회해야 합니다.'
+grep -Fq "const lan = useLan(route === 'home' || route === 'lan');" "$APP" || \
+	fail '대시보드와 LAN route가 같은 LAN/WAN 충돌 상태를 조회해야 합니다.'
 
 grep -Fq '상위 네트워크' "$PAGE" || fail 'LAN 화면에 상위 네트워크 정보를 표시해야 합니다.'
 grep -Fq '주소 대역이 겹칩니다' "$PAGE" || fail 'LAN 화면에 subnet 충돌 상태를 표시해야 합니다.'
