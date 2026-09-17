@@ -13,6 +13,7 @@ import {
 import { DashboardSafeShieldActivity } from '../components/DashboardSafeShieldActivity';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { ConnectedDevicesSummary } from '../types/devices';
+import type { FirmwareStatus } from '../types/firmware';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
@@ -33,6 +34,9 @@ interface HomePageProps {
   devicesError: string | null;
   devicesLoading: boolean;
   error: string | null;
+  firmware: FirmwareStatus | null;
+  firmwareError: string | null;
+  firmwareLoading: boolean;
   loading: boolean;
   onRetry: () => void;
   safeshield: SafeShieldStatus | null;
@@ -172,12 +176,12 @@ function freshnessMeta(
   fallback: string,
 ): ComponentChildren {
   if (!timestamp || timestamp <= 0) {
-    return fallback;
+    return `${label}: ${fallback}`;
   }
 
   return (
     <span title={formatTimestamp(timestamp)}>
-      {label} {formatRelativeTime(timestamp, nowTimestamp)}
+      {label}: {formatRelativeTime(timestamp, nowTimestamp)}
     </span>
   );
 }
@@ -254,6 +258,9 @@ export function HomePage({
   devicesError,
   devicesLoading,
   error,
+  firmware,
+  firmwareError,
+  firmwareLoading,
   loading,
   onRetry,
   safeshield,
@@ -360,6 +367,26 @@ export function HomePage({
       updateStaleThreshold !== null &&
       updateAge > updateStaleThreshold,
   );
+  const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);
+  const deviceFirmware =
+    firmwareLoading && !firmware
+      ? '확인 중'
+      : firmwareError && !firmware
+        ? '확인 필요'
+        : customFirmwareAvailable
+          ? firmware?.current.releaseVersion
+            ? `SmartSafeHub ${firmware.current.releaseVersion}`
+            : 'SmartSafeHub 펌웨어'
+          : `${data.software.distribution} ${data.software.version}`;
+  const deviceRevision =
+    firmwareLoading && !firmware
+      ? '확인 중'
+      : firmwareError && !firmware
+        ? '확인 필요'
+        : customFirmwareAvailable
+          ? firmware?.current.buildId || data.software.revision
+          : data.software.revision;
+  const deviceRevisionLabel = customFirmwareAvailable ? '빌드 ID' : '리비전';
 
   return (
     <div class="min-w-0 space-y-6">
@@ -384,10 +411,10 @@ export function HomePage({
             href="#safeshield"
             icon={<ShieldIcon class="size-5" />}
             meta={freshnessMeta(
-              safeShieldStale ? '차단 목록 갱신 지연 ·' : '차단 목록 갱신',
+              safeShieldStale ? '차단 목록 갱신 지연' : '차단 목록 갱신',
               safeshield?.timestamps.lastSuccess,
               relativeNow,
-              safeshieldLoading ? '최근 갱신 확인 중' : '최근 갱신 기록 없음',
+              safeshieldLoading ? '확인 중' : '기록 없음',
             )}
             metaWarning={safeShieldStale}
             state={
@@ -403,10 +430,10 @@ export function HomePage({
             href="#devices"
             icon={<DevicesIcon class="size-5" />}
             meta={freshnessMeta(
-              devicesStale ? '목록 갱신 권장 ·' : '목록 확인',
+              devicesStale ? '목록 갱신 권장' : '목록 확인',
               devices?.generatedAt,
               relativeNow,
-              devicesLoading ? '목록 확인 중' : '최근 확인 기록 없음',
+              devicesLoading ? '확인 중' : '기록 없음',
             )}
             metaWarning={devicesStale}
             state={
@@ -431,13 +458,13 @@ export function HomePage({
                     '자동 확인 꺼짐 · 마지막 확인',
                     updates.lastCheckAt,
                     relativeNow,
-                    '자동 확인 꺼짐 · 확인 기록 없음',
+                    '확인 기록 없음',
                   )
                 : freshnessMeta(
-                    updatesStale ? '업데이트 확인 지연 ·' : '마지막 확인',
+                    updatesStale ? '업데이트 확인 지연' : '마지막 확인',
                     updates?.lastCheckAt,
                     relativeNow,
-                    updatesLoading ? '업데이트 확인 중' : '아직 확인하지 않음',
+                    updatesLoading ? '확인 중' : '아직 없음',
                   )
             }
             metaWarning={updatesStale}
@@ -635,9 +662,21 @@ export function HomePage({
               <DetailRow label="호스트 이름" value={data.device.hostname} />
               <DetailRow
                 label="펌웨어"
-                value={`${data.software.distribution} ${data.software.version}`}
+                value={
+                  <span
+                    title={
+                      customFirmwareAvailable
+                        ? firmware?.current.releaseVersion
+                          ? `SmartSafeHub 펌웨어 ${firmware.current.releaseVersion}`
+                          : 'SmartSafeHub 커스텀 펌웨어'
+                        : firmwareError || undefined
+                    }
+                  >
+                    {deviceFirmware}
+                  </span>
+                }
               />
-              <DetailRow label="리비전" value={data.software.revision} />
+              <DetailRow label={deviceRevisionLabel} value={deviceRevision} />
               <DetailRow label="커널" value={data.software.kernel} />
               <DetailRow
                 label="WAN IP"

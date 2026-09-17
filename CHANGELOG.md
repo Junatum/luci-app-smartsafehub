@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.15-r8] - 2026-09-17
+
+### UI 개선
+
+- 대시보드 개요 카드의 freshness 문구를 `차단 목록 갱신: 41분 전`, `목록 확인: 1분 전`, `마지막 확인: 42분 전`처럼 `항목: 상대 시간` 구조로 통일했습니다. 지연 상태도 `차단 목록 갱신 지연: 2시간 전`처럼 같은 구조를 사용해 정상/이상 상태를 빠르게 구분할 수 있습니다.
+- 장치 정보는 `/usr/share/smartsafehub/firmware.json`이 있는 SmartSafeHub 커스텀 펌웨어에서 Hub가 resolve한 제품 릴리즈 버전을 `SmartSafeHub 1.0.2`처럼 우선 표시하고, OpenWrt 리비전 대신 immutable build ID를 표시합니다. 커스텀 펌웨어 메타데이터가 없는 기존 이미지에서만 OpenWrt 배포판/버전/리비전으로 fallback합니다.
+- 커널은 제품 레이어의 별도 버전을 만들지 않고 현재 장치에서 실제 실행 중인 커널 버전을 그대로 표시합니다.
+
+### 테스트
+
+- Dashboard가 펌웨어 상태 RPC의 커스텀 firmware metadata를 함께 읽고 SmartSafeHub 제품 버전/build ID를 우선 사용하며 OpenWrt fallback과 실제 runtime kernel을 유지하는지 contract를 추가했습니다.
+- freshness label과 상대 시간이 콜론으로 분리되는 UI 계약을 추가했습니다.
+
 ## [0.2.15-r7] - 2026-09-17
 
 ### UI 개선

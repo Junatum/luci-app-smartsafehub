@@ -25,12 +25,16 @@ grep -Fq "const dashboardSafeShield = useSafeShieldStatus(route === 'home');" "$
 	fail 'Dashboard must load SafeShield status'
 grep -Fq "const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);" "$APP" || \
 	fail 'Dashboard SafeShield statistics must disable periodic polling'
+grep -Fq "const firmware = useFirmwareUpdates(route === 'system' || route === 'home');" "$APP" || \
+	fail 'Dashboard must load cached SmartSafeHub firmware identity'
 grep -Fq 'devices={dashboardDevices.data}' "$APP" || \
 	fail 'Dashboard must receive the connected-device summary'
 grep -Fq 'safeshield={dashboardSafeShield.data}' "$APP" || \
 	fail 'Dashboard must receive SafeShield status'
 grep -Fq 'statistics={dashboardSafeShieldStatistics.data}' "$APP" || \
 	fail 'Dashboard must receive SafeShield statistics'
+grep -Fq 'firmware={firmware.data}' "$APP" || \
+	fail 'Dashboard must receive SmartSafeHub firmware status'
 grep -Fq 'dashboardDevices.refresh()' "$APP" || \
 	fail 'Dashboard refresh must refresh connected-device information'
 grep -Fq 'dashboardSafeShield.refresh()' "$APP" || \
@@ -39,6 +43,8 @@ grep -Fq 'dashboardSafeShieldStatistics.refresh()' "$APP" || \
 	fail 'Dashboard refresh must refresh SafeShield statistics'
 grep -Fq 'updates.refresh()' "$APP" || \
 	fail 'Dashboard refresh must refresh update information'
+grep -Fq 'firmware.refresh()' "$APP" || \
+	fail 'Dashboard refresh must refresh firmware identity information'
 
 grep -Fq 'export function useConnectedDevices(active: boolean, polling = true)' "$DEVICES_HOOK" || \
 	fail 'connected-device hook must support one-shot Dashboard loading'
@@ -81,12 +87,14 @@ if grep -Fq 'title="최근 상태 확인"' "$HOME" || grep -Fq 'dashboard-freshn
 fi
 grep -Fq 'formatRelativeTime(timestamp, nowTimestamp)' "$HOME" || \
 	fail 'Dashboard overview cards must render relative freshness timestamps'
-grep -Fq "safeShieldStale ? '차단 목록 갱신 지연 ·' : '차단 목록 갱신'" "$HOME" || \
+grep -Fq "safeShieldStale ? '차단 목록 갱신 지연' : '차단 목록 갱신'" "$HOME" || \
 	fail 'SafeShield overview must own its freshness metadata and stale warning'
-grep -Fq "devicesStale ? '목록 갱신 권장 ·' : '목록 확인'" "$HOME" || \
+grep -Fq "devicesStale ? '목록 갱신 권장' : '목록 확인'" "$HOME" || \
 	fail 'connected-device overview must own its freshness metadata and stale warning'
-grep -Fq "updatesStale ? '업데이트 확인 지연 ·' : '마지막 확인'" "$HOME" || \
+grep -Fq "updatesStale ? '업데이트 확인 지연' : '마지막 확인'" "$HOME" || \
 	fail 'software-update overview must own its freshness metadata and stale warning'
+grep -Fq '{label}: {formatRelativeTime(timestamp, nowTimestamp)}' "$HOME" || \
+	fail 'Dashboard freshness metadata must separate the label and relative time with a colon'
 grep -Fq "updates && !updates.settings.checkEnabled" "$HOME" || \
 	fail 'disabled software auto-check must not be reported as stale'
 grep -Fq 'const RELATIVE_TIME_TICK_MS = 60_000;' "$HOME" || \
@@ -103,6 +111,18 @@ grep -Fq 'formatLoadAverage(data.runtime.load[1])' "$HOME" || \
 	fail 'Dashboard must show the 5-minute load average'
 grep -Fq 'formatLoadAverage(data.runtime.load[2])' "$HOME" || \
 	fail 'Dashboard must show the 15-minute load average'
+grep -Fq "const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);" "$HOME" || \
+	fail 'Dashboard device details must detect SmartSafeHub custom firmware metadata'
+grep -Fq '`SmartSafeHub ${firmware.current.releaseVersion}`' "$HOME" || \
+	fail 'Dashboard device details must prefer the SmartSafeHub product firmware version'
+grep -Fq "firmware?.current.buildId || data.software.revision" "$HOME" || \
+	fail 'Dashboard device details must prefer the immutable SmartSafeHub build ID'
+grep -Fq "const deviceRevisionLabel = customFirmwareAvailable ? '빌드 ID' : '리비전';" "$HOME" || \
+	fail 'Dashboard must label custom firmware identity as build ID and preserve OpenWrt revision fallback'
+grep -Fq '`${data.software.distribution} ${data.software.version}`' "$HOME" || \
+	fail 'Dashboard device details must retain OpenWrt firmware fallback for legacy images'
+grep -Fq '<DetailRow label="커널" value={data.software.kernel} />' "$HOME" || \
+	fail 'Dashboard device details must keep the actual running kernel version'
 grep -Fq 'value={data.network.ipv4Address || '\''할당되지 않음'\''}' "$HOME" || \
 	fail 'Dashboard device details must include the WAN address'
 

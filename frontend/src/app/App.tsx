@@ -28,7 +28,7 @@ export function App() {
   const configurationBackup = useConfigurationBackup();
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
-  const firmware = useFirmwareUpdates(route === 'system');
+  const firmware = useFirmwareUpdates(route === 'system' || route === 'home');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -211,6 +211,9 @@ export function App() {
           devicesError={dashboardDevices.error}
           devicesLoading={dashboardDevices.loading}
           error={status.error}
+          firmware={firmware.data}
+          firmwareError={firmware.error}
+          firmwareLoading={firmware.loading}
           loading={status.loading}
           onRetry={() =>
             void Promise.all([
@@ -219,6 +222,7 @@ export function App() {
               dashboardSafeShield.refresh(),
               dashboardSafeShieldStatistics.refresh(),
               updates.refresh(),
+              firmware.refresh(),
             ])
           }
           safeshield={dashboardSafeShield.data}
@@ -243,6 +247,7 @@ export function App() {
         dashboardSafeShield.refresh(),
         dashboardSafeShieldStatistics.refresh(),
         updates.refresh(),
+        firmware.refresh(),
       ]);
       return;
     }
@@ -279,7 +284,8 @@ export function App() {
           (dashboardDevices.refreshing ||
             dashboardSafeShield.refreshing ||
             dashboardSafeShieldStatistics.refreshing ||
-            updates.refreshing)) ||
+            updates.refreshing ||
+            firmware.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
         (route === 'settings' &&
           (systemTime.refreshing || scheduledReboot.refreshing)) ||
