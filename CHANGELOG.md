@@ -14,6 +14,8 @@
 - Backend CI가 OpenWrt 25.12와 동일 계열인 ucode `2026.01.16~85922056` 소스 revision(`8592205`)을 직접 빌드하고 `SMARTSAFEHUB_REQUIRE_UCODE=1`로 실제 컴파일 검사를 필수화했습니다. 로컬에 ucode가 없어 검사가 건너뛰어져도 CI에서는 누락을 허용하지 않습니다.
 - host ucode에는 OpenWrt 전용 `ubus`/`uci` 동적 모듈이 없으므로 테스트 전용 최소 import stub으로 이름 해석만 제공하고, SmartSafeHub의 실제 ucode 소스와 상대 import graph는 대상 컴파일러가 그대로 검사하도록 했습니다.
 - 과거 장애와 동일한 `export function`의 세미콜론 누락 코드를 테스트 중 의도적으로 컴파일해 대상 ucode 컴파일러가 이를 거부하는지도 확인합니다.
+- LAN 기능 계약 테스트에서 별도로 실행하던 raw `ucode -c`를 제거했습니다. Host CI의 ucode에는 OpenWrt 전용 `ubus`/`uci`/`fs` 모듈이 없어 실제 소스 문법과 무관하게 import 해석에서 실패할 수 있으므로, 실제 컴파일은 전용 `test-ucode-syntax.sh`가 stub module search path를 구성한 뒤 단일하게 담당합니다.
+- 정적 검증에 회귀 계약을 추가해 다른 기능별 테스트가 다시 raw `ucode -c`를 추가하지 못하도록 했습니다.
 - README의 ucode 진단 및 배포 전 검사 절차를 새 CI 컴파일 계약에 맞게 갱신했습니다.
 
 ## [0.2.15-r19] - 2026-09-17

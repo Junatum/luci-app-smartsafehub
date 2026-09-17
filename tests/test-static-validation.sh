@@ -49,6 +49,19 @@ for script in \
 	sh -n "$ROOT_DIR/$script"
 done
 
+# 실제 ucode 컴파일은 test-ucode-syntax.sh가 OpenWrt 전용 모듈 stub과
+# target module search path를 구성한 뒤 단일 진입점으로 수행해야 합니다.
+# 기능별 계약 테스트가 raw `ucode -c`를 추가하면 host CI에서는 ubus/uci/fs
+# import를 찾지 못해 소스 문법과 무관한 false failure가 발생할 수 있습니다.
+RAW_UCODE_COMPILE_TESTS="$(
+	find "$ROOT_DIR/tests" -type f -name 'test-*.sh' \
+		! -name 'test-ucode-syntax.sh' \
+		! -name 'test-static-validation.sh' \
+		-exec grep -l -E 'ucode[[:space:]].*-c' {} + 2>/dev/null || true
+)"
+[ -z "$RAW_UCODE_COMPILE_TESTS" ] || \
+	fail "ucode 실제 컴파일은 tests/test-ucode-syntax.sh에서만 수행해야 합니다: $RAW_UCODE_COMPILE_TESTS"
+
 find \
 	"$ROOT_DIR/root/usr/share/rpcd/acl.d" \
 	"$ROOT_DIR/root/usr/share/luci/menu.d" \

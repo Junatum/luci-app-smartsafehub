@@ -75,14 +75,10 @@ for function_name in read_lan_settings update_lan_settings apply_recommended_lan
 	assert_ucode_export_terminated "$function_name"
 done
 
-if command -v ucode >/dev/null 2>&1; then
-	UCODE_OUTPUT="$(mktemp "${TMPDIR:-/tmp}/smartsafehub-lan-ucode.XXXXXX")"
-	trap 'rm -f "$UCODE_OUTPUT"' EXIT HUP INT TERM
-	ucode -c -o "$UCODE_OUTPUT" "$LAN_RPC_ENTRY" || \
-		fail 'smartsafehub-network.uc와 LAN 구현 모듈이 ucode 컴파일을 통과해야 합니다.'
-	rm -f "$UCODE_OUTPUT"
-	trap - EXIT HUP INT TERM
-fi
+# 실제 ucode 컴파일은 tests/test-ucode-syntax.sh 한 곳에서 수행합니다.
+# Host CI의 ucode에는 OpenWrt 전용 ubus/uci/fs 모듈이 포함되지 않으므로
+# 기능별 계약 테스트에서 별도의 compiler 직접 호출을 실행하면 정상 소스도
+# import 해석 단계에서 실패할 수 있습니다.
 grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
 	fail '격리된 LAN backend ubus 객체가 등록되어야 합니다.'
 for method in lan_settings lan_update lan_auto_subnet; do
