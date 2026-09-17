@@ -8,6 +8,7 @@ REPORT_STATE_FILE="${SMARTSAFEHUB_HEALTH_REPORT_STATE_FILE:-$RUNTIME_DIR/health-
 MEMINFO_FILE="${SMARTSAFEHUB_HEALTH_MEMINFO_FILE:-/proc/meminfo}"
 LOADAVG_FILE="${SMARTSAFEHUB_HEALTH_LOADAVG_FILE:-/proc/loadavg}"
 CPUINFO_FILE="${SMARTSAFEHUB_HEALTH_CPUINFO_FILE:-/proc/cpuinfo}"
+UPTIME_FILE="${SMARTSAFEHUB_HEALTH_UPTIME_FILE:-/proc/uptime}"
 UPDATER_STATE_FILE="${SMARTSAFEHUB_HEALTH_UPDATER_STATE_FILE:-$RUNTIME_DIR/updates.state}"
 FIRMWARE_STATE_FILE="${SMARTSAFEHUB_HEALTH_FIRMWARE_STATE_FILE:-$RUNTIME_DIR/firmware.state}"
 DNSMASQ_INIT="${SMARTSAFEHUB_HEALTH_DNSMASQ_INIT:-/etc/init.d/dnsmasq}"
@@ -21,6 +22,7 @@ LOGGER_BIN="${SMARTSAFEHUB_HEALTH_LOGGER_BIN:-logger}"
 DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 DEFAULT_CHECK_INTERVAL_S=300
 DEFAULT_REPORT_INTERVAL_S=1800
+DEFAULT_STARTUP_GRACE_S=120
 MIN_CHECK_INTERVAL_S=60
 MIN_REPORT_INTERVAL_S=300
 REPORT_TIMEOUT_S=15
@@ -42,6 +44,7 @@ ISSUE_FINGERPRINT=""
 MEMORY_AVAILABLE_PERCENT=0
 LOAD_1M="0"
 OVERLAY_AVAILABLE_PERCENT=0
+SAFESHIELD_INITIALIZING=0
 
 cleanup() {
 	[ -n "$CHECKS_FILE" ] && rm -f "$CHECKS_FILE"
@@ -74,6 +77,43 @@ check_interval_s() {
 
 report_interval_s() {
 	normalized_integer "$(uci_get report_interval_s)" "$DEFAULT_REPORT_INTERVAL_S" "$MIN_REPORT_INTERVAL_S"
+}
+
+startup_grace_s() {
+	normalized_integer "$(uci_get startup_grace_s)" "$DEFAULT_STARTUP_GRACE_S" 0
+}
+
+system_uptime_s() {
+	awk '{ split($1, parts, "."); print parts[1]; exit }' "$UPTIME_FILE" 2>/dev/null || true
+}
+
+in_startup_grace() {
+	local uptime grace
+	uptime="$(system_uptime_s)"
+	grace="$(startup_grace_s)"
+	case "$uptime:$grace" in
+		*[!0-9:]*) return 1 ;;
+	esac
+	[ "$grace" -gt 0 ] 2>/dev/null || return 1
+	[ "$uptime" -lt "$grace" ] 2>/dev/null
+}
+
+is_safeshield_refresh_stage() {
+	case "$1" in
+		starting|boot_delay|boot_refresh|boot_refresh_skipped|scheduled_refresh|init|resolve_api|download_artifact|local_overrides|merge|install|restart_dnsmasq|runtime_check|blocklist_verify) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
+safeshield_startup_pending() {
+	local status="$1" stage="$2" dns_ok="$3" installed="$4"
+	in_startup_grace || return 1
+	case "$status" in error|failed) return 1 ;; esac
+	[ "$status" = 'running' ] && return 0
+	is_safeshield_refresh_stage "$stage" && return 0
+	case "$dns_ok" in true|1) ;; *) return 0 ;; esac
+	case "$installed" in true|1) ;; *) return 0 ;; esac
+	return 1
 }
 
 reporter_enabled() {
@@ -142,6 +182,7 @@ add_check() {
 
 	case "$status" in
 		ok) OK_COUNT=$((OK_COUNT + 1)) ;;
+		initializing) UNKNOWN_COUNT=$((UNKNOWN_COUNT + 1)) ;;
 		warning) WARNING_COUNT=$((WARNING_COUNT + 1)); raise_overall warning ;;
 		critical) CRITICAL_COUNT=$((CRITICAL_COUNT + 1)); raise_overall critical ;;
 		*) status="unknown"; UNKNOWN_COUNT=$((UNKNOWN_COUNT + 1)) ;;
@@ -241,15 +282,21 @@ collect_dnsmasq() {
 }
 
 collect_safeshield() {
-	local enabled status dns_ok installed last_error code
+	local enabled status stage dns_ok installed last_error code
 	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/health-safeshield.$$.json"
 	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then
-		add_check safeshield.runtime 'SafeShield' unknown '' 'SafeShield 상태 API를 확인하지 못했습니다.' null ''
+		if in_startup_grace; then
+			SAFESHIELD_INITIALIZING=1
+			add_check safeshield.runtime 'SafeShield' initializing 'SAFESHIELD_INITIALIZING' 'SafeShield 보호 기능을 준비하고 있습니다.' null ''
+		else
+			add_check safeshield.runtime 'SafeShield' warning 'SAFESHIELD_STATUS_UNAVAILABLE' 'SafeShield 상태 API를 확인하지 못했습니다.' null ''
+		fi
 		return
 	fi
 
 	enabled="$(json_value "$SAFESHIELD_STATUS_FILE" '@.enabled')"
 	status="$(json_value "$SAFESHIELD_STATUS_FILE" '@.status')"
+	stage="$(json_value "$SAFESHIELD_STATUS_FILE" '@.stage')"
 	dns_ok="$(json_value "$SAFESHIELD_STATUS_FILE" '@.runtime.dns_runtime_ok')"
 	installed="$(json_value "$SAFESHIELD_STATUS_FILE" '@.blocklist.installed')"
 	last_error="$(sanitize_code "$(json_value "$SAFESHIELD_STATUS_FILE" '@.runtime.last_error_code')")"
@@ -261,15 +308,35 @@ collect_safeshield() {
 			;;
 	esac
 
-	if [ "$dns_ok" = 'false' ] || [ "$dns_ok" = '0' ]; then
-		code="${last_error:-SAFESHIELD_DNS_RUNTIME_ERROR}"
-		add_check safeshield.runtime 'SafeShield' critical "$code" 'SafeShield와 DNS 서비스의 연동 상태에 이상이 있습니다.' null ''
+	if safeshield_startup_pending "$status" "$stage" "$dns_ok" "$installed"; then
+		SAFESHIELD_INITIALIZING=1
+		add_check safeshield.runtime 'SafeShield' initializing 'SAFESHIELD_INITIALIZING' 'SafeShield 보호 기능을 준비하고 있습니다.' null ''
 		return
 	fi
-	if [ "$installed" = 'false' ] || [ "$installed" = '0' ]; then
-		add_check safeshield.runtime 'SafeShield' warning 'SAFESHIELD_BLOCKLIST_MISSING' 'SafeShield 차단 목록이 설치되어 있지 않습니다.' null ''
-		return
-	fi
+
+	case "$dns_ok" in
+		true|1) ;;
+		false|0)
+			code="${last_error:-SAFESHIELD_DNS_RUNTIME_ERROR}"
+			add_check safeshield.runtime 'SafeShield' critical "$code" 'SafeShield와 DNS 서비스의 연동 상태에 이상이 있습니다.' null ''
+			return
+			;;
+		*)
+			add_check safeshield.runtime 'SafeShield' warning 'SAFESHIELD_STATUS_INCOMPLETE' 'SafeShield DNS 런타임 상태를 확인하지 못했습니다.' null ''
+			return
+			;;
+	esac
+	case "$installed" in
+		true|1) ;;
+		false|0)
+			add_check safeshield.runtime 'SafeShield' warning 'SAFESHIELD_BLOCKLIST_MISSING' 'SafeShield 차단 목록이 설치되어 있지 않습니다.' null ''
+			return
+			;;
+		*)
+			add_check safeshield.runtime 'SafeShield' warning 'SAFESHIELD_STATUS_INCOMPLETE' 'SafeShield 차단 목록 상태를 확인하지 못했습니다.' null ''
+			return
+			;;
+	esac
 	case "$status" in
 		error|failed)
 			code="${last_error:-SAFESHIELD_RUNTIME_ERROR}"
@@ -316,6 +383,7 @@ health_summary_message() {
 	case "$OVERALL" in
 		critical) printf '%s' '즉시 확인이 필요한 이상 항목이 있습니다.' ;;
 		warning) printf '%s' '확인이 필요한 주의 항목이 있습니다.' ;;
+		initializing) printf '%s' 'SafeShield 보호 기능을 준비하고 있습니다.' ;;
 		*) printf '%s' '현재 진단에서 이상이 발견되지 않았습니다.' ;;
 	esac
 }
@@ -344,7 +412,7 @@ collect_health() {
 	: > "$CHECKS_FILE"
 	: > "$ISSUES_FILE"
 	CHECK_COUNT=0; OK_COUNT=0; WARNING_COUNT=0; CRITICAL_COUNT=0; UNKNOWN_COUNT=0
-	OVERALL=ok; ISSUE_FINGERPRINT=''; MEMORY_AVAILABLE_PERCENT=0; LOAD_1M='0'; OVERLAY_AVAILABLE_PERCENT=0
+	OVERALL=ok; ISSUE_FINGERPRINT=''; MEMORY_AVAILABLE_PERCENT=0; LOAD_1M='0'; OVERLAY_AVAILABLE_PERCENT=0; SAFESHIELD_INITIALIZING=0
 
 	collect_memory
 	collect_load
@@ -355,6 +423,9 @@ collect_health() {
 	collect_updater_state
 	collect_firmware_state
 	collect_time
+	if [ "$SAFESHIELD_INITIALIZING" -eq 1 ] && [ "$OVERALL" = 'ok' ]; then
+		OVERALL=initializing
+	fi
 	write_health_file
 }
 
@@ -500,6 +571,10 @@ maybe_report() {
 		write_report_state 1 0 "$plan" "$license_status" "$last_at" ineligible 'HEALTH_REPORTER_NOT_ELIGIBLE' "$last_fingerprint" 0
 		return 0
 	fi
+	if [ "$SAFESHIELD_INITIALIZING" -eq 1 ]; then
+		write_report_state 1 1 "$plan" "$license_status" "$last_at" initializing '' "$last_fingerprint" 0
+		return 0
+	fi
 
 	next_retry_at="$(state_value "$REPORT_STATE_FILE" next_retry_at)"
 	case "$next_retry_at" in ''|*[!0-9]*) next_retry_at=0 ;; esac
@@ -585,7 +660,13 @@ run_daemon() {
 		interval="$(check_interval_s)"
 		if [ "$last_check" -eq 0 ] || [ "$now" -ge $((last_check + interval)) ]; then
 			run_cycle || true
-			last_check="$now"
+			if [ "$SAFESHIELD_INITIALIZING" -eq 1 ]; then
+				# During boot, recheck on the short daemon tick instead of leaving the
+				# UI in a transient state for the full regular health interval.
+				last_check=0
+			else
+				last_check="$now"
+			fi
 		fi
 		# Keep a short scheduler tick so a changed check_interval_s is picked up
 		# quickly, but perform diagnostics and reporter work only on a health cycle.

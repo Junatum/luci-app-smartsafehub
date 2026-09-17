@@ -1,4 +1,4 @@
-export type HealthSeverity = 'ok' | 'warning' | 'critical' | 'unknown';
+export type HealthSeverity = 'ok' | 'initializing' | 'warning' | 'critical' | 'unknown';
 
 export interface HealthCheck {
   id: string;

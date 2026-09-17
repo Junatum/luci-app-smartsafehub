@@ -108,8 +108,8 @@ grep -Fq 'const networkConflict = Boolean(lan?.conflict.detected);' "$HOME" || \
 	fail 'Internet 개요 카드는 WAN/LAN 대역 충돌 상태를 사용해야 합니다'
 grep -Fq 'href="#lan"' "$HOME" || \
 	fail 'Internet 개요와 연결 상태 상세는 LAN 설정으로 연결되어야 합니다'
-grep -Fq "linkLabel={networkConflict ? '해결하기 →' : '네트워크 설정 →'}" "$HOME" || \
-	fail 'Internet 개요 카드는 정상/충돌 상태에 맞는 LAN 이동 문구를 표시해야 합니다'
+grep -Fq "linkLabel={networkConflict ? '해결하기 →' : '자세히 보기 →'}" "$HOME" || \
+	fail 'Internet 개요 카드는 정상 상태에서 다른 개요 카드와 같은 자세히 보기 문구를 사용하고 충돌 시 해결하기를 표시해야 합니다'
 grep -Fq "? '⚠ LAN 대역과 충돌합니다'" "$HOME" || \
 	fail 'Internet 개요 카드는 대역 충돌을 명확하게 경고해야 합니다'
 grep -Fq "? '✓ 네트워크 충돌 없음'" "$HOME" || \
@@ -153,6 +153,12 @@ grep -Fq 'href="#settings"' "$HOME" || \
 	fail '장치 진단의 상세 보기는 설정 페이지로 연결되어야 합니다'
 grep -Fq '아직 생성된 진단 결과가 없습니다.' "$HOME" || \
 	fail '진단 결과가 아직 없을 때 대기 상태를 표시해야 합니다'
+grep -Fq "status === 'initializing'" "$HOME" || \
+	fail '대시보드 장치 진단은 부팅 초기화 상태를 별도 준비 중 톤으로 표시해야 합니다'
+grep -Fq "label: '준비 중'" "$HOME" || \
+	fail '대시보드 장치 진단의 initializing 상태 라벨은 준비 중이어야 합니다'
+grep -Fq "data.overall === 'initializing'" "$HOME" || \
+	fail '대시보드 장치 진단은 initializing 상태에 경고 아이콘 대신 대기 아이콘을 사용해야 합니다'
 grep -Fq '진단 상태를 확인하지 못했습니다.' "$HOME" || \
 	fail '진단 조회 실패 시 확인 필요 상태를 표시해야 합니다'
 if grep -Fq 'reporter.enabled' "$HOME" || grep -Fq '원격 상태 보고' "$HOME"; then

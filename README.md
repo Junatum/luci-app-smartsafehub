@@ -50,7 +50,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 대시보드 장치 정보와 설정 페이지 시스템 상태 모두 SmartSafeHub 커스텀 펌웨어가 설치된 이미지에서는 Hub가 resolve한 제품 릴리즈 버전과 immutable build ID를 우선 표시하고, 메타데이터가 없는 기존 이미지만 OpenWrt 배포판/버전/리비전으로 대체 표시. 커널은 현재 실제 실행 중인 커널 버전을 표시
 - 실제 부팅 시각, 실행 시간, 시스템 부하와 메모리 사용량
 - WAN 연결 상태, 프로토콜과 IPv4 주소
-- 대시보드 `INTERNET` 개요 카드는 WAN 주소/프로토콜과 함께 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 충돌 여부를 표시합니다. 정상일 때는 `네트워크 충돌 없음`, 충돌 시에는 `네트워크 충돌`과 `해결하기` 링크를 표시해 `네트워크 > LAN`으로 바로 이동할 수 있습니다.
+- 대시보드 `INTERNET` 개요 카드는 WAN 주소/프로토콜과 함께 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 충돌 여부를 표시합니다. 정상일 때는 `네트워크 충돌 없음`과 다른 개요 카드와 동일한 `자세히 보기` 링크를 표시하고, 충돌 시에는 `네트워크 충돌`과 `해결하기` 링크를 표시해 `네트워크 > LAN`으로 바로 이동할 수 있습니다.
 - `네트워크 보호 활동 > 연결 상태` 상세 카드는 상위 WAN 네트워크, SmartSafeHub LAN 네트워크와 대역 충돌 상태를 함께 보여주며, RFC1918 사설 WAN 주소는 `사설 네트워크`로 표시해 상위 NAT 환경임을 구분할 수 있게 합니다.
 - 사설 WAN IPv4 판별 코드는 TypeScript `noUncheckedIndexedAccess` 계약을 따르며, `split()` 결과의 배열 인덱스를 직접 비교하지 않고 존재 여부를 확인한 octet 변수만 사용합니다. 프런트엔드 CI의 `npm run build`/`tsc --noEmit`가 이 타입 안전성을 검증합니다.
 - SafeShield 차단 목록, 연결 기기 목록, 관리 소프트웨어 업데이트의 최근 확인 시각은 별도 하단 섹션 대신 각 개요 카드에서 `차단 목록 갱신: 41분 전`처럼 `항목: 상대 시간` 형식으로 표시하며, 마우스를 올리면 정확한 시각을 확인할 수 있음
@@ -161,7 +161,8 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 기본 비활성화된 예약 재부팅을 `매일` 또는 `매주` 주기, 요일과 로컬 시각으로 설정 가능. 기본 제안값은 매주 일요일 04:00
 - 예약 재부팅 시 관리 소프트웨어 또는 펌웨어 작업이 진행 중이면 15분 단위로 최대 2시간 연기하고, 설치 준비된 펌웨어가 있는 경우에도 사용자의 pending 작업을 보존하기 위해 재부팅을 미룸
 - 부팅 후 10분 이내에는 예약 재부팅을 건너뛰고 동일 예약 key의 중복 실행을 막아 재부팅 루프를 방지
-- 모든 사용자를 대상으로 메모리, 시스템 부하, `/overlay` 저장 공간, WAN, dnsmasq, SafeShield, 업데이트 상태와 시스템 시간을 5분 주기로 로컬 진단하고 설정 화면에서 정상/주의/이상 결과와 `지금 진단` 기능 제공
+- 모든 사용자를 대상으로 메모리, 시스템 부하, `/overlay` 저장 공간, WAN, dnsmasq, SafeShield, 업데이트 상태와 시스템 시간을 5분 주기로 로컬 진단하고 설정 화면에서 정상/준비 중/주의/이상 결과와 `지금 진단` 기능 제공
+- 부팅 후 기본 120초(`smartsafehub.health.startup_grace_s`) 동안 SafeShield가 첫 갱신 중이거나 상태 API가 아직 준비되지 않은 경우에는 장애가 아닌 `준비 중`으로 처리합니다. 이 동안 warning/critical issue와 원격 Health 보고를 만들지 않으며, 정규 5분 주기 대신 daemon tick에서 다시 확인합니다. grace 이후에도 준비되지 않으면 실제 주의/이상 판정으로 전환합니다.
 - 유료 멤버십 또는 Trial 장치에서는 사용자가 명시적으로 opt-in한 경우에만 Health Reporter를 사용할 수 있습니다. 기본값은 OFF이며 정상 상태는 30분 heartbeat, 이상 상태 fingerprint가 바뀌면 정기 주기 전에도 한 번 보고합니다. 사용자가 OFF로 변경하면 이후 자동 상태 보고 네트워크 요청을 수행하지 않습니다.
 - Health Reporter는 서버 전송용 payload를 whitelist 방식으로 별도 생성해 메모리/부하/저장 공간 수치, 전체 진단 상태와 이상 코드만 전송합니다. 호스트명, WAN IP, Wi-Fi SSID/MAC, DNS 요청 내용과 시스템 로그 원문은 자동 보고에 포함하지 않습니다.
 - 장치, Wi-Fi, SafeShield와 로컬 Health 상태를 JSON 진단 파일로 다운로드
@@ -527,6 +528,8 @@ rm -f /tmp/luci-indexcache
 ## 배포 전 체크리스트
 
 셸 계약 테스트는 stdout의 `PASS:`뿐 아니라 stderr가 비어 있는지도 확인합니다. ACL을 `jq`로 검증할 때 여러 배열을 `or`로 비교하는 식은 각 파이프 표현식을 괄호로 분리해, 파이프의 중간 배열이 다음 ACL 경로의 입력으로 전달되지 않도록 유지합니다.
+
+Health 계약 테스트의 mock 환경은 각 시나리오를 subshell에서 실행하고 기본값을 매번 다시 설정합니다. macOS `/bin/sh`와 Linux `dash`처럼 함수 호출 앞 `VAR=value` 임시 대입의 복원 동작 차이가 다음 시나리오의 SafeShield/license mock 상태로 전파되지 않도록 하기 위한 테스트 격리 규칙입니다.
 
 ```bash
 sh tests/test-lan-settings.sh

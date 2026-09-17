@@ -1,5 +1,25 @@
 # 변경 기록
 
+## [0.2.15-r25] - 2026-09-17
+
+### UI 개선
+
+- 대시보드 `INTERNET` 개요 카드의 정상 상태 동작 문구를 다른 개요 카드와 동일한 `자세히 보기 →`로 통일했습니다. WAN/LAN subnet 충돌이 감지된 경우에는 조치가 필요하다는 의미가 분명하도록 기존 `해결하기 →` 문구를 유지합니다.
+- 부팅 직후 SafeShield가 첫 차단 목록 갱신을 수행하는 동안 로컬 장치 진단이 이를 장애로 오인하지 않도록 `initializing` 상태와 `준비 중` 표시를 추가했습니다. 라이트/다크 모드 모두 기존 teal 상태 톤을 사용합니다.
+
+### Health 안정성
+
+- Health에 `startup_grace_s=120` 기본값을 추가했습니다. 부팅 후 grace 구간에서 SafeShield가 `running`/갱신 stage이거나 DNS 런타임·차단 목록이 아직 준비되지 않은 경우 `SAFESHIELD_INITIALIZING`으로 기록하고 warning/critical issue를 생성하지 않습니다.
+- grace 구간에 SafeShield ubus 상태 API 자체가 아직 등록되지 않은 경우도 일시적인 초기화 상태로 처리합니다. grace 종료 후에도 상태 API가 없거나 차단 목록/DNS 런타임이 준비되지 않으면 다시 실제 warning/critical 판정을 사용합니다.
+- SafeShield 초기화 중에는 opt-in Health Reporter의 원격 보고를 보류해 재부팅 때마다 일시적인 장애/복구 이벤트가 서버에 쌓이지 않도록 했습니다.
+- 첫 Health cycle이 `initializing`이면 정규 5분 진단 주기를 기다리지 않고 60초 daemon tick에서 다시 검사해 SafeShield 준비 완료 상태가 빠르게 반영되도록 했습니다.
+
+### 테스트 및 문서
+
+- Health 테스트에 부팅 grace 중 첫 갱신, grace 만료 후 장애 승격, SafeShield 상태 API 지연, 원격 Reporter 억제와 빠른 재검사 계약을 추가했습니다.
+- 테스트용 `jsonfilter` stub이 JSON boolean `false`를 누락하지 않도록 수정해 실제 OpenWrt jsonfilter 동작에 더 가깝게 만들었습니다.
+- 대시보드 계약 테스트에 정상 `자세히 보기` 문구와 장치 진단 `준비 중` 렌더링 계약을 추가하고 README/아키텍처 문서를 갱신했습니다.
+
 ## [0.2.15-r24] - 2026-09-17
 
 ### 수정

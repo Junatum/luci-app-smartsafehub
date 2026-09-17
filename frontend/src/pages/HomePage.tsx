@@ -262,6 +262,14 @@ function dashboardHealthTone(status: HealthSeverity): {
   label: string;
   panel: string;
 } {
+  if (status === 'initializing') {
+    return {
+      badge: 'bg-teal-100 text-teal-800',
+      icon: 'text-teal-700',
+      label: '준비 중',
+      panel: 'border-teal-200 bg-teal-50',
+    };
+  }
   if (status === 'critical') {
     return {
       badge: 'bg-rose-100 text-rose-800',
@@ -355,6 +363,8 @@ function DashboardHealthSummary({
           <div class="flex min-w-0 items-start gap-3">
             {data.overall === 'ok' ? (
               <CheckCircleIcon class={`mt-0.5 size-5 shrink-0 ${tone.icon}`} />
+            ) : data.overall === 'initializing' ? (
+              <ClockIcon class={`mt-0.5 size-5 shrink-0 ${tone.icon}`} />
             ) : (
               <AlertIcon class={`mt-0.5 size-5 shrink-0 ${tone.icon}`} />
             )}
@@ -654,7 +664,7 @@ export function HomePage({
             eyebrow="Internet"
             href="#lan"
             icon={<GlobeIcon class="size-5" />}
-            linkLabel={networkConflict ? '해결하기 →' : '네트워크 설정 →'}
+            linkLabel={networkConflict ? '해결하기 →' : '자세히 보기 →'}
             meta={internetMeta}
             metaState={internetMetaState}
             state={internetState}

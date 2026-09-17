@@ -16,6 +16,7 @@ config maintenance 'maintenance'
 
 config health 'health'
 	option check_interval_s '300'
+	option startup_grace_s '120'
 	option reporter_enabled '0'
 	option report_interval_s '1800'
 	option api_base_url 'https://www.smartsafehub.com/api/v1'

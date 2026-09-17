@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r24`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r25`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -306,6 +306,7 @@ SettingsPage에 이미 로드된 smartsafehub.status
 ```text
 smartsafehub-health daemon
   ├─ 5분마다 로컬 Health 진단
+  │   ├─ 부팅 초기 SafeShield 준비 중이면 60초 tick에서 재확인
   │   └─ /tmp/smartsafehub/health.json
   │
   └─ Health Reporter
@@ -317,13 +318,13 @@ smartsafehub-health daemon
 
 로컬 진단은 멤버십과 관계없이 항상 사용할 수 있습니다. Health Reporter는 `reporter_enabled=0`을 기본값으로 하며 유료/Trial 사용자가 설정 화면에서 직접 활성화해야 합니다. OFF 상태에서는 heartbeat, 이상 발생/복구 보고를 포함해 Reporter의 서버 요청을 수행하지 않습니다.
 
-진단 대상은 가용 메모리, CPU 코어 대비 1분 load, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 오류와 시스템 시간입니다. 주기 결과는 flash에 쓰지 않고 `/tmp/smartsafehub/health.json`에 atomic write합니다.
+진단 대상은 가용 메모리, CPU 코어 대비 1분 load, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 오류와 시스템 시간입니다. 주기 결과는 flash에 쓰지 않고 `/tmp/smartsafehub/health.json`에 atomic write합니다. 부팅 후 기본 120초의 `startup_grace_s` 동안 SafeShield가 첫 갱신 stage에 있거나 DNS 런타임/차단 목록/상태 API가 아직 준비되지 않은 경우에는 `initializing`으로 기록하고 issue fingerprint를 만들지 않습니다. grace가 끝난 뒤에도 준비되지 않으면 실제 warning/critical 상태로 승격합니다.
 
-대시보드는 설정 페이지와 같은 `health_status` 결과를 읽어 `시스템 상태 > 리소스 사용량` 카드 아래에 로컬 진단 요약을 표시합니다. 정상 상태는 한 줄 요약과 마지막 진단 시각/검사 항목 수만 간결하게 보여주고, 주의·이상 상태는 최대 2개의 비정상 항목을 함께 노출합니다. 원격 Health Reporter의 opt-in 상태나 서버 보고 내용은 대시보드의 핵심 상태 요약과 분리하고 설정 페이지에서 관리합니다.
+대시보드는 설정 페이지와 같은 `health_status` 결과를 읽어 `시스템 상태 > 리소스 사용량` 카드 아래에 로컬 진단 요약을 표시합니다. 정상 상태는 한 줄 요약과 마지막 진단 시각/검사 항목 수만 간결하게 보여주고, 부팅 초기 SafeShield `initializing`은 `준비 중`으로 표시하며, 주의·이상 상태는 최대 2개의 비정상 항목을 함께 노출합니다. 원격 Health Reporter의 opt-in 상태나 서버 보고 내용은 대시보드의 핵심 상태 요약과 분리하고 설정 페이지에서 관리합니다.
 
 Health helper는 OpenWrt awk와 CI의 GNU awk에서 동일하게 실행되는 POSIX 호환 표현만 사용합니다. 특히 GNU awk 내장 이름과 충돌하는 이름을 `-v` 변수로 전달하지 않으며 contract test가 이를 고정합니다.
 
-서버 보고 payload는 로컬 진단 JSON을 그대로 재사용하지 않고 whitelist 방식으로 새로 생성합니다. 허용 필드는 schema, 보고 시각, 전체 상태, 메모리/부하/저장 공간 수치와 `{code, severity}` 이상 목록뿐입니다. 호스트명, WAN IP, SSID/MAC, DNS 요청 내용, 로그 원문과 라이선스 키는 payload에 넣지 않습니다. 전송 실패 시 5분 backoff를 적용해 서버 장애 중 요청이 매 분 반복되지 않도록 합니다.
+서버 보고 payload는 로컬 진단 JSON을 그대로 재사용하지 않고 whitelist 방식으로 새로 생성합니다. 허용 필드는 schema, 보고 시각, 전체 상태, 메모리/부하/저장 공간 수치와 `{code, severity}` 이상 목록뿐입니다. 호스트명, WAN IP, SSID/MAC, DNS 요청 내용, 로그 원문과 라이선스 키는 payload에 넣지 않습니다. SafeShield가 부팅 초기화 중이면 Reporter는 전송을 보류해 transient issue가 서버 장애 이력으로 남지 않게 하고, 준비 완료 뒤 기존 heartbeat/fingerprint 규칙으로 복귀합니다. 전송 실패 시 5분 backoff를 적용해 서버 장애 중 요청이 매 분 반복되지 않도록 합니다.
 
 ### 4.8 반응형 UI
 
@@ -580,7 +581,7 @@ WifiPage form
 
 ### 7.4 대시보드 Internet 상태
 
-대시보드는 핵심 `smartsafehub.status`의 WAN 링크/IP/프로토콜과 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 및 충돌 판정을 함께 사용합니다. `INTERNET` 개요 카드는 WAN이 올라와 있고 subnet 충돌이 없을 때 정상 상태를 표시하며, WAN/LAN 대역이 겹치면 연결 자체가 up이어도 `네트워크 충돌` 경고와 `#lan` 해결 링크를 우선 표시합니다. LAN 상태 조회가 실패해도 핵심 대시보드 상태 조회와 렌더링은 유지하고, 대역 관련 메타데이터만 확인 필요 상태로 처리합니다.
+대시보드는 핵심 `smartsafehub.status`의 WAN 링크/IP/프로토콜과 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 및 충돌 판정을 함께 사용합니다. `INTERNET` 개요 카드는 WAN이 올라와 있고 subnet 충돌이 없을 때 정상 상태와 다른 개요 카드와 동일한 `자세히 보기` 링크를 표시하며, WAN/LAN 대역이 겹치면 연결 자체가 up이어도 `네트워크 충돌` 경고와 `#lan` `해결하기` 링크를 우선 표시합니다. LAN 상태 조회가 실패해도 핵심 대시보드 상태 조회와 렌더링은 유지하고, 대역 관련 메타데이터만 확인 필요 상태로 처리합니다.
 
 `네트워크 보호 활동 > 연결 상태` 카드는 연결 기기 수를 중복 표시하지 않고 WAN IP/프로토콜, 상위 네트워크, LAN 네트워크, 충돌 여부를 보여주는 네트워크 구성 요약 역할을 담당합니다. WAN IPv4가 RFC1918 사설 주소이면 `사설 네트워크`로 표시하되 이를 장애로 취급하지 않습니다. 대시보드 수동 새로고침은 기존 상태 소스와 함께 LAN 상태도 갱신합니다.
 

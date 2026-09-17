@@ -356,6 +356,13 @@ function healthTone(status: HealthSeverity): {
   panel: string;
   label: string;
 } {
+  if (status === 'initializing') {
+    return {
+      badge: 'bg-teal-100 text-teal-800',
+      panel: 'border-teal-200 bg-teal-50',
+      label: '준비 중',
+    };
+  }
   if (status === 'critical') {
     return {
       badge: 'bg-rose-100 text-rose-800',
@@ -388,6 +395,8 @@ function reporterResultLabel(result: string): string {
   switch (result) {
     case 'reported':
       return '정상 보고';
+    case 'initializing':
+      return '초기화 대기';
     case 'failed':
       return '최근 보고 실패';
     case 'idle':
@@ -471,6 +480,8 @@ function HealthDiagnosticCard(props: {
                 <span class="mt-0.5 shrink-0">
                   {data?.overall === 'ok' ? (
                     <CheckCircleIcon class="size-5 text-emerald-700" />
+                  ) : data?.overall === 'initializing' ? (
+                    <ClockIcon class="size-5 text-teal-700" />
                   ) : (
                     <AlertIcon class="size-5 text-amber-700" />
                   )}
