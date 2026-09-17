@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r16`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r21`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -388,6 +388,7 @@ ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus
 기본 `network.lan`/`dhcp.lan`의 LAN 및 DHCP 관리:
 
 - LAN IPv4 주소와 CIDR(`/8~30`) 읽기·검증
+- OpenWrt 25.12의 `list ipaddr 'address/prefix'`가 ucode에서 배열로 반환되는 형식과 이전 scalar `ipaddr + netmask` 형식을 함께 해석하고, 25.12 list 구성에서는 CIDR/list 형태를 보존해 저장
 - DHCP 시작/종료 주소를 OpenWrt `start`/`limit` 형식으로 변환
 - DHCP 서버 사용 여부(`ignore`)와 임대 시간 관리
 - `network.interface.wan.status`를 이용한 WAN/LAN IPv4 subnet 충돌 감지

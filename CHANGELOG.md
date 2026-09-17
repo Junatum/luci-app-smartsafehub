@@ -1,5 +1,21 @@
 # 변경 기록
 
+## [0.2.15-r21] - 2026-09-17
+
+### 수정
+
+- OpenWrt 25.12에서 `network.lan.ipaddr`가 `list ipaddr '192.168.1.1/24'` 형태로 저장되고 ucode `get_all()`에서는 `["192.168.1.1/24"]` 배열로 반환되는데, LAN backend가 문자열 `ipaddr`와 별도 `netmask`를 전제로 해 `LAN_CONFIG_READ_FAILED`를 반환하던 문제를 수정했습니다.
+- LAN IPv4 파서를 문자열/배열과 CIDR/legacy `ipaddr + netmask` 형식을 모두 처리하도록 변경했습니다. 25.12 list 형식에서는 첫 IPv4 항목을 관리 주소로 사용하고 추가 주소 항목은 보존합니다.
+- LAN 변경 시 현재 UCI 저장 형식을 고려해 OpenWrt 25.12 list 형식은 CIDR 값을 유지하고 별도 legacy `netmask` 옵션을 제거하며, 기존 scalar 형식은 호환성을 위해 기존 저장 방식을 유지합니다.
+- 동일한 LAN/DHCP 값을 다시 저장할 때 배열 값을 문자열과 직접 비교해 항상 변경으로 판정하던 문제를 없애고, 파싱된 주소·prefix·DHCP 범위·임대 시간·사용 상태를 기준으로 변경 여부를 판단하도록 수정했습니다.
+
+### 테스트 및 문서
+
+- 실제 장치에서 확인된 OpenWrt 25.12 UCI fixture(`ipaddr: [ "192.168.1.1/24" ]`, `start=100`, `limit=150`)를 사용하는 `tests/test-lan-uci-runtime.sh`를 추가했습니다. host ucode와 `uci`/`ubus`/`fs` stub을 이용해 실제 `network-management.uc`를 실행하고 LAN 주소, `/24`, DHCP `.100~.249`가 정상 해석되는지 검증합니다.
+- 동일한 25.12 fixture를 같은 값으로 업데이트했을 때 `changed=false`, `reloadScheduled=false`인지 확인해 list/CIDR 형식 때문에 불필요한 네트워크 reload가 발생하는 회귀도 방지합니다.
+- GitHub Actions에서는 기존 `SMARTSAFEHUB_REQUIRE_UCODE=1` 계약에 의해 이 런타임 호환성 테스트도 ucode 없이 skip할 수 없도록 했습니다.
+- README와 아키텍처 문서에 OpenWrt 25.12의 LAN list/CIDR 저장 형식과 호환성 테스트를 반영했습니다.
+
 ## [0.2.15-r20] - 2026-09-17
 
 ### 수정

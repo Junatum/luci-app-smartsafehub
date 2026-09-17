@@ -59,6 +59,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 ### LAN 및 DHCP 관리
 
 - SmartSafeHub 내부 IPv4 주소와 DHCP 할당 시작/종료 주소를 `네트워크 > LAN`에서 관리
+- OpenWrt 25.12 기본 형식인 `list ipaddr '192.168.1.1/24'`와 이전 `option ipaddr + option netmask` 형식을 모두 읽을 수 있으며, 25.12 list 형식으로 저장된 경우 CIDR/list 표현을 유지해 변경
 - WAN과 LAN IPv4 subnet이 겹치면 충돌 상태와 상위 네트워크 대역을 표시하고, 활성 인터페이스와 겹치지 않는 안전한 `/24` 사설 대역을 자동 추천
 - 추천 대역 자동 변경 시 공유기 주소는 `.1`, DHCP pool은 `.100~.249`를 기본으로 구성하고 기존 DHCP 사용 여부와 임대 시간은 유지
 - 수동 저장 시 사설 IPv4, network/broadcast 주소, DHCP pool 범위, 공유기 주소 포함 여부와 WAN subnet 중복을 backend에서 재검증
@@ -461,6 +462,8 @@ SMARTSAFEHUB_REQUIRE_UCODE=1 sh tests/test-ucode-syntax.sh
 일반 로컬 ShellSpec 실행에서는 ucode가 설치되지 않은 환경의 개발 흐름을 막지 않기 위해 해당 검사만 skip할 수 있지만, GitHub Actions Backend job은 `SMARTSAFEHUB_REQUIRE_UCODE=1`을 고정하므로 실제 컴파일 없이 성공할 수 없습니다.
 
 실제 ucode 컴파일은 `tests/test-ucode-syntax.sh`에서만 수행합니다. GitHub Actions에서 빌드한 host ucode에는 OpenWrt 런타임 전용 `ubus`, `uci`, `fs` 모듈이 포함되지 않으므로 `test-lan-settings.sh` 같은 기능별 계약 테스트에서 raw `ucode -c`를 직접 실행하면 정상 소스도 외부 모듈 import 해석 단계에서 실패할 수 있습니다. 전용 문법 테스트가 최소 stub과 module search path를 구성하고, 기능별 테스트는 소스 구조와 동작 계약만 검증하도록 역할을 분리합니다. 정적 검증은 이 원칙을 위반하는 raw compile 호출이 다른 테스트에 다시 추가되는 것도 차단합니다.
+
+LAN 설정은 문법 검사만으로 실제 OpenWrt UCI 값의 타입 차이를 검출할 수 없으므로 `tests/test-lan-uci-runtime.sh`에서 별도 런타임 회귀 검사를 수행합니다. 이 테스트는 실제 장치에서 확인된 OpenWrt 25.12 형식인 `network.lan.ipaddr = [ "192.168.1.1/24" ]` fixture와 DHCP `start=100`, `limit=150`을 stub UCI cursor로 제공하고 실제 `network-management.uc`의 `read_lan_settings()`와 동일값 update를 실행합니다. CI에서는 주소가 `192.168.1.1/24`, DHCP 범위가 `192.168.1.100~249`로 해석되고 동일 설정이 `changed=false`로 판정되는지까지 확인합니다.
 
 LAN 컴파일이 성공한 뒤에는 다음 명령으로 실제 객체와 메서드 등록을 확인합니다.
 

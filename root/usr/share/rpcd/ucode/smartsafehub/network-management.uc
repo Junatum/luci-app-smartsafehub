@@ -171,37 +171,132 @@ function valid_host_address(ip, subnet) {
 	return ip.value > subnet.networkValue && ip.value < subnet.broadcastValue;
 }
 
+function string_values(value) {
+	if (type(value) == 'string') {
+		return length(value) ? [ value ] : [];
+	}
+	if (type(value) != 'array') {
+		return [];
+	}
+
+	let values = [];
+	for (let item in value) {
+		if (type(item) == 'string' && length(item)) {
+			push(values, item);
+		}
+	}
+
+	return values;
+}
+
+function parse_lan_ipaddr(value, netmask) {
+	const legacy_prefix = prefix_from_netmask(string_value(netmask, '255.255.255.0'));
+
+	for (let candidate in string_values(value)) {
+		let raw_address = candidate;
+		let prefix = legacy_prefix;
+
+		if (match(candidate, /\//) != null) {
+			const parts = split(candidate, '/');
+			if (length(parts) != 2) {
+				continue;
+			}
+
+			raw_address = parts[0];
+			prefix = valid_prefix_length(parts[1]);
+		}
+
+		const ip = parse_ipv4(raw_address);
+		if (ip == null || prefix == null) {
+			continue;
+		}
+
+		const subnet = subnet_for(ip, prefix);
+		if (!valid_host_address(ip, subnet)) {
+			continue;
+		}
+
+		return {
+			ip: ip,
+			prefixLength: prefix,
+			netmask: netmask_from_prefix(prefix),
+			subnet: subnet,
+		};
+	}
+
+	return null;
+}
+
 function lan_network_config(ctx) {
 	const section = ctx?.get_all('network', 'lan');
 	if (section == null || section?.['.type'] != 'interface') {
 		return null;
 	}
 
-	let raw_address = string_value(section?.ipaddr, null);
-	let prefix = prefix_from_netmask(string_value(section?.netmask, '255.255.255.0'));
-
-	if (raw_address != null && match(raw_address, /\//) != null) {
-		const parts = split(raw_address, '/');
-		raw_address = parts?.[0];
-		prefix = valid_prefix_length(parts?.[1]);
-	}
-
-	const ip = parse_ipv4(raw_address);
-	if (ip == null || prefix == null) {
-		return null;
-	}
-
-	const subnet = subnet_for(ip, prefix);
-	if (!valid_host_address(ip, subnet)) {
+	const address = parse_lan_ipaddr(section?.ipaddr, section?.netmask);
+	if (address == null) {
 		return null;
 	}
 
 	return {
 		section: section,
-		ip: ip,
-		prefixLength: prefix,
-		netmask: netmask_from_prefix(prefix),
-		subnet: subnet,
+		ip: address.ip,
+		prefixLength: address.prefixLength,
+		netmask: address.netmask,
+		subnet: address.subnet,
+	};
+}
+
+function ipaddr_entry_is_ipv4(value) {
+	if (type(value) != 'string') {
+		return false;
+	}
+
+	const parts = split(value, '/');
+	return parse_ipv4(parts?.[0]) != null;
+}
+
+function target_lan_address(current_ipaddr, validated) {
+	const cidr = sprintf('%s/%d', validated.ip.address, validated.prefixLength);
+
+	if (type(current_ipaddr) == 'array') {
+		let values = [];
+		let replaced = false;
+
+		for (let item in current_ipaddr) {
+			if (!replaced && ipaddr_entry_is_ipv4(item)) {
+				push(values, cidr);
+				replaced = true;
+			}
+			else {
+				push(values, item);
+			}
+		}
+
+		if (!replaced) {
+			let prefixed = [ cidr ];
+			for (let item in values) {
+				push(prefixed, item);
+			}
+			values = prefixed;
+		}
+
+		return {
+			ipaddr: values,
+			netmask: null,
+		};
+	}
+
+	if (type(current_ipaddr) == 'string' && match(current_ipaddr, /\//) != null) {
+		return {
+			ipaddr: cidr,
+			netmask: null,
+		};
+	}
+
+	return {
+		ipaddr: validated.ip.address,
+		netmask: validated.netmask,
 	};
 }
 
@@ -545,12 +640,11 @@ function apply_validated_settings(validated) {
 		return failure('LAN_CONFIG_READ_FAILED', '내부 네트워크 설정을 읽지 못했습니다.');
 	}
 
-	const network_section = ctx.get_all('network', 'lan');
-	const dhcp_section = ctx.get_all('dhcp', 'lan');
-	if (
-		network_section == null || network_section?.['.type'] != 'interface' ||
-		dhcp_section == null || dhcp_section?.['.type'] != 'dhcp'
-	) {
+	const current_lan = lan_network_config(ctx);
+	const network_section = current_lan?.section;
+	const current_dhcp = current_lan != null ? lan_dhcp_config(ctx, current_lan) : null;
+	const dhcp_section = current_dhcp?.section;
+	if (current_lan == null || current_dhcp == null) {
 		return failure('LAN_CONFIG_UNAVAILABLE', 'LAN 또는 DHCP 기본 설정을 찾지 못했습니다.');
 	}
 	if (string_value(network_section?.proto, 'static') != 'static') {
@@ -565,18 +659,18 @@ function apply_validated_settings(validated) {
 		leasetime: dhcp_section?.leasetime,
 		ignore: dhcp_section?.ignore,
 	};
+	const target_address = target_lan_address(snapshot.ipaddr, validated);
 	const start_offset = validated.dhcpStart.value - validated.subnet.networkValue;
 	const limit = validated.dhcpEnd.value - validated.dhcpStart.value + 1;
 	const target_ignore = validated.dhcpEnabled ? null : '1';
+	const address_changed = current_lan.ip.address != validated.ip.address;
 	const changed =
-		string_value(snapshot.ipaddr, '') != validated.ip.address ||
-		string_value(snapshot.netmask, '') != validated.netmask ||
-		integer_value(snapshot.start, -1) != start_offset ||
-		integer_value(snapshot.limit, -1) != limit ||
-		string_value(snapshot.leasetime, DEFAULT_LEASE_TIME) != validated.leaseTime ||
-		(validated.dhcpEnabled
-			? string_value(snapshot.ignore, '0') == '1'
-			: string_value(snapshot.ignore, '0') != '1');
+		address_changed ||
+		current_lan.prefixLength != validated.prefixLength ||
+		current_dhcp.start?.value != validated.dhcpStart.value ||
+		current_dhcp.end?.value != validated.dhcpEnd.value ||
+		current_dhcp.leaseTime != validated.leaseTime ||
+		current_dhcp.enabled != validated.dhcpEnabled;
 
 	if (!changed) {
 		return success({
@@ -588,8 +682,8 @@ function apply_validated_settings(validated) {
 	}
 
 	const updated =
-		ctx.set('network', 'lan', 'ipaddr', validated.ip.address) == true &&
-		ctx.set('network', 'lan', 'netmask', validated.netmask) == true &&
+		ctx.set('network', 'lan', 'ipaddr', target_address.ipaddr) == true &&
+		restore_option(ctx, 'network', 'lan', 'netmask', target_address.netmask) &&
 		ctx.set('dhcp', 'lan', 'start', sprintf('%d', start_offset)) == true &&
 		ctx.set('dhcp', 'lan', 'limit', sprintf('%d', limit)) == true &&
 		ctx.set('dhcp', 'lan', 'leasetime', validated.leaseTime) == true &&
@@ -612,8 +706,8 @@ function apply_validated_settings(validated) {
 	return success({
 		changed: true,
 		reloadScheduled: true,
-		addressChanged: string_value(snapshot.ipaddr, '') != validated.ip.address,
-		previousAddress: string_value(snapshot.ipaddr, null),
+		addressChanged: address_changed,
+		previousAddress: current_lan.ip.address,
 		newAddress: validated.ip.address,
 		settings: settings_payload(),
 	});

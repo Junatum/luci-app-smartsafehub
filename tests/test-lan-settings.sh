@@ -129,6 +129,12 @@ grep -Fq "prefix >= 8 && prefix <= 30" "$LAN_MODULE" || \
 	fail '고급 subnet 설정은 /8~30 범위로 제한해야 합니다.'
 grep -Fq "ctx.set('network', 'lan', 'ipaddr'" "$LAN_MODULE" || \
 	fail 'LAN IP는 UCI network.lan에 저장해야 합니다.'
+grep -Fq "type(current_ipaddr) == 'array'" "$LAN_MODULE" || \
+	fail 'OpenWrt 25.12의 network.lan.ipaddr list 형식을 처리해야 합니다.'
+grep -Fq "const cidr = sprintf('%s/%d', validated.ip.address, validated.prefixLength);" "$LAN_MODULE" || \
+	fail 'OpenWrt 25.12 LAN 주소 저장은 CIDR 표기를 사용해야 합니다.'
+grep -Fq "restore_option(ctx, 'network', 'lan', 'netmask', target_address.netmask)" "$LAN_MODULE" || \
+	fail 'CIDR/list 형식에서는 legacy netmask 옵션을 안전하게 제거해야 합니다.'
 grep -Fq "ctx.set('dhcp', 'lan', 'start'" "$LAN_MODULE" || \
 	fail 'DHCP 시작 주소는 UCI dhcp.lan에 저장해야 합니다.'
 grep -Fq "ctx.set('dhcp', 'lan', 'limit'" "$LAN_MODULE" || \
