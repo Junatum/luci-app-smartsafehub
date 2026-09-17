@@ -28,6 +28,14 @@ grep -Fq "const systemTime = useSystemTimeSettings(route === 'settings');" "$APP
 	fail 'settings route must load dedicated timezone settings'
 grep -Fq "const scheduledReboot = useScheduledRebootSettings(route === 'settings');" "$APP" || \
 	fail 'settings route must load scheduled reboot settings'
+grep -Fq "route === 'system' || route === 'home' || route === 'settings'" "$APP" || \
+	fail 'settings route must load cached SmartSafeHub firmware identity'
+grep -Fq 'firmware={firmware.data}' "$APP" || \
+	fail 'settings page must receive SmartSafeHub firmware status'
+grep -Fq 'firmwareError={firmware.error}' "$APP" || \
+	fail 'settings page must receive firmware status errors'
+grep -Fq 'firmwareLoading={firmware.loading}' "$APP" || \
+	fail 'settings page must receive firmware loading state'
 grep -Fq 'const configurationBackup = useConfigurationBackup();' "$APP" || \
 	fail 'settings route must wire configuration backup and restore actions'
 grep -Fq "case 'system':" "$APP" || fail 'update route must remain registered in App'
@@ -39,6 +47,8 @@ grep -Fq 'void Promise.all([updates.refresh(), firmware.refresh()]);' "$APP" || 
 grep -Fq "if (route === 'settings')" "$APP" || fail 'settings refresh branch must exist'
 grep -Fq 'scheduledReboot.refresh(),' "$APP" || \
 	fail 'settings refresh must refresh scheduled reboot settings together with system/time state'
+grep -Fq 'firmware.refresh(),' "$APP" || \
+	fail 'settings refresh must refresh firmware identity together with system state'
 
 grep -Fq "label: '설정'" "$ROUTES" || fail 'settings route must be visible in product navigation'
 grep -Fq "description: '기기의 펌웨어와 관리 소프트웨어 업데이트를 관리합니다.'" "$ROUTES" || \
@@ -93,6 +103,18 @@ if grep -Fq 'SoftwareUpdatesCard' "$SETTINGS_PAGE"; then
 	fail 'settings page must not embed the software update experience'
 fi
 
+grep -Fq "const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);" "$SETTINGS_PAGE" || \
+	fail 'settings system status must detect SmartSafeHub custom firmware metadata'
+grep -Fq '`SmartSafeHub ${firmware.current.releaseVersion}`' "$SETTINGS_PAGE" || \
+	fail 'settings system status must prefer the SmartSafeHub product firmware version'
+grep -Fq '`빌드 ID: ${firmware.current.buildId}`' "$SETTINGS_PAGE" || \
+	fail 'settings system status must show the immutable SmartSafeHub build ID'
+grep -Fq '`${data.software.distribution} ${data.software.version}`' "$SETTINGS_PAGE" || \
+	fail 'settings system status must retain OpenWrt firmware fallback for legacy images'
+grep -Fq '`리비전 ${data.software.revision}`' "$SETTINGS_PAGE" || \
+	fail 'settings system status must retain OpenWrt revision fallback for legacy images'
+grep -Fq '`커널 ${data.software.kernel}`' "$SETTINGS_PAGE" || \
+	fail 'settings system status must keep the actual running kernel version'
 grep -Fq 'Device settings' "$SETTINGS_PAGE" || \
 	fail 'settings page must visually separate device settings from system management'
 grep -Fq 'System management' "$SETTINGS_PAGE" || \

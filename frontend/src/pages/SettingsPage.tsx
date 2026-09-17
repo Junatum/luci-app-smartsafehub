@@ -19,6 +19,7 @@ import {
 import type { ConfigurationBackupAction } from '../hooks/useConfigurationBackup';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { ConfigurationBackupValidation } from '../types/backup';
+import type { FirmwareStatus } from '../types/firmware';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
   ScheduledRebootDayOfWeek,
@@ -41,6 +42,9 @@ interface SettingsPageProps {
   error: string | null;
   feedbackError: string | null;
   feedbackMessage: string | null;
+  firmware: FirmwareStatus | null;
+  firmwareError: string | null;
+  firmwareLoading: boolean;
   loading: boolean;
   rebootAccepted: boolean;
   scheduledRebootData: ScheduledRebootSettings | null;
@@ -770,6 +774,9 @@ export function SettingsPage({
   error,
   feedbackError,
   feedbackMessage,
+  firmware,
+  firmwareError,
+  firmwareLoading,
   loading,
   rebootAccepted,
   scheduledRebootData,
@@ -835,6 +842,29 @@ export function SettingsPage({
   const memoryPercent = Math.round(memoryUsage?.percent ?? 0);
   const advancedSystemUrl = luciAdminUrl('/admin/system');
   const logsUrl = luciAdminUrl('/admin/status/logs');
+  const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);
+  const firmwareValue = !data
+    ? '미확인'
+    : firmwareLoading && !firmware
+      ? '확인 중'
+      : firmwareError && !firmware
+        ? '확인 필요'
+        : customFirmwareAvailable
+          ? firmware?.current.releaseVersion
+            ? `SmartSafeHub ${firmware.current.releaseVersion}`
+            : 'SmartSafeHub 펌웨어'
+          : `${data.software.distribution} ${data.software.version}`;
+  const firmwareDescription = !data
+    ? '버전 정보를 확인할 수 없습니다.'
+    : firmwareLoading && !firmware
+      ? '펌웨어 정보를 확인하고 있습니다.'
+      : firmwareError && !firmware
+        ? firmwareError
+        : customFirmwareAvailable
+          ? firmware?.current.buildId
+            ? `빌드 ID: ${firmware.current.buildId}`
+            : '빌드 ID를 확인할 수 없습니다.'
+          : `리비전 ${data.software.revision}`;
 
   return (
     <section class="min-w-0 space-y-7">
@@ -872,8 +902,8 @@ export function SettingsPage({
         <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <InfoCard
             label="Firmware"
-            value={data ? `${data.software.version}` : '미확인'}
-            description={data ? data.software.revision : '버전 정보를 확인할 수 없습니다.'}
+            value={firmwareValue}
+            description={firmwareDescription}
           />
           <InfoCard
             label="Uptime"

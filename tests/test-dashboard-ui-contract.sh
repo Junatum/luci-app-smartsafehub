@@ -25,8 +25,8 @@ grep -Fq "const dashboardSafeShield = useSafeShieldStatus(route === 'home');" "$
 	fail 'Dashboard must load SafeShield status'
 grep -Fq "const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);" "$APP" || \
 	fail 'Dashboard SafeShield statistics must disable periodic polling'
-grep -Fq "const firmware = useFirmwareUpdates(route === 'system' || route === 'home');" "$APP" || \
-	fail 'Dashboard must load cached SmartSafeHub firmware identity'
+grep -Fq "route === 'system' || route === 'home' || route === 'settings'" "$APP" || \
+	fail 'Dashboard and Settings must load cached SmartSafeHub firmware identity'
 grep -Fq 'devices={dashboardDevices.data}' "$APP" || \
 	fail 'Dashboard must receive the connected-device summary'
 grep -Fq 'safeshield={dashboardSafeShield.data}' "$APP" || \

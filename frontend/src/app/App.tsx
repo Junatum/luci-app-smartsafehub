@@ -28,7 +28,9 @@ export function App() {
   const configurationBackup = useConfigurationBackup();
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
-  const firmware = useFirmwareUpdates(route === 'system' || route === 'home');
+  const firmware = useFirmwareUpdates(
+    route === 'system' || route === 'home' || route === 'settings',
+  );
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -120,6 +122,9 @@ export function App() {
           error={status.error}
           feedbackError={systemActions.error}
           feedbackMessage={systemActions.message}
+          firmware={firmware.data}
+          firmwareError={firmware.error}
+          firmwareLoading={firmware.loading}
           loading={status.loading}
           onBackupDiscard={configurationBackup.discard}
           onBackupDownload={() => void configurationBackup.download()}
@@ -133,6 +138,7 @@ export function App() {
           onRetry={() =>
             void Promise.all([
               status.refresh(),
+              firmware.refresh(),
               systemTime.refresh(),
               scheduledReboot.refresh(),
             ])
@@ -260,6 +266,7 @@ export function App() {
     if (route === 'settings') {
       void Promise.all([
         status.refresh(),
+        firmware.refresh(),
         systemTime.refresh(),
         scheduledReboot.refresh(),
       ]);
@@ -288,7 +295,7 @@ export function App() {
             firmware.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
         (route === 'settings' &&
-          (systemTime.refreshing || scheduledReboot.refreshing)) ||
+          (firmware.refreshing || systemTime.refreshing || scheduledReboot.refreshing)) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}
