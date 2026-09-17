@@ -73,8 +73,8 @@ grep -Fq '원격 상태 보고' "$SETTINGS_PAGE" || \
 	fail 'settings diagnostics must expose paid/trial remote health reporting'
 grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || \
 	fail 'remote health reporting must be explicit opt-in with opt-out copy'
-grep -Fq "const health = useHealth(route === 'settings');" "$APP" || \
-	fail 'settings route must load the local health resource'
+grep -Fq "const health = useHealth(route === 'home' || route === 'settings');" "$APP" || \
+	fail '설정 페이지와 대시보드가 같은 로컬 Health 리소스를 불러와야 합니다'
 grep -Fq 'title="설정 백업 및 복원"' "$SETTINGS_PAGE" || \
 	fail 'settings page must expose first-class configuration backup and restore management'
 grep -Fq '설정 백업 다운로드' "$SETTINGS_PAGE" || \

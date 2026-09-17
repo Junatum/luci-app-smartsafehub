@@ -9,140 +9,175 @@ ACTIVITY="$ROOT_DIR/frontend/src/components/DashboardSafeShieldActivity.tsx"
 DEVICES_HOOK="$ROOT_DIR/frontend/src/hooks/useConnectedDevices.ts"
 STATISTICS_HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
 FORMAT="$ROOT_DIR/frontend/src/app/format.ts"
+HEALTH_HOOK="$ROOT_DIR/frontend/src/hooks/useHealth.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT"; do
-	[ -f "$file" ] || fail "missing dashboard source: ${file#$ROOT_DIR/}"
+for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT" "$HEALTH_HOOK"; do
+	[ -f "$file" ] || fail "대시보드 소스 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
 grep -Fq "const dashboardDevices = useConnectedDevices(route === 'home', false);" "$APP" || \
-	fail 'Dashboard connected-device summary must disable periodic polling'
+	fail '대시보드 연결 기기 요약은 주기 polling을 사용하지 않아야 합니다'
 grep -Fq "const dashboardSafeShield = useSafeShieldStatus(route === 'home');" "$APP" || \
-	fail 'Dashboard must load SafeShield status'
+	fail '대시보드는 SafeShield 상태를 불러와야 합니다'
 grep -Fq "const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);" "$APP" || \
-	fail 'Dashboard SafeShield statistics must disable periodic polling'
+	fail '대시보드 SafeShield 통계는 주기 polling을 사용하지 않아야 합니다'
 grep -Fq "route === 'system' || route === 'home' || route === 'settings'" "$APP" || \
-	fail 'Dashboard and Settings must load cached SmartSafeHub firmware identity'
+	fail '대시보드와 설정 페이지는 SmartSafeHub 펌웨어 식별 정보를 불러와야 합니다'
 grep -Fq 'devices={dashboardDevices.data}' "$APP" || \
-	fail 'Dashboard must receive the connected-device summary'
+	fail '대시보드는 연결 기기 요약 데이터를 전달받아야 합니다'
 grep -Fq 'safeshield={dashboardSafeShield.data}' "$APP" || \
-	fail 'Dashboard must receive SafeShield status'
+	fail '대시보드는 SafeShield 상태를 전달받아야 합니다'
 grep -Fq 'statistics={dashboardSafeShieldStatistics.data}' "$APP" || \
-	fail 'Dashboard must receive SafeShield statistics'
+	fail '대시보드는 SafeShield 통계를 전달받아야 합니다'
 grep -Fq 'firmware={firmware.data}' "$APP" || \
-	fail 'Dashboard must receive SmartSafeHub firmware status'
+	fail '대시보드는 SmartSafeHub 펌웨어 상태를 전달받아야 합니다'
+grep -Fq "const health = useHealth(route === 'home' || route === 'settings');" "$APP" || \
+	fail '대시보드와 설정 페이지가 같은 로컬 Health 상태를 조회해야 합니다'
+grep -Fq 'health={health.data}' "$APP" || \
+	fail '대시보드에 로컬 Health 진단 데이터를 전달해야 합니다'
+grep -Fq 'healthError={health.error}' "$APP" || \
+	fail '대시보드에 로컬 Health 조회 오류를 전달해야 합니다'
+grep -Fq 'healthLoading={health.loading}' "$APP" || \
+	fail '대시보드에 로컬 Health 로딩 상태를 전달해야 합니다'
 grep -Fq 'dashboardDevices.refresh()' "$APP" || \
-	fail 'Dashboard refresh must refresh connected-device information'
+	fail '대시보드 새로고침은 연결 기기 정보를 갱신해야 합니다'
 grep -Fq 'dashboardSafeShield.refresh()' "$APP" || \
-	fail 'Dashboard refresh must refresh SafeShield information'
+	fail '대시보드 새로고침은 SafeShield 정보를 갱신해야 합니다'
 grep -Fq 'dashboardSafeShieldStatistics.refresh()' "$APP" || \
-	fail 'Dashboard refresh must refresh SafeShield statistics'
+	fail '대시보드 새로고침은 SafeShield 통계를 갱신해야 합니다'
 grep -Fq 'updates.refresh()' "$APP" || \
-	fail 'Dashboard refresh must refresh update information'
+	fail '대시보드 새로고침은 업데이트 정보를 갱신해야 합니다'
 grep -Fq 'firmware.refresh()' "$APP" || \
-	fail 'Dashboard refresh must refresh firmware identity information'
+	fail '대시보드 새로고침은 펌웨어 식별 정보를 갱신해야 합니다'
+home_refresh_count="$(grep -Fc 'health.refresh()' "$APP")"
+[ "$home_refresh_count" -ge 3 ] || \
+	fail '대시보드 재시도·전역 새로고침과 설정 새로고침에 Health 조회가 포함되어야 합니다'
+grep -Fq 'health.refreshing)) ||' "$APP" || \
+	fail '대시보드 전역 새로고침 표시가 Health 갱신 상태를 포함해야 합니다'
 
 grep -Fq 'export function useConnectedDevices(active: boolean, polling = true)' "$DEVICES_HOOK" || \
-	fail 'connected-device hook must support one-shot Dashboard loading'
+	fail '연결 기기 hook은 대시보드의 단발성 조회를 지원해야 합니다'
 grep -Fq '...(polling ? { pollInterval: REFRESH_INTERVAL_MS } : {}),' "$DEVICES_HOOK" || \
- 	fail 'connected-device Dashboard loading must not schedule the 15-second poll'
+	fail '대시보드 연결 기기 조회는 15초 polling을 예약하지 않아야 합니다'
 
 grep -Fq 'export function useConnectedDevices(active: boolean, polling = true)' "$DEVICES_HOOK" || \
-	fail 'connected-device hook must support one-shot Dashboard loading'
+	fail '연결 기기 hook은 대시보드의 단발성 조회를 지원해야 합니다'
 
 grep -Fq '...(polling ? { pollInterval: REFRESH_INTERVAL_MS } : {}),' "$DEVICES_HOOK" || \
-	fail 'connected-device Dashboard loading must omit pollInterval when polling is disabled'
+	fail '대시보드 연결 기기 polling을 끄면 pollInterval을 생략해야 합니다'
 
 grep -Fq 'export function useSafeShieldStatistics(active: boolean, polling = true)' "$STATISTICS_HOOK" || \
-	fail 'SafeShield statistics hook must support one-shot Dashboard loading'
+	fail 'SafeShield 통계 hook은 대시보드의 단발성 조회를 지원해야 합니다'
 grep -Fq '...(polling ? { pollInterval: STATISTICS_REFRESH_INTERVAL_MS } : {}),' "$STATISTICS_HOOK" || \
-	fail 'SafeShield Dashboard statistics must omit pollInterval when polling is disabled'
+	fail '대시보드 SafeShield 통계 polling을 끄면 pollInterval을 생략해야 합니다'
 
 for hook in "$DEVICES_HOOK" "$STATISTICS_HOOK"; do
 	if grep -Fq 'pollInterval: polling ?' "$hook"; then
-		fail "optional polling must omit pollInterval instead of assigning null/undefined: ${hook#$ROOT_DIR/}"
+		fail "선택적 polling은 null/undefined를 넣지 말고 pollInterval 자체를 생략해야 합니다: ${hook#$ROOT_DIR/}"
 	fi
 done
 
 grep -Fq 'title="시스템 개요"' "$HOME" || \
-	fail 'Dashboard must use the product-style system overview heading'
+	fail '대시보드는 제품 스타일의 시스템 개요 제목을 사용해야 합니다'
 grep -Fq 'eyebrow="SafeShield"' "$HOME" || \
-	fail 'Dashboard must expose the SafeShield protection summary'
+	fail '대시보드는 SafeShield 보호 요약을 표시해야 합니다'
 grep -Fq 'eyebrow="Connected devices"' "$HOME" || \
-	fail 'Dashboard must expose connected-device information'
+	fail '대시보드는 연결 기기 정보를 표시해야 합니다'
 grep -Fq 'eyebrow="Software update"' "$HOME" || \
-	fail 'Dashboard must expose software update information'
+	fail '대시보드는 소프트웨어 업데이트 정보를 표시해야 합니다'
 grep -Fq 'title="네트워크 보호 활동"' "$HOME" || \
-	fail 'Dashboard must expose the network protection activity section'
+	fail '대시보드는 네트워크 보호 활동 영역을 표시해야 합니다'
 grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \
-	fail 'Dashboard must render SafeShield activity visualization'
+	fail '대시보드는 SafeShield 활동 시각화를 렌더링해야 합니다'
 grep -Fq 'title="시스템 상태"' "$HOME" || \
-	fail 'Dashboard must expose the system health section'
+	fail '대시보드는 시스템 상태 영역을 표시해야 합니다'
+grep -Fq 'function DashboardHealthSummary({' "$HOME" || \
+	fail '대시보드 시스템 상태에 로컬 장치 진단 요약 컴포넌트가 있어야 합니다'
+grep -Fq '>장치 진단</p>' "$HOME" || \
+	fail '대시보드 리소스 카드에서 장치 진단 제목을 표시해야 합니다'
+grep -Fq '마지막 진단: {formatRelativeTime(data.generatedAt, nowTimestamp)} · 검사 항목:' "$HOME" || \
+	fail '장치 진단 요약은 마지막 진단 시각과 검사 항목 수를 표시해야 합니다'
+grep -Fq '{data.summary.total}개' "$HOME" || \
+	fail '장치 진단 요약은 전체 검사 항목 수를 표시해야 합니다'
+grep -Fq 'const visibleIssues = noteworthy.slice(0, 2);' "$HOME" || \
+	fail '대시보드에서는 비정상 진단 항목을 최대 2건까지만 표시해야 합니다'
+grep -Fq '외 {hiddenIssueCount}건의 확인 항목이 있습니다.' "$HOME" || \
+	fail '표시하지 못한 비정상 진단 항목 수를 요약해야 합니다'
+grep -Fq 'href="#settings"' "$HOME" || \
+	fail '장치 진단의 상세 보기는 설정 페이지로 연결되어야 합니다'
+grep -Fq '아직 생성된 진단 결과가 없습니다.' "$HOME" || \
+	fail '진단 결과가 아직 없을 때 대기 상태를 표시해야 합니다'
+grep -Fq '진단 상태를 확인하지 못했습니다.' "$HOME" || \
+	fail '진단 조회 실패 시 확인 필요 상태를 표시해야 합니다'
+if grep -Fq 'reporter.enabled' "$HOME" || grep -Fq '원격 상태 보고' "$HOME"; then
+	fail '대시보드는 원격 Health Reporter 설정을 노출하지 않고 로컬 진단 요약만 표시해야 합니다'
+fi
 if grep -Fq 'title="최근 상태 확인"' "$HOME" || grep -Fq 'dashboard-freshness-title' "$HOME"; then
-	fail 'Dashboard must not keep a separate freshness section'
+	fail '대시보드는 별도의 최근 상태 확인 영역을 다시 추가하지 않아야 합니다'
 fi
 grep -Fq 'formatRelativeTime(timestamp, nowTimestamp)' "$HOME" || \
-	fail 'Dashboard overview cards must render relative freshness timestamps'
+	fail '대시보드 개요 카드는 최근 확인 시각을 상대 시간으로 표시해야 합니다'
 grep -Fq "safeShieldStale ? '차단 목록 갱신 지연' : '차단 목록 갱신'" "$HOME" || \
-	fail 'SafeShield overview must own its freshness metadata and stale warning'
+	fail 'SafeShield 개요 카드가 최근 갱신 정보와 지연 경고를 직접 표시해야 합니다'
 grep -Fq "devicesStale ? '목록 갱신 권장' : '목록 확인'" "$HOME" || \
-	fail 'connected-device overview must own its freshness metadata and stale warning'
+	fail '연결 기기 개요 카드가 최근 확인 정보와 지연 경고를 직접 표시해야 합니다'
 grep -Fq "updatesStale ? '업데이트 확인 지연' : '마지막 확인'" "$HOME" || \
-	fail 'software-update overview must own its freshness metadata and stale warning'
+	fail '소프트웨어 업데이트 개요 카드가 최근 확인 정보와 지연 경고를 직접 표시해야 합니다'
 grep -Fq '{label}: {formatRelativeTime(timestamp, nowTimestamp)}' "$HOME" || \
-	fail 'Dashboard freshness metadata must separate the label and relative time with a colon'
+	fail '대시보드 최근 확인 문구는 항목과 상대 시간을 콜론으로 구분해야 합니다'
 grep -Fq "updates && !updates.settings.checkEnabled" "$HOME" || \
-	fail 'disabled software auto-check must not be reported as stale'
+	fail '소프트웨어 자동 확인이 꺼져 있으면 지연 상태로 표시하지 않아야 합니다'
 grep -Fq 'const RELATIVE_TIME_TICK_MS = 60_000;' "$HOME" || \
-	fail 'Dashboard relative freshness labels must update once per minute without backend polling'
+	fail '대시보드 상대 시간 문구는 백엔드 polling 없이 1분마다 갱신되어야 합니다'
 grep -Fq "return '방금 전';" "$FORMAT" || \
-	fail 'relative time formatter must expose a just-now state'
+	fail '상대 시간 formatter는 방금 전 상태를 지원해야 합니다'
 grep -Fq 'Math.floor(elapsedSeconds / 60)}분 전' "$FORMAT" || \
-	fail 'relative time formatter must expose minute granularity'
+	fail '상대 시간 formatter는 분 단위를 지원해야 합니다'
 grep -Fq 'Math.floor(elapsedSeconds / 3_600)}시간 전' "$FORMAT" || \
-	fail 'relative time formatter must expose hour granularity'
+	fail '상대 시간 formatter는 시간 단위를 지원해야 합니다'
 grep -Fq 'Math.floor(elapsedSeconds / 86_400)}일 전' "$FORMAT" || \
-	fail 'relative time formatter must expose day granularity'
+	fail '상대 시간 formatter는 일 단위를 지원해야 합니다'
 grep -Fq 'formatLoadAverage(data.runtime.load[1])' "$HOME" || \
-	fail 'Dashboard must show the 5-minute load average'
+	fail '대시보드는 5분 시스템 부하를 표시해야 합니다'
 grep -Fq 'formatLoadAverage(data.runtime.load[2])' "$HOME" || \
-	fail 'Dashboard must show the 15-minute load average'
+	fail '대시보드는 15분 시스템 부하를 표시해야 합니다'
 grep -Fq "const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);" "$HOME" || \
-	fail 'Dashboard device details must detect SmartSafeHub custom firmware metadata'
+	fail '대시보드 장치 정보는 SmartSafeHub 커스텀 펌웨어 메타데이터를 감지해야 합니다'
 grep -Fq '`SmartSafeHub ${firmware.current.releaseVersion}`' "$HOME" || \
-	fail 'Dashboard device details must prefer the SmartSafeHub product firmware version'
+	fail '대시보드 장치 정보는 SmartSafeHub 제품 펌웨어 버전을 우선 표시해야 합니다'
 grep -Fq "firmware?.current.buildId || data.software.revision" "$HOME" || \
-	fail 'Dashboard device details must prefer the immutable SmartSafeHub build ID'
+	fail '대시보드 장치 정보는 immutable SmartSafeHub build ID를 우선 표시해야 합니다'
 grep -Fq "const deviceRevisionLabel = customFirmwareAvailable ? '빌드 ID' : '리비전';" "$HOME" || \
-	fail 'Dashboard must label custom firmware identity as build ID and preserve OpenWrt revision fallback'
+	fail '대시보드는 커스텀 펌웨어 식별자를 빌드 ID로 표시하고 OpenWrt 리비전 fallback을 유지해야 합니다'
 grep -Fq '`${data.software.distribution} ${data.software.version}`' "$HOME" || \
-	fail 'Dashboard device details must retain OpenWrt firmware fallback for legacy images'
+	fail '대시보드 장치 정보는 기존 이미지용 OpenWrt 펌웨어 fallback을 유지해야 합니다'
 grep -Fq '<DetailRow label="커널" value={data.software.kernel} />' "$HOME" || \
-	fail 'Dashboard device details must keep the actual running kernel version'
+	fail '대시보드 장치 정보는 실제 실행 중인 커널 버전을 유지해야 합니다'
 grep -Fq 'value={data.network.ipv4Address || '\''할당되지 않음'\''}' "$HOME" || \
-	fail 'Dashboard device details must include the WAN address'
+	fail '대시보드 장치 정보는 WAN 주소를 포함해야 합니다'
 
 grep -Fq 'aria-label={`메모리 사용률 ${memoryPercent}%`}' "$HOME" || \
-	fail 'Dashboard memory card must expose its utilization progress bar'
+	fail '대시보드 메모리 카드에 사용률 진행 막대가 있어야 합니다'
 grep -Fq 'class="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200"' "$HOME" || \
-	fail 'Dashboard memory progress bar must stay inside the compact memory card'
+	fail '대시보드 메모리 진행 막대는 메모리 카드 안에 유지되어야 합니다'
 if grep -Fq '<span>메모리 사용률</span>' "$HOME"; then
-	fail 'Dashboard must not duplicate memory utilization in a separate block'
+	fail '대시보드는 메모리 사용률을 별도 블록으로 중복 표시하지 않아야 합니다'
 fi
 
 grep -Fq "import { SafeShieldBlockedBarChart } from './SafeShieldBlockedBarChart';" "$ACTIVITY" || \
-	fail 'Dashboard must reuse the existing SafeShield Chart.js bar chart'
+	fail '대시보드는 기존 SafeShield Chart.js 막대 차트를 재사용해야 합니다'
 grep -Fq 'const DISPLAY_HOURS = 24;' "$ACTIVITY" || \
-	fail 'Dashboard SafeShield activity must use a 24-hour window'
+	fail '대시보드 SafeShield 활동은 24시간 범위를 사용해야 합니다'
 grep -Fq '<SafeShieldBlockedBarChart buckets={buckets} />' "$ACTIVITY" || \
-	fail 'Dashboard must chart hourly blocked requests'
+	fail '대시보드는 시간별 차단 요청을 차트로 표시해야 합니다'
 grep -Fq 'DNS 요청' "$ACTIVITY" || \
-	fail 'Dashboard SafeShield activity must show DNS query totals'
+	fail '대시보드 SafeShield 활동은 DNS 요청 합계를 표시해야 합니다'
 grep -Fq '차단율' "$ACTIVITY" || \
-	fail 'Dashboard SafeShield activity must show the block rate'
+	fail '대시보드 SafeShield 활동은 차단율을 표시해야 합니다'
 
-echo 'PASS: dashboard overview, SafeShield activity chart and one-shot summary loading are consistent'
+echo 'PASS: 대시보드 개요, SafeShield 활동 차트, 로컬 진단 요약과 단발성 상태 조회 계약이 정상입니다'

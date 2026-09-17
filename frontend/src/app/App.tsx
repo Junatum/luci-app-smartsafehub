@@ -41,7 +41,7 @@ export function App() {
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
-  const health = useHealth(route === 'settings');
+  const health = useHealth(route === 'home' || route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
   const systemTime = useSystemTimeSettings(route === 'settings');
   const safeshieldActions = useSafeShieldActions(
@@ -233,6 +233,9 @@ export function App() {
           firmware={firmware.data}
           firmwareError={firmware.error}
           firmwareLoading={firmware.loading}
+          health={health.data}
+          healthError={health.error}
+          healthLoading={health.loading}
           loading={status.loading}
           onRetry={() =>
             void Promise.all([
@@ -242,6 +245,7 @@ export function App() {
               dashboardSafeShieldStatistics.refresh(),
               updates.refresh(),
               firmware.refresh(),
+              health.refresh(),
             ])
           }
           safeshield={dashboardSafeShield.data}
@@ -267,6 +271,7 @@ export function App() {
         dashboardSafeShieldStatistics.refresh(),
         updates.refresh(),
         firmware.refresh(),
+        health.refresh(),
       ]);
       return;
     }
@@ -306,7 +311,8 @@ export function App() {
             dashboardSafeShield.refreshing ||
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing ||
-            firmware.refreshing)) ||
+            firmware.refreshing ||
+            health.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
         (route === 'settings' &&
           (firmware.refreshing ||
