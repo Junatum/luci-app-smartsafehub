@@ -4,6 +4,7 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 RPC_ENTRY="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub.uc"
+LAN_RPC_ENTRY="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub-network.uc"
 LAN_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/network-management.uc"
 ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 API="$ROOT_DIR/frontend/src/api/smartsafehub.ts"
@@ -19,15 +20,26 @@ fail() {
 	exit 1
 }
 
-for file in "$RPC_ENTRY" "$LAN_MODULE" "$ACL" "$API" "$HOOK" "$PAGE" "$ROUTES" "$HASH_ROUTE" "$NAVIGATION" "$APP"; do
+for file in "$RPC_ENTRY" "$LAN_RPC_ENTRY" "$LAN_MODULE" "$ACL" "$API" "$HOOK" "$PAGE" "$ROUTES" "$HASH_ROUTE" "$NAVIGATION" "$APP"; do
 	[ -f "$file" ] || fail "LAN 설정 계약 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
-grep -Fq "from './smartsafehub/network-management.uc';" "$RPC_ENTRY" || \
-	fail 'LAN 관리 ucode 모듈이 RPC entry에 연결되어야 합니다.'
+if grep -Fq "network-management.uc" "$RPC_ENTRY" || grep -Fq "network_management.uc" "$RPC_ENTRY"; then
+	fail '공개 smartsafehub RPC entry가 LAN 구현 모듈을 직접 import하면 안 됩니다.'
+fi
+grep -Fq "safe_call('smartsafehub_network', method, args ?? {})" "$RPC_ENTRY" || \
+	fail '공개 LAN RPC는 격리된 smartsafehub_network backend를 프록시해야 합니다.'
+grep -Fq "'LAN_BACKEND_UNAVAILABLE'" "$RPC_ENTRY" || \
+	fail 'LAN backend 로드 실패를 기존 RPC 객체 중단 없이 도메인 오류로 반환해야 합니다.'
+grep -Fq "from './smartsafehub/network-management.uc';" "$LAN_RPC_ENTRY" || \
+	fail '격리된 LAN RPC entry가 기존 LAN 구현 모듈을 불러와야 합니다.'
+grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
+	fail '격리된 LAN backend ubus 객체가 등록되어야 합니다.'
 for method in lan_settings lan_update lan_auto_subnet; do
 	grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$RPC_ENTRY" || \
-		fail "LAN RPC 메서드가 등록되지 않았습니다: $method"
+		fail "공개 LAN RPC 메서드가 등록되지 않았습니다: $method"
+	grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$LAN_RPC_ENTRY" || \
+		fail "내부 LAN RPC 메서드가 등록되지 않았습니다: $method"
 done
 
 jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("lan_settings") != null' "$ACL" >/dev/null || \
@@ -36,6 +48,10 @@ for method in lan_update lan_auto_subnet; do
 	jq -e --arg method "$method" '."luci-app-smartsafehub".write.ubus.smartsafehub | index($method) != null' "$ACL" >/dev/null || \
 		fail "$method 쓰기 ACL이 필요합니다."
 done
+
+if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_network != null or ."luci-app-smartsafehub".write.ubus.smartsafehub_network != null' "$ACL" >/dev/null; then
+	fail '내부 smartsafehub_network 객체를 브라우저 ACL에 직접 노출하면 안 됩니다.'
+fi
 
 grep -Fq "const SAFE_LAN_CANDIDATES = [" "$LAN_MODULE" || \
 	fail '자동 충돌 해결을 위한 안전한 LAN 후보 목록이 필요합니다.'

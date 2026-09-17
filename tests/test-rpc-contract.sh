@@ -10,6 +10,8 @@ FIRMWARE_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 BACKUP_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/backup.uc"
 BACKUP_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 SECURITY_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/security.uc"
+LAN_RPC_ENTRY="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub-network.uc"
+LAN_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/network-management.uc"
 UPDATER="$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 
@@ -49,6 +51,20 @@ jq -e \
 
 assert_acl_method read system_root_password_status
 assert_acl_method write system_root_password_set
+[ -f "$LAN_RPC_ENTRY" ] || fail 'isolated LAN rpc entry is missing'
+[ -f "$LAN_MODULE" ] || fail 'LAN implementation module is missing'
+if grep -Eq "network[-_]management\.uc" "$RPC_ENTRY"; then
+	fail 'main smartsafehub RPC entry must not directly import LAN implementation'
+fi
+grep -Fq "safe_call('smartsafehub_network', method, args ?? {})" "$RPC_ENTRY" || \
+	fail 'public LAN RPCs must proxy the isolated LAN backend'
+grep -Fq "from './smartsafehub/network-management.uc';" "$LAN_RPC_ENTRY" || \
+	fail 'isolated LAN backend must use the canonical LAN implementation module path'
+grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
+	fail 'isolated LAN backend must register its own ubus object'
+if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_network != null or ."luci-app-smartsafehub".write.ubus.smartsafehub_network != null' "$ACL" >/dev/null; then
+	fail 'isolated LAN backend must not be directly exposed through LuCI ACL'
+fi
 assert_acl_method read lan_settings
 assert_acl_method write lan_update
 assert_acl_method write lan_auto_subnet

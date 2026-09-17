@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.15-r18] - 2026-09-17
+
+### 수정
+
+- LAN/DHCP 구현을 별도 내부 `smartsafehub_network` ubus 객체로 격리해 LAN backend의 로드/컴파일 오류가 `system_root_password_status`와 대시보드 등 기존 `smartsafehub` RPC 전체로 전파되지 않도록 했습니다.
+- 격리 과정에서 LAN 구현 모듈을 `network_management.uc`로 이름 변경하던 방식을 제거하고 기존 `network-management.uc` 경로를 그대로 유지했습니다. 패치 적용 또는 Git staging 과정에서 rename 대상 파일이 누락되면 LAN 계약, ucode import 계약, RPC 계약이 동시에 실패할 수 있던 문제를 방지합니다.
+- 공개 `smartsafehub` 객체는 기존 LAN API 이름을 유지하면서 내부 backend를 프록시하고, 내부 객체가 없으면 `LAN_BACKEND_UNAVAILABLE`을 반환합니다.
+
+### 테스트 및 문서
+
+- LAN 구현 모듈이 공개 RPC 진입점에 직접 import되지 않는지, 내부 LAN RPC가 기존 canonical 모듈 경로를 사용하는지, 내부 객체가 브라우저 ACL에 노출되지 않는지 회귀 테스트를 보강했습니다.
+- LAN RPC 격리 구조와 `ucode -c` 진단 방법을 README 및 아키텍처 문서에 반영했습니다.
+
 ## [0.2.15-r16] - 2026-09-17
 
 ### 기능

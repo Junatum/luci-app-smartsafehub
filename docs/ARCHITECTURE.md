@@ -353,14 +353,17 @@ rpcd는 이 반환값으로 `smartsafehub` ubus 객체를 등록합니다.
 ### 5.2 모듈 구성
 
 ```text
-root/usr/share/rpcd/ucode/smartsafehub/
-├── core.uc
-├── devices.uc
-├── health.uc
-├── network-management.uc
-├── system.uc
-├── wifi.uc
-└── wifi-management.uc
+root/usr/share/rpcd/ucode/
+├── smartsafehub.uc
+├── smartsafehub-network.uc
+└── smartsafehub/
+    ├── core.uc
+    ├── devices.uc
+    ├── health.uc
+    ├── network-management.uc
+    ├── system.uc
+    ├── wifi.uc
+    └── wifi-management.uc
 ```
 
 #### `core.uc`
@@ -376,7 +379,11 @@ root/usr/share/rpcd/ucode/smartsafehub/
 
 ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus 연결을 공유합니다.
 
-#### `network-management.uc`
+#### `smartsafehub-network.uc` / `network-management.uc`
+
+공개 `smartsafehub` RPC와 LAN 구현의 장애 범위를 분리하기 위해 `smartsafehub-network.uc`가 내부 `smartsafehub_network` ubus 객체를 등록하고, 공개 `smartsafehub`의 LAN 메서드는 `safe_call()`로 이 내부 객체를 프록시합니다. 내부 객체는 LuCI ACL에 직접 노출하지 않습니다. 따라서 LAN 구현이 로드되지 않아도 `system_root_password_status`와 대시보드용 기존 RPC 객체는 유지됩니다.
+
+기존 `network-management.uc` 파일명은 그대로 유지합니다. LAN backend 격리와 무관한 파일명 rename을 피워 패치/checkout 과정에서 구현 모듈이 누락되는 회귀를 방지합니다.
 
 기본 `network.lan`/`dhcp.lan`의 LAN 및 DHCP 관리:
 

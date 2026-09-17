@@ -375,6 +375,15 @@ ubus -v list smartsafehub
 ubus call smartsafehub status '{}'
 ```
 
+LAN/DHCP 구현은 기존 관리 RPC의 가용성을 보호하기 위해 별도 내부 객체로 격리되어 있습니다. 정상 상태에서는 다음 객체도 등록됩니다. 브라우저에서는 이 객체를 직접 호출하지 않고 공개 `smartsafehub` LAN RPC가 내부적으로 프록시합니다.
+
+```bash
+ubus -v list smartsafehub_network
+ubus call smartsafehub_network lan_settings '{}'
+```
+
+`smartsafehub_network`가 없어도 `smartsafehub` 객체와 로그인/대시보드 RPC는 계속 동작해야 합니다. LAN 화면에서는 backend unavailable 오류를 표시합니다. LAN 구현 파일은 기존 경로인 `smartsafehub/network-management.uc`를 그대로 사용해 패치/체크아웃 과정의 파일명 이동에 의존하지 않습니다.
+
 주요 읽기 기능:
 
 ```bash
@@ -426,10 +435,18 @@ ucode -c \
   -o /tmp/smartsafehub/smartsafehub.ucb \
   /usr/share/rpcd/ucode/smartsafehub.uc
 
-echo "compile exit=$?"
+echo "main compile exit=$?"
+
+ucode -c \
+  -o /tmp/smartsafehub/smartsafehub-network.ucb \
+  /usr/share/rpcd/ucode/smartsafehub-network.uc
+
+echo "lan compile exit=$?"
 ```
 
-정상 결과는 `compile exit=0`입니다. 실패하면 출력되는 모듈 파일과 줄 번호를 먼저 수정합니다.
+공개 `smartsafehub.uc`는 LAN 구현 모듈을 직접 import하지 않습니다. 따라서 LAN 전용 진입점의 컴파일/로드 오류가 기존 관리자 보안 상태 확인과 대시보드 진입까지 중단시키지 않아야 합니다.
+
+정상 결과는 `main compile exit=0`, `lan compile exit=0`입니다. 실패하면 출력되는 모듈 파일과 줄 번호를 먼저 수정합니다.
 
 ```bash
 /etc/init.d/rpcd restart

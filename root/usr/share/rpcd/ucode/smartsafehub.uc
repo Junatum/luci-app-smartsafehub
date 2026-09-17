@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
-import { failure } from './smartsafehub/core.uc';
+import { failure, safe_call } from './smartsafehub/core.uc';
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
 	discard_uploaded_backup,
@@ -41,11 +41,6 @@ import {
 	update_wifi
 } from './smartsafehub/wifi-management.uc';
 import {
-	apply_recommended_lan,
-	read_lan_settings,
-	update_lan_settings
-} from './smartsafehub/network-management.uc';
-import {
 	read_health_status,
 	run_health_diagnostic,
 	update_health_reporter
@@ -70,6 +65,19 @@ function require_root_password(handler) {
 
 		return handler(request);
 	};
+}
+
+function call_lan_backend(method, args) {
+	const result = safe_call('smartsafehub_network', method, args ?? {});
+
+	if (type(result) != 'object' || type(result?.ok) != 'bool') {
+		return failure(
+			'LAN_BACKEND_UNAVAILABLE',
+			'내부 네트워크 관리 기능을 불러오지 못했습니다. rpcd 상태를 확인해 주세요.'
+		);
+	}
+
+	return result;
 }
 
 const methods = {
@@ -98,7 +106,7 @@ const methods = {
 	},
 	lan_settings: {
 		call: require_root_password(function(request) {
-			return read_lan_settings();
+			return call_lan_backend('lan_settings', {});
 		}),
 	},
 	lan_update: {
@@ -112,7 +120,7 @@ const methods = {
 			confirm: '',
 		},
 		call: require_root_password(function(request) {
-			return update_lan_settings(request);
+			return call_lan_backend('lan_update', request.args);
 		}),
 	},
 	lan_auto_subnet: {
@@ -120,7 +128,7 @@ const methods = {
 			confirm: '',
 		},
 		call: require_root_password(function(request) {
-			return apply_recommended_lan(request);
+			return call_lan_backend('lan_auto_subnet', request.args);
 		}),
 	},
 	wifi_summary: {
