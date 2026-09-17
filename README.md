@@ -143,7 +143,10 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 기본 비활성화된 예약 재부팅을 `매일` 또는 `매주` 주기, 요일과 로컬 시각으로 설정 가능. 기본 제안값은 매주 일요일 04:00
 - 예약 재부팅 시 관리 소프트웨어 또는 펌웨어 작업이 진행 중이면 15분 단위로 최대 2시간 연기하고, 설치 준비된 펌웨어가 있는 경우에도 사용자의 pending 작업을 보존하기 위해 재부팅을 미룸
 - 부팅 후 10분 이내에는 예약 재부팅을 건너뛰고 동일 예약 key의 중복 실행을 막아 재부팅 루프를 방지
-- 장치, Wi-Fi와 SafeShield 상태를 JSON 진단 파일로 다운로드
+- 모든 사용자를 대상으로 메모리, 시스템 부하, `/overlay` 저장 공간, WAN, dnsmasq, SafeShield, 업데이트 상태와 시스템 시간을 5분 주기로 로컬 진단하고 설정 화면에서 정상/주의/이상 결과와 `지금 진단` 기능 제공
+- 유료 멤버십 또는 Trial 장치에서는 사용자가 명시적으로 opt-in한 경우에만 Health Reporter를 사용할 수 있습니다. 기본값은 OFF이며 정상 상태는 30분 heartbeat, 이상 상태 fingerprint가 바뀌면 정기 주기 전에도 한 번 보고합니다. 사용자가 OFF로 변경하면 이후 자동 상태 보고 네트워크 요청을 수행하지 않습니다.
+- Health Reporter는 서버 전송용 payload를 whitelist 방식으로 별도 생성해 메모리/부하/저장 공간 수치, 전체 진단 상태와 이상 코드만 전송합니다. 호스트명, WAN IP, Wi-Fi SSID/MAC, DNS 요청 내용과 시스템 로그 원문은 자동 보고에 포함하지 않습니다.
+- 장치, Wi-Fi, SafeShield와 로컬 Health 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음
 - 진단 파일에는 호스트명, WAN IPv4와 Wi-Fi SSID가 포함될 수 있으므로 외부 전달 전 확인 필요
 - OpenWrt 표준 `sysupgrade` 설정 백업을 SmartSafeHub에서 직접 다운로드하고, SmartSafeHub 또는 기본 LuCI에서 만든 `.tar.gz` 백업을 업로드·검증한 뒤 복원 가능
@@ -160,9 +163,9 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 설정 백업 다운로드는 LuCI의 인증된 `/cgi-bin/cgi-backup` 경로를 통해 OpenWrt `sysupgrade --create-backup` 형식을 그대로 사용합니다. 복원은 `/cgi-bin/cgi-upload`로 전용 `/tmp/smartsafehub/config-backup.tar.gz` 경로에만 업로드한 뒤 `/usr/libexec/smartsafehub-backup`이 archive 구조와 업데이트 충돌 여부를 확인하고 `sysupgrade --restore-backup`을 실행합니다. 따라서 SmartSafeHub 백업은 기본 LuCI/CLI와 상호 호환되며 별도의 독자 백업 포맷을 만들지 않습니다.
 
-SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tmp/smartsafehub/` 한 디렉터리에 모읍니다. 업데이트 상태와 릴리즈 노트, 펌웨어 상태·다운로드 이미지, 예약 재부팅 상태, Wi-Fi 변경 lock, 설정 백업 업로드 파일이 이 경로를 공유하며 `updater/`나 `firmware/` 같은 추가 하위 분류 디렉터리는 만들지 않습니다. `/tmp` 기반이므로 재부팅 시 함께 초기화되고 flash 저장 공간에는 기록하지 않습니다. 각 helper와 init script가 필요할 때 디렉터리를 다시 생성합니다.
+SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tmp/smartsafehub/` 한 디렉터리에 모읍니다. 업데이트 상태와 릴리즈 노트, 펌웨어 상태·다운로드 이미지, Health 진단/Reporter 상태, 예약 재부팅 상태, Wi-Fi 변경 lock, 설정 백업 업로드 파일이 이 경로를 공유하며 `updater/`나 `firmware/` 같은 추가 하위 분류 디렉터리는 만들지 않습니다. `/tmp` 기반이므로 재부팅 시 함께 초기화되고 flash 저장 공간에는 기록하지 않습니다. 각 helper와 init script가 필요할 때 디렉터리를 다시 생성합니다.
 
-진단 파일은 설정 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
+진단 파일은 설정 화면에 이미 로드된 시스템/Health 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다. Health Reporter는 이 다운로드 JSON을 전송하지 않으며 `/usr/libexec/smartsafehub-health`가 개인정보가 배제된 별도 최소 payload를 생성합니다.
 
 ### 모바일 지원
 
@@ -202,7 +205,7 @@ jsonfilter
 safeshield (>= 0.3.23)
 ```
 
-`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `EXTRA_DEPENDS:=safeshield (>= 0.3.20)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
+`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.23)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
 
 프런트엔드 빌드에는 **Node.js 24 이상**이 필요합니다.
 
@@ -368,15 +371,15 @@ ubus call safeshield config '{}'
 ubus call safeshield rules_list '{}'
 ```
 
-SmartSafeHub 자체 RPC는 장치·Wi-Fi·시스템 기능만 소유하며 총 5개입니다.
+SmartSafeHub 자체 RPC는 장치·Wi-Fi·시스템·로컬 Health 기능을 소유합니다. Health 관련 RPC는 다음과 같습니다.
 
 ```text
-status
-connected_devices
-wifi_summary
-wifi_update
-system_reboot
+health_status
+health_run
+health_reporter_update
 ```
+
+`health_status`는 `/tmp/smartsafehub/health.json`과 Reporter 상태를 읽습니다. 최초 결과가 아직 없으면 rpcd를 막지 않도록 진단 helper를 분리된 프로세스로 시작하고 `확인 중` 상태를 즉시 반환합니다. `health_run`도 같은 방식으로 사용자의 `지금 진단`을 비동기로 시작하며 프런트엔드가 새 `generatedAt`이 기록될 때까지 짧게 재조회합니다. `health_reporter_update`는 최근 로컬 eligibility 상태를 확인한 뒤 opt-in 설정을 저장하며, 실제 Hub API는 라이선스/Trial 여부를 다시 검증해야 합니다.
 
 SafeShield 기능은 `luci-app-smartsafehub`가 별도 프록시를 만들지 않고 SafeShield 패키지가 제공하는 공식 ubus API를 직접 사용합니다.
 
@@ -392,7 +395,7 @@ safeshield.license_get
 safeshield.license_update
 ```
 
-`license_get`은 평문 라이선스 키를 반환하므로 일반 상태 조회에는 사용하지 않습니다. 사용자가 현재 키를 명시적으로 불러올 때만 호출하며, LuCI ACL에서도 일반 read 권한과 분리해 write 권한 그룹에 포함합니다. 진단 다운로드와 주기적 상태 polling은 `safeshield.status`의 마스킹된 라이선스 정보만 사용합니다.
+`license_get`은 평문 라이선스 키를 반환하므로 브라우저의 일반 상태 조회에는 사용하지 않습니다. 사용자가 현재 키를 명시적으로 불러올 때 호출하며 LuCI ACL에서도 일반 read 권한과 분리합니다. 로컬 Health 진단, 진단 다운로드와 주기적 UI polling은 `safeshield.status`의 마스킹된 라이선스 정보만 사용합니다. 예외적으로 opt-in된 유료/Trial Health Reporter daemon은 실제 HTTPS 보고 직전에 서버 인증 헤더를 만들기 위해 평문 키를 일시적으로 조회하며, 키를 런타임 상태 파일이나 보고 payload에 기록하지 않습니다.
 
 ## ucode 컴파일 검사
 
@@ -425,13 +428,13 @@ ubus -v list smartsafehub
 진단 생성 흐름은 다음과 같습니다.
 
 ```text
-현재 시스템 상태 재사용
+현재 시스템/Health 상태 재사용
   + smartsafehub.wifi_summary
   + safeshield.status
   → 브라우저에서 JSON 결합 및 다운로드
 ```
 
-Wi-Fi 또는 SafeShield가 설치되지 않았거나 일시적으로 응답하지 않아도 진단 파일은 생성되며 해당 섹션은 사용 불가 기본값으로 기록됩니다. 진단 파일에는 비밀번호와 라이선스 키는 없지만 호스트명, WAN IPv4와 Wi-Fi SSID 같은 네트워크 식별 정보가 포함될 수 있으므로 외부 전달 전에 내용을 확인하세요.
+Wi-Fi 또는 SafeShield가 설치되지 않았거나 일시적으로 응답하지 않아도 진단 파일은 생성되며 해당 섹션은 사용 불가 기본값으로 기록됩니다. 로컬 Health 결과도 함께 포함됩니다. 진단 파일에는 비밀번호와 라이선스 키는 없지만 호스트명, WAN IPv4와 Wi-Fi SSID 같은 네트워크 식별 정보가 포함될 수 있으므로 외부 전달 전에 내용을 확인하세요.
 
 오류가 발생하면 브라우저 개발자 도구의 Network 항목과 다음 로그를 함께 확인합니다.
 

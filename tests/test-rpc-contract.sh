@@ -37,6 +37,7 @@ for method in system_root_password_status system_root_password_set \
 	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
 	system_time_settings system_timezone_update system_time_sync \
 	system_scheduled_reboot_settings system_scheduled_reboot_update \
+	health_status health_run health_reporter_update \
 	system_backup_validate system_backup_restore system_backup_discard; do
 	assert_rpc_method "$method"
 done
@@ -60,6 +61,9 @@ assert_acl_method write system_timezone_update
 assert_acl_method write system_time_sync
 assert_acl_method read system_scheduled_reboot_settings
 assert_acl_method write system_scheduled_reboot_update
+assert_acl_method read health_status
+assert_acl_method write health_run
+assert_acl_method write health_reporter_update
 for method in system_backup_validate system_backup_restore system_backup_discard; do
 	assert_acl_method write "$method"
 done

@@ -47,9 +47,11 @@ require_file "$SHELLSPEC_CONTRACTS"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-maintenance"
+require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-health"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-maintenance"
+require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-health"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 require_executable "$ROOT_DIR/tests/test-static-validation.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
@@ -60,6 +62,7 @@ require_executable "$ROOT_DIR/tests/test-reload-safety.sh"
 require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"
 require_executable "$ROOT_DIR/tests/test-system-time-contract.sh"
 require_executable "$ROOT_DIR/tests/test-scheduled-reboot.sh"
+require_executable "$ROOT_DIR/tests/test-health.sh"
 require_executable "$ROOT_DIR/tests/test-backup-restore.sh"
 require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
@@ -131,6 +134,10 @@ printf '%s\n' "$postinst_block" | grep -Fq 'mkdir -p /tmp/smartsafehub' ||
 	fail 'package postinst must create the SmartSafeHub runtime directory'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
 	fail 'package postinst must force-enable smartsafehub-firmware'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health enable' ||
+	fail 'package postinst must force-enable smartsafehub-health'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health restart' ||
+	fail 'package postinst must start or restart smartsafehub-health immediately after installation'
 printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.check_enabled' ||
 	fail 'package postinst must remove the obsolete firmware check_enabled option on existing installs'
 if printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.updates.check_enabled'; then

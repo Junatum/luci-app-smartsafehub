@@ -4,6 +4,7 @@ import type {
   ConfigurationBackupValidation,
 } from '../types/backup';
 import type { ConnectedDevicesSummary } from '../types/devices';
+import type { HealthAccepted, HealthStatus } from '../types/health';
 import type {
   FirmwareAccepted,
   FirmwareStatus,
@@ -37,6 +38,18 @@ export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
 
 export function fetchStatus(): Promise<SmartSafeHubStatus> {
   return callApi(API_OBJECT, 'status');
+}
+
+export function fetchHealthStatus(): Promise<HealthStatus> {
+  return callApi(API_OBJECT, 'health_status');
+}
+
+export function requestHealthRun(): Promise<HealthAccepted> {
+  return callApi(API_OBJECT, 'health_run');
+}
+
+export function updateHealthReporter(enabled: boolean): Promise<HealthStatus> {
+  return callApi(API_OBJECT, 'health_reporter_update', { enabled });
 }
 
 export function fetchSoftwareUpdates(): Promise<SoftwareUpdateStatus> {

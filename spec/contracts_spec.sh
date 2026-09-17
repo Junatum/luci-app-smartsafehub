@@ -92,6 +92,13 @@ Describe 'SmartSafeHub shell contract suite'
     The error should be blank
   End
 
+  It '로컬 진단과 원격 상태 보고 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-health.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'passes configuration backup and restore contract'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-backup-restore.sh"
     The status should be success

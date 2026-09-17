@@ -2,6 +2,7 @@ import { useCallback, useState } from 'preact/hooks';
 
 import { fetchSafeShieldStatus } from '../api/safeshield';
 import {
+  fetchHealthStatus,
   fetchWifiSummary,
   requestSystemReboot,
 } from '../api/smartsafehub';
@@ -59,16 +60,18 @@ async function fetchDiagnostics(
     );
   }
 
-  // The system snapshot is already loaded for this page. Only the two
-  // independent detail APIs are requested, and they run in parallel so a
-  // missing optional service does not prevent the diagnostic file download.
-  const [wifiResult, safeshieldResult] = await Promise.allSettled([
+  // The system snapshot is already loaded for this page. Wi-Fi, SafeShield and
+  // local Health details are requested in parallel so one unavailable optional
+  // service does not prevent the diagnostic file download.
+  const [wifiResult, safeshieldResult, healthResult] = await Promise.allSettled([
     fetchWifiSummary(),
     fetchSafeShieldStatus(),
+    fetchHealthStatus(),
   ]);
 
   return {
     generatedAt: Math.floor(Date.now() / 1000),
+    health: healthResult.status === 'fulfilled' ? healthResult.value : null,
     system,
     wifi:
       wifiResult.status === 'fulfilled'

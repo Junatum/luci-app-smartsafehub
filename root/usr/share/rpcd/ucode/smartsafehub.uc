@@ -40,6 +40,11 @@ import {
 	read_wifi_summary,
 	update_wifi
 } from './smartsafehub/wifi-management.uc';
+import {
+	read_health_status,
+	run_health_diagnostic,
+	update_health_reporter
+} from './smartsafehub/health.uc';
 
 function require_root_password(handler) {
 	return function(request) {
@@ -230,6 +235,24 @@ const methods = {
 		},
 		call: require_root_password(function(request) {
 			return reboot_system(request);
+		}),
+	},
+	health_status: {
+		call: require_root_password(function(request) {
+			return read_health_status(request);
+		}),
+	},
+	health_run: {
+		call: require_root_password(function(request) {
+			return run_health_diagnostic(request);
+		}),
+	},
+	health_reporter_update: {
+		args: {
+			enabled: false,
+		},
+		call: require_root_password(function(request) {
+			return update_health_reporter(request);
 		}),
 	},
 };

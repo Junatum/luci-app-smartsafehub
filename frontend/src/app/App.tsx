@@ -5,6 +5,7 @@ import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { useHashRoute } from '../hooks/useHashRoute';
+import { useHealth } from '../hooks/useHealth';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
 import { useSafeShieldStatistics } from '../hooks/useSafeShieldStatistics';
@@ -40,6 +41,7 @@ export function App() {
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
   const systemActions = useSystemActions(status.data);
+  const health = useHealth(route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
   const systemTime = useSystemTimeSettings(route === 'settings');
   const safeshieldActions = useSafeShieldActions(
@@ -125,6 +127,13 @@ export function App() {
           firmware={firmware.data}
           firmwareError={firmware.error}
           firmwareLoading={firmware.loading}
+          health={health.data}
+          healthActionError={health.actionError}
+          healthActionMessage={health.actionMessage}
+          healthError={health.error}
+          healthLoading={health.loading}
+          healthRunning={health.running}
+          healthSavingReporter={health.savingReporter}
           loading={status.loading}
           onBackupDiscard={configurationBackup.discard}
           onBackupDownload={() => void configurationBackup.download()}
@@ -132,8 +141,11 @@ export function App() {
           onBackupUpload={configurationBackup.upload}
           onDismissBackupFeedback={configurationBackup.dismissFeedback}
           onDismissFeedback={systemActions.dismissFeedback}
+          onDismissHealthFeedback={health.dismissActionFeedback}
           onDismissTimeFeedback={systemTime.dismissSaveFeedback}
           onDownloadDiagnostics={() => void systemActions.downloadDiagnostics()}
+          onRunHealth={() => void health.runDiagnostic()}
+          onSetHealthReporter={(enabled) => void health.setReporterEnabled(enabled)}
           onReboot={() => void systemActions.reboot()}
           onRetry={() =>
             void Promise.all([
@@ -141,6 +153,7 @@ export function App() {
               firmware.refresh(),
               systemTime.refresh(),
               scheduledReboot.refresh(),
+              health.refresh(),
             ])
           }
           onDismissScheduledRebootFeedback={scheduledReboot.dismissSaveFeedback}
@@ -269,6 +282,7 @@ export function App() {
         firmware.refresh(),
         systemTime.refresh(),
         scheduledReboot.refresh(),
+        health.refresh(),
       ]);
       return;
     }
@@ -295,7 +309,10 @@ export function App() {
             firmware.refreshing)) ||
         (route === 'system' && firmware.refreshing) ||
         (route === 'settings' &&
-          (firmware.refreshing || systemTime.refreshing || scheduledReboot.refreshing)) ||
+          (firmware.refreshing ||
+            systemTime.refreshing ||
+            scheduledReboot.refreshing ||
+            health.refreshing)) ||
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}

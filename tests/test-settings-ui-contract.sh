@@ -12,13 +12,14 @@ TIME_HOOK="$ROOT_DIR/frontend/src/hooks/useSystemTimeSettings.ts"
 SCHEDULE_HOOK="$ROOT_DIR/frontend/src/hooks/useScheduledRebootSettings.ts"
 BACKUP_HOOK="$ROOT_DIR/frontend/src/hooks/useConfigurationBackup.ts"
 BACKUP_API="$ROOT_DIR/frontend/src/api/configurationBackup.ts"
+HEALTH_HOOK="$ROOT_DIR/frontend/src/hooks/useHealth.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK" "$SCHEDULE_HOOK" "$BACKUP_HOOK" "$BACKUP_API"; do
+for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK" "$SCHEDULE_HOOK" "$BACKUP_HOOK" "$BACKUP_API" "$HEALTH_HOOK"; do
 	[ -f "$file" ] || fail "missing settings split source: ${file#$ROOT_DIR/}"
 done
 
@@ -68,6 +69,12 @@ grep -Fq "'지금 동기화'" "$SETTINGS_PAGE" || \
 	fail 'settings page must expose immediate NTP synchronization'
 grep -Fq 'title="진단 및 지원"' "$SETTINGS_PAGE" || \
 	fail 'diagnostic download must be grouped as diagnostic and support functionality'
+grep -Fq '원격 상태 보고' "$SETTINGS_PAGE" || \
+	fail 'settings diagnostics must expose paid/trial remote health reporting'
+grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || \
+	fail 'remote health reporting must be explicit opt-in with opt-out copy'
+grep -Fq "const health = useHealth(route === 'settings');" "$APP" || \
+	fail 'settings route must load the local health resource'
 grep -Fq 'title="설정 백업 및 복원"' "$SETTINGS_PAGE" || \
 	fail 'settings page must expose first-class configuration backup and restore management'
 grep -Fq '설정 백업 다운로드' "$SETTINGS_PAGE" || \

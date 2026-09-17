@@ -11,7 +11,8 @@
           "updates_status",
           "firmware_status",
           "system_time_settings",
-          "system_scheduled_reboot_settings"
+          "system_scheduled_reboot_settings",
+          "health_status"
         ],
         "safeshield": [
           "status",
@@ -43,7 +44,9 @@
           "firmware_discard",
           "system_backup_validate",
           "system_backup_restore",
-          "system_backup_discard"
+          "system_backup_discard",
+          "health_run",
+          "health_reporter_update"
         ],
         "safeshield": [
           "set_enabled",

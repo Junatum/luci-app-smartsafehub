@@ -1,5 +1,26 @@
 # 변경 기록
 
+## [0.2.15-r10] - 2026-09-17
+
+### 기능
+
+- 모든 사용자가 사용할 수 있는 로컬 Health 진단 엔진을 추가했습니다. 메모리 가용량, CPU 코어 대비 시스템 부하, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 상태와 시스템 시간을 5분 주기로 점검하고 결과를 `/tmp/smartsafehub/health.json`에만 보관합니다.
+- 설정 화면의 기존 `진단 및 지원` 카드를 실제 진단 결과 중심으로 확장했습니다. 현재 정상/주의/이상 상태, 진단 항목 수, 주요 검사 결과와 마지막 진단 시각을 표시하고 `지금 진단`으로 즉시 다시 점검할 수 있습니다. 진단 JSON 다운로드에도 최신 Health 결과를 포함합니다.
+- 유료 멤버십 또는 Trial 장치에서만 사용할 수 있는 Health Reporter를 추가했습니다. 기본값은 OFF이며 사용자가 설정 화면에서 직접 opt-in한 경우에만 30분 heartbeat와 이상 fingerprint 변경 시 보고합니다. 사용자는 언제든지 다시 OFF로 전환할 수 있습니다.
+- Health Reporter 전송 실패 시 5분 backoff를 적용해 서버/네트워크 장애 중 매 분 재시도하지 않도록 했습니다.
+
+### 보안 및 개인정보 보호
+
+- 원격 상태 보고 payload는 whitelist 방식으로 별도 생성하며 메모리/부하/저장 공간 수치, 전체 진단 상태와 이상 코드만 포함합니다. 호스트명, WAN IP, Wi-Fi SSID/MAC, DNS 요청 내용, 시스템 로그 원문과 라이선스 키는 payload에 포함하지 않습니다.
+- 평문 SafeShield 라이선스 키는 Health Reporter가 실제 HTTPS 보고를 전송할 때 인증 헤더를 구성하기 위해 메모리에서 일시적으로만 조회하며 파일이나 보고 payload에 저장하지 않습니다. 로컬 진단, 상태 조회와 진단 다운로드에서는 평문 키를 조회하지 않습니다.
+- `reporter_enabled=0`에서는 heartbeat, 이상 보고와 복구 보고를 포함한 Health Reporter 네트워크 요청을 수행하지 않습니다. 로컬 Health 진단은 멤버십/Reporter 설정과 독립적으로 계속 동작합니다.
+
+### 테스트
+
+- FREE 사용자의 로컬 진단, 유료/Trial opt-in, 개인정보 필드 배제, 최초/주기/상태 변경 보고, 전송 실패 backoff와 opt-out 후 네트워크 요청 차단을 mock 기반으로 검증하는 `test-health.sh`를 추가했습니다.
+- 새 Health RPC/ACL, UCI 기본값, procd 서비스, 프런트엔드 API/hook/UI와 패키지 post-install 활성화 계약을 기존 정적/패키지/RPC/UI contract에 추가했습니다.
+- Health helper가 내부적으로 다른 ubus 객체를 호출하므로 rpcd handler에서 동기 실행하지 않고 detached process로 시작하는 회귀 계약을 추가해 rpcd 이벤트 루프 교착을 방지했습니다.
+
 ## [0.2.15-r9] - 2026-09-17
 
 ### UI 개선

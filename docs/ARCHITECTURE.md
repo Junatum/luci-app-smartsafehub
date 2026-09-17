@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.2-r1`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r10`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -111,7 +111,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `safeshield.license_get`
 - `safeshield.license_update`
 
-`license_get`은 동작 자체는 읽기이지만 평문 라이선스 키를 반환하는 민감 API이므로 일반 상태 조회 권한과 분리해 write ACL 그룹에 포함합니다. 주기적 상태 polling과 진단 수집에서는 호출하지 않습니다.
+`license_get`은 동작 자체는 읽기이지만 평문 라이선스 키를 반환하는 민감 API이므로 일반 상태 조회 권한과 분리해 write ACL 그룹에 포함합니다. 브라우저의 주기적 상태 polling, 로컬 Health 진단과 진단 다운로드에서는 호출하지 않습니다. opt-in된 Health Reporter daemon만 실제 HTTPS 보고 시 서버 인증을 위해 일시적으로 호출하며 키를 파일이나 payload에 저장하지 않습니다.
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
@@ -138,7 +138,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 현재 자산 버전:
 
 ```text
-0.2.2-r1
+0.2.15-r10
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -274,7 +274,8 @@ SafeShield 상세 상태는 기존 `safeshield.status`의 원시 응답을 프�
 SettingsPage에 이미 로드된 smartsafehub.status
         │
         ├─ Promise.allSettled(smartsafehub.wifi_summary)
-        └─ Promise.allSettled(safeshield.status)
+        ├─ Promise.allSettled(safeshield.status)
+        └─ Promise.allSettled(smartsafehub.health_status)
                     │
                     ▼
         브라우저에서 SystemDiagnostics 조합
@@ -286,13 +287,35 @@ SettingsPage에 이미 로드된 smartsafehub.status
 설계 이유:
 
 - 시스템 상태를 중복 조회하지 않음
-- 독립적인 두 상세 요청을 병렬 실행
+- 독립적인 Wi-Fi, SafeShield, Health 상세 요청을 병렬 실행
 - 선택적 서비스 한쪽이 실패해도 전체 다운로드 유지
 - rpcd 안에서 다시 ubus를 중첩 호출하는 복합 진단 RPC 제거
 - Wi-Fi 비밀번호와 라이선스 키를 수집하지 않음
 - 호스트명, WAN IPv4와 Wi-Fi SSID는 진단 목적의 식별 정보로 포함될 수 있음을 화면에 안내
 
-### 4.7 반응형 UI
+### 4.7 로컬 Health와 원격 Health Reporter
+
+로컬 진단과 서버 보고는 의도적으로 분리합니다.
+
+```text
+smartsafehub-health daemon
+  ├─ 5분마다 로컬 Health 진단
+  │   └─ /tmp/smartsafehub/health.json
+  │
+  └─ Health Reporter
+      ├─ reporter_enabled=1
+      ├─ 유료 멤버십 또는 Trial
+      ├─ 30분 heartbeat 또는 issue fingerprint 변경
+      └─ POST /api/v1/health/reports
+```
+
+로컬 진단은 멤버십과 관계없이 항상 사용할 수 있습니다. Health Reporter는 `reporter_enabled=0`을 기본값으로 하며 유료/Trial 사용자가 설정 화면에서 직접 활성화해야 합니다. OFF 상태에서는 heartbeat, 이상 발생/복구 보고를 포함해 Reporter의 서버 요청을 수행하지 않습니다.
+
+진단 대상은 가용 메모리, CPU 코어 대비 1분 load, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 오류와 시스템 시간입니다. 주기 결과는 flash에 쓰지 않고 `/tmp/smartsafehub/health.json`에 atomic write합니다.
+
+서버 보고 payload는 로컬 진단 JSON을 그대로 재사용하지 않고 whitelist 방식으로 새로 생성합니다. 허용 필드는 schema, 보고 시각, 전체 상태, 메모리/부하/저장 공간 수치와 `{code, severity}` 이상 목록뿐입니다. 호스트명, WAN IP, SSID/MAC, DNS 요청 내용, 로그 원문과 라이선스 키는 payload에 넣지 않습니다. 전송 실패 시 5분 backoff를 적용해 서버 장애 중 요청이 매 분 반복되지 않도록 합니다.
+
+### 4.8 반응형 UI
 
 - `md` 이상에서는 가로 제품 메뉴
 - 768px 미만에서는 sticky 모바일 메뉴
@@ -323,6 +346,7 @@ rpcd는 이 반환값으로 `smartsafehub` ubus 객체를 등록합니다.
 root/usr/share/rpcd/ucode/smartsafehub/
 ├── core.uc
 ├── devices.uc
+├── health.uc
 ├── system.uc
 ├── wifi.uc
 └── wifi-management.uc
@@ -419,7 +443,7 @@ SafeShield가 소유하는 기능:
 
 SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. 통계 수집 ON/OFF는 SafeShield 공식 `safeshield.config_update`에 `statistics_enabled`만 전달해 변경하며, 그 외 일반 설정 편집에는 사용하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
 
-라이선스 상태의 기본 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 평문 키는 사용자가 **현재 키 불러오기**를 명시적으로 실행했을 때만 `safeshield.license_get`으로 가져오며, 새 키 등록과 변경은 `license_update`, 제거는 `license_update`에 빈 키를 전달하는 기존 SafeShield 계약을 사용합니다. 따라서 평문 키는 일반 polling이나 진단 다운로드 흐름에 포함되지 않습니다.
+라이선스 상태의 기본 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 브라우저가 평문 키를 가져오는 것은 사용자가 **현재 키 불러오기**를 명시적으로 실행한 경우뿐이며, 새 키 등록과 변경은 `license_update`, 제거는 `license_update`에 빈 키를 전달하는 기존 SafeShield 계약을 사용합니다. 로컬 Health 진단·진단 다운로드·일반 polling에도 평문 키가 포함되지 않습니다. 단, opt-in된 유료/Trial Health Reporter daemon은 서버 보고 직전에 `safeshield.license_get`으로 키를 메모리에 일시 조회해 HTTPS 인증 헤더에 사용하고 즉시 폐기합니다.
 
 #### `system.uc`
 
@@ -433,11 +457,13 @@ SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UC
 
 rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가 막힐 수 있으므로 `ubus.defer()`로 순차 호출하고 마지막 콜백에서 `request.reply()`를 실행합니다. 최초 `system.board` 요청을 시작하지 못하면 `SYSTEM_BOARD_REQUEST_FAILED` 오류를 즉시 반환하며, WAN 조회 실패는 장치·런타임 정보 전체 실패로 처리하지 않습니다.
 
+`smartsafehub-health` helper도 내부에서 `network.interface.wan`과 `safeshield` ubus 객체를 사용하므로 rpcd handler에서 동기 실행하지 않습니다. `health_status`에 캐시가 없거나 `health_run`을 요청한 경우 `/bin/sh -c '... &'`로 helper를 분리된 프로세스에서 시작하고 즉시 반환합니다. 프런트엔드는 새 `generatedAt`이 확인될 때까지 제한된 횟수만 재조회합니다.
+
 재부팅은 요청 인자 `confirm: "reboot"`를 확인한 뒤 2초 후 실행합니다.
 
 ## 6. 공개 RPC 계약
 
-SmartSafeHub 자체가 등록하는 메서드는 총 **5개**입니다.
+SmartSafeHub 자체 RPC에는 장치·Wi-Fi·시스템 기능과 로컬 Health 기능이 포함됩니다.
 
 | 메서드 | 유형 | 인자 | 설명 |
 |---|---|---|---|
@@ -446,6 +472,9 @@ SmartSafeHub 자체가 등록하는 메서드는 총 **5개**입니다.
 | `wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
 | `wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
 | `system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
+| `health_status` | 읽기 | 없음 | 최신 로컬 Health와 Reporter 상태 조회 |
+| `health_run` | 쓰기 | 없음 | 로컬 Health 진단 helper를 비동기로 시작 |
+| `health_reporter_update` | 쓰기 | `enabled` | 유료/Trial eligibility 확인 후 원격 보고 opt-in 변경 |
 
 SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 
@@ -550,13 +579,31 @@ SettingsPage의 기존 system snapshot
   → 비밀 정보가 없는 JSON 다운로드
 ```
 
-### 7.7 프런트엔드 자산 갱신
+### 7.7 Health Reporter
+
+```text
+5분 로컬 진단
+  → health.json atomic write
+  → 유료/Trial + reporter_enabled=1 여부 확인
+      ├─ OFF / 미대상: 서버 요청 없음
+      └─ ON / 대상
+          ├─ 30분 heartbeat
+          ├─ 이상 fingerprint 변경 즉시 보고
+          └─ 실패 시 5분 backoff
+              → license_get (일시 인증)
+              → privacy whitelist payload
+              → POST /api/v1/health/reports
+```
+
+Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으로 검증해야 합니다. 공유기의 클라이언트 측 gating은 서버 권한 검사를 대신하지 않습니다.
+
+### 7.8 프런트엔드 자산 갱신
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.2-r1
-  → app.js?v=0.2.2-r1
-  → app.css?v=0.2.2-r1
+  → data-asset-version = 0.2.15-r10
+  → app.js?v=0.2.15-r10
+  → app.css?v=0.2.15-r10
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -569,9 +616,11 @@ PKG_VERSION + PKG_RELEASE
 - 모든 원격 호출은 `/admin/ubus`를 통과합니다.
 - ACL에 등록하지 않은 메서드는 호출할 수 없습니다.
 - 읽기와 쓰기 메서드를 분리합니다.
-- 평문 라이선스 키를 반환하는 `license_get`은 일반 read ACL과 분리하고 사용자 명시 동작에서만 호출합니다.
+- 평문 라이선스 키를 반환하는 `license_get`은 일반 read ACL과 분리합니다. 브라우저에서는 사용자 명시 동작에서만 호출하고, opt-in된 Health Reporter daemon에서는 실제 서버 보고의 인증 순간에만 일시 사용합니다.
 - 진단 파일은 비밀번호와 라이선스 키를 요청하거나 저장하지 않습니다.
 - 진단 파일에 포함될 수 있는 호스트명, WAN IPv4와 Wi-Fi SSID를 사용자에게 사전 안내합니다.
+- Health Reporter payload는 별도 whitelist builder를 사용하며 네트워크 식별 정보, DNS 요청 내용, 로그 원문과 라이선스 키를 포함하지 않습니다.
+- Health Reporter는 기본 OFF이고 유료/Trial 사용자도 직접 opt-in해야 하며 OFF 이후 자동 보고 요청을 보내지 않습니다.
 
 ### 8.2 입력 검증
 
@@ -589,6 +638,7 @@ PKG_VERSION + PKG_RELEASE
 - WAN 인터페이스를 읽지 못해도 장치와 런타임 상태 반환
 - SafeShield API가 없으면 사용 불가 상태로 정규화
 - 진단 상세 조회 하나가 실패해도 JSON 다운로드 유지
+- Health Reporter 전송 실패는 로컬 진단을 실패시키지 않고 5분 backoff 후 재시도
 - Wi-Fi 적용 실패 시 원래 UCI 설정 복원 시도
 - SafeShield 갱신과 규칙 변경에 별도 lock 사용
 - Wi-Fi 변경에도 별도 lock을 사용해 여러 탭의 동시 commit과 reload 방지
@@ -601,6 +651,7 @@ PKG_VERSION + PKG_RELEASE
 - 숨겨진 탭에서 폴링 중단
 - station 정보가 있을 때 hostapd 중복 조회 생략
 - 시스템 진단에서 이미 로드된 상태 재사용
+- Health Reporter heartbeat는 30분 간격, 상태 변경은 fingerprint 변화 시 한 번만 즉시 보고
 - 비활성 화면은 폴링하지 않고 재진입 시 최신 상태 조회
 - 모든 RPC에 제한 시간을 둬 영구 대기와 single-flight 고착 방지
 
@@ -666,17 +717,18 @@ ubus call smartsafehub connected_devices '{}'
 - Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
 - WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
 - SafeShield 기능은 별도 `safeshield` 패키지와 공식 ubus API 계약에 의존하며 내부 파일·init script에는 직접 의존하지 않습니다.
-- 진단 파일은 현재 시점의 상태 snapshot이며 장기간의 로그 수집 기능은 아닙니다.
+- 진단 다운로드 파일은 현재 시점의 상세 snapshot이며 장기간의 로그 수집 기능은 아닙니다. Health Reporter는 별도의 최소 상태 payload만 주기적으로 전송합니다.
+- 현재 저장소에는 Hub의 `/api/v1/health/reports` 수신 구현이 포함되어 있지 않으므로 실제 원격 저장/이력 조회 기능은 Hub backend의 대응 API가 함께 배포되어야 합니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
 - ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.
 
 ## 12. SmartSafeHub 패키지 업데이트
 
-SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 아래에 통합합니다. 업데이트, 펌웨어, 예약 재부팅, Wi-Fi 변경 lock, 설정 백업 업로드가 같은 제품 전용 디렉터리를 사용하며 기능별 추가 하위 디렉터리는 두지 않습니다. init script와 helper가 `/tmp` 초기화 이후 디렉터리 존재를 보장합니다.
+SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 아래에 통합합니다. 업데이트, 펌웨어, Health 진단/Reporter, 예약 재부팅, Wi-Fi 변경 lock, 설정 백업 업로드가 같은 제품 전용 디렉터리를 사용하며 기능별 추가 하위 디렉터리는 두지 않습니다. init script와 helper가 `/tmp` 초기화 이후 디렉터리 존재를 보장합니다.
 
 업데이트 기능은 rpcd와 실제 APK 작업을 분리합니다. `updates_check`와 `updates_install`은 요청을 검증한 뒤 `/usr/libexec/smartsafehub-updater`를 백그라운드에서 시작하고 즉시 반환합니다. updater는 `apk update`와 패키지 조회·설치를 수행하고 `/tmp/smartsafehub/updates.state`에 결과를 atomic write합니다. `updates_status`는 이 로컬 상태 파일과 UCI 설정만 읽으므로 저장소 응답 속도가 제품 UI API에 영향을 주지 않습니다.
 
-업데이트 감지 대상은 `luci-app-smartsafehub` 하나입니다. 새 버전이 확인되면 `apk add --upgrade luci-app-smartsafehub`만 실행합니다. Makefile은 `LUCI_DEPENDS:=... +safeshield`와 `EXTRA_DEPENDS:=safeshield (>= 0.3.10)`를 함께 선언합니다. 따라서 빌드 시 SafeShield 선택 관계를 유지하면서, 설치·업데이트 시 APK dependency resolver가 최소 `0.3.10` 조건을 만족하도록 필요한 경우 SafeShield를 함께 갱신합니다.
+업데이트 감지 대상은 `luci-app-smartsafehub` 하나입니다. 새 버전이 확인되면 `apk add --upgrade luci-app-smartsafehub`만 실행합니다. Makefile은 `LUCI_DEPENDS:=... +safeshield`와 `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.23)`를 함께 선언합니다. 따라서 빌드 시 SafeShield 선택 관계를 유지하면서, 설치·업데이트 시 APK dependency resolver가 최소 `0.3.23` 조건을 만족하도록 필요한 경우 SafeShield를 함께 갱신합니다.
 
 새 버전이 있으면 updater는 SmartSafeHub 전용 `/etc/apk/repositories.d/smartsafehub.list`의 APK repository URL에서 `https://repo.smartsafehub.com/<channel>` base를 유도하고 먼저 `releases/luci-app-smartsafehub/index.json`을 조회합니다. 다른 repository 파일은 release channel 결정에 사용하지 않습니다. index의 newest-first 순서를 이용해 현재 설치 버전 이후부터 APK가 제시한 최신 버전까지의 `<version>.json`만 내려받고 `/tmp/smartsafehub/release-notes.json` 하나의 bundle로 atomic cache합니다. rpcd는 bundle의 설치/최신 버전 범위, 각 릴리즈의 schema·package·version과 크기 제한을 검증한 뒤 `updates_status.releaseNotes`와 `releaseNotesComplete`로 노출합니다. index 또는 일부 릴리즈 노트를 가져오지 못한 경우에도 가능한 노트만 표시하며, 이 메타데이터는 signed APK metadata를 대체하지 않는 표시용 보조 정보이므로 다운로드·파싱 실패는 update check/install 결과에 영향을 주지 않습니다.
 

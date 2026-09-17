@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   formatBytes,
   formatLoadAverage,
+  formatRelativeTime,
   formatTimestampInTimezone,
   formatUptime,
   getMemoryUsage,
 } from '../app/format';
 import {
+  AlertIcon,
   CalendarIcon,
+  CheckCircleIcon,
   ClockIcon,
   DatabaseIcon,
   DownloadIcon,
@@ -20,6 +23,7 @@ import type { ConfigurationBackupAction } from '../hooks/useConfigurationBackup'
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { ConfigurationBackupValidation } from '../types/backup';
 import type { FirmwareStatus } from '../types/firmware';
+import type { HealthSeverity, HealthStatus } from '../types/health';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
   ScheduledRebootDayOfWeek,
@@ -45,6 +49,13 @@ interface SettingsPageProps {
   firmware: FirmwareStatus | null;
   firmwareError: string | null;
   firmwareLoading: boolean;
+  health: HealthStatus | null;
+  healthActionError: string | null;
+  healthActionMessage: string | null;
+  healthError: string | null;
+  healthLoading: boolean;
+  healthRunning: boolean;
+  healthSavingReporter: boolean;
   loading: boolean;
   rebootAccepted: boolean;
   scheduledRebootData: ScheduledRebootSettings | null;
@@ -66,8 +77,11 @@ interface SettingsPageProps {
   onBackupUpload: (file: File) => Promise<boolean>;
   onDismissBackupFeedback: () => void;
   onDismissFeedback: () => void;
+  onDismissHealthFeedback: () => void;
   onDismissTimeFeedback: () => void;
   onDownloadDiagnostics: () => void;
+  onRunHealth: () => void;
+  onSetHealthReporter: (enabled: boolean) => void;
   onReboot: () => void;
   onRetry: () => void;
   onDismissScheduledRebootFeedback: () => void;
@@ -336,6 +350,293 @@ function TimeSettingsCard(props: {
   );
 }
 
+
+function healthTone(status: HealthSeverity): {
+  badge: string;
+  panel: string;
+  label: string;
+} {
+  if (status === 'critical') {
+    return {
+      badge: 'bg-rose-100 text-rose-800',
+      panel: 'border-rose-200 bg-rose-50',
+      label: '이상',
+    };
+  }
+  if (status === 'warning') {
+    return {
+      badge: 'bg-amber-100 text-amber-800',
+      panel: 'border-amber-200 bg-amber-50',
+      label: '주의',
+    };
+  }
+  if (status === 'unknown') {
+    return {
+      badge: 'bg-slate-200 text-slate-700',
+      panel: 'border-slate-200 bg-slate-50',
+      label: '확인 불가',
+    };
+  }
+  return {
+    badge: 'bg-emerald-100 text-emerald-800',
+    panel: 'border-emerald-200 bg-emerald-50',
+    label: '정상',
+  };
+}
+
+function reporterResultLabel(result: string): string {
+  switch (result) {
+    case 'reported':
+      return '정상 보고';
+    case 'failed':
+      return '최근 보고 실패';
+    case 'idle':
+      return '다음 보고 대기';
+    case 'ineligible':
+      return '멤버십 확인 필요';
+    case 'disabled':
+      return '꺼짐';
+    default:
+      return '아직 보고하지 않음';
+  }
+}
+
+function HealthDiagnosticCard(props: {
+  actionError: string | null;
+  actionMessage: string | null;
+  data: HealthStatus | null;
+  error: string | null;
+  loading: boolean;
+  running: boolean;
+  savingReporter: boolean;
+  downloadBusy: boolean;
+  onDismissFeedback: () => void;
+  onDownload: () => void;
+  onRetry: () => void;
+  onRun: () => void;
+  onSetReporter: (enabled: boolean) => void;
+}) {
+  const data = props.data;
+  const tone = healthTone(data?.overall ?? 'unknown');
+  const noteworthy = data?.checks.filter((check) => check.status !== 'ok') ?? [];
+  const visibleChecks = noteworthy.length > 0
+    ? noteworthy.slice(0, 4)
+    : data?.checks.filter((check) =>
+        ['system.memory', 'network.wan', 'service.dnsmasq', 'safeshield.runtime'].includes(check.id),
+      ) ?? [];
+  const reporter = data?.reporter;
+  const canToggleReporter = reporter?.eligible === true || reporter?.enabled === true;
+
+  return (
+    <ActionCard
+      description="SmartSafeHub가 장치 상태를 직접 점검하고 이상 항목을 알려줍니다. 로컬 진단은 멤버십과 관계없이 사용할 수 있습니다."
+      icon={<DownloadIcon class="size-5" />}
+      title="진단 및 지원"
+    >
+      {(props.actionError || props.actionMessage) && (
+        <div
+          class={`mb-4 flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+            props.actionError
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+        >
+          <span>{props.actionError || props.actionMessage}</span>
+          <button
+            class="shrink-0 rounded-lg px-2 py-1 text-xs font-extrabold hover:bg-black/5"
+            onClick={props.onDismissFeedback}
+            type="button"
+          >
+            닫기
+          </button>
+        </div>
+      )}
+
+      {props.error && !data ? (
+        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
+          <p class="m-0 text-sm font-bold text-rose-800">{props.error}</p>
+          <button
+            class="mt-3 inline-flex min-h-10 items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100"
+            onClick={props.onRetry}
+            type="button"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      ) : (
+        <>
+          <div class={`rounded-xl border p-4 ${tone.panel}`}>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="flex min-w-0 items-start gap-3">
+                <span class="mt-0.5 shrink-0">
+                  {data?.overall === 'ok' ? (
+                    <CheckCircleIcon class="size-5 text-emerald-700" />
+                  ) : (
+                    <AlertIcon class="size-5 text-amber-700" />
+                  )}
+                </span>
+                <div class="min-w-0">
+                  <p class="m-0 text-sm font-black text-slate-950">
+                    {data?.summary.message ?? '장치 상태를 확인하고 있습니다.'}
+                  </p>
+                  <p class="mt-1 mb-0 text-xs leading-5 text-slate-600">
+                    마지막 진단 : {data ? formatRelativeTime(data.generatedAt) : '확인 중'}
+                  </p>
+                </div>
+              </div>
+              <span class={`rounded-full px-2.5 py-1 text-xs font-extrabold ${tone.badge}`}>
+                {tone.label}
+              </span>
+            </div>
+          </div>
+
+          {data && (
+            <div class="mt-4 grid grid-cols-3 gap-2">
+              <div class="rounded-xl bg-slate-50 p-3">
+                <p class="m-0 text-[11px] font-extrabold text-slate-500">진단 항목</p>
+                <p class="mt-1 mb-0 text-lg font-black text-slate-950">{data.summary.total}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 p-3">
+                <p class="m-0 text-[11px] font-extrabold text-slate-500">주의</p>
+                <p class="mt-1 mb-0 text-lg font-black text-amber-700">{data.summary.warning}</p>
+              </div>
+              <div class="rounded-xl bg-slate-50 p-3">
+                <p class="m-0 text-[11px] font-extrabold text-slate-500">이상</p>
+                <p class="mt-1 mb-0 text-lg font-black text-rose-700">{data.summary.critical}</p>
+              </div>
+            </div>
+          )}
+
+          {visibleChecks.length > 0 && (
+            <div class="mt-4 space-y-2">
+              {visibleChecks.map((check) => {
+                const checkTone = healthTone(check.status);
+                return (
+                  <div class="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2.5" key={check.id}>
+                    <div class="min-w-0">
+                      <p class="m-0 text-xs font-extrabold text-slate-900">{check.label}</p>
+                      <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">{check.message}</p>
+                    </div>
+                    <span class={`shrink-0 rounded-full px-2 py-1 text-[11px] font-extrabold ${checkTone.badge}`}>
+                      {checkTone.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+              disabled={props.running || props.loading}
+              onClick={props.onRun}
+              type="button"
+            >
+              {props.running ? '진단 중' : '지금 진단'}
+            </button>
+            <button
+              class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+              disabled={props.downloadBusy}
+              onClick={props.onDownload}
+              type="button"
+            >
+              {props.downloadBusy ? '진단 정보 생성 중' : '진단 정보 다운로드'}
+            </button>
+          </div>
+          <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+            다운로드 파일에는 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보가 포함될 수 있으므로 외부 전달 전에 내용을 확인해 주세요.
+          </p>
+
+          <div class="mt-5 border-t border-slate-200 pt-5">
+            <div class="flex min-w-0 items-start justify-between gap-4">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="m-0 text-sm font-black text-slate-950">원격 상태 보고</p>
+                  <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
+                    유료 · Trial
+                  </span>
+                </div>
+                <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                  장치의 최소 상태 정보와 이상 코드만 SmartSafeHub 서버에 전송합니다. 기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.
+                </p>
+              </div>
+              <button
+                aria-checked={reporter?.enabled === true}
+                aria-label="원격 상태 보고 사용"
+                class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  reporter?.enabled
+                    ? 'border-teal-600 bg-teal-600'
+                    : 'border-slate-300 bg-slate-200'
+                }`}
+                disabled={!data || props.savingReporter || !canToggleReporter}
+                onClick={() => props.onSetReporter(!(reporter?.enabled ?? false))}
+                role="switch"
+                type="button"
+              >
+                <span
+                  aria-hidden="true"
+                  class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+                    reporter?.enabled ? 'left-6' : 'left-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {reporter?.eligible ? (
+              <div class="mt-4 rounded-xl bg-slate-50 p-4">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <p class="m-0 text-[11px] font-extrabold text-slate-500">보고 상태</p>
+                    <p class="mt-1 mb-0 text-sm font-black text-slate-900">
+                      {props.savingReporter ? '설정 저장 중' : reporterResultLabel(reporter.lastResult)}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="m-0 text-[11px] font-extrabold text-slate-500">마지막 서버 보고</p>
+                    <p class="mt-1 mb-0 text-sm font-black text-slate-900">
+                      {reporter.lastReportAt > 0 ? formatRelativeTime(reporter.lastReportAt) : '기록 없음'}
+                    </p>
+                  </div>
+                </div>
+                {reporter.enabled && reporter.lastErrorCode && (
+                  <p class="mt-3 mb-0 text-xs font-bold text-rose-700">
+                    최근 보고 오류 : {reporter.lastErrorCode}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p class="m-0 text-sm font-extrabold text-slate-900">
+                  원격 상태 보고는 유료 멤버십 또는 체험 기간에 사용할 수 있습니다.
+                </p>
+                <a
+                  class="mt-3 inline-flex text-xs font-extrabold text-teal-700 hover:text-teal-800"
+                  href="https://www.smartsafehub.com/pricing/"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  멤버십 알아보기
+                </a>
+              </div>
+            )}
+
+            <div class="mt-4 grid grid-cols-1 gap-3 text-xs leading-5 text-slate-500 sm:grid-cols-2">
+              <div class="rounded-xl border border-slate-200 p-3">
+                <p class="m-0 font-extrabold text-slate-700">전송되는 정보</p>
+                <p class="mt-1 mb-0">메모리·부하·저장 공간 수치, 진단 상태, 이상 코드와 보고 시각</p>
+              </div>
+              <div class="rounded-xl border border-slate-200 p-3">
+                <p class="m-0 font-extrabold text-slate-700">전송하지 않는 정보</p>
+                <p class="mt-1 mb-0">호스트명, WAN IP, Wi-Fi SSID/MAC, DNS 요청 내용, 시스템 로그 원문</p>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </ActionCard>
+  );
+}
 
 function ConfigurationBackupCard(props: {
   action: ConfigurationBackupAction;
@@ -777,6 +1078,13 @@ export function SettingsPage({
   firmware,
   firmwareError,
   firmwareLoading,
+  health,
+  healthActionError,
+  healthActionMessage,
+  healthError,
+  healthLoading,
+  healthRunning,
+  healthSavingReporter,
   loading,
   rebootAccepted,
   scheduledRebootData,
@@ -798,8 +1106,11 @@ export function SettingsPage({
   onBackupUpload,
   onDismissBackupFeedback,
   onDismissFeedback,
+  onDismissHealthFeedback,
   onDismissTimeFeedback,
   onDownloadDiagnostics,
+  onRunHealth,
+  onSetHealthReporter,
   onReboot,
   onRetry,
   onDismissScheduledRebootFeedback,
@@ -954,23 +1265,21 @@ export function SettingsPage({
             syncing={timeSyncing}
           />
 
-          <ActionCard
-            description="장치, 펌웨어, 메모리, 인터넷, Wi-Fi와 SafeShield 상태를 JSON 파일로 저장합니다. 비밀번호와 라이선스 키는 포함하지 않습니다."
-            icon={<DownloadIcon class="size-5" />}
-            title="진단 및 지원"
-          >
-            <button
-              class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
-              disabled={action !== null}
-              onClick={onDownloadDiagnostics}
-              type="button"
-            >
-              {action === 'diagnostics' ? '진단 정보 생성 중' : '진단 정보 다운로드'}
-            </button>
-            <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              진단 파일에는 호스트명, WAN IP와 Wi-Fi SSID 같은 네트워크 식별 정보가 포함될 수 있으므로 외부 전달 전에 내용을 확인해 주세요.
-            </p>
-          </ActionCard>
+          <HealthDiagnosticCard
+            actionError={healthActionError}
+            actionMessage={healthActionMessage}
+            data={health}
+            downloadBusy={action === 'diagnostics'}
+            error={healthError}
+            loading={healthLoading}
+            onDismissFeedback={onDismissHealthFeedback}
+            onDownload={onDownloadDiagnostics}
+            onRetry={onRetry}
+            onRun={onRunHealth}
+            onSetReporter={onSetHealthReporter}
+            running={healthRunning}
+            savingReporter={healthSavingReporter}
+          />
         </div>
       </section>
 

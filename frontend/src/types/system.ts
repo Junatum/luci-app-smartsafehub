@@ -1,3 +1,4 @@
+import type { HealthStatus } from './health';
 import type { SmartSafeHubStatus } from './status';
 import type { WifiSummary } from './wifi';
 
@@ -8,7 +9,6 @@ export interface SystemTimeSettings {
   ntpEnabled: boolean;
   timezones: Record<string, string>;
 }
-
 
 export type ScheduledRebootFrequency = 'daily' | 'weekly';
 export type ScheduledRebootDayOfWeek =
@@ -46,6 +46,7 @@ export interface SafeShieldDiagnosticStatus {
 
 export interface SystemDiagnostics {
   generatedAt: number;
+  health: HealthStatus | null;
   system: SmartSafeHubStatus;
   wifi: WifiSummary;
   safeshield: SafeShieldDiagnosticStatus;
