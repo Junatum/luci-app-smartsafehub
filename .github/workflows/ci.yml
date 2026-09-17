@@ -38,8 +38,30 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/shellspec" --version
 
+      - name: Install OpenWrt-compatible ucode compiler
+        env:
+          UCODE_REF: 8592205
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libjson-c-dev pkg-config
+          git clone https://github.com/jow-/ucode.git "$RUNNER_TEMP/ucode"
+          git -C "$RUNNER_TEMP/ucode" checkout --detach "$UCODE_REF"
+          cmake \
+            -S "$RUNNER_TEMP/ucode" \
+            -B "$RUNNER_TEMP/ucode-build" \
+            -DUBUS_SUPPORT=OFF \
+            -DUCI_SUPPORT=OFF \
+            -DULOOP_SUPPORT=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/ucode-build" --parallel
+          test -x "$RUNNER_TEMP/ucode-build/ucode"
+          echo "$RUNNER_TEMP/ucode-build" >> "$GITHUB_PATH"
+
       - name: Run tests
         shell: bash
+        env:
+          SMARTSAFEHUB_REQUIRE_UCODE: '1'
         run: shellspec
 
   frontend:

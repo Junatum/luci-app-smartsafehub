@@ -448,6 +448,18 @@ echo "lan compile exit=$?"
 
 정상 결과는 `main compile exit=0`, `lan compile exit=0`입니다. 실패하면 출력되는 모듈 파일과 줄 번호를 먼저 수정합니다. SmartSafeHub의 ucode 모듈에서 `export function` 선언은 일반 내부 함수와 달리 기존 모듈들과 동일하게 함수 본문 뒤를 `};`로 종료해야 합니다. `}`만 사용하면 다음 `export` 또는 파일 끝에서 `Expecting ';'` 컴파일 오류가 발생해 해당 ubus 객체가 등록되지 않습니다.
 
+같은 종류의 문법 오류를 장치 설치 이후에 발견하지 않도록 Backend CI에서는 실제 ucode 컴파일을 필수 계약으로 실행합니다. CI는 OpenWrt 25.12에서 사용하는 ucode `2026.01.16~85922056` 계열의 source revision `8592205`를 host용으로 빌드한 뒤 `tests/test-ucode-syntax.sh`를 실행합니다. 이 테스트는 `smartsafehub.uc`, `smartsafehub-network.uc` 같은 모든 rpcd 최상위 진입점을 실제 `ucode -c`로 컴파일하므로 상대 import를 따라가는 과정에서 feature module의 문법 오류도 함께 잡습니다.
+
+또한 `smartsafehub/` 아래의 모든 `.uc` 파일을 합성 모듈에서 직접 import해 현재 어느 진입점에서도 사용하지 않는 모듈까지 컴파일합니다. host compiler에는 OpenWrt 전용 `ubus`/`uci` 모듈이 없기 때문에 테스트 중 최소 stub을 module search path에 넣지만, 이 stub은 외부 모듈 이름 해석만 담당하며 SmartSafeHub 소스 자체와 상대 import는 실제 ucode parser/compiler가 검사합니다. 과거에 발생한 `export function ... }` 형태도 별도 negative regression으로 컴파일이 거부되는지 확인합니다.
+
+로컬에 `ucode`가 설치되어 있으면 다음 명령으로 CI와 같은 소스 검사를 강제할 수 있습니다. `SMARTSAFEHUB_REQUIRE_UCODE=1`에서는 compiler가 없으면 skip하지 않고 실패합니다.
+
+```bash
+SMARTSAFEHUB_REQUIRE_UCODE=1 sh tests/test-ucode-syntax.sh
+```
+
+일반 로컬 ShellSpec 실행에서는 ucode가 설치되지 않은 환경의 개발 흐름을 막지 않기 위해 해당 검사만 skip할 수 있지만, GitHub Actions Backend job은 `SMARTSAFEHUB_REQUIRE_UCODE=1`을 고정하므로 실제 컴파일 없이 성공할 수 없습니다.
+
 LAN 컴파일이 성공한 뒤에는 다음 명령으로 실제 객체와 메서드 등록을 확인합니다.
 
 ```bash
@@ -505,6 +517,7 @@ rm -f /tmp/luci-indexcache
 
 ```bash
 sh tests/test-lan-settings.sh
+SMARTSAFEHUB_REQUIRE_UCODE=1 sh tests/test-ucode-syntax.sh
 shellspec spec/contracts_spec.sh
 ```
 

@@ -42,6 +42,7 @@ for script in \
 	tests/test-rules-ui-contract.sh \
 	tests/test-safeshield-page-contract.sh \
 	tests/test-statistics-ui-contract.sh \
+	tests/test-ucode-syntax.sh \
 	tests/test-ucode-imports.sh \
 	tests/test-updater.sh \
 	tests/test-firmware-updater.sh; do

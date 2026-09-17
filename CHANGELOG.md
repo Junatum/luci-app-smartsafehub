@@ -10,8 +10,11 @@
 ### 테스트 및 문서
 
 - LAN 계약 테스트에 export 함수 종료 문법 검사를 추가해 `};` 누락을 개발 환경에서도 감지하도록 했습니다.
-- 실행 환경에 `ucode`가 있으면 `smartsafehub-network.uc`를 `ucode -c`로 실제 컴파일하는 검증을 추가했습니다.
-- README의 ucode 진단 절차에 export 함수 종료 규칙과 LAN RPC 등록 확인 명령을 추가했습니다.
+- 특정 LAN 진입점만 선택적으로 검사하던 방식에 더해 `tests/test-ucode-syntax.sh`를 추가했습니다. 실제 `ucode -c`로 모든 rpcd 최상위 진입점을 컴파일하고, 합성 모듈에서 `smartsafehub/` 아래의 모든 재사용 모듈을 import해 현재 호출되지 않는 모듈까지 문법 오류를 검사합니다.
+- Backend CI가 OpenWrt 25.12와 동일 계열인 ucode `2026.01.16~85922056` 소스 revision(`8592205`)을 직접 빌드하고 `SMARTSAFEHUB_REQUIRE_UCODE=1`로 실제 컴파일 검사를 필수화했습니다. 로컬에 ucode가 없어 검사가 건너뛰어져도 CI에서는 누락을 허용하지 않습니다.
+- host ucode에는 OpenWrt 전용 `ubus`/`uci` 동적 모듈이 없으므로 테스트 전용 최소 import stub으로 이름 해석만 제공하고, SmartSafeHub의 실제 ucode 소스와 상대 import graph는 대상 컴파일러가 그대로 검사하도록 했습니다.
+- 과거 장애와 동일한 `export function`의 세미콜론 누락 코드를 테스트 중 의도적으로 컴파일해 대상 ucode 컴파일러가 이를 거부하는지도 확인합니다.
+- README의 ucode 진단 및 배포 전 검사 절차를 새 CI 컴파일 계약에 맞게 갱신했습니다.
 
 ## [0.2.15-r19] - 2026-09-17
 
