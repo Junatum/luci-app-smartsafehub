@@ -271,6 +271,8 @@ if MOCK_APK_UPDATE_FAIL=1 "$UPDATER" check; then
 fi
 assert_contains "$TMP/updates.state" "phase${TAB}error"
 assert_contains "$TMP/updates.state" "error_code${TAB}UPDATES_INDEX_REFRESH_FAILED"
+last_attempt_at="$(awk -F '\t' '$1 == "last_attempt_at" { print $2 }' "$TMP/updates.state")"
+[ "${last_attempt_at:-0}" -gt 0 ] || fail 'failed update check must record last_attempt_at for daemon throttling'
 assert_contains "$TMP/updates.state" "package${TAB}luci-app-smartsafehub${TAB}0.2.1-r1${TAB}${RELEASE_VERSION}${TAB}1"
 assert_contains "$TMP/release-notes.json" "\"installed_version\": \"0.2.1-r1\""
 assert_contains "$TMP/release-notes.json" "\"available_version\": \"${RELEASE_VERSION}\""
@@ -424,10 +426,88 @@ assert_contains "$UPDATER" 'if [ "$retry_count" -lt "$AUTO_INSTALL_MAX_ATTEMPTS"
 assert_contains "$UPDATER" "printf '%s\\n' \"\$current_epoch\" > \"\$AUTO_RETRY_MARKER\""
 assert_contains "$UPDATER" 'log_message "automatic update failed after $retry_count attempts; retrying tomorrow"'
 
-# Exercise the automatic retry state machine directly without entering the infinite daemon loop.
+# Daemon startup checks are intentionally staggered behind firmware and retry transient failures only
+# three times before the normal interval throttles future package-index refreshes.
+assert_contains "$UPDATER" 'DAEMON_INITIAL_DELAY_S=20'
+assert_contains "$UPDATER" 'BOOT_CHECK_RETRY_S=60'
+assert_contains "$UPDATER" 'BOOT_CHECK_MAX_ATTEMPTS=3'
+assert_contains "$UPDATER" 'last_attempt="$(state_value last_attempt_at)"'
+assert_contains "$UPDATER" 'boot_check_with_retry || true'
+
+# Exercise the daemon boot retry and automatic install state machines directly without entering
+# the infinite daemon loop.
 sed '/^case "${1:-}" in$/,$d' "$UPDATER" > "$TMP/updater-lib.sh"
 # shellcheck disable=SC1090
 . "$TMP/updater-lib.sh"
+
+MOCK_BOOT_CHECK_CALLS=0
+MOCK_BOOT_CHECK_SUCCESS_AT=2
+MOCK_BOOT_SLEEP_LOG="$TMP/updater-boot-sleep.log"
+: > "$MOCK_BOOT_SLEEP_LOG"
+
+execute_check() {
+	MOCK_BOOT_CHECK_CALLS=$((MOCK_BOOT_CHECK_CALLS + 1))
+	[ "$MOCK_BOOT_CHECK_CALLS" -ge "$MOCK_BOOT_CHECK_SUCCESS_AT" ]
+}
+
+sleep() {
+	printf '%s\n' "$1" >> "$MOCK_BOOT_SLEEP_LOG"
+}
+
+log_message() {
+	:
+}
+
+boot_check_with_retry
+[ "$MOCK_BOOT_CHECK_CALLS" -eq 2 ] || fail 'management software boot check did not stop after the first successful retry'
+[ "$(wc -l < "$MOCK_BOOT_SLEEP_LOG" | tr -d '[:space:]')" -eq 1 ] || fail 'management software boot check must sleep only between failed attempts'
+assert_contains "$MOCK_BOOT_SLEEP_LOG" '60'
+
+MOCK_BOOT_CHECK_CALLS=0
+MOCK_BOOT_CHECK_SUCCESS_AT=99
+: > "$MOCK_BOOT_SLEEP_LOG"
+if boot_check_with_retry; then
+	fail 'management software boot check must report failure after exhausting retries'
+fi
+[ "$MOCK_BOOT_CHECK_CALLS" -eq 3 ] || fail 'management software boot check must stop after three failed attempts'
+[ "$(wc -l < "$MOCK_BOOT_SLEEP_LOG" | tr -d '[:space:]')" -eq 2 ] || fail 'management software boot retry must wait only between the three attempts'
+
+# A failed check has no successful last_check_at, but last_attempt_at must still keep the normal
+# daemon loop from refreshing APK indexes every minute while the repository/network is unavailable.
+STATE_FILE="$TMP/periodic-updates.state"
+cat > "$STATE_FILE" <<EOF2
+version	1
+phase	error
+last_check_at	0
+last_attempt_at	100000
+last_install_at	0
+last_error_at	100000
+error_code	UPDATES_INDEX_REFRESH_FAILED
+error_message	temporary failure
+EOF2
+CHECK_ENABLED=1
+CHECK_INTERVAL_S=21600
+MOCK_PERIODIC_EPOCH=100060
+MOCK_PERIODIC_CHECK_CALLS=0
+
+date() {
+	case "${1:-}" in
+		+%s) printf '%s\n' "$MOCK_PERIODIC_EPOCH" ;;
+		*) command date "$@" ;;
+	esac
+}
+
+execute_check() {
+	MOCK_PERIODIC_CHECK_CALLS=$((MOCK_PERIODIC_CHECK_CALLS + 1))
+	return 0
+}
+
+periodic_check_if_due
+[ "$MOCK_PERIODIC_CHECK_CALLS" -eq 0 ] || fail 'failed management software check retried before the configured interval elapsed'
+MOCK_PERIODIC_EPOCH=$((100000 + CHECK_INTERVAL_S))
+periodic_check_if_due
+[ "$MOCK_PERIODIC_CHECK_CALLS" -eq 1 ] || fail 'management software check did not resume after the configured interval elapsed'
+STATE_FILE="$TMP/updates.state"
 
 # The production updater intentionally does not use set -e; mirror that behavior for failed-install paths.
 set +e

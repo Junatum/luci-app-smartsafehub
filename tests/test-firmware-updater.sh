@@ -238,4 +238,51 @@ if grep -Eq '"\$SYSUPGRADE_BIN"[^\n]*(--force|-F)' "$FIRMWARE"; then
 	fail 'firmware helper must not offer forced sysupgrade'
 fi
 
-echo 'PASS: firmware resolve, download integrity, OpenWrt validation, manual upload and cleanup paths are safe'
+# The firmware daemon performs one early boot check, retries transient failures at most
+# three times, and then falls back to the normal configured interval.
+assert_contains "$FIRMWARE" 'DAEMON_INITIAL_DELAY_S=10'
+assert_contains "$FIRMWARE" 'BOOT_CHECK_RETRY_S=60'
+assert_contains "$FIRMWARE" 'BOOT_CHECK_MAX_ATTEMPTS=3'
+assert_contains "$FIRMWARE" 'boot_check_with_retry || true'
+
+sed '/^case "${1:-}" in$/,$d' "$FIRMWARE" > "$TMP/firmware-lib.sh"
+# shellcheck disable=SC1090
+. "$TMP/firmware-lib.sh"
+
+MOCK_BOOT_CHECK_CALLS=0
+MOCK_BOOT_CHECK_SUCCESS_AT=2
+MOCK_BOOT_SLEEP_LOG="$TMP/firmware-boot-sleep.log"
+: > "$MOCK_BOOT_SLEEP_LOG"
+
+load_daemon_settings() {
+	CHECK_ENABLED=1
+}
+
+execute_check() {
+	MOCK_BOOT_CHECK_CALLS=$((MOCK_BOOT_CHECK_CALLS + 1))
+	[ "$MOCK_BOOT_CHECK_CALLS" -ge "$MOCK_BOOT_CHECK_SUCCESS_AT" ]
+}
+
+sleep() {
+	printf '%s\n' "$1" >> "$MOCK_BOOT_SLEEP_LOG"
+}
+
+log_message() {
+	:
+}
+
+boot_check_with_retry
+[ "$MOCK_BOOT_CHECK_CALLS" -eq 2 ] || fail 'firmware boot check did not stop after the first successful retry'
+[ "$(wc -l < "$MOCK_BOOT_SLEEP_LOG" | tr -d '[:space:]')" -eq 1 ] || fail 'firmware boot check must sleep only between failed attempts'
+assert_contains "$MOCK_BOOT_SLEEP_LOG" '60'
+
+MOCK_BOOT_CHECK_CALLS=0
+MOCK_BOOT_CHECK_SUCCESS_AT=99
+: > "$MOCK_BOOT_SLEEP_LOG"
+if boot_check_with_retry; then
+	fail 'firmware boot check must report failure after exhausting retries'
+fi
+[ "$MOCK_BOOT_CHECK_CALLS" -eq 3 ] || fail 'firmware boot check must stop after three failed attempts'
+[ "$(wc -l < "$MOCK_BOOT_SLEEP_LOG" | tr -d '[:space:]')" -eq 2 ] || fail 'firmware boot retry must wait only between the three attempts'
+
+echo 'PASS: firmware resolve, download integrity, OpenWrt validation, boot retry and cleanup paths are safe'
