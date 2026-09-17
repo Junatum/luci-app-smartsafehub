@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r14`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r15`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -143,7 +143,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r14
+0.2.15-r15
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -609,13 +609,17 @@ SettingsPage의 기존 system snapshot
 
 Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으로 검증해야 합니다. 공유기의 클라이언트 측 gating은 서버 권한 검사를 대신하지 않습니다.
 
-### 7.8 프런트엔드 자산 갱신
+### 7.8 다크 테마 상태 패널
+
+대시보드 장치 진단은 Tailwind의 반투명 상태 배경(`bg-emerald-50/70`, `bg-amber-50/70`, `bg-rose-50/70`)과 세부 카드(`bg-white/70`, `border-white/80`)를 사용합니다. Shadow DOM 안의 `.ssh-app[data-theme='dark']` 테마 레이어가 이 유틸리티를 어두운 상태색과 slate 계열로 명시적으로 재매핑해 라이트 테마용 밝은 반투명 배경이 다크 모드에 그대로 남지 않도록 합니다.
+
+### 7.9 프런트엔드 자산 갱신
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r14
-  → app.js?v=0.2.15-r14
-  → app.css?v=0.2.15-r14
+  → data-asset-version = 0.2.15-r15
+  → app.js?v=0.2.15-r15
+  → app.css?v=0.2.15-r15
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

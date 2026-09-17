@@ -10,13 +10,14 @@ DEVICES_HOOK="$ROOT_DIR/frontend/src/hooks/useConnectedDevices.ts"
 STATISTICS_HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
 FORMAT="$ROOT_DIR/frontend/src/app/format.ts"
 HEALTH_HOOK="$ROOT_DIR/frontend/src/hooks/useHealth.ts"
+APP_STYLE="$ROOT_DIR/frontend/src/styles/app.css"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT" "$HEALTH_HOOK"; do
+for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT" "$HEALTH_HOOK" "$APP_STYLE"; do
 	[ -f "$file" ] || fail "대시보드 소스 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
@@ -117,6 +118,17 @@ grep -Fq '진단 상태를 확인하지 못했습니다.' "$HOME" || \
 if grep -Fq 'reporter.enabled' "$HOME" || grep -Fq '원격 상태 보고' "$HOME"; then
 	fail '대시보드는 원격 Health Reporter 설정을 노출하지 않고 로컬 진단 요약만 표시해야 합니다'
 fi
+
+grep -Fq "[class~='bg-emerald-50/70']" "$APP_STYLE" || \
+	fail '다크 모드에서 정상 장치 진단 배경을 어두운 emerald 톤으로 재매핑해야 합니다'
+grep -Fq "[class~='bg-amber-50/70']" "$APP_STYLE" || \
+	fail '다크 모드에서 주의 장치 진단 배경을 어두운 amber 톤으로 재매핑해야 합니다'
+grep -Fq "[class~='bg-rose-50/70']" "$APP_STYLE" || \
+	fail '다크 모드에서 이상 장치 진단 배경을 어두운 rose 톤으로 재매핑해야 합니다'
+grep -Fq "[class~='bg-white/70']" "$APP_STYLE" || \
+	fail '다크 모드에서 장치 진단 세부 항목의 반투명 흰 배경을 어두운 배경으로 재매핑해야 합니다'
+grep -Fq "[class~='border-white/80']" "$APP_STYLE" || \
+	fail '다크 모드에서 장치 진단 세부 항목의 흰 테두리를 어두운 테두리로 재매핑해야 합니다'
 if grep -Fq 'title="최근 상태 확인"' "$HOME" || grep -Fq 'dashboard-freshness-title' "$HOME"; then
 	fail '대시보드는 별도의 최근 상태 확인 영역을 다시 추가하지 않아야 합니다'
 fi

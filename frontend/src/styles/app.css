@@ -257,6 +257,10 @@
   background-color: rgb(15 23 42 / 0.95);
 }
 
+.ssh-app[data-theme='dark'] [class~='bg-white/70'] {
+  background-color: rgb(15 23 42 / 0.78);
+}
+
 .ssh-app[data-theme='dark'] [class~='bg-slate-50'],
 .ssh-app[data-theme='dark'] [class~='bg-slate-50/70'] {
   background-color: #020617;
@@ -322,6 +326,10 @@
   border-color: #334155;
 }
 
+.ssh-app[data-theme='dark'] [class~='border-white/80'] {
+  border-color: #334155;
+}
+
 .ssh-app[data-theme='dark'] [class~='ring-slate-100'],
 .ssh-app[data-theme='dark'] [class~='ring-slate-200'],
 .ssh-app[data-theme='dark'] [class~='ring-white'] {
@@ -354,6 +362,10 @@
   background-color: rgb(16 185 129 / 0.13);
 }
 
+.ssh-app[data-theme='dark'] [class~='bg-emerald-50/70'] {
+  background-color: rgb(16 185 129 / 0.10);
+}
+
 .ssh-app[data-theme='dark'] [class~='text-emerald-700'],
 .ssh-app[data-theme='dark'] [class~='text-emerald-800'],
 .ssh-app[data-theme='dark'] [class~='text-emerald-900'],
@@ -375,6 +387,10 @@
 .ssh-app[data-theme='dark'] [class~='bg-amber-100'],
 .ssh-app[data-theme='dark'] [class~='bg-amber-100/70'] {
   background-color: rgb(245 158 11 / 0.13);
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-amber-50/70'] {
+  background-color: rgb(245 158 11 / 0.10);
 }
 
 .ssh-app[data-theme='dark'] [class~='text-amber-700'],
@@ -419,6 +435,10 @@
 
 .ssh-app[data-theme='dark'] [class~='bg-rose-50'] {
   background-color: rgb(244 63 94 / 0.12);
+}
+
+.ssh-app[data-theme='dark'] [class~='bg-rose-50/70'] {
+  background-color: rgb(244 63 94 / 0.10);
 }
 
 .ssh-app[data-theme='dark'] [class~='text-rose-600'],
