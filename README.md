@@ -446,7 +446,18 @@ echo "lan compile exit=$?"
 
 공개 `smartsafehub.uc`는 LAN 구현 모듈을 직접 import하지 않습니다. 따라서 LAN 전용 진입점의 컴파일/로드 오류가 기존 관리자 보안 상태 확인과 대시보드 진입까지 중단시키지 않아야 합니다.
 
-정상 결과는 `main compile exit=0`, `lan compile exit=0`입니다. 실패하면 출력되는 모듈 파일과 줄 번호를 먼저 수정합니다.
+정상 결과는 `main compile exit=0`, `lan compile exit=0`입니다. 실패하면 출력되는 모듈 파일과 줄 번호를 먼저 수정합니다. SmartSafeHub의 ucode 모듈에서 `export function` 선언은 일반 내부 함수와 달리 기존 모듈들과 동일하게 함수 본문 뒤를 `};`로 종료해야 합니다. `}`만 사용하면 다음 `export` 또는 파일 끝에서 `Expecting ';'` 컴파일 오류가 발생해 해당 ubus 객체가 등록되지 않습니다.
+
+LAN 컴파일이 성공한 뒤에는 다음 명령으로 실제 객체와 메서드 등록을 확인합니다.
+
+```bash
+/etc/init.d/rpcd restart
+sleep 2
+ubus -v list smartsafehub_network
+ubus call smartsafehub_network lan_settings '{}'
+```
+
+기존 핵심 RPC도 함께 확인하려면 다음을 실행합니다.
 
 ```bash
 /etc/init.d/rpcd restart

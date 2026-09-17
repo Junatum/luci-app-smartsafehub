@@ -20,6 +20,44 @@ fail() {
 	exit 1
 }
 
+assert_ucode_export_terminated() {
+	function_name="$1"
+
+	if ! awk -v function_name="$function_name" '
+		BEGIN { found = 0; active = 0; depth = 0; complete = 0 }
+		!active && $0 ~ ("^export function " function_name "\\(") {
+			found = 1
+			active = 1
+		}
+		active {
+			line = $0
+			opens = gsub(/\{/, "", line)
+			line = $0
+			closes = gsub(/\}/, "", line)
+			depth += opens - closes
+
+			if (depth == 0) {
+				if ($0 !~ /^[[:space:]]*};[[:space:]]*$/) {
+					exit 2
+				}
+
+				complete = 1
+				exit 0
+			}
+		}
+		END {
+			if (!found) {
+				exit 3
+			}
+			if (!complete && depth != 0) {
+				exit 4
+			}
+		}
+	' "$LAN_MODULE"; then
+		fail "ucode export 함수는 }; 로 끝나야 합니다: $function_name"
+	fi
+}
+
 for file in "$RPC_ENTRY" "$LAN_RPC_ENTRY" "$LAN_MODULE" "$ACL" "$API" "$HOOK" "$PAGE" "$ROUTES" "$HASH_ROUTE" "$NAVIGATION" "$APP"; do
 	[ -f "$file" ] || fail "LAN 설정 계약 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
@@ -32,6 +70,19 @@ if grep -Fq 'smartsafehub_network' "$RPC_ENTRY"; then
 fi
 grep -Fq "from './smartsafehub/network-management.uc';" "$LAN_RPC_ENTRY" || \
 	fail '격리된 LAN RPC entry가 기존 LAN 구현 모듈을 불러와야 합니다.'
+
+for function_name in read_lan_settings update_lan_settings apply_recommended_lan; do
+	assert_ucode_export_terminated "$function_name"
+done
+
+if command -v ucode >/dev/null 2>&1; then
+	UCODE_OUTPUT="$(mktemp "${TMPDIR:-/tmp}/smartsafehub-lan-ucode.XXXXXX")"
+	trap 'rm -f "$UCODE_OUTPUT"' EXIT HUP INT TERM
+	ucode -c -o "$UCODE_OUTPUT" "$LAN_RPC_ENTRY" || \
+		fail 'smartsafehub-network.uc와 LAN 구현 모듈이 ucode 컴파일을 통과해야 합니다.'
+	rm -f "$UCODE_OUTPUT"
+	trap - EXIT HUP INT TERM
+fi
 grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
 	fail '격리된 LAN backend ubus 객체가 등록되어야 합니다.'
 for method in lan_settings lan_update lan_auto_subnet; do

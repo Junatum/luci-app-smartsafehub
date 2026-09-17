@@ -642,7 +642,7 @@ export function read_lan_settings() {
 	return payload == null
 		? failure('LAN_CONFIG_READ_FAILED', '내부 네트워크 설정을 읽지 못했습니다.')
 		: success(payload);
-}
+};
 
 export function update_lan_settings(request) {
 	return with_lan_update_lock(function() {
@@ -653,7 +653,7 @@ export function update_lan_settings(request) {
 
 		return apply_validated_settings(validated);
 	});
-}
+};
 
 export function apply_recommended_lan(request) {
 	return with_lan_update_lock(function() {
@@ -693,4 +693,4 @@ export function apply_recommended_lan(request) {
 
 		return apply_validated_settings(validated);
 	});
-}
+};

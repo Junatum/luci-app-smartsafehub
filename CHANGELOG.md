@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.15-r20] - 2026-09-17
+
+### 수정
+
+- LAN 전용 `smartsafehub_network` RPC가 등록되지 않아 LAN 화면에서 `요청한 리소스를 찾을 수 없습니다.`가 표시되던 문제를 수정했습니다. 원인은 `network-management.uc`의 `export function` 선언 세 곳이 ucode 문법상 필요한 `};` 대신 `}`로 끝나 모듈 컴파일이 실패하던 것이었습니다.
+- `read_lan_settings`, `update_lan_settings`, `apply_recommended_lan` export 함수를 기존 SmartSafeHub ucode 모듈과 동일한 종료 형식으로 수정해 `smartsafehub-network.uc`가 정상적으로 import 및 등록될 수 있도록 했습니다.
+
+### 테스트 및 문서
+
+- LAN 계약 테스트에 export 함수 종료 문법 검사를 추가해 `};` 누락을 개발 환경에서도 감지하도록 했습니다.
+- 실행 환경에 `ucode`가 있으면 `smartsafehub-network.uc`를 `ucode -c`로 실제 컴파일하는 검증을 추가했습니다.
+- README의 ucode 진단 절차에 export 함수 종료 규칙과 LAN RPC 등록 확인 명령을 추가했습니다.
+
 ## [0.2.15-r19] - 2026-09-17
 
 ### 수정
