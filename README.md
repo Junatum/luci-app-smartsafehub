@@ -382,6 +382,8 @@ health_reporter_update
 
 `health_status`는 `/tmp/smartsafehub/health.json`과 Reporter 상태를 읽습니다. 최초 결과가 아직 없으면 rpcd를 막지 않도록 진단 helper를 분리된 프로세스로 시작하고 `확인 중` 상태를 즉시 반환합니다. `health_run`도 같은 방식으로 사용자의 `지금 진단`을 비동기로 시작하며 프런트엔드가 새 `generatedAt`이 기록될 때까지 짧게 재조회합니다. `health_reporter_update`는 최근 로컬 eligibility 상태를 확인한 뒤 opt-in 설정을 저장하며, 실제 Hub API는 라이선스/Trial 여부를 다시 검증해야 합니다.
 
+Health helper의 awk 코드는 OpenWrt의 기본 awk뿐 아니라 GitHub Actions에서 사용하는 GNU awk에서도 실행 가능해야 합니다. GNU awk 내장 이름과 충돌할 수 있는 식별자를 `awk -v` 변수명으로 사용하지 않으며, `test-health.sh`가 이 호환성 계약을 회귀 검사합니다.
+
 SafeShield 기능은 `luci-app-smartsafehub`가 별도 프록시를 만들지 않고 SafeShield 패키지가 제공하는 공식 ubus API를 직접 사용합니다.
 
 ```text

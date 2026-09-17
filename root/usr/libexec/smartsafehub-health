@@ -189,7 +189,7 @@ collect_load() {
 	cores="$(awk '/^processor[[:space:]]*:/ { count += 1 } END { print count + 0 }' "$CPUINFO_FILE" 2>/dev/null || true)"
 	case "$cores" in ''|0|*[!0-9]*) cores=1 ;; esac
 	case "$load1" in ''|*[!0-9.]*) add_check system.load '시스템 부하' unknown '' '시스템 부하를 확인하지 못했습니다.' null 'load/core'; return ;; esac
-	ratio="$(awk -v load="$load1" -v cores="$cores" 'BEGIN { if (cores < 1) cores=1; printf "%d", (load * 100 / cores) + 0.5 }')"
+	ratio="$(awk -v load_value="$load1" -v cores="$cores" 'BEGIN { if (cores < 1) cores=1; printf "%d", (load_value * 100 / cores) + 0.5 }')"
 	LOAD_1M="$load1"
 	status=ok; code=''; message='시스템 부하가 정상 범위입니다.'
 	if [ "$ratio" -ge 250 ]; then

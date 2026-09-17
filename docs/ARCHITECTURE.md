@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r11`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r12`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -143,7 +143,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r11
+0.2.15-r12
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -317,6 +317,8 @@ smartsafehub-health daemon
 로컬 진단은 멤버십과 관계없이 항상 사용할 수 있습니다. Health Reporter는 `reporter_enabled=0`을 기본값으로 하며 유료/Trial 사용자가 설정 화면에서 직접 활성화해야 합니다. OFF 상태에서는 heartbeat, 이상 발생/복구 보고를 포함해 Reporter의 서버 요청을 수행하지 않습니다.
 
 진단 대상은 가용 메모리, CPU 코어 대비 1분 load, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 오류와 시스템 시간입니다. 주기 결과는 flash에 쓰지 않고 `/tmp/smartsafehub/health.json`에 atomic write합니다.
+
+Health helper는 OpenWrt awk와 CI의 GNU awk에서 동일하게 실행되는 POSIX 호환 표현만 사용합니다. 특히 GNU awk 내장 이름과 충돌하는 이름을 `-v` 변수로 전달하지 않으며 contract test가 이를 고정합니다.
 
 서버 보고 payload는 로컬 진단 JSON을 그대로 재사용하지 않고 whitelist 방식으로 새로 생성합니다. 허용 필드는 schema, 보고 시각, 전체 상태, 메모리/부하/저장 공간 수치와 `{code, severity}` 이상 목록뿐입니다. 호스트명, WAN IP, SSID/MAC, DNS 요청 내용, 로그 원문과 라이선스 키는 payload에 넣지 않습니다. 전송 실패 시 5분 backoff를 적용해 서버 장애 중 요청이 매 분 반복되지 않도록 합니다.
 
@@ -606,9 +608,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r11
-  → app.js?v=0.2.15-r11
-  → app.css?v=0.2.15-r11
+  → data-asset-version = 0.2.15-r12
+  → app.js?v=0.2.15-r12
+  → app.css?v=0.2.15-r12
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

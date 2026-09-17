@@ -1,91 +1,91 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-Describe 'SmartSafeHub shell contract suite'
-  It 'passes shell syntax and JSON validation'
+Describe 'SmartSafeHub 셸 계약 테스트'
+  It '셸 문법과 JSON 유효성을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-static-validation.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes package contract'
+  It '패키지 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-package-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes navigation contract'
+  It '내비게이션 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-navigation-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes document UI contract'
+  It '문서 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-document-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes login UI contract'
+  It '로그인 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-login-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes initial root password setup contract'
+  It '초기 관리자 비밀번호 설정 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-initial-password-setup.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes dashboard UI contract'
+  It '대시보드 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-dashboard-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes network input contract'
+  It '네트워크 입력 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-network-input-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes update UI contract'
+  It '업데이트 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-update-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes reload and session safety regression contract'
+  It '새로고침과 세션 안전 회귀 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-reload-safety.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes settings UI contract'
+  It '설정 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-settings-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes system timezone contract'
+  It '시스템 시간대 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-system-time-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes scheduled reboot contract'
+  It '예약 재부팅 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-scheduled-reboot.sh"
     The status should be success
     The output should start with 'PASS:'
@@ -99,56 +99,56 @@ Describe 'SmartSafeHub shell contract suite'
     The error should be blank
   End
 
-  It 'passes configuration backup and restore contract'
+  It '설정 백업과 복원 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-backup-restore.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes ucode import contract'
+  It 'ucode import 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-ucode-imports.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes RPC contract'
+  It 'RPC 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-rpc-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes rules UI contract'
+  It '규칙 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-rules-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes SafeShield page contract'
+  It 'SafeShield 페이지 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-safeshield-page-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes statistics UI contract'
+  It '보호 통계 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-statistics-ui-contract.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes updater contract'
+  It '관리 소프트웨어 업데이트 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-updater.sh"
     The status should be success
     The output should start with 'PASS:'
     The error should be blank
   End
 
-  It 'passes firmware updater contract'
+  It '펌웨어 업데이트 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-firmware-updater.sh"
     The status should be success
     The output should start with 'PASS:'

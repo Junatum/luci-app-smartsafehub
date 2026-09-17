@@ -1,5 +1,16 @@
 # 변경 기록
 
+## [0.2.15-r12] - 2026-09-17
+
+### 수정
+
+- Health 진단의 CPU 부하 비율 계산에서 GNU awk가 내장 이름으로 사용하는 `load`를 `-v` 변수명으로 전달해 GitHub Actions의 gawk 환경에서 `cannot use gawk builtin 'load' as variable name` 오류가 발생하던 문제를 수정했습니다. awk 변수명을 `load_value`로 변경해 OpenWrt awk와 GNU awk 모두에서 동일하게 동작하도록 했습니다.
+
+### 테스트
+
+- `test-health.sh`에 GNU awk 예약 이름을 다시 `-v load=` 형태로 사용하지 못하도록 회귀 검사를 추가했습니다.
+- GitHub Actions와 ShellSpec 출력에서 테스트 목적을 바로 확인할 수 있도록 ShellSpec 계약 테스트 이름을 가능한 범위에서 한글 설명으로 통일했고, Health 계약 테스트의 실패/성공 메시지도 한글화했습니다.
+
 ## [0.2.15-r11] - 2026-09-17
 
 ### 수정
