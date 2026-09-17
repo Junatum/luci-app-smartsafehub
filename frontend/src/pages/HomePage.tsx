@@ -165,7 +165,6 @@ function SectionHeading({
 }
 
 const RELATIVE_TIME_TICK_MS = 60_000;
-const DEVICE_SUMMARY_STALE_AFTER_S = 15 * 60;
 
 function elapsedSeconds(timestamp: number | null | undefined, nowTimestamp: number): number | null {
   if (!timestamp || !Number.isFinite(timestamp) || timestamp <= 0) {
@@ -513,10 +512,6 @@ export function HomePage({
       safeShieldStaleThreshold !== null &&
       safeShieldRefreshAge > safeShieldStaleThreshold,
   );
-  const devicesAge = elapsedSeconds(devices?.generatedAt, relativeNow);
-  const devicesStale = Boolean(
-    devicesAge !== null && devicesAge > DEVICE_SUMMARY_STALE_AFTER_S,
-  );
   const updateAge = elapsedSeconds(updates?.lastCheckAt, relativeNow);
   const updateStaleThreshold = updates
     ? Math.max(updates.settings.checkIntervalSeconds * 2, 7_200)
@@ -591,21 +586,12 @@ export function HomePage({
             href="#devices"
             icon={<DevicesIcon class="size-5" />}
             meta={freshnessMeta(
-              devicesStale ? '목록 갱신 권장' : '목록 확인',
+              '목록 확인',
               devices?.generatedAt,
               relativeNow,
               devicesLoading ? '확인 중' : '기록 없음',
             )}
-            metaWarning={devicesStale}
-            state={
-              devices
-                ? devicesStale
-                  ? 'warning'
-                  : 'healthy'
-                : devicesError
-                  ? 'warning'
-                  : 'neutral'
-            }
+            state={devices ? 'healthy' : devicesError ? 'warning' : 'neutral'}
             value={devicesValue}
           />
           <OverviewCard

@@ -124,8 +124,16 @@ grep -Fq 'formatRelativeTime(timestamp, nowTimestamp)' "$HOME" || \
 	fail '대시보드 개요 카드는 최근 확인 시각을 상대 시간으로 표시해야 합니다'
 grep -Fq "safeShieldStale ? '차단 목록 갱신 지연' : '차단 목록 갱신'" "$HOME" || \
 	fail 'SafeShield 개요 카드가 최근 갱신 정보와 지연 경고를 직접 표시해야 합니다'
-grep -Fq "devicesStale ? '목록 갱신 권장' : '목록 확인'" "$HOME" || \
-	fail '연결 기기 개요 카드가 최근 확인 정보와 지연 경고를 직접 표시해야 합니다'
+grep -Fq "'목록 확인'," "$HOME" || \
+	fail '연결 기기 개요 카드는 마지막 목록 확인 시각을 정보성 메타데이터로 표시해야 합니다'
+if grep -Fq 'devicesStale' "$HOME" || grep -Fq 'DEVICE_SUMMARY_STALE_AFTER_S' "$HOME"; then
+	fail '연결 기기 목록 확인 시각이 오래되었다는 이유만으로 주의 상태를 만들면 안 됩니다'
+fi
+if grep -Fq 'metaWarning={devicesStale}' "$HOME"; then
+	fail '연결 기기 목록 확인 시각은 노란색 경고 메타데이터로 표시하면 안 됩니다'
+fi
+grep -Fq "state={devices ? 'healthy' : devicesError ? 'warning' : 'neutral'}" "$HOME" || \
+	fail '연결 기기 데이터가 있으면 목록 확인 시각과 관계없이 정상 상태를 유지해야 합니다'
 grep -Fq "updatesStale ? '업데이트 확인 지연' : '마지막 확인'" "$HOME" || \
 	fail '소프트웨어 업데이트 개요 카드가 최근 확인 정보와 지연 경고를 직접 표시해야 합니다'
 grep -Fq '{label}: {formatRelativeTime(timestamp, nowTimestamp)}' "$HOME" || \

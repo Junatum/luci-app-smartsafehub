@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r13`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r14`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -143,7 +143,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r13
+0.2.15-r14
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -535,6 +535,9 @@ WifiPage form
 
 ### 7.3 연결 기기
 
+대시보드의 연결 기기 카드에서 `generatedAt`은 마지막 목록 확인 시각을 보여주는 정보성 값으로만 사용합니다. 사용자가 대시보드에 머무르는 동안 연결 기기 조회는 주기 polling을 하지 않으므로 시간이 오래되었다는 사실 자체를 장애나 주의 상태로 판단하지 않습니다. 실제 연결 기기 조회가 실패한 경우에만 확인 필요 상태로 표시합니다.
+
+
 ```text
 ConnectedDevicesPage
   → smartsafehub.connected_devices
@@ -610,9 +613,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r13
-  → app.js?v=0.2.15-r13
-  → app.css?v=0.2.15-r13
+  → data-asset-version = 0.2.15-r14
+  → app.js?v=0.2.15-r14
+  → app.css?v=0.2.15-r14
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
