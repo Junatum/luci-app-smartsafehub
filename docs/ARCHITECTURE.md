@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r10`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r11`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -92,6 +92,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.connected_devices`
 - `smartsafehub.wifi_summary`
 - `smartsafehub.updates_status`
+- `smartsafehub.health_status`
 - `safeshield.status`
 - `safeshield.config`
 - `safeshield.rules_list`
@@ -103,6 +104,8 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.updates_check`
 - `smartsafehub.updates_install`
 - `smartsafehub.updates_settings_update`
+- `smartsafehub.health_run`
+- `smartsafehub.health_reporter_update`
 - `safeshield.set_enabled`
 - `safeshield.config_update` (통계 수집 설정에 한정)
 - `safeshield.refresh`
@@ -112,6 +115,8 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `safeshield.license_update`
 
 `license_get`은 동작 자체는 읽기이지만 평문 라이선스 키를 반환하는 민감 API이므로 일반 상태 조회 권한과 분리해 write ACL 그룹에 포함합니다. 브라우저의 주기적 상태 polling, 로컬 Health 진단과 진단 다운로드에서는 호출하지 않습니다. opt-in된 Health Reporter daemon만 실제 HTTPS 보고 시 서버 인증을 위해 일시적으로 호출하며 키를 파일이나 payload에 저장하지 않습니다.
+
+rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 패키지 업그레이드로 새 RPC 메서드가 추가되면 이미 로그인되어 있던 세션에는 새 메서드 권한이 아직 없을 수 있습니다. postinst는 `rpcd reload`로 새 ucode plugin/ACL을 즉시 로드하고, 프런트엔드는 `Access denied` 발생 시 오래전부터 존재한 `system_root_password_status`를 같은 session ID로 확인합니다. 이 control RPC도 거부될 때만 실제 세션 만료로 처리하고, control RPC가 성공하면 새 ACL만 부족한 유효 세션으로 간주해 전체 애플리케이션을 강제 로그아웃시키지 않습니다.
 
 진단 다운로드용 별도 `system_diagnostics` RPC는 사용하지 않습니다. 진단 파일은 읽기 권한이 있는 기존 API 응답을 프런트엔드에서 결합해 생성합니다.
 
@@ -138,7 +143,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 현재 자산 버전:
 
 ```text
-0.2.15-r10
+0.2.15-r11
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -601,9 +606,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r10
-  → app.js?v=0.2.15-r10
-  → app.css?v=0.2.15-r10
+  → data-asset-version = 0.2.15-r11
+  → app.js?v=0.2.15-r11
+  → app.css?v=0.2.15-r11
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

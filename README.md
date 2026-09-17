@@ -39,6 +39,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 세션이 없으면 `LoginApp`, 유효한 세션 ID를 받으면 제품 `App`을 같은 Shadow DOM에서 렌더링
 - 로그인 폼은 `luci_username` / `luci_password`를 보호된 session endpoint에 POST하며 실제 비밀번호 검증, cookie 발급과 추가 인증 정책은 LuCI dispatcher가 담당
 - 로그인 성공 후 페이지 이동 없이 받은 session ID로 `/admin/ubus` bootstrap을 구성하고 같은 `/cgi-bin/luci/smartsafehub#home` URL에서 제품 화면으로 전환
+- ubus `Access denied`를 세션 만료로 처리하기 전 동일 session ID로 기존 `system_root_password_status` RPC를 짧게 확인합니다. 새 패키지가 RPC/ACL을 추가한 직후 기존 세션에 해당 메서드 권한만 아직 반영되지 않은 경우에는 설정 화면을 강제로 로그아웃시키지 않고 권한 오류로 표시하며, 실제 기존 RPC 접근까지 거부될 때만 로그인 화면으로 전환합니다.
 - 예전 `/cgi-bin/luci/admin/smartsafehub` 경로도 공개 shell만 제공한 뒤 브라우저 주소를 공식 public URL로 정규화
 - 비밀번호 표시/숨김, Caps Lock 안내, 모바일 안전 영역 지원
 - 추가 인증 등 특수 LuCI 구성에서는 보호된 session endpoint의 기본 LuCI 로그인 화면으로 계속할 수 있는 fallback 제공
@@ -336,7 +337,7 @@ apk add --allow-untrusted /tmp/luci-app-smartsafehub-*.apk
 
 정확한 현재 버전은 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`, 또는 설치된 장치의 `apk info luci-app-smartsafehub`로 확인합니다.
 
-설치 후 LuCI 메뉴 캐시를 지우고 rpcd plugin/ACL을 다시 읽습니다. 기존 LuCI 세션을 유지하기 위해 `restart` 대신 `reload`를 사용합니다.
+패키지의 postinst는 설치/업그레이드 후 LuCI 메뉴 캐시를 지우고 `rpcd reload`를 실행해 새 ucode RPC와 ACL을 즉시 다시 읽습니다. OpenWrt의 rpcd plugin 패키지와 같은 방식으로 `restart` 대신 `reload`를 사용해 기존 세션을 가능한 한 유지합니다. 수동 설치 환경에서 확인이 필요하면 아래 명령을 직접 실행할 수 있습니다.
 
 ```bash
 rm -f /tmp/luci-indexcache

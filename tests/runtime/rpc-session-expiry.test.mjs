@@ -44,11 +44,33 @@ for (const error of [
   assert.equal(isAccessDenied(error), false, `must not expire session for unrelated failure: ${error.code}`);
 }
 
+assert.match(
+  rpcSource,
+  /async function probeRpcSessionAccess\([\s\S]*?'system_root_password_status'[\s\S]*?result\[0\] === 0[\s\S]*?return 'active'[\s\S]*?result\[0\] === 6[\s\S]*?return 'expired'/,
+  'session verification must probe a long-lived SmartSafeHub RPC and distinguish active from denied sessions',
+);
+assert.match(
+  rpcSource,
+  /rpcError\.code === -32002[\s\S]*?return 'expired'/,
+  'JSON-RPC access denial during the control probe must mark the session expired',
+);
+assert.match(
+  rpcSource,
+  /response\.status === 401 \|\| response\.status === 403/,
+  'HTTP authentication denial during the control probe must mark the session expired',
+);
+assert.equal(
+  rpcSource.includes('probeLuciSession'),
+  false,
+  'RPC recovery must not probe the LuCI session echo endpoint',
+);
+
 const expiryBody = functionBody(
   rpcSource,
-  'function sessionExpiryError(error: RpcError, sessionId: string): RpcError',
+  'async function sessionExpiryError(',
   '\n\nfunction parseJsonRpcResponse',
 );
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 class RpcError extends Error {
   constructor(code, message) {
@@ -57,25 +79,34 @@ class RpcError extends Error {
   }
 }
 
-function evaluateExpiry({ error, requestSessionId, currentSessionId }) {
+async function evaluateExpiry({
+  error,
+  access,
+  requestSessionId = 'session-a',
+  currentSessionId = 'session-a',
+}) {
   const notifications = [];
+  const bootstrap = { sessionId: requestSessionId, rpcUrl: '/ubus' };
   const currentSessionMatches = (sessionId) => sessionId === currentSessionId;
+  const probeRpcSessionAccess = async () => access;
   const notifySessionExpired = (sessionId) => notifications.push(sessionId);
-  const execute = new Function(
+  const execute = new AsyncFunction(
     'error',
-    'sessionId',
+    'bootstrap',
     'isAccessDenied',
     'currentSessionMatches',
+    'probeRpcSessionAccess',
     'notifySessionExpired',
     'RpcError',
     'SESSION_EXPIRED_MESSAGE',
     `'use strict';\n${expiryBody}`,
   );
-  const result = execute(
+  const result = await execute(
     error,
-    requestSessionId,
+    bootstrap,
     isAccessDenied,
     currentSessionMatches,
+    probeRpcSessionAccess,
     notifySessionExpired,
     RpcError,
     'expired',
@@ -85,19 +116,31 @@ function evaluateExpiry({ error, requestSessionId, currentSessionId }) {
 
 {
   const original = new RpcError('UBUS_6', '접근 권한이 없습니다.');
-  const { result, notifications } = evaluateExpiry({
-    error: original,
-    requestSessionId: 'session-a',
-    currentSessionId: 'session-a',
-  });
+  const { result, notifications } = await evaluateExpiry({ error: original, access: 'active' });
+  assert.equal(result.code, 'RPC_PERMISSION_DENIED');
+  assert.match(result.message, /로그아웃 후 다시 로그인/);
+  assert.deepEqual(notifications, []);
+}
+
+{
+  const original = new RpcError('UBUS_6', '접근 권한이 없습니다.');
+  const { result, notifications } = await evaluateExpiry({ error: original, access: 'expired' });
   assert.equal(result.code, 'SESSION_EXPIRED');
   assert.deepEqual(notifications, ['session-a']);
 }
 
 {
   const original = new RpcError('UBUS_6', '접근 권한이 없습니다.');
-  const { result, notifications } = evaluateExpiry({
+  const { result, notifications } = await evaluateExpiry({ error: original, access: 'unknown' });
+  assert.equal(result, original, 'an inconclusive control probe must not force logout');
+  assert.deepEqual(notifications, []);
+}
+
+{
+  const original = new RpcError('UBUS_6', '접근 권한이 없습니다.');
+  const { result, notifications } = await evaluateExpiry({
     error: original,
+    access: 'expired',
     requestSessionId: 'stale-session',
     currentSessionId: 'new-session',
   });
@@ -107,24 +150,23 @@ function evaluateExpiry({ error, requestSessionId, currentSessionId }) {
 
 {
   const original = new RpcError('NETWORK_ERROR', 'network down');
-  const { result, notifications } = evaluateExpiry({
-    error: original,
-    requestSessionId: 'session-a',
-    currentSessionId: 'session-a',
-  });
+  const { result, notifications } = await evaluateExpiry({ error: original, access: 'expired' });
   assert.equal(result, original, 'non-authentication failures must stay ordinary RPC errors');
   assert.deepEqual(notifications, []);
 }
 
+const callApiStart = rpcSource.indexOf('export async function callApi<T>');
+assert.notEqual(callApiStart, -1, 'callApi implementation must exist');
+const callApiBody = rpcSource.slice(callApiStart);
 assert.equal(
-  rpcSource.includes('probeCurrentSession'),
+  callApiBody.includes('sessionExpiryError('),
   false,
-  'Access denied recovery must not re-probe a potentially stale LuCI session',
+  'SmartSafeHub domain errors returned after an authorized ubus call must never be reclassified as session expiry',
 );
-assert.equal(
-  rpcSource.includes('probeLuciSession'),
-  false,
-  'RPC layer must not start a second session-validation loop',
+assert.match(
+  callApiBody,
+  /throw new RpcError\(response\.error\.code, response\.error\.message\)/,
+  'SmartSafeHub domain errors must remain ordinary RpcError instances',
 );
 
-console.log('PASS: RPC access-denied classification expires only the active session without re-probing');
+console.log('PASS: RPC access denial distinguishes stale ACL permissions from an actually expired LuCI session');

@@ -138,6 +138,13 @@ printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health enab
 	fail 'package postinst must force-enable smartsafehub-health'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health restart' ||
 	fail 'package postinst must start or restart smartsafehub-health immediately after installation'
+printf '%s\n' "$postinst_block" | grep -Fq 'rm -f /tmp/luci-indexcache' ||
+	fail 'package postinst must clear the LuCI index cache after installing RPC/menu changes'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd reload' ||
+	fail 'package postinst must reload rpcd so newly installed ucode methods and ACL files are active'
+if printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd restart'; then
+	fail 'package postinst must reload rpcd instead of restarting it and discarding active sessions'
+fi
 printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.check_enabled' ||
 	fail 'package postinst must remove the obsolete firmware check_enabled option on existing installs'
 if printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.updates.check_enabled'; then

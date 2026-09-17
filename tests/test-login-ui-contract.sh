@@ -70,14 +70,20 @@ grep -Fq '/^(?:access|permission)\s+denied\.?$/i.test(sessionId)' "$SESSION" || 
 
 grep -Fq "export const SESSION_EXPIRED_EVENT = 'smartsafehub:session-expired';" "$SESSION_EVENTS" || \
 	fail 'session expiry must use one shared application event'
-grep -Fq 'notifySessionExpired(sessionId);' "$RPC" || \
-	fail 'RPC access denial must notify the application immediately'
+grep -Fq 'notifySessionExpired(bootstrap.sessionId);' "$RPC" || \
+	fail 'confirmed RPC session expiry must notify the application immediately'
 grep -Fq "new RpcError('SESSION_EXPIRED', SESSION_EXPIRED_MESSAGE)" "$RPC" || \
-	fail 'access denial must become a dedicated session-expired RPC error'
-grep -Fq 'currentSessionMatches(sessionId)' "$RPC" || \
+	fail 'confirmed access denial must become a dedicated session-expired RPC error'
+grep -Fq 'currentSessionMatches(bootstrap.sessionId)' "$RPC" || \
 	fail 'stale RPC failures must not expire a newly authenticated session'
-if grep -Fq 'probeCurrentSession' "$RPC" || grep -Fq 'probeLuciSession' "$RPC"; then
-	fail 'RPC access-denied recovery must not probe another LuCI session endpoint'
+grep -Fq 'async function probeRpcSessionAccess' "$RPC" || \
+	fail 'RPC access denial must verify the current session against an existing SmartSafeHub RPC before forcing logout'
+grep -Fq "'system_root_password_status'" "$RPC" || \
+	fail 'RPC access verification must use the long-lived root password status method'
+grep -Fq "'RPC_PERMISSION_DENIED'" "$RPC" || \
+	fail 'a valid session missing only a new ACL grant must remain an ordinary permission error'
+if grep -Fq 'probeLuciSession' "$RPC"; then
+	fail 'RPC access-denied recovery must not probe the LuCI session echo endpoint'
 fi
 grep -Fq 'window.addEventListener(SESSION_EXPIRED_EVENT' "$MAIN" || \
 	fail 'public entry must listen for session expiry globally'

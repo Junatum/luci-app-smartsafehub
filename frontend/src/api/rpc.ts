@@ -19,6 +19,7 @@ const UBUS_STATUS_TEXT: Readonly<Record<number, string>> = {
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+const SESSION_ACCESS_PROBE_TIMEOUT_MS = 3_000;
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 60_000;
 
@@ -90,17 +91,113 @@ function currentSessionMatches(sessionId: string): boolean {
   return window.__SMARTHUB_BOOTSTRAP__?.sessionId === sessionId;
 }
 
-function sessionExpiryError(error: RpcError, sessionId: string): RpcError {
-  if (!isAccessDenied(error) || !currentSessionMatches(sessionId)) {
+type SessionAccessProbeResult = 'active' | 'expired' | 'unknown';
+
+async function probeRpcSessionAccess(
+  bootstrap: SmartSafeHubBootstrap,
+): Promise<SessionAccessProbeResult> {
+  const id = requestId++;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    SESSION_ACCESS_PROBE_TIMEOUT_MS,
+  );
+
+  try {
+    const response = await fetch(bootstrap.rpcUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        method: 'call',
+        params: [
+          bootstrap.sessionId,
+          'smartsafehub',
+          'system_root_password_status',
+          {},
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      return 'expired';
+    }
+    if (!response.ok) {
+      return 'unknown';
+    }
+
+    const payload: unknown = await response.json();
+    if (!isObject(payload) || payload.jsonrpc !== '2.0' || payload.id !== id) {
+      return 'unknown';
+    }
+
+    if ('error' in payload) {
+      const rpcError = payload.error;
+      if (
+        isObject(rpcError) &&
+        typeof rpcError.code === 'number' &&
+        rpcError.code === -32002
+      ) {
+        return 'expired';
+      }
+      return 'unknown';
+    }
+
+    const result = payload.result;
+    if (!Array.isArray(result) || result.length < 1) {
+      return 'unknown';
+    }
+
+    if (result[0] === 0) {
+      return 'active';
+    }
+    if (result[0] === 6) {
+      return 'expired';
+    }
+
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function sessionExpiryError(
+  error: RpcError,
+  bootstrap: SmartSafeHubBootstrap,
+): Promise<RpcError> {
+  if (!isAccessDenied(error) || !currentSessionMatches(bootstrap.sessionId)) {
     return error;
   }
 
-  // Access denied from SmartSafeHub's authenticated ubus endpoint means the
-  // bootstrap session can no longer be used by this application. Do not probe
-  // another LuCI endpoint here: that request may still echo a stale auth
-  // session and keep the application mounted in an Access denied/reload loop.
-  // Rendering the login screen is the only deterministic recovery path.
-  notifySessionExpired(sessionId);
+  // A newly installed RPC method may return UBUS_STATUS_PERMISSION_DENIED to
+  // an existing LuCI session because rpcd expands ACL groups at login time.
+  // Verify the same session against a long-lived SmartSafeHub method before
+  // deciding that the session itself has expired. This avoids ejecting the
+  // user from Settings merely because the current session predates a new ACL.
+  const access = await probeRpcSessionAccess(bootstrap);
+
+  if (!currentSessionMatches(bootstrap.sessionId)) {
+    return error;
+  }
+
+  if (access === 'active') {
+    return new RpcError(
+      'RPC_PERMISSION_DENIED',
+      '현재 로그인 세션에 이 기능 권한이 없습니다. SmartSafeHub 업데이트 직후라면 로그아웃 후 다시 로그인해 주세요.',
+    );
+  }
+  if (access !== 'expired') {
+    return error;
+  }
+
+  notifySessionExpired(bootstrap.sessionId);
   return new RpcError('SESSION_EXPIRED', SESSION_EXPIRED_MESSAGE);
 }
 
@@ -209,7 +306,7 @@ export async function callRpc<T>(
     }
 
     if (error instanceof RpcError) {
-      throw sessionExpiryError(error, bootstrap.sessionId);
+      throw await sessionExpiryError(error, bootstrap);
     }
 
     throw new RpcError(
@@ -227,14 +324,13 @@ export async function callApi<T>(
   params: Record<string, unknown> = {},
   options: RpcCallOptions = {},
 ): Promise<T> {
-  const bootstrap = getBootstrap();
   const response = await callRpc<ApiResponse<T>>(object, method, params, options);
 
+  // Reaching the SmartSafeHub API envelope means ubus already authorized and
+  // executed the method. Domain errors must therefore stay ordinary API
+  // errors instead of being mistaken for an expired LuCI session.
   if (!response.ok) {
-    throw sessionExpiryError(
-      new RpcError(response.error.code, response.error.message),
-      bootstrap.sessionId,
-    );
+    throw new RpcError(response.error.code, response.error.message);
   }
 
   return response.data;
