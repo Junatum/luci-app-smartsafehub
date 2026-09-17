@@ -18,9 +18,15 @@ const STYLESHEET_ATTRIBUTE = 'data-smartsafehub-shadow-style';
 
 
 function canonicalizeEntryUrl(): void {
-  const legacyPath = luciUrl('/admin/smartsafehub');
+  const luciRootPath = luciUrl('/');
+  const compatibilityPaths = new Set([
+    luciRootPath,
+    luciRootPath.replace(/\/$/, ''),
+    luciUrl('/smartsafehub'),
+    luciUrl('/admin/smartsafehub'),
+  ]);
 
-  if (window.location.pathname !== legacyPath) {
+  if (!compatibilityPaths.has(window.location.pathname)) {
     return;
   }
 
@@ -37,7 +43,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.15-r25',
+    assetVersion: host.dataset.assetVersion ?? '0.2.15-r26',
     locale: document.documentElement.lang || 'ko',
   });
 }

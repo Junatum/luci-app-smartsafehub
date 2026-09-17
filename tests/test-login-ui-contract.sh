@@ -9,6 +9,7 @@ SESSION="$ROOT_DIR/frontend/src/auth/session.ts"
 SESSION_EVENTS="$ROOT_DIR/frontend/src/auth/sessionEvents.ts"
 RPC="$ROOT_DIR/frontend/src/api/rpc.ts"
 THEME="$ROOT_DIR/frontend/src/utils/theme.ts"
+LUCI_UTIL="$ROOT_DIR/frontend/src/utils/luci.ts"
 APP_SHELL="$ROOT_DIR/frontend/src/components/AppShell.tsx"
 ICONS="$ROOT_DIR/frontend/src/components/Icons.tsx"
 STYLES="$ROOT_DIR/frontend/src/styles/app.css"
@@ -20,7 +21,7 @@ fail() {
 	exit 1
 }
 
-for file in "$LOGIN" "$MAIN" "$SESSION" "$SESSION_EVENTS" "$RPC" "$THEME" "$APP_SHELL" "$ICONS" "$STYLES" "$BUILT_JS" "$BUILT_CSS"; do
+for file in "$LOGIN" "$MAIN" "$SESSION" "$LUCI_UTIL" "$SESSION_EVENTS" "$RPC" "$THEME" "$APP_SHELL" "$ICONS" "$STYLES" "$BUILT_JS" "$BUILT_CSS"; do
 	[ -f "$file" ] || fail "missing login UI source: ${file#$ROOT_DIR/}"
 done
 
@@ -58,6 +59,15 @@ grep -Fq 'applyDocumentTheme(theme);' "$LOGIN" || \
 	fail 'public login must update document theme metadata'
 grep -Fq 'applyDocumentTheme(readColorTheme());' "$ROOT_DIR/frontend/src/main.tsx" || \
 	fail 'public entry must apply the saved theme before session probing/rendering'
+
+grep -Fq 'const compatibilityPaths = new Set([' "$MAIN" || \
+	fail 'public entry must canonicalize supported LuCI compatibility entry paths'
+grep -Fq "luciUrl('/smartsafehub')" "$MAIN" || \
+	fail 'legacy SmartSafeHub LuCI entry must remain a compatibility path'
+grep -Fq "luciUrl('/admin/smartsafehub')" "$MAIN" || \
+	fail 'legacy admin SmartSafeHub entry must remain a compatibility path'
+grep -Fq 'return `/${normalizedHash}`;' "$LUCI_UTIL" || \
+	fail 'official SmartSafeHub public URL must be the router root'
 
 grep -Fq 'response.status === 401' "$SESSION" || \
 	fail 'session probe must treat HTTP 401 as an unauthenticated session'

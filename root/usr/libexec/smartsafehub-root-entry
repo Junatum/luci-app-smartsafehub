@@ -1,0 +1,57 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -eu
+
+HANDLER_FILE="${SMARTSAFEHUB_ROOT_HANDLER:-/etc/uhttpd/smartsafehub-root.json}"
+UHTTPD_INIT="${SMARTSAFEHUB_UHTTPD_INIT:-/etc/init.d/uhttpd}"
+ACTION='install'
+RELOAD=0
+
+usage() {
+	echo "usage: $0 [--install|--remove] [--reload]" >&2
+	exit 2
+}
+
+for arg in "$@"; do
+	case "$arg" in
+		--install) ACTION='install' ;;
+		--remove) ACTION='remove' ;;
+		--reload) RELOAD=1 ;;
+		*) usage ;;
+	esac
+done
+
+uci -q show uhttpd.main >/dev/null 2>&1 || exit 0
+
+current_handlers="$(uci -q get uhttpd.main.json_script 2>/dev/null || true)"
+has_handler=0
+for handler in $current_handlers; do
+	if [ "$handler" = "$HANDLER_FILE" ]; then
+		has_handler=1
+		break
+	fi
+done
+
+changed=0
+case "$ACTION" in
+	install)
+		[ -s "$HANDLER_FILE" ] || exit 0
+		if [ "$has_handler" -eq 0 ]; then
+			uci -q add_list uhttpd.main.json_script="$HANDLER_FILE"
+			changed=1
+		fi
+		;;
+	remove)
+		if [ "$has_handler" -eq 1 ]; then
+			uci -q del_list uhttpd.main.json_script="$HANDLER_FILE" >/dev/null 2>&1 || true
+			changed=1
+		fi
+		;;
+esac
+
+[ "$changed" -eq 1 ] || exit 0
+uci -q commit uhttpd
+
+if [ "$RELOAD" -eq 1 ] && [ -x "$UHTTPD_INIT" ]; then
+	"$UHTTPD_INIT" reload >/dev/null 2>&1 || true
+fi

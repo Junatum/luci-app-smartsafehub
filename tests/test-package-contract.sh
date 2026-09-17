@@ -53,6 +53,8 @@ require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-maintenance"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-health"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
+require_file "$ROOT_DIR/root/usr/libexec/smartsafehub-root-entry"
+require_executable "$ROOT_DIR/root/etc/uci-defaults/99-smartsafehub-root-entry"
 require_executable "$ROOT_DIR/tests/test-static-validation.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
 require_executable "$ROOT_DIR/tests/test-firmware-updater.sh"
@@ -68,6 +70,7 @@ require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 require_executable "$ROOT_DIR/tests/test-runtime-path-contract.sh"
 require_executable "$ROOT_DIR/tests/test-lan-settings.sh"
+require_executable "$ROOT_DIR/tests/test-root-url-rewrite.sh"
 
 pkg_version="$(make_value PKG_VERSION)"
 pkg_release="$(make_value PKG_RELEASE)"
@@ -154,6 +157,19 @@ fi
 if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
 	fail 'firmware service enable must not depend on upgrade or previous enabled state'
 fi
+printf '%s\n' "$postinst_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reload' ||
+	fail 'package postinst must register the SmartSafeHub exact-root uHTTPd rewrite at runtime via /bin/sh'
+
+prerm_block="$(awk '
+	/^define Package\/luci-app-smartsafehub\/prerm$/ { in_block = 1 }
+	in_block { print }
+	in_block && /^endef$/ { exit }
+' "$MAKEFILE")"
+[ -n "$prerm_block" ] || fail 'package prerm hook is missing'
+printf '%s\n' "$prerm_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
+	fail 'package prerm must limit uHTTPd cleanup to runtime removal'
+printf '%s\n' "$prerm_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reload' ||
+	fail 'package prerm must unregister only the SmartSafeHub root rewrite via /bin/sh'
 
 firmware_config_block="$(awk '
 	/^config firmware / { in_block = 1 }

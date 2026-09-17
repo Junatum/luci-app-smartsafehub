@@ -1,5 +1,19 @@
 # 변경 기록
 
+## [0.2.15-r26] - 2026-09-18
+
+### 루트 URL 진입
+
+- 공식 사용자 URL을 공유기 루트 `/`로 변경했습니다. uHTTPd `json_script` request handler가 `REQUEST_URI == "/"`인 요청만 `/cgi-bin/luci/`로 내부 rewrite하므로 브라우저에는 `/cgi-bin/luci`가 노출되지 않습니다.
+- 이전 설계의 전역 `uhttpd.main.index_page` 변경은 사용하지 않습니다. `/www/index.html`도 덮어쓰지 않아 다른 디렉터리 index와 `/cgi-bin/cgi-upload`, `/ubus`, `/luci-static/...` 같은 명시적 endpoint의 기존 동작을 유지합니다.
+- root-entry helper는 기존 `uhttpd.main.json_script` handler를 보존한 채 SmartSafeHub handler를 뒤에 추가하고, 패키지 제거 시 자기 항목만 제거합니다. 설정이 실제로 바뀐 경우에만 uHTTPd를 reload합니다.
+- 패키지 설치/업그레이드는 `postinst`, 펌웨어 이미지에 기본 포함된 설치는 `uci-defaults`에서 같은 handler를 등록합니다. 기존 `/cgi-bin/luci/`, `/cgi-bin/luci/smartsafehub`, `/cgi-bin/luci/admin/smartsafehub`는 호환 경로로 유지하고 로드 후 브라우저 주소를 `/`로 정규화합니다.
+
+### 테스트 및 문서
+
+- exact-root rewrite JSON 계약, `index_page` 비변경, 기존 `json_script` 보존, 중복 설치/제거 idempotency, 선택적 uHTTPd reload를 검증하는 `test-root-url-rewrite.sh`를 추가했습니다.
+- 패키지 설치/제거 hook과 공식 public URL 정규화에 대한 회귀 계약을 보강하고 README/아키텍처 문서를 갱신했습니다.
+
 ## [0.2.15-r25] - 2026-09-17
 
 ### UI 개선

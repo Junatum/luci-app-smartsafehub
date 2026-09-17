@@ -32,17 +32,23 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 ### 로그인과 단일 진입 URL
 
-- 공식 사용자 URL은 `/cgi-bin/luci/smartsafehub#home` 하나로 통일
-- `/cgi-bin/luci/`도 first-child 규칙을 통해 인증이 필요 없는 SmartSafeHub Preact shell로 연결
+- 공식 사용자 URL은 공유기 루트 `/#home`이며 일반 접속은 `http://192.168.1.1/`처럼 `/cgi-bin/luci`를 노출하지 않음
+- `/etc/uhttpd/smartsafehub-root.json`의 uHTTPd `json_script`가 **정확히 `/` 요청만** `/cgi-bin/luci/`로 내부 rewrite하며 HTTP redirect를 사용하지 않으므로 브라우저 주소는 `/`로 유지
+- `uhttpd.main.index_page`와 OpenWrt가 소유하는 `/www/index.html`은 변경하지 않음. `/cgi-bin/cgi-upload`, `/ubus`, `/luci-static/...`, 다른 디렉터리 index 등 기존 uHTTPd 경로는 rewrite 대상이 아님
+- 기존 `uhttpd.main.json_script` handler가 있으면 순서를 보존하고 SmartSafeHub handler를 뒤에 추가하며, 패키지 제거 시 SmartSafeHub 항목만 제거
+- `/cgi-bin/luci/`, `/cgi-bin/luci/smartsafehub`, `/cgi-bin/luci/admin/smartsafehub`는 호환 진입 경로로 유지하되 shell이 로드되면 History API로 `/` 주소로 정규화
 - 공개 shell은 `auth: {}`로 항상 로드되므로 비로그인 상태에서도 LuCI dispatcher가 stock 로그인 화면이나 403을 먼저 반환하지 않음
 - Preact가 보호된 `/cgi-bin/luci/smartsafehub/session` endpoint를 조회해 현재 LuCI cookie session을 확인
 - 세션이 없으면 `LoginApp`, 유효한 세션 ID를 받으면 제품 `App`을 같은 Shadow DOM에서 렌더링
 - 로그인 폼은 `luci_username` / `luci_password`를 보호된 session endpoint에 POST하며 실제 비밀번호 검증, cookie 발급과 추가 인증 정책은 LuCI dispatcher가 담당
-- 로그인 성공 후 페이지 이동 없이 받은 session ID로 `/admin/ubus` bootstrap을 구성하고 같은 `/cgi-bin/luci/smartsafehub#home` URL에서 제품 화면으로 전환
+- 로그인 성공 후 페이지 이동 없이 받은 session ID로 `/admin/ubus` bootstrap을 구성하고 같은 `/#home` URL에서 제품 화면으로 전환
 - ubus `Access denied`를 세션 만료로 처리하기 전 동일 session ID로 기존 `system_root_password_status` RPC를 짧게 확인합니다. 새 패키지가 RPC/ACL을 추가한 직후 기존 세션에 해당 메서드 권한만 아직 반영되지 않은 경우에는 설정 화면을 강제로 로그아웃시키지 않고 권한 오류로 표시하며, 실제 기존 RPC 접근까지 거부될 때만 로그인 화면으로 전환합니다.
-- 예전 `/cgi-bin/luci/admin/smartsafehub` 경로도 공개 shell만 제공한 뒤 브라우저 주소를 공식 public URL로 정규화
 - 비밀번호 표시/숨김, Caps Lock 안내, 모바일 안전 영역 지원
 - 추가 인증 등 특수 LuCI 구성에서는 보호된 session endpoint의 기본 LuCI 로그인 화면으로 계속할 수 있는 fallback 제공
+
+루트 URL 등록은 `/usr/libexec/smartsafehub-root-entry`가 담당합니다. 실행 중인 공유기에 패키지를 설치/업그레이드하면 `postinst`가 handler를 추가한 뒤 uHTTPd를 reload하고, 펌웨어 이미지에 기본 포함된 경우 `uci-defaults`가 첫 부팅 설정에 handler를 등록합니다. 제거 시에는 기존 다른 `json_script` 항목은 보존하고 SmartSafeHub handler만 해제합니다. helper는 패치 적용 방식에 따른 executable bit 차이에 의존하지 않도록 `/bin/sh`로 명시 실행합니다.
+
+내부 LuCI/RPC/펌웨어 업로드 endpoint는 계속 기존 경로를 직접 사용합니다. 특히 펌웨어 업로드의 `/cgi-bin/cgi-upload` 등 `/`이 아닌 요청은 root rewrite와 무관합니다.
 
 ### 장치 대시보드
 

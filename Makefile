@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.15
-PKG_RELEASE:=25
+PKG_RELEASE:=26
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -37,10 +37,21 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 		/etc/init.d/smartsafehub-health enable
 		/etc/init.d/smartsafehub-health restart >/dev/null 2>&1 || true
 	fi
+	if [ -f /usr/libexec/smartsafehub-root-entry ]; then
+		/bin/sh /usr/libexec/smartsafehub-root-entry --install --reload
+	fi
 	rm -f /tmp/luci-indexcache
 	if [ -x /etc/init.d/rpcd ]; then
 		/etc/init.d/rpcd reload >/dev/null 2>&1 || true
 	fi
+fi
+exit 0
+endef
+
+define Package/luci-app-smartsafehub/prerm
+#!/bin/sh
+if [ -z "$${IPKG_INSTROOT}" ] && [ -f /usr/libexec/smartsafehub-root-entry ]; then
+	/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reload
 fi
 exit 0
 endef

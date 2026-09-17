@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r25`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r26`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -23,8 +23,10 @@ SmartSafeHub는 OpenWrt의 모든 고급 설정을 대체하지 않습니다. �
 
 ```text
 브라우저
-  │
-  │ /cgi-bin/luci/smartsafehub
+  │ /
+  ▼
+uHTTPd json_script
+  │ exact root만 내부 rewrite → /cgi-bin/luci/
   ▼
 LuCI public Preact shell (auth: {})
 root/usr/share/ucode/luci/template/smartsafehub/login.ut
@@ -72,11 +74,15 @@ SafeShield 관련 읽기·변경은 `safeshield` 패키지가 제공하는 공�
 root/usr/share/luci/menu.d/luci-app-smartsafehub.json
 ```
 
-공식 사용자 경로 `smartsafehub`는 `auth: {}`인 공개 shell입니다. 따라서 비로그인 요청도 dispatcher 인증 단계에서 막히지 않고 항상 `smartsafehub/login` 템플릿과 Preact 번들을 로드합니다.
+공식 사용자 URL은 공유기 루트 `/`입니다. `/etc/uhttpd/smartsafehub-root.json`은 uHTTPd `json_script`의 request rule로 `REQUEST_URI == "/"`인 경우에만 `/cgi-bin/luci/`로 내부 rewrite합니다. `uhttpd.main.index_page`나 `/www/index.html`은 변경하지 않으므로 다른 디렉터리 index, `/cgi-bin/cgi-upload`, `/ubus`, 정적 자산과 다른 패키지의 명시적 endpoint에는 적용되지 않습니다.
+
+`/usr/libexec/smartsafehub-root-entry`는 기존 `uhttpd.main.json_script` 값을 덮어쓰지 않고 SmartSafeHub handler를 뒤에 추가합니다. 패키지 제거 시에는 자기 handler만 `del_list`하며 다른 패키지 handler의 순서와 값은 유지합니다. 패키지 설치/업그레이드에서는 postinst가 변경이 있을 때만 uHTTPd를 reload하고, 펌웨어 기본 포함 설치에서는 `uci-defaults`가 첫 부팅에 등록합니다.
+
+LuCI의 `smartsafehub` 경로는 `auth: {}`인 공개 shell입니다. 따라서 비로그인 요청도 dispatcher 인증 단계에서 막히지 않고 항상 `smartsafehub/login` 템플릿과 Preact 번들을 로드합니다.
 
 `smartsafehub/session`은 cookie authentication과 `login: true`를 사용하는 별도 보호 endpoint입니다. Preact는 이 endpoint를 GET하여 세션 유무를 확인하고, 로그인 폼 제출 시 같은 endpoint에 `luci_username` / `luci_password`를 POST합니다. 세션이 없으면 GET probe는 403으로 끝나지만 이는 background fetch이므로 stock 로그인 화면이 사용자 UI를 덮지 않습니다.
 
-`admin/smartsafehub`는 이전 북마크 호환을 위해 child node에서 `auth: {}`를 명시한 공개 shell로 유지합니다. LuCI의 `admin` parent가 인증 노드여도 child auth가 public shell로 override되며, 프런트엔드는 즉시 `history.replaceState()`로 `/cgi-bin/luci/smartsafehub` 주소로 정규화합니다.
+`/cgi-bin/luci/`, `smartsafehub`, `admin/smartsafehub`는 기존 first-child 동작과 북마크 호환을 위해 유지합니다. `admin/smartsafehub`는 child node에서 `auth: {}`를 명시하므로 LuCI의 `admin` parent가 인증 노드여도 public shell로 override되며, 호환 경로에서 shell이 로드되면 프런트엔드는 `history.replaceState()`로 브라우저 주소를 `/`로 정규화합니다.
 
 ### 3.2 ACL
 
@@ -128,7 +134,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 
 주요 흐름:
 
-1. `/cgi-bin/luci/smartsafehub`는 `auth: {}`로 항상 Preact shell을 렌더링
+1. 브라우저가 `/`을 요청하면 uHTTPd가 exact-root rule로 `/cgi-bin/luci/`에 내부 rewrite하고 LuCI first-child가 `auth: {}`인 SmartSafeHub Preact shell을 렌더링
 2. `main.tsx`가 `/cgi-bin/luci/smartsafehub/session`을 GET
 3. 403이면 `LoginApp`, 유효한 32자리 session ID면 제품 `App` 렌더링
 4. 로그인 폼은 같은 session endpoint에 credentials를 POST
@@ -143,7 +149,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r16
+0.2.15-r26
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -669,9 +675,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r16
-  → app.js?v=0.2.15-r16
-  → app.css?v=0.2.15-r16
+  → data-asset-version = 0.2.15-r26
+  → app.js?v=0.2.15-r26
+  → app.css?v=0.2.15-r26
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

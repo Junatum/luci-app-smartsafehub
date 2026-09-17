@@ -45,5 +45,5 @@ export function smartSafeHubPublicUrl(hash = ''): string {
       : `#${hash}`
     : '';
 
-  return `${luciUrl('/smartsafehub')}${normalizedHash}`;
+  return `/${normalizedHash}`;
 }
