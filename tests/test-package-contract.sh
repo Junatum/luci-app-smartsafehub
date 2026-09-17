@@ -118,4 +118,18 @@ awk '
 	END { exit(found ? 0 : 1) }
 ' "$MAKEFILE" || fail '/etc/config/smartsafehub must be declared as a conffile'
 
-echo "PASS: package metadata, versions, conffile and executable permissions are consistent"
+postinst_block="$(awk '
+	/^define Package\/luci-app-smartsafehub\/postinst$/ { in_block = 1 }
+	in_block { print }
+	in_block && /^endef$/ { exit }
+' "$MAKEFILE")"
+[ -n "$postinst_block" ] || fail 'package postinst hook is missing'
+printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
+	fail 'package postinst must limit service enable to runtime installation'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
+	fail 'package postinst must force-enable smartsafehub-firmware'
+if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
+	fail 'firmware service enable must not depend on upgrade or previous enabled state'
+fi
+
+echo "PASS: package metadata, versions, conffile, forced firmware enable and executable permissions are consistent"

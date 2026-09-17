@@ -98,6 +98,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 홈 알림 배너와 업데이트 메뉴 badge로 설치 가능한 SmartSafeHub 애플리케이션 업데이트 표시
 - 관리 소프트웨어는 1·6·12·24시간 자동 확인 주기와 지정 시각 자동 설치를 지원하고, 명시적 설정이 없는 신규 설치에서는 Stable 채널만 자동 설치를 기본 활성화하고 Beta 채널은 비활성화. 펌웨어는 별도의 업데이트 영역에서 확인하며 자동 설치하지 않음
 - 데몬 시작 시 펌웨어는 10초 뒤, 관리 소프트웨어는 20초 뒤 최초 업데이트 확인을 수행합니다. 초기 네트워크가 아직 준비되지 않아 실패하면 60초 간격으로 최대 3회까지만 재시도하며, 이후에는 설정된 일반 확인 주기로 돌아갑니다. 관리 소프트웨어는 실패한 확인 시도 시각도 별도로 기록해 저장소 장애 중 `apk update`가 1분마다 반복되지 않도록 제한합니다.
+- `luci-app-smartsafehub`를 실제 공유기에 설치하거나 업그레이드할 때마다 `smartsafehub-firmware` 서비스를 강제로 enable합니다. 기존 설치에서 신규 펌웨어 데몬의 `S96smartsafehub-firmware` 링크가 없던 경우도 다음 패키지 업데이트 시 자동 복구되며, 사용자가 이전에 수동으로 disable했더라도 패키지 업데이트 정책이 다시 활성화합니다.
 - 기존 장치에 `auto_install` 값이 이미 저장되어 있으면 그 사용자의 선택을 그대로 유지
 - 애플리케이션 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
 - 로컬 APK 설치로 SmartSafeHub 또는 SafeShield가 `/etc/apk/world`의 identity hash에 고정된 경우 해당 두 항목만 일반 패키지 항목으로 정규화한 뒤 `apk upgrade luci-app-smartsafehub`를 실행합니다. identity pin 해제를 위해 `apk add --upgrade --latest`나 전역 `apk upgrade --available`을 사용하지 않아 관계없는 OpenWrt 패키지와 커널 모듈을 갱신 범위에 포함시키지 않습니다.

@@ -1,5 +1,16 @@
 # 변경 기록
 
+## [0.2.15-r4] - 2026-09-17
+
+### 수정
+
+- 기존 설치를 업그레이드했을 때 새로 추가된 `smartsafehub-firmware` init script에 `S96smartsafehub-firmware` 시작 링크가 생성되지 않아 재부팅 후 펌웨어 자동 확인 데몬이 `inactive` 상태로 남을 수 있던 문제를 수정했습니다.
+- `luci-app-smartsafehub`의 runtime post-install hook에서 설치와 업그레이드 시마다 `smartsafehub-firmware enable`을 강제로 실행하도록 변경했습니다. 이전 활성화 상태나 upgrade 여부를 보존하지 않으며, 패키지가 갱신될 때마다 펌웨어 자동 시작 상태를 복구합니다.
+
+### 테스트
+
+- package contract에 runtime post-install hook이 `smartsafehub-firmware enable`을 포함하고, `PKG_UPGRADE`나 기존 enabled 상태에 따라 실행을 건너뛰지 않는지 검증하는 회귀 테스트를 추가했습니다.
+
 ## [0.2.15-r3] - 2026-09-17
 
 ### UI 개선

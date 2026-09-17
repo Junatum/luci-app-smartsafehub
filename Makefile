@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.15
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -22,6 +22,14 @@ LUCI_PKGARCH:=all
 
 define Package/luci-app-smartsafehub/conffiles
 /etc/config/smartsafehub
+endef
+
+define Package/luci-app-smartsafehub/postinst
+#!/bin/sh
+if [ -z "$${IPKG_INSTROOT}" ] && [ -x /etc/init.d/smartsafehub-firmware ]; then
+	/etc/init.d/smartsafehub-firmware enable
+fi
+exit 0
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk
