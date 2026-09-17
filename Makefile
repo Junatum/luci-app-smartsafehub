@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.15
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -26,8 +26,12 @@ endef
 
 define Package/luci-app-smartsafehub/postinst
 #!/bin/sh
-if [ -z "$${IPKG_INSTROOT}" ] && [ -x /etc/init.d/smartsafehub-firmware ]; then
-	/etc/init.d/smartsafehub-firmware enable
+if [ -z "$${IPKG_INSTROOT}" ]; then
+	uci -q delete smartsafehub.firmware.check_enabled >/dev/null 2>&1 || true
+	uci -q commit smartsafehub >/dev/null 2>&1 || true
+	if [ -x /etc/init.d/smartsafehub-firmware ]; then
+		/etc/init.d/smartsafehub-firmware enable
+	fi
 fi
 exit 0
 endef

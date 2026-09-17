@@ -326,7 +326,6 @@ export function read_firmware_status() {
 	state.settings = {
 		channel: read_update_channel(),
 		apiBaseUrl: read_api_base_url(),
-		checkEnabled: firmware_config?.check_enabled != '0',
 		checkIntervalSeconds: check_interval,
 		autoInstall: false,
 	};

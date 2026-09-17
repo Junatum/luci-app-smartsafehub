@@ -37,7 +37,6 @@ PREPARED_SHA256=""
 PREPARED_SIZE=0
 ALLOW_BACKUP=0
 TARGET_BUILD_ID=""
-CHECK_ENABLED=1
 CHECK_INTERVAL_S="$DEFAULT_CHECK_INTERVAL_S"
 
 log_message() {
@@ -154,9 +153,6 @@ uci_get() {
 
 load_daemon_settings() {
 	local value
-
-	value="$(uci_get check_enabled)"
-	[ "$value" = "0" ] && CHECK_ENABLED=0 || CHECK_ENABLED=1
 
 	value="$(uci_get check_interval_s)"
 	case "$value" in
@@ -579,7 +575,6 @@ boot_check_with_retry() {
 
 	while [ "$attempt" -le "$BOOT_CHECK_MAX_ATTEMPTS" ]; do
 		load_daemon_settings
-		[ "$CHECK_ENABLED" = "1" ] || return 0
 
 		if execute_check; then
 			return 0
@@ -599,7 +594,6 @@ boot_check_with_retry() {
 
 periodic_check_if_due() {
 	local now last_check phase
-	[ "$CHECK_ENABLED" = "1" ] || return 0
 
 	phase="$(state_value phase)"
 	case "$phase" in

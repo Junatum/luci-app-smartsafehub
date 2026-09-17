@@ -57,7 +57,6 @@ export interface PreparedFirmware {
 export interface FirmwareSettings {
   channel: FirmwareChannel;
   apiBaseUrl: string;
-  checkEnabled: boolean;
   checkIntervalSeconds: number;
   autoInstall: false;
 }

@@ -128,8 +128,36 @@ printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package postinst must limit service enable to runtime installation'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
 	fail 'package postinst must force-enable smartsafehub-firmware'
+printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.check_enabled' ||
+	fail 'package postinst must remove the obsolete firmware check_enabled option on existing installs'
+if printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.updates.check_enabled'; then
+	fail 'package postinst must not remove the management software check_enabled option'
+fi
 if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
 	fail 'firmware service enable must not depend on upgrade or previous enabled state'
 fi
 
-echo "PASS: package metadata, versions, conffile, forced firmware enable and executable permissions are consistent"
+firmware_config_block="$(awk '
+	/^config firmware / { in_block = 1 }
+	in_block && /^config / && $0 !~ /^config firmware / { exit }
+	in_block { print }
+' "$CONFIG_FILE")"
+if printf '%s\n' "$firmware_config_block" | grep -Fq 'check_enabled'; then
+	fail 'firmware config must not expose check_enabled; firmware checks are always enabled'
+fi
+grep -Fq "config updates 'updates'" "$CONFIG_FILE" ||
+	fail 'updates config section is missing'
+grep -A5 -F "config updates 'updates'" "$CONFIG_FILE" | grep -Fq "option check_enabled '1'" ||
+	fail 'management software check_enabled must remain user-configurable'
+if grep -R -F 'smartsafehub.firmware.check_enabled' \
+	"$ROOT_DIR/root/usr/libexec/smartsafehub-firmware" \
+	"$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc" \
+	"$ROOT_DIR/frontend/src/types/firmware.ts" >/dev/null 2>&1; then
+	fail 'firmware-only code must not reference smartsafehub.firmware.check_enabled'
+fi
+if grep -Fq 'checkEnabled' "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc" || \
+	grep -Fq 'checkEnabled' "$ROOT_DIR/frontend/src/types/firmware.ts"; then
+	fail 'firmware status contract must not expose checkEnabled'
+fi
+
+echo "PASS: package metadata, versions, conffile, forced firmware enable, firmware check policy and executable permissions are consistent"

@@ -106,7 +106,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 펌웨어는 현재 패키지 저장소 channel과 장치 코드를 사용해 Hub의 `POST /api/v1/firmware/resolve` API에서 이 장치용 최신 Sysupgrade 배포를 확인
 - 펌웨어 제품 버전은 `1.0.2` 같은 `X.Y.Z` 릴리즈 버전을 사용하며, 이미지 빌드 후 관리자가 검증·게시할 때 Hub의 `OpenWrtBuild.release_version`에 지정합니다. 공유기 이미지의 `firmware.json`에는 릴리즈 버전을 넣지 않고 immutable `build_id`만 유지합니다.
 - 공유기는 `firmware.json`의 `build_id`를 resolve API에 보내고 Hub가 이를 현재 `release_version`으로 역조회합니다. 업데이트 가능 여부는 Hub가 현재/최신 릴리즈 버전을 비교해 결정하며, 공유기 UI는 `current_version`과 `release.version`을 제품 펌웨어 버전으로 표시하고 OpenWrt 버전과 build ID는 진단 정보로 구분합니다.
-- 펌웨어 자동 확인은 기본 활성화되어 6시간 간격으로 수행하며, 실제 펌웨어 자동 설치는 제공하지 않고 사용자의 명시적인 최종 확인이 있어야 설치
+- 펌웨어 업데이트 확인은 비활성화 옵션 없이 항상 수행하며 기본 6시간 간격으로 최신 버전을 확인합니다. 기존 설치에 남아 있는 `smartsafehub.firmware.check_enabled` 값은 패키지 설치/업그레이드 시 정리합니다. 관리 소프트웨어의 업데이트 확인 여부는 기존처럼 사용자가 선택할 수 있으며, 실제 펌웨어 자동 설치는 제공하지 않고 사용자의 명시적인 최종 확인이 있어야 설치
 - 온라인 펌웨어는 Hub가 제공한 파일 크기와 SHA-256을 검증한 뒤 OpenWrt `system.validate_firmware_image`와 `sysupgrade --test`를 모두 통과한 경우에만 설치 준비 완료로 표시
 - `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용. 수동 설치는 온라인 펌웨어 업데이트와 같은 카드 안에서 접이식 보조 영역으로 제공하고, 브라우저 기본 file input 대신 파일명·크기와 선택/검증 동작을 일관되게 표시하는 전용 파일 선택 UI를 사용
 - 수동 업로드 검증은 비동기 firmware helper의 실제 상태를 `ready` 또는 `error`까지 추적하며, 이전 작업의 stale error를 새 검증 결과로 오인하지 않습니다. 검증이 `ready`로 완료되면 backend `prepared` 정보를 기준으로 설정 유지 옵션과 펌웨어 설치 동작을 즉시 표시합니다.

@@ -71,7 +71,6 @@ set -eu
 case "${1:-}" in
 	get)
 		case "${2:-}" in
-			smartsafehub.firmware.check_enabled) echo 1 ;;
 			smartsafehub.firmware.check_interval_s) echo 21600 ;;
 			smartsafehub.firmware.api_base_url) echo 'https://www.smartsafehub.com/api/v1' ;;
 			*) exit 1 ;;
@@ -232,6 +231,13 @@ assert_contains "$TMP/firmware.state" "allow_backup${TAB}1"
 "$FIRMWARE" clean
 [ ! -e "$TMP/firmware.bin" ] || fail 'clean must remove the prepared firmware image'
 assert_contains "$TMP/firmware.state" "phase${TAB}idle"
+
+# Policy contract: firmware update checks are always enabled. The firmware helper
+# must not depend on an enable/disable UCI flag. Management-software update
+# check_enabled is intentionally separate and remains user-configurable.
+if grep -Fq 'check_enabled' "$FIRMWARE"; then
+	fail 'firmware helper must not depend on check_enabled'
+fi
 
 # Safety contract: SmartSafeHub never enables forced sysupgrade.
 if grep -Eq '"\$SYSUPGRADE_BIN"[^\n]*(--force|-F)' "$FIRMWARE"; then

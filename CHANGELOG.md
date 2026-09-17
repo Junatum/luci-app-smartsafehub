@@ -1,5 +1,17 @@
 # 변경 기록
 
+## [0.2.15-r5] - 2026-09-17
+
+### 개선
+
+- 펌웨어 업데이트 확인은 제품 정책상 항상 수행하므로 `smartsafehub.firmware.check_enabled` 설정과 펌웨어 helper의 활성화 분기를 제거했습니다. 부팅 초기 확인과 이후 주기 확인은 `check_interval_s`만 사용해 항상 실행됩니다. 기존 설치에 conffile로 남아 있을 수 있는 `smartsafehub.firmware.check_enabled` 값도 패키지 설치/업그레이드 시 제거합니다.
+- 펌웨어 상태 RPC와 프런트엔드 펌웨어 타입에서 사용되지 않던 `checkEnabled` 필드를 제거해 실제 동작과 API 계약을 일치시켰습니다.
+- 관리 소프트웨어 updater의 `smartsafehub.updates.check_enabled`와 UI 설정은 그대로 유지해 사용자가 관리 소프트웨어 업데이트 확인 여부를 계속 선택할 수 있습니다.
+
+### 테스트
+
+- 펌웨어 helper/config/API에 `check_enabled` 의존성이 다시 추가되지 않는지 검증하고, 동시에 관리 소프트웨어의 `check_enabled`가 유지되는지 확인하는 회귀 테스트를 추가했습니다.
+
 ## [0.2.15-r4] - 2026-09-17
 
 ### 수정
