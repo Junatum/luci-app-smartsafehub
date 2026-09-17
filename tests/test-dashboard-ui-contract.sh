@@ -8,13 +8,14 @@ HOME="$ROOT_DIR/frontend/src/pages/HomePage.tsx"
 ACTIVITY="$ROOT_DIR/frontend/src/components/DashboardSafeShieldActivity.tsx"
 DEVICES_HOOK="$ROOT_DIR/frontend/src/hooks/useConnectedDevices.ts"
 STATISTICS_HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
+FORMAT="$ROOT_DIR/frontend/src/app/format.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK"; do
+for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT"; do
 	[ -f "$file" ] || fail "missing dashboard source: ${file#$ROOT_DIR/}"
 done
 
@@ -75,8 +76,29 @@ grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \
 	fail 'Dashboard must render SafeShield activity visualization'
 grep -Fq 'title="시스템 상태"' "$HOME" || \
 	fail 'Dashboard must expose the system health section'
-grep -Fq 'title="최근 상태 확인"' "$HOME" || \
-	fail 'Dashboard must expose freshness information'
+if grep -Fq 'title="최근 상태 확인"' "$HOME" || grep -Fq 'dashboard-freshness-title' "$HOME"; then
+	fail 'Dashboard must not keep a separate freshness section'
+fi
+grep -Fq 'formatRelativeTime(timestamp, nowTimestamp)' "$HOME" || \
+	fail 'Dashboard overview cards must render relative freshness timestamps'
+grep -Fq "safeShieldStale ? '차단 목록 갱신 지연 ·' : '차단 목록 갱신'" "$HOME" || \
+	fail 'SafeShield overview must own its freshness metadata and stale warning'
+grep -Fq "devicesStale ? '목록 갱신 권장 ·' : '목록 확인'" "$HOME" || \
+	fail 'connected-device overview must own its freshness metadata and stale warning'
+grep -Fq "updatesStale ? '업데이트 확인 지연 ·' : '마지막 확인'" "$HOME" || \
+	fail 'software-update overview must own its freshness metadata and stale warning'
+grep -Fq "updates && !updates.settings.checkEnabled" "$HOME" || \
+	fail 'disabled software auto-check must not be reported as stale'
+grep -Fq 'const RELATIVE_TIME_TICK_MS = 60_000;' "$HOME" || \
+	fail 'Dashboard relative freshness labels must update once per minute without backend polling'
+grep -Fq "return '방금 전';" "$FORMAT" || \
+	fail 'relative time formatter must expose a just-now state'
+grep -Fq 'Math.floor(elapsedSeconds / 60)}분 전' "$FORMAT" || \
+	fail 'relative time formatter must expose minute granularity'
+grep -Fq 'Math.floor(elapsedSeconds / 3_600)}시간 전' "$FORMAT" || \
+	fail 'relative time formatter must expose hour granularity'
+grep -Fq 'Math.floor(elapsedSeconds / 86_400)}일 전' "$FORMAT" || \
+	fail 'relative time formatter must expose day granularity'
 grep -Fq 'formatLoadAverage(data.runtime.load[1])' "$HOME" || \
 	fail 'Dashboard must show the 5-minute load average'
 grep -Fq 'formatLoadAverage(data.runtime.load[2])' "$HOME" || \

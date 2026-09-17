@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import {
   ClockIcon,
@@ -21,6 +21,7 @@ import {
   formatBytes,
   formatLoadAverage,
   formatNumber,
+  formatRelativeTime,
   formatTimestamp,
   formatUptime,
   getMemoryUsage,
@@ -53,6 +54,8 @@ interface OverviewCardProps {
   eyebrow: string;
   href?: string;
   icon: ComponentChildren;
+  meta?: ComponentChildren;
+  metaWarning?: boolean;
   state?: OverviewState;
   value: string;
 }
@@ -72,6 +75,8 @@ function OverviewCard({
   eyebrow,
   href,
   icon,
+  meta,
+  metaWarning = false,
   state = 'neutral',
   value,
 }: OverviewCardProps) {
@@ -93,6 +98,15 @@ function OverviewCard({
       <p class="mt-2 mb-0 min-h-10 text-sm font-medium leading-5 text-slate-500">
         {detail}
       </p>
+      {meta ? (
+        <p
+          class={`mt-3 mb-0 text-xs font-bold ${
+            metaWarning ? 'text-amber-700' : 'text-slate-400'
+          }`}
+        >
+          {meta}
+        </p>
+      ) : null}
       {href ? (
         <span class="mt-4 inline-flex text-xs font-extrabold text-teal-700">자세히 보기 →</span>
       ) : null}
@@ -137,6 +151,34 @@ function SectionHeading({
       </h2>
       <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">{description}</p>
     </div>
+  );
+}
+
+const RELATIVE_TIME_TICK_MS = 60_000;
+const DEVICE_SUMMARY_STALE_AFTER_S = 15 * 60;
+
+function elapsedSeconds(timestamp: number | null | undefined, nowTimestamp: number): number | null {
+  if (!timestamp || !Number.isFinite(timestamp) || timestamp <= 0) {
+    return null;
+  }
+
+  return Math.max(0, nowTimestamp - timestamp);
+}
+
+function freshnessMeta(
+  label: string,
+  timestamp: number | null | undefined,
+  nowTimestamp: number,
+  fallback: string,
+): ComponentChildren {
+  if (!timestamp || timestamp <= 0) {
+    return fallback;
+  }
+
+  return (
+    <span title={formatTimestamp(timestamp)}>
+      {label} {formatRelativeTime(timestamp, nowTimestamp)}
+    </span>
   );
 }
 
@@ -226,6 +268,15 @@ export function HomePage({
   updatesLoading,
 }: HomePageProps) {
   const memory = useMemo(() => (data ? getMemoryUsage(data.runtime.memory) : null), [data]);
+  const [relativeNow, setRelativeNow] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRelativeNow(Math.floor(Date.now() / 1000));
+    }, RELATIVE_TIME_TICK_MS);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (loading) {
     return <LoadingPanel />;
@@ -280,6 +331,35 @@ export function HomePage({
     ? [data.network.protocol, data.network.ipv4Address].filter(Boolean).join(' · ') ||
       '인터페이스 정보 없음'
     : 'WAN 인터페이스를 찾을 수 없습니다.';
+  const safeShieldRefreshAge = elapsedSeconds(
+    safeshield?.timestamps.lastSuccess,
+    relativeNow,
+  );
+  const safeShieldStaleThreshold = safeshield
+    ? Math.max(safeshield.timestamps.refreshIntervalS * 2, 86_400)
+    : null;
+  const safeShieldStale = Boolean(
+    safeshield?.enabled &&
+      safeshield.status !== 'running' &&
+      safeShieldRefreshAge !== null &&
+      safeShieldStaleThreshold !== null &&
+      safeShieldRefreshAge > safeShieldStaleThreshold,
+  );
+  const devicesAge = elapsedSeconds(devices?.generatedAt, relativeNow);
+  const devicesStale = Boolean(
+    devicesAge !== null && devicesAge > DEVICE_SUMMARY_STALE_AFTER_S,
+  );
+  const updateAge = elapsedSeconds(updates?.lastCheckAt, relativeNow);
+  const updateStaleThreshold = updates
+    ? Math.max(updates.settings.checkIntervalSeconds * 2, 7_200)
+    : null;
+  const updatesStale = Boolean(
+    updates?.settings.checkEnabled &&
+      updates.phase !== 'checking' &&
+      updateAge !== null &&
+      updateStaleThreshold !== null &&
+      updateAge > updateStaleThreshold,
+  );
 
   return (
     <div class="min-w-0 space-y-6">
@@ -303,7 +383,18 @@ export function HomePage({
             eyebrow="SafeShield"
             href="#safeshield"
             icon={<ShieldIcon class="size-5" />}
-            state={safeShieldSummary.state}
+            meta={freshnessMeta(
+              safeShieldStale ? '차단 목록 갱신 지연 ·' : '차단 목록 갱신',
+              safeshield?.timestamps.lastSuccess,
+              relativeNow,
+              safeshieldLoading ? '최근 갱신 확인 중' : '최근 갱신 기록 없음',
+            )}
+            metaWarning={safeShieldStale}
+            state={
+              safeShieldSummary.state === 'healthy' && safeShieldStale
+                ? 'warning'
+                : safeShieldSummary.state
+            }
             value={safeShieldSummary.value}
           />
           <OverviewCard
@@ -311,7 +402,22 @@ export function HomePage({
             eyebrow="Connected devices"
             href="#devices"
             icon={<DevicesIcon class="size-5" />}
-            state={devices ? 'healthy' : devicesError ? 'warning' : 'neutral'}
+            meta={freshnessMeta(
+              devicesStale ? '목록 갱신 권장 ·' : '목록 확인',
+              devices?.generatedAt,
+              relativeNow,
+              devicesLoading ? '목록 확인 중' : '최근 확인 기록 없음',
+            )}
+            metaWarning={devicesStale}
+            state={
+              devices
+                ? devicesStale
+                  ? 'warning'
+                  : 'healthy'
+                : devicesError
+                  ? 'warning'
+                  : 'neutral'
+            }
             value={devicesValue}
           />
           <OverviewCard
@@ -319,8 +425,24 @@ export function HomePage({
             eyebrow="Software update"
             href="#system"
             icon={<UpdateIcon class="size-5" />}
+            meta={
+              updates && !updates.settings.checkEnabled
+                ? freshnessMeta(
+                    '자동 확인 꺼짐 · 마지막 확인',
+                    updates.lastCheckAt,
+                    relativeNow,
+                    '자동 확인 꺼짐 · 확인 기록 없음',
+                  )
+                : freshnessMeta(
+                    updatesStale ? '업데이트 확인 지연 ·' : '마지막 확인',
+                    updates?.lastCheckAt,
+                    relativeNow,
+                    updatesLoading ? '업데이트 확인 중' : '아직 확인하지 않음',
+                  )
+            }
+            metaWarning={updatesStale}
             state={
-              updatesError
+              updatesError || updatesStale
                 ? 'warning'
                 : updateAvailable
                   ? 'warning'
@@ -526,46 +648,6 @@ export function HomePage({
         </div>
       </section>
 
-      <section aria-labelledby="dashboard-freshness-title">
-        <SectionHeading
-          description="Dashboard에 표시된 보안, 기기와 업데이트 정보의 최근 확인 시각입니다."
-          eyebrow="Status freshness"
-          id="dashboard-freshness-title"
-          title="최근 상태 확인"
-        />
-        <article class="min-w-0 rounded-2xl border border-slate-200 bg-white px-5 shadow-sm shadow-slate-900/5 sm:px-6">
-          <dl class="m-0 grid min-w-0 lg:grid-cols-3 lg:divide-x lg:divide-slate-200">
-            <div class="py-4 lg:pr-6">
-              <dt class="text-xs font-extrabold text-slate-500">SafeShield 차단 목록</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">
-                {safeshield?.timestamps.lastSuccess
-                  ? formatTimestamp(safeshield.timestamps.lastSuccess)
-                  : safeshieldLoading
-                    ? '확인 중'
-                    : '기록 없음'}
-              </dd>
-            </div>
-            <div class="border-t border-slate-100 py-4 lg:border-t-0 lg:px-6">
-              <dt class="text-xs font-extrabold text-slate-500">연결 기기 목록</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">
-                {devices?.generatedAt
-                  ? formatTimestamp(devices.generatedAt)
-                  : devicesLoading
-                    ? '확인 중'
-                    : '기록 없음'}
-              </dd>
-            </div>
-            <div class="border-t border-slate-100 py-4 lg:border-t-0 lg:pl-6">
-              <dt class="text-xs font-extrabold text-slate-500">소프트웨어 업데이트</dt>
-              <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">
-                {updates?.lastCheckAt
-                  ? formatTimestamp(updates.lastCheckAt)
-                  : '아직 확인하지 않음'}
-              </dd>
-            </div>
-          </dl>
-        </article>
-      </section>
     </div>
   );
 }

@@ -72,6 +72,28 @@ export function formatTimestamp(timestamp: number): string {
   return TIMESTAMP_FORMATTER.format(new Date(timestamp * 1000));
 }
 
+export function formatRelativeTime(timestamp: number, nowTimestamp = Date.now() / 1000): string {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return '기록 없음';
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor(nowTimestamp - timestamp));
+
+  if (elapsedSeconds < 60) {
+    return '방금 전';
+  }
+
+  if (elapsedSeconds < 3_600) {
+    return `${Math.floor(elapsedSeconds / 60)}분 전`;
+  }
+
+  if (elapsedSeconds < 86_400) {
+    return `${Math.floor(elapsedSeconds / 3_600)}시간 전`;
+  }
+
+  return `${Math.floor(elapsedSeconds / 86_400)}일 전`;
+}
+
 export function formatTimestampInTimezone(
   timestamp: number,
   zonename: string,
