@@ -32,6 +32,7 @@ import type {
 import { callApi } from './rpc';
 
 const API_OBJECT = 'smartsafehub';
+const LAN_API_OBJECT = 'smartsafehub_network';
 
 export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
   return callApi(API_OBJECT, 'connected_devices');
@@ -160,14 +161,14 @@ export function requestSystemReboot(): Promise<SystemRebootResult> {
 }
 
 export function fetchLanSettings(): Promise<LanSettings> {
-  return callApi(API_OBJECT, 'lan_settings');
+  return callApi(LAN_API_OBJECT, 'lan_settings');
 }
 
 export function updateLanSettings(
   input: LanSettingsInput,
 ): Promise<LanUpdateResult> {
   return callApi(
-    API_OBJECT,
+    LAN_API_OBJECT,
     'lan_update',
     {
       ip_address: input.ipAddress,
@@ -184,7 +185,7 @@ export function updateLanSettings(
 
 export function applyRecommendedLanSubnet(): Promise<LanUpdateResult> {
   return callApi(
-    API_OBJECT,
+    LAN_API_OBJECT,
     'lan_auto_subnet',
     { confirm: 'apply' },
     { timeoutMs: 10_000 },

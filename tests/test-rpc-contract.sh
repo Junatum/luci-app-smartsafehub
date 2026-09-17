@@ -34,8 +34,16 @@ assert_acl_method() {
 		"$ACL" >/dev/null || fail "$method is missing from $access ACL"
 }
 
+assert_acl_object_method() {
+	access="$1"
+	object="$2"
+	method="$3"
+	jq -e --arg access "$access" --arg object "$object" --arg method "$method" \
+		'.["luci-app-smartsafehub"][$access].ubus[$object] | index($method) != null' \
+		"$ACL" >/dev/null || fail "$object.$method is missing from $access ACL"
+}
+
 for method in system_root_password_status system_root_password_set \
-	lan_settings lan_update lan_auto_subnet \
 	updates_status updates_check updates_install updates_settings_update \
 	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
 	system_time_settings system_timezone_update system_time_sync \
@@ -56,18 +64,25 @@ assert_acl_method write system_root_password_set
 if grep -Eq "network[-_]management\.uc" "$RPC_ENTRY"; then
 	fail 'main smartsafehub RPC entry must not directly import LAN implementation'
 fi
-grep -Fq "safe_call('smartsafehub_network', method, args ?? {})" "$RPC_ENTRY" || \
-	fail 'public LAN RPCs must proxy the isolated LAN backend'
+if grep -Fq 'smartsafehub_network' "$RPC_ENTRY"; then
+	fail 'main smartsafehub RPC entry must not synchronously call the LAN rpcd object'
+fi
 grep -Fq "from './smartsafehub/network-management.uc';" "$LAN_RPC_ENTRY" || \
 	fail 'isolated LAN backend must use the canonical LAN implementation module path'
 grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
 	fail 'isolated LAN backend must register its own ubus object'
-if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_network != null or ."luci-app-smartsafehub".write.ubus.smartsafehub_network != null' "$ACL" >/dev/null; then
-	fail 'isolated LAN backend must not be directly exposed through LuCI ACL'
-fi
-assert_acl_method read lan_settings
-assert_acl_method write lan_update
-assert_acl_method write lan_auto_subnet
+grep -Fq "import { root_password_configured } from './smartsafehub/security.uc';" "$LAN_RPC_ENTRY" || \
+	fail 'isolated LAN backend must enforce the root password gate itself'
+for method in lan_settings lan_update lan_auto_subnet; do
+	grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$LAN_RPC_ENTRY" || \
+		fail "isolated LAN rpc method is not registered: $method"
+	if grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$RPC_ENTRY"; then
+		fail "LAN rpc method must not be duplicated in the main object: $method"
+	fi
+done
+assert_acl_object_method read smartsafehub_network lan_settings
+assert_acl_object_method write smartsafehub_network lan_update
+assert_acl_object_method write smartsafehub_network lan_auto_subnet
 assert_acl_method read updates_status
 assert_acl_method write updates_check
 assert_acl_method write updates_install

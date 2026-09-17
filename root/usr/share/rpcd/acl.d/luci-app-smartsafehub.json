@@ -7,7 +7,6 @@
           "system_root_password_status",
           "status",
           "connected_devices",
-          "lan_settings",
           "wifi_summary",
           "updates_status",
           "firmware_status",
@@ -20,6 +19,9 @@
           "statistics",
           "config",
           "rules_list"
+        ],
+        "smartsafehub_network": [
+          "lan_settings"
         ]
       },
       "cgi-io": [
@@ -30,8 +32,6 @@
       "ubus": {
         "smartsafehub": [
           "system_root_password_set",
-          "lan_update",
-          "lan_auto_subnet",
           "wifi_update",
           "system_timezone_update",
           "system_time_sync",
@@ -59,6 +59,10 @@
           "rule_delete",
           "license_get",
           "license_update"
+        ],
+        "smartsafehub_network": [
+          "lan_update",
+          "lan_auto_subnet"
         ]
       },
       "cgi-io": [

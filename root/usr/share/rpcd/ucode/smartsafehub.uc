@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
-import { failure, safe_call } from './smartsafehub/core.uc';
+import { failure } from './smartsafehub/core.uc';
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
 	discard_uploaded_backup,
@@ -67,19 +67,6 @@ function require_root_password(handler) {
 	};
 }
 
-function call_lan_backend(method, args) {
-	const result = safe_call('smartsafehub_network', method, args ?? {});
-
-	if (type(result) != 'object' || type(result?.ok) != 'bool') {
-		return failure(
-			'LAN_BACKEND_UNAVAILABLE',
-			'내부 네트워크 관리 기능을 불러오지 못했습니다. rpcd 상태를 확인해 주세요.'
-		);
-	}
-
-	return result;
-}
-
 const methods = {
 	system_root_password_status: {
 		call: function(request) {
@@ -102,33 +89,6 @@ const methods = {
 	connected_devices: {
 		call: require_root_password(function(request) {
 			return read_connected_devices();
-		}),
-	},
-	lan_settings: {
-		call: require_root_password(function(request) {
-			return call_lan_backend('lan_settings', {});
-		}),
-	},
-	lan_update: {
-		args: {
-			ip_address: '',
-			prefix_length: 24,
-			dhcp_enabled: true,
-			dhcp_start: '',
-			dhcp_end: '',
-			lease_time: '12h',
-			confirm: '',
-		},
-		call: require_root_password(function(request) {
-			return call_lan_backend('lan_update', request.args);
-		}),
-	},
-	lan_auto_subnet: {
-		args: {
-			confirm: '',
-		},
-		call: require_root_password(function(request) {
-			return call_lan_backend('lan_auto_subnet', request.args);
 		}),
 	},
 	wifi_summary: {

@@ -1,17 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 
+import { failure } from './smartsafehub/core.uc';
+import { root_password_configured } from './smartsafehub/security.uc';
 import {
 	apply_recommended_lan,
 	read_lan_settings,
 	update_lan_settings
 } from './smartsafehub/network-management.uc';
 
+function require_root_password(handler) {
+	return function(request) {
+		const configured = root_password_configured();
+
+		if (configured == null) {
+			return failure(
+				'SYSTEM_ROOT_PASSWORD_STATUS_UNAVAILABLE',
+				'root 비밀번호 설정 상태를 확인하지 못했습니다.'
+			);
+		}
+		if (!configured) {
+			return failure(
+				'SYSTEM_ROOT_PASSWORD_REQUIRED',
+				'SmartSafeHub를 사용하기 전에 root 관리자 비밀번호를 설정해 주세요.'
+			);
+		}
+
+		return handler(request);
+	};
+}
+
 const methods = {
 	lan_settings: {
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return read_lan_settings();
-		},
+		}),
 	},
 	lan_update: {
 		args: {
@@ -23,17 +46,17 @@ const methods = {
 			lease_time: '12h',
 			confirm: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return update_lan_settings(request);
-		},
+		}),
 	},
 	lan_auto_subnet: {
 		args: {
 			confirm: '',
 		},
-		call: function(request) {
+		call: require_root_password(function(request) {
 			return apply_recommended_lan(request);
-		},
+		}),
 	},
 };
 

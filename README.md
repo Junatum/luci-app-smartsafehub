@@ -375,19 +375,19 @@ ubus -v list smartsafehub
 ubus call smartsafehub status '{}'
 ```
 
-LAN/DHCP 구현은 기존 관리 RPC의 가용성을 보호하기 위해 별도 내부 객체로 격리되어 있습니다. 정상 상태에서는 다음 객체도 등록됩니다. 브라우저에서는 이 객체를 직접 호출하지 않고 공개 `smartsafehub` LAN RPC가 내부적으로 프록시합니다.
+LAN/DHCP 구현은 기존 관리 RPC의 가용성을 보호하기 위해 별도 `smartsafehub_network` ubus 객체로 격리되어 있습니다. LAN 화면은 같은 `rpcd` 프로세스 안에서 다른 객체를 동기 프록시하지 않고 이 객체를 직접 호출합니다. `smartsafehub_network`는 자체적으로 관리자 비밀번호 설정 상태를 확인하며 LuCI ACL도 LAN 읽기/쓰기 메서드에만 제한됩니다.
 
 ```bash
 ubus -v list smartsafehub_network
 ubus call smartsafehub_network lan_settings '{}'
 ```
 
-`smartsafehub_network`가 없어도 `smartsafehub` 객체와 로그인/대시보드 RPC는 계속 동작해야 합니다. LAN 화면에서는 backend unavailable 오류를 표시합니다. LAN 구현 파일은 기존 경로인 `smartsafehub/network-management.uc`를 그대로 사용해 패치/체크아웃 과정의 파일명 이동에 의존하지 않습니다.
+`smartsafehub_network`가 로드되지 않더라도 `smartsafehub` 객체와 로그인/대시보드 RPC는 계속 동작해야 합니다. LAN 구현 파일은 기존 경로인 `smartsafehub/network-management.uc`를 그대로 사용해 패치/체크아웃 과정의 파일명 이동에 의존하지 않습니다.
 
 주요 읽기 기능:
 
 ```bash
-ubus call smartsafehub lan_settings '{}'
+ubus call smartsafehub_network lan_settings '{}'
 ubus call smartsafehub wifi_summary '{}'
 ubus call smartsafehub connected_devices '{}'
 ubus call smartsafehub system_time_settings '{}'
@@ -396,7 +396,7 @@ ubus call safeshield config '{}'
 ubus call safeshield rules_list '{}'
 ```
 
-SmartSafeHub 자체 RPC는 장치·LAN/DHCP·Wi-Fi·시스템·로컬 Health 기능을 소유합니다. Health 관련 RPC는 다음과 같습니다.
+SmartSafeHub의 핵심 `smartsafehub` RPC는 장치·Wi-Fi·시스템·로컬 Health 기능을 소유하고, LAN/DHCP는 장애 격리를 위해 `smartsafehub_network` 객체가 소유합니다. Health 관련 RPC는 다음과 같습니다.
 
 ```text
 health_status
@@ -489,6 +489,13 @@ rm -f /tmp/luci-indexcache
 브라우저에서는 강력 새로고침을 수행하거나 기존 SmartSafeHub 탭을 닫고 다시 접속합니다. 통합 진입 템플릿의 `app.js?v=...`와 Shadow DOM용 `app.css?v=...`에는 현재 패키지의 `PKG_VERSION-rPKG_RELEASE` 값이 사용되므로 패키지 릴리스 변경 시 브라우저 캐시가 함께 무효화됩니다.
 
 ## 배포 전 체크리스트
+
+셸 계약 테스트는 stdout의 `PASS:`뿐 아니라 stderr가 비어 있는지도 확인합니다. ACL을 `jq`로 검증할 때 여러 배열을 `or`로 비교하는 식은 각 파이프 표현식을 괄호로 분리해, 파이프의 중간 배열이 다음 ACL 경로의 입력으로 전달되지 않도록 유지합니다.
+
+```bash
+sh tests/test-lan-settings.sh
+shellspec spec/contracts_spec.sh
+```
 
 ```bash
 cd frontend

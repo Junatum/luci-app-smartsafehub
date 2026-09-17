@@ -27,30 +27,39 @@ done
 if grep -Fq "network-management.uc" "$RPC_ENTRY" || grep -Fq "network_management.uc" "$RPC_ENTRY"; then
 	fail '공개 smartsafehub RPC entry가 LAN 구현 모듈을 직접 import하면 안 됩니다.'
 fi
-grep -Fq "safe_call('smartsafehub_network', method, args ?? {})" "$RPC_ENTRY" || \
-	fail '공개 LAN RPC는 격리된 smartsafehub_network backend를 프록시해야 합니다.'
-grep -Fq "'LAN_BACKEND_UNAVAILABLE'" "$RPC_ENTRY" || \
-	fail 'LAN backend 로드 실패를 기존 RPC 객체 중단 없이 도메인 오류로 반환해야 합니다.'
+if grep -Fq 'smartsafehub_network' "$RPC_ENTRY"; then
+	fail 'smartsafehub RPC가 같은 rpcd 프로세스의 LAN 객체를 동기 ubus 호출하면 안 됩니다.'
+fi
 grep -Fq "from './smartsafehub/network-management.uc';" "$LAN_RPC_ENTRY" || \
 	fail '격리된 LAN RPC entry가 기존 LAN 구현 모듈을 불러와야 합니다.'
 grep -Fq 'return { smartsafehub_network: methods };' "$LAN_RPC_ENTRY" || \
 	fail '격리된 LAN backend ubus 객체가 등록되어야 합니다.'
 for method in lan_settings lan_update lan_auto_subnet; do
-	grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$RPC_ENTRY" || \
-		fail "공개 LAN RPC 메서드가 등록되지 않았습니다: $method"
+	if grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$RPC_ENTRY"; then
+		fail "LAN RPC 메서드는 핵심 smartsafehub 객체에 중복 등록하면 안 됩니다: $method"
+	fi
 	grep -Eq "^[[:space:]]*${method}:[[:space:]]*\\{" "$LAN_RPC_ENTRY" || \
-		fail "내부 LAN RPC 메서드가 등록되지 않았습니다: $method"
+		fail "격리 LAN RPC 메서드가 등록되지 않았습니다: $method"
 done
 
-jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("lan_settings") != null' "$ACL" >/dev/null || \
-	fail 'lan_settings 읽기 ACL이 필요합니다.'
+grep -Fq "import { root_password_configured } from './smartsafehub/security.uc';" "$LAN_RPC_ENTRY" || \
+	fail '격리 LAN RPC가 자체적으로 관리자 비밀번호 설정 상태를 확인해야 합니다.'
+grep -Fq 'call: require_root_password(function(request)' "$LAN_RPC_ENTRY" || \
+	fail '격리 LAN RPC 메서드는 관리자 비밀번호 gate를 직접 적용해야 합니다.'
+
+jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_network | index("lan_settings") != null' "$ACL" >/dev/null || \
+	fail 'smartsafehub_network.lan_settings 읽기 ACL이 필요합니다.'
 for method in lan_update lan_auto_subnet; do
-	jq -e --arg method "$method" '."luci-app-smartsafehub".write.ubus.smartsafehub | index($method) != null' "$ACL" >/dev/null || \
-		fail "$method 쓰기 ACL이 필요합니다."
+	jq -e --arg method "$method" '."luci-app-smartsafehub".write.ubus.smartsafehub_network | index($method) != null' "$ACL" >/dev/null || \
+		fail "smartsafehub_network.$method 쓰기 ACL이 필요합니다."
 done
 
-if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_network != null or ."luci-app-smartsafehub".write.ubus.smartsafehub_network != null' "$ACL" >/dev/null; then
-	fail '내부 smartsafehub_network 객체를 브라우저 ACL에 직접 노출하면 안 됩니다.'
+if jq -e '
+	((."luci-app-smartsafehub".read.ubus.smartsafehub // []) | index("lan_settings") != null) or
+	((."luci-app-smartsafehub".write.ubus.smartsafehub // []) | index("lan_update") != null) or
+	((."luci-app-smartsafehub".write.ubus.smartsafehub // []) | index("lan_auto_subnet") != null)
+' "$ACL" >/dev/null; then
+	fail 'LAN 메서드를 핵심 smartsafehub 객체 ACL에 중복 노출하면 안 됩니다.'
 fi
 
 grep -Fq "const SAFE_LAN_CANDIDATES = [" "$LAN_MODULE" || \
@@ -88,8 +97,10 @@ grep -Fq 'restore_snapshot(snapshot)' "$LAN_MODULE" || \
 grep -Fq "const LAN_UPDATE_LOCK = '/tmp/smartsafehub/lan-update.lock';" "$LAN_MODULE" || \
 	fail '동시 LAN 설정 변경을 직렬화하는 잠금이 필요합니다.'
 
-grep -Fq "return callApi(API_OBJECT, 'lan_settings');" "$API" || \
-	fail '프런트엔드 LAN 조회 API가 필요합니다.'
+grep -Fq "const LAN_API_OBJECT = 'smartsafehub_network';" "$API" || \
+	fail '프런트엔드 LAN API는 격리된 ubus 객체를 직접 사용해야 합니다.'
+grep -Fq "return callApi(LAN_API_OBJECT, 'lan_settings');" "$API" || \
+	fail '프런트엔드 LAN 조회 API가 격리된 ubus 객체를 호출해야 합니다.'
 grep -Fq "'lan_update'" "$API" || fail '프런트엔드 LAN 저장 API가 필요합니다.'
 grep -Fq "'lan_auto_subnet'" "$API" || fail '프런트엔드 추천 대역 적용 API가 필요합니다.'
 grep -Fq "export function useLan(active: boolean)" "$HOOK" || \

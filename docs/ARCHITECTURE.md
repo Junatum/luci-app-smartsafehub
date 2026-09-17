@@ -381,9 +381,9 @@ ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus
 
 #### `smartsafehub-network.uc` / `network-management.uc`
 
-공개 `smartsafehub` RPC와 LAN 구현의 장애 범위를 분리하기 위해 `smartsafehub-network.uc`가 내부 `smartsafehub_network` ubus 객체를 등록하고, 공개 `smartsafehub`의 LAN 메서드는 `safe_call()`로 이 내부 객체를 프록시합니다. 내부 객체는 LuCI ACL에 직접 노출하지 않습니다. 따라서 LAN 구현이 로드되지 않아도 `system_root_password_status`와 대시보드용 기존 RPC 객체는 유지됩니다.
+`smartsafehub-network.uc`는 LAN 구현을 별도 `smartsafehub_network` ubus 객체로 등록해 핵심 `smartsafehub` RPC와 장애 범위를 분리합니다. LAN 화면은 이 객체를 직접 호출하며 핵심 RPC가 같은 `rpcd` 프로세스의 다른 ucode 객체를 동기 `ubus.call()`로 다시 호출하지 않습니다. LAN 객체는 자체적으로 관리자 비밀번호 설정 상태를 확인하고 LuCI ACL에는 LAN 메서드만 최소 권한으로 노출합니다. 따라서 LAN 구현이 로드되지 않아도 `system_root_password_status`와 대시보드용 기존 RPC 객체는 유지됩니다.
 
-기존 `network-management.uc` 파일명은 그대로 유지합니다. LAN backend 격리와 무관한 파일명 rename을 피워 패치/checkout 과정에서 구현 모듈이 누락되는 회귀를 방지합니다.
+기존 `network-management.uc` 파일명은 그대로 유지합니다. LAN backend 격리와 무관한 파일명 rename을 피하여 패치/checkout 과정에서 구현 모듈이 누락되는 회귀를 방지합니다.
 
 기본 `network.lan`/`dhcp.lan`의 LAN 및 DHCP 관리:
 
@@ -494,21 +494,21 @@ rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가
 
 ## 6. 공개 RPC 계약
 
-SmartSafeHub 자체 RPC에는 장치·LAN/DHCP·Wi-Fi·시스템 기능과 로컬 Health 기능이 포함됩니다.
+핵심 `smartsafehub` RPC에는 장치·Wi-Fi·시스템 기능과 로컬 Health 기능이 포함됩니다. LAN/DHCP는 별도 `smartsafehub_network` 객체가 제공합니다.
 
-| 메서드 | 유형 | 인자 | 설명 |
+| 객체 / 메서드 | 유형 | 인자 | 설명 |
 |---|---|---|---|
-| `status` | 읽기 | 없음 | 장치, 소프트웨어, 런타임과 WAN 상태 |
-| `connected_devices` | 읽기 | 없음 | 연결 기기 목록과 집계 |
-| `lan_settings` | 읽기 | 없음 | LAN/DHCP 설정, WAN 충돌 상태와 추천 대역 |
-| `lan_update` | 쓰기 | `ip_address`, `prefix_length`, `dhcp_enabled`, `dhcp_start`, `dhcp_end`, `lease_time`, `confirm` | LAN/DHCP 수동 변경 |
-| `lan_auto_subnet` | 쓰기 | `confirm` | WAN 충돌 시 안전한 추천 `/24` 대역 자동 적용 |
-| `wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
-| `wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
-| `system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
-| `health_status` | 읽기 | 없음 | 최신 로컬 Health와 Reporter 상태 조회 |
-| `health_run` | 쓰기 | 없음 | 로컬 Health 진단 helper를 비동기로 시작 |
-| `health_reporter_update` | 쓰기 | `enabled` | 유료/Trial eligibility 확인 후 원격 보고 opt-in 변경 |
+| `smartsafehub.status` | 읽기 | 없음 | 장치, 소프트웨어, 런타임과 WAN 상태 |
+| `smartsafehub.connected_devices` | 읽기 | 없음 | 연결 기기 목록과 집계 |
+| `smartsafehub_network.lan_settings` | 읽기 | 없음 | LAN/DHCP 설정, WAN 충돌 상태와 추천 대역 |
+| `smartsafehub_network.lan_update` | 쓰기 | `ip_address`, `prefix_length`, `dhcp_enabled`, `dhcp_start`, `dhcp_end`, `lease_time`, `confirm` | LAN/DHCP 수동 변경 |
+| `smartsafehub_network.lan_auto_subnet` | 쓰기 | `confirm` | WAN 충돌 시 안전한 추천 `/24` 대역 자동 적용 |
+| `smartsafehub.wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
+| `smartsafehub.wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
+| `smartsafehub.system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
+| `smartsafehub.health_status` | 읽기 | 없음 | 최신 로컬 Health와 Reporter 상태 조회 |
+| `smartsafehub.health_run` | 쓰기 | 없음 | 로컬 Health 진단 helper를 비동기로 시작 |
+| `smartsafehub.health_reporter_update` | 쓰기 | `enabled` | 유료/Trial eligibility 확인 후 원격 보고 opt-in 변경 |
 
 SafeShield 기능은 아래 공식 API를 직접 소비합니다.
 
@@ -546,7 +546,8 @@ HomePage 또는 SettingsPage
 ```text
 LanPage form
   → useLan.save 또는 useLan.applyRecommendation
-  → smartsafehub.lan_update / lan_auto_subnet
+  → smartsafehub_network.lan_update / lan_auto_subnet
+  → smartsafehub_network 자체 관리자 비밀번호 gate
   → 사설 IPv4·CIDR·DHCP pool 검증
   → WAN/LAN subnet overlap 거부
   → network.lan + dhcp.lan UCI snapshot

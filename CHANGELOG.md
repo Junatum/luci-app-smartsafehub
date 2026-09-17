@@ -1,5 +1,20 @@
 # 변경 기록
 
+## [0.2.15-r19] - 2026-09-17
+
+### 수정
+
+- LAN 화면이 `smartsafehub.lan_settings`에서 같은 `rpcd` 프로세스 안의 `smartsafehub_network` 객체를 `safe_call()`로 동기 호출하면서 응답을 받지 못해 `LAN_BACKEND_UNAVAILABLE`로 표시되던 문제를 수정했습니다.
+- 핵심 `smartsafehub` 객체에서 LAN 프록시 메서드를 제거하고 LAN 화면이 격리된 `smartsafehub_network` 객체를 직접 호출하도록 변경했습니다. 이 구조는 LAN 구현의 로드 실패가 대시보드 RPC로 전파되지 않는 격리 특성을 유지하면서 rpcd 내부 동기 중첩 ubus 호출도 피합니다.
+- `smartsafehub_network`에 관리자 비밀번호 설정 상태 확인을 직접 적용하고 LuCI ACL에는 `lan_settings` 읽기와 `lan_update`/`lan_auto_subnet` 쓰기 권한만 명시적으로 허용했습니다.
+
+### 테스트 및 문서
+
+- LAN ACL 중복 노출 검사에서 `jq` 파이프와 `or`의 연산자 우선순위 때문에 배열을 ACL 최상위 객체처럼 다시 인덱싱하며 stderr를 출력하던 계약 테스트 오류를 수정했습니다. 각 ACL 배열 조회를 괄호로 분리하고 누락 키는 빈 배열로 처리해 ShellSpec의 `The error should be blank` 계약을 만족합니다.
+- LAN 계약과 RPC 계약에 핵심 `smartsafehub` 객체가 `smartsafehub_network`를 동기 호출하거나 LAN 메서드를 중복 등록하지 않는지 검증하는 회귀 테스트를 추가했습니다.
+- 프런트엔드가 LAN 전용 ubus 객체를 직접 사용하는지, LAN 객체 자체에 관리자 비밀번호 gate와 최소 ACL이 적용되는지 검증하도록 테스트를 보강했습니다.
+- README와 아키텍처 문서의 LAN RPC 호출 흐름 및 진단 명령을 실제 구현과 일치하도록 갱신했습니다.
+
 ## [0.2.15-r18] - 2026-09-17
 
 ### 수정
