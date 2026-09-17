@@ -121,6 +121,17 @@ grep -Fq 'export function PanelLeftCloseIcon' "$ICONS" || \
 	fail 'collapsed navigation must provide a collapse icon'
 grep -Fq 'export function PanelLeftOpenIcon' "$ICONS" || \
 	fail 'collapsed navigation must provide an expand icon'
+grep -Fq '<path d="m15 18-6-6 6-6" />' "$ICONS" || \
+	fail 'sidebar collapse icon must use the shared left-chevron path'
+grep -Fq '<path d="m9 18 6-6-6-6" />' "$ICONS" || \
+	fail 'sidebar expand icon must use the shared right-chevron path'
+if grep -Fq '<rect height="18" rx="2" width="18" x="3" y="3" />' "$ICONS"; then
+	fail 'sidebar toggle icons must not keep the legacy panel outline'
+fi
+grep -Fq '<PanelLeftOpenIcon class="size-4" />' "$NAVIGATION" || \
+	fail 'sidebar expand icon must use the shared toggle icon size'
+grep -Fq '<PanelLeftCloseIcon class="size-4" />' "$NAVIGATION" || \
+	fail 'sidebar collapse icon must use the shared toggle icon size'
 grep -Fq 'export function MoonIcon' "$ICONS" || fail 'dark mode must provide a moon icon'
 grep -Fq 'export function SunIcon' "$ICONS" || fail 'dark mode must provide a sun icon'
 grep -Fq 'export function ReloadIcon' "$ICONS" || fail 'header refresh must provide a dedicated reload icon'

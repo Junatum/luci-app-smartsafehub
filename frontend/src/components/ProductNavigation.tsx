@@ -302,7 +302,7 @@ export function ProductNavigation({
               {collapsed ? (
                 <PanelLeftOpenIcon class="size-4" />
               ) : (
-                <PanelLeftCloseIcon class="size-4.5" />
+                <PanelLeftCloseIcon class="size-4" />
               )}
             </button>
           </div>
