@@ -4,6 +4,7 @@ import { ROUTE_BY_NAME } from '../app/routes';
 import type { AppRoute } from '../app/routes';
 import { luciAdminUrl } from '../utils/luci';
 import {
+  CableIcon,
   CloseIcon,
   DevicesIcon,
   HomeIcon,
@@ -39,7 +40,7 @@ const NAVIGATION_GROUPS: readonly {
   routes: readonly AppRoute[];
 }[] = [
   { label: 'Overview', routes: ['home'] },
-  { label: 'Network', routes: ['wifi', 'devices'] },
+  { label: 'Network', routes: ['lan', 'wifi', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
   { label: 'System', routes: ['system', 'settings'] },
 ];
@@ -48,6 +49,8 @@ function NavigationIcon({ route }: { route: AppRoute }) {
   switch (route) {
     case 'home':
       return <HomeIcon class="size-5" />;
+    case 'lan':
+      return <CableIcon class="size-5" />;
     case 'wifi':
       return <WifiIcon class="size-5" />;
     case 'devices':

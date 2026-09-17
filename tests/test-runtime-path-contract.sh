@@ -52,6 +52,7 @@ check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/updates.uc" "$RUNTI
 check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc" "$RUNTIME_DIR/firmware.state"
 check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/firmware.uc" "$RUNTIME_DIR/firmware-resolve.json"
 check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/backup.uc" "$RUNTIME_DIR/config-backup.tar.gz"
+check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/network-management.uc" "$RUNTIME_DIR/lan-update.lock"
 check_path "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/wifi-management.uc" "$RUNTIME_DIR/wifi-update.lock"
 check_path "$ROOT_DIR/frontend/src/api/firmwareUpload.ts" "$RUNTIME_DIR/firmware.bin"
 check_path "$ROOT_DIR/frontend/src/api/configurationBackup.ts" "$RUNTIME_DIR/config-backup.tar.gz"

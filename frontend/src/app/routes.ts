@@ -1,5 +1,6 @@
 export type AppRoute =
   | 'home'
+  | 'lan'
   | 'wifi'
   | 'devices'
   | 'safeshield'
@@ -22,6 +23,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: '대시보드',
     title: '대시보드',
     description: '네트워크, 장치와 시스템 상태를 한눈에 확인합니다.',
+  },
+  {
+    route: 'lan',
+    hash: '#lan',
+    label: 'LAN',
+    title: 'LAN',
+    description: '내부 네트워크 주소, DHCP 범위와 상위 네트워크 충돌을 관리합니다.',
   },
   {
     route: 'wifi',

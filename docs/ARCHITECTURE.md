@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r15`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r16`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -143,7 +143,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r15
+0.2.15-r16
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -187,6 +187,7 @@ Shadow root에는 버전이 포함된 `app.css` 링크와 Preact mount point가 
 | route | hash | 화면 |
 |---|---|---|
 | `home` | `#home` | 장치 대시보드 |
+| `lan` | `#lan` | LAN 및 DHCP |
 | `wifi` | `#wifi` | Wi-Fi |
 | `devices` | `#devices` | 연결된 기기 |
 | `safeshield` | `#safeshield` | SafeShield |
@@ -356,6 +357,7 @@ root/usr/share/rpcd/ucode/smartsafehub/
 ├── core.uc
 ├── devices.uc
 ├── health.uc
+├── network-management.uc
 ├── system.uc
 ├── wifi.uc
 └── wifi-management.uc
@@ -373,6 +375,19 @@ root/usr/share/rpcd/ucode/smartsafehub/
 - 제한 시간이 있는 시스템 명령 실행
 
 ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus 연결을 공유합니다.
+
+#### `network-management.uc`
+
+기본 `network.lan`/`dhcp.lan`의 LAN 및 DHCP 관리:
+
+- LAN IPv4 주소와 CIDR(`/8~30`) 읽기·검증
+- DHCP 시작/종료 주소를 OpenWrt `start`/`limit` 형식으로 변환
+- DHCP 서버 사용 여부(`ignore`)와 임대 시간 관리
+- `network.interface.wan.status`를 이용한 WAN/LAN IPv4 subnet 충돌 감지
+- `network.interface dump`의 다른 활성 IPv4 subnet까지 피하는 안전한 `/24` 추천
+- RFC1918 사설 주소/대역, network/broadcast 주소와 DHCP pool 유효성 검증
+- `/tmp/smartsafehub/lan-update.lock`으로 동시 변경 직렬화
+- UCI snapshot 복구와 2초 지연 `/sbin/reload_config` 적용
 
 #### `wifi.uc`
 
@@ -472,12 +487,15 @@ rpcd handler에서 중첩 동기 ubus 호출을 수행하면 이벤트 루프가
 
 ## 6. 공개 RPC 계약
 
-SmartSafeHub 자체 RPC에는 장치·Wi-Fi·시스템 기능과 로컬 Health 기능이 포함됩니다.
+SmartSafeHub 자체 RPC에는 장치·LAN/DHCP·Wi-Fi·시스템 기능과 로컬 Health 기능이 포함됩니다.
 
 | 메서드 | 유형 | 인자 | 설명 |
 |---|---|---|---|
 | `status` | 읽기 | 없음 | 장치, 소프트웨어, 런타임과 WAN 상태 |
 | `connected_devices` | 읽기 | 없음 | 연결 기기 목록과 집계 |
+| `lan_settings` | 읽기 | 없음 | LAN/DHCP 설정, WAN 충돌 상태와 추천 대역 |
+| `lan_update` | 쓰기 | `ip_address`, `prefix_length`, `dhcp_enabled`, `dhcp_start`, `dhcp_end`, `lease_time`, `confirm` | LAN/DHCP 수동 변경 |
+| `lan_auto_subnet` | 쓰기 | `confirm` | WAN 충돌 시 안전한 추천 `/24` 대역 자동 적용 |
 | `wifi_summary` | 읽기 | 없음 | 관리 대상 기본 Wi-Fi 요약 |
 | `wifi_update` | 쓰기 | `section`, `ssid`, `security`, `password`, `enabled` | Wi-Fi 설정 변경과 reload |
 | `system_reboot` | 쓰기 | `confirm` | 확인 후 재부팅 예약 |
@@ -516,7 +534,25 @@ HomePage 또는 SettingsPage
   → request.reply(ApiResponse)
 ```
 
-### 7.2 Wi-Fi 변경
+### 7.2 LAN/DHCP 변경
+
+```text
+LanPage form
+  → useLan.save 또는 useLan.applyRecommendation
+  → smartsafehub.lan_update / lan_auto_subnet
+  → 사설 IPv4·CIDR·DHCP pool 검증
+  → WAN/LAN subnet overlap 거부
+  → network.lan + dhcp.lan UCI snapshot
+  → UCI commit
+  → 2초 지연 /sbin/reload_config 예약
+      ├─ 주소 유지: 같은 페이지에서 런타임 재조회
+      └─ 주소 변경: 새 공유기 IP 안내 후 클라이언트 재연결
+  → 예약 실패 시 snapshot 복원
+```
+
+자동 추천은 현재 활성 인터페이스들의 IPv4 subnet을 읽고 미리 정한 RFC1918 `/24` 후보 중 겹치지 않는 첫 대역을 선택합니다. 사용자의 명시적 확인 없이 자동으로 LAN 주소를 바꾸지는 않습니다.
+
+### 7.3 Wi-Fi 변경
 
 ```text
 WifiPage form
@@ -533,7 +569,7 @@ WifiPage form
   → lock 해제
 ```
 
-### 7.3 연결 기기
+### 7.4 연결 기기
 
 대시보드의 연결 기기 카드에서 `generatedAt`은 마지막 목록 확인 시각을 보여주는 정보성 값으로만 사용합니다. 사용자가 대시보드에 머무르는 동안 연결 기기 조회는 주기 polling을 하지 않으므로 시간이 오래되었다는 사실 자체를 장애나 주의 상태로 판단하지 않습니다. 실제 연결 기기 조회가 실패한 경우에만 확인 필요 상태로 표시합니다.
 
@@ -617,9 +653,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r15
-  → app.js?v=0.2.15-r15
-  → app.css?v=0.2.15-r15
+  → data-asset-version = 0.2.15-r16
+  → app.js?v=0.2.15-r16
+  → app.css?v=0.2.15-r16
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -740,7 +776,7 @@ ubus call smartsafehub connected_devices '{}'
 
 ## 12. SmartSafeHub 패키지 업데이트
 
-SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 아래에 통합합니다. 업데이트, 펌웨어, Health 진단/Reporter, 예약 재부팅, Wi-Fi 변경 lock, 설정 백업 업로드가 같은 제품 전용 디렉터리를 사용하며 기능별 추가 하위 디렉터리는 두지 않습니다. init script와 helper가 `/tmp` 초기화 이후 디렉터리 존재를 보장합니다.
+SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 아래에 통합합니다. 업데이트, 펌웨어, Health 진단/Reporter, 예약 재부팅, LAN/Wi-Fi 변경 lock, 설정 백업 업로드가 같은 제품 전용 디렉터리를 사용하며 기능별 추가 하위 디렉터리는 두지 않습니다. init script와 helper가 `/tmp` 초기화 이후 디렉터리 존재를 보장합니다.
 
 업데이트 기능은 rpcd와 실제 APK 작업을 분리합니다. `updates_check`와 `updates_install`은 요청을 검증한 뒤 `/usr/libexec/smartsafehub-updater`를 백그라운드에서 시작하고 즉시 반환합니다. updater는 `apk update`와 패키지 조회·설치를 수행하고 `/tmp/smartsafehub/updates.state`에 결과를 atomic write합니다. `updates_status`는 이 로컬 상태 파일과 UCI 설정만 읽으므로 저장소 응답 속도가 제품 UI API에 영향을 주지 않습니다.
 

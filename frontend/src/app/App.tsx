@@ -6,6 +6,7 @@ import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useHealth } from '../hooks/useHealth';
+import { useLan } from '../hooks/useLan';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
 import { useSafeShieldStatistics } from '../hooks/useSafeShieldStatistics';
@@ -18,6 +19,7 @@ import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useWifi } from '../hooks/useWifi';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
+import { LanPage } from '../pages/LanPage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -32,6 +34,7 @@ export function App() {
   const firmware = useFirmwareUpdates(
     route === 'system' || route === 'home' || route === 'settings',
   );
+  const lan = useLan(route === 'lan');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -50,8 +53,10 @@ export function App() {
   );
 
   const current =
-    route === 'wifi'
-      ? wifi
+    route === 'lan'
+      ? lan
+      : route === 'wifi'
+        ? wifi
       : route === 'devices'
         ? devices
         : route === 'safeshield'
@@ -65,6 +70,22 @@ export function App() {
   let content: ComponentChildren;
 
   switch (route) {
+    case 'lan':
+      content = (
+        <LanPage
+          action={lan.action}
+          data={lan.data}
+          error={lan.error}
+          feedback={lan.feedback}
+          loading={lan.loading}
+          onApplyRecommendation={lan.applyRecommendation}
+          onDismissFeedback={lan.dismissFeedback}
+          onRetry={() => void lan.refresh()}
+          onSave={lan.save}
+        />
+      );
+      break;
+
     case 'wifi':
       content = (
         <WifiPage

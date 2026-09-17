@@ -103,6 +103,14 @@ grep -Fq 'class="ssh-mobile-navigation' "$NAVIGATION" || \
 ROUTES="$ROOT_DIR/frontend/src/app/routes.ts"
 HASH_ROUTE="$ROOT_DIR/frontend/src/hooks/useHashRoute.ts"
 
+grep -Fq "{ label: 'Network', routes: ['lan', 'wifi', 'devices'] }" "$NAVIGATION" || \
+	fail 'Network navigation group must place LAN before Wi-Fi and connected devices'
+grep -Fq "route: 'lan'" "$ROUTES" || \
+	fail 'LAN route must be registered'
+grep -Fq "hash: '#lan'" "$ROUTES" || \
+	fail 'LAN route must expose the #lan hash'
+grep -Fq "'#lan': 'lan'" "$HASH_ROUTE" || \
+	fail 'hash router must resolve #lan'
 grep -Fq "{ label: 'System', routes: ['system', 'settings'] }" "$NAVIGATION" || \
 	fail 'System navigation group must place settings directly below updates'
 grep -Fq "case 'settings':" "$NAVIGATION" || \

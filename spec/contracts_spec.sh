@@ -57,6 +57,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'LAN/DHCP 설정과 subnet 충돌 방지 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-lan-settings.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '업데이트 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-update-ui-contract.sh"
     The status should be success

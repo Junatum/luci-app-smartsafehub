@@ -41,6 +41,11 @@ import {
 	update_wifi
 } from './smartsafehub/wifi-management.uc';
 import {
+	apply_recommended_lan,
+	read_lan_settings,
+	update_lan_settings
+} from './smartsafehub/network-management.uc';
+import {
 	read_health_status,
 	run_health_diagnostic,
 	update_health_reporter
@@ -89,6 +94,33 @@ const methods = {
 	connected_devices: {
 		call: require_root_password(function(request) {
 			return read_connected_devices();
+		}),
+	},
+	lan_settings: {
+		call: require_root_password(function(request) {
+			return read_lan_settings();
+		}),
+	},
+	lan_update: {
+		args: {
+			ip_address: '',
+			prefix_length: 24,
+			dhcp_enabled: true,
+			dhcp_start: '',
+			dhcp_end: '',
+			lease_time: '12h',
+			confirm: '',
+		},
+		call: require_root_password(function(request) {
+			return update_lan_settings(request);
+		}),
+	},
+	lan_auto_subnet: {
+		args: {
+			confirm: '',
+		},
+		call: require_root_password(function(request) {
+			return apply_recommended_lan(request);
 		}),
 	},
 	wifi_summary: {

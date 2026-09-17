@@ -33,6 +33,7 @@ assert_acl_method() {
 }
 
 for method in system_root_password_status system_root_password_set \
+	lan_settings lan_update lan_auto_subnet \
 	updates_status updates_check updates_install updates_settings_update \
 	firmware_status firmware_check firmware_prepare firmware_validate_upload firmware_install firmware_discard \
 	system_time_settings system_timezone_update system_time_sync \
@@ -48,6 +49,9 @@ jq -e \
 
 assert_acl_method read system_root_password_status
 assert_acl_method write system_root_password_set
+assert_acl_method read lan_settings
+assert_acl_method write lan_update
+assert_acl_method write lan_auto_subnet
 assert_acl_method read updates_status
 assert_acl_method write updates_check
 assert_acl_method write updates_install

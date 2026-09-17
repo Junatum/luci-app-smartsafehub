@@ -5,6 +5,7 @@ import type {
 } from '../types/backup';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type { HealthAccepted, HealthStatus } from '../types/health';
+import type { LanSettings, LanSettingsInput, LanUpdateResult } from '../types/lan';
 import type {
   FirmwareAccepted,
   FirmwareStatus,
@@ -156,6 +157,38 @@ export function requestConfigurationBackupDiscard(): Promise<ConfigurationBackup
 
 export function requestSystemReboot(): Promise<SystemRebootResult> {
   return callApi(API_OBJECT, 'system_reboot', { confirm: 'reboot' });
+}
+
+export function fetchLanSettings(): Promise<LanSettings> {
+  return callApi(API_OBJECT, 'lan_settings');
+}
+
+export function updateLanSettings(
+  input: LanSettingsInput,
+): Promise<LanUpdateResult> {
+  return callApi(
+    API_OBJECT,
+    'lan_update',
+    {
+      ip_address: input.ipAddress,
+      prefix_length: input.prefixLength,
+      dhcp_enabled: input.dhcpEnabled,
+      dhcp_start: input.dhcpStart,
+      dhcp_end: input.dhcpEnd,
+      lease_time: input.leaseTime,
+      confirm: 'apply',
+    },
+    { timeoutMs: 10_000 },
+  );
+}
+
+export function applyRecommendedLanSubnet(): Promise<LanUpdateResult> {
+  return callApi(
+    API_OBJECT,
+    'lan_auto_subnet',
+    { confirm: 'apply' },
+    { timeoutMs: 10_000 },
+  );
 }
 
 export function fetchWifiSummary(): Promise<WifiSummary> {

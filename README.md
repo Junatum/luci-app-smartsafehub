@@ -56,6 +56,16 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - `시스템 상태 > 리소스 사용량` 카드 아래에서 최신 로컬 장치 진단을 함께 요약해 표시. 정상일 때는 전체 상태와 마지막 진단 시각/검사 항목 수를 간결하게 보여주고, 주의·이상 항목이 있으면 최대 2건을 바로 노출하며 상세 진단은 설정 페이지에서 확인
 - 장치 진단 요약의 정상/주의/이상 배경과 세부 항목은 라이트/다크 테마에 각각 맞는 대비를 사용하며, 다크 모드에서 반투명 밝은 배경이 남지 않도록 전용 테마 매핑을 적용
 
+### LAN 및 DHCP 관리
+
+- SmartSafeHub 내부 IPv4 주소와 DHCP 할당 시작/종료 주소를 `네트워크 > LAN`에서 관리
+- WAN과 LAN IPv4 subnet이 겹치면 충돌 상태와 상위 네트워크 대역을 표시하고, 활성 인터페이스와 겹치지 않는 안전한 `/24` 사설 대역을 자동 추천
+- 추천 대역 자동 변경 시 공유기 주소는 `.1`, DHCP pool은 `.100~.249`를 기본으로 구성하고 기존 DHCP 사용 여부와 임대 시간은 유지
+- 수동 저장 시 사설 IPv4, network/broadcast 주소, DHCP pool 범위, 공유기 주소 포함 여부와 WAN subnet 중복을 backend에서 재검증
+- 고급 설정에서 `/8~30` CIDR, DHCP 서버 사용 여부와 임대 시간을 관리하며 일반 가정용 네트워크는 `/24` 권장
+- LAN 주소 변경은 RPC 응답 뒤 지연 적용하고 새 공유기 주소를 UI에 안내해 현재 세션이 끊긴 뒤 다시 접속할 수 있도록 처리
+- 게스트/VLAN/다중 LAN과 방화벽 zone 구성 자체는 기존 LuCI에서 계속 관리
+
 ### Wi-Fi 관리
 
 - 무선 장치별 관리 대상 기본 LAN AP 표시
@@ -263,6 +273,7 @@ luci-app-smartsafehub/
 │   │       ├── system.uc
 │   │       ├── firmware.uc
 │   │       ├── updates.uc
+│   │       ├── network-management.uc
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc
 │   └── www/luci-static/smartsafehub/
@@ -367,6 +378,7 @@ ubus call smartsafehub status '{}'
 주요 읽기 기능:
 
 ```bash
+ubus call smartsafehub lan_settings '{}'
 ubus call smartsafehub wifi_summary '{}'
 ubus call smartsafehub connected_devices '{}'
 ubus call smartsafehub system_time_settings '{}'
@@ -375,7 +387,7 @@ ubus call safeshield config '{}'
 ubus call safeshield rules_list '{}'
 ```
 
-SmartSafeHub 자체 RPC는 장치·Wi-Fi·시스템·로컬 Health 기능을 소유합니다. Health 관련 RPC는 다음과 같습니다.
+SmartSafeHub 자체 RPC는 장치·LAN/DHCP·Wi-Fi·시스템·로컬 Health 기능을 소유합니다. Health 관련 RPC는 다음과 같습니다.
 
 ```text
 health_status
@@ -524,7 +536,8 @@ apk info luci-app-smartsafehub
 
 - Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
 - 게스트 Wi-Fi, VLAN, mesh, 방화벽과 상세 패키지 설정은 기존 LuCI에서 관리합니다.
-- WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
+- LAN 화면은 기본 `network.lan`/`dhcp.lan`만 관리하며 다중 LAN, VLAN별 DHCP와 방화벽 zone 구성은 기존 LuCI에서 관리합니다.
+- WAN/LAN 충돌 감지는 IPv4 기준이며 WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
 - SafeShield 기능은 별도 `safeshield` 패키지와 공식 ubus API 계약에 의존하며, SmartSafeHub는 SafeShield의 상태 파일이나 init script를 직접 다루지 않습니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.
 - ucode module 문법은 JavaScript·TypeScript와 차이가 있으므로 실제 `ucode -c` 검사가 필요합니다.

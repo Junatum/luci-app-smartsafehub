@@ -67,6 +67,7 @@ require_executable "$ROOT_DIR/tests/test-backup-restore.sh"
 require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 require_executable "$ROOT_DIR/tests/test-runtime-path-contract.sh"
+require_executable "$ROOT_DIR/tests/test-lan-settings.sh"
 
 pkg_version="$(make_value PKG_VERSION)"
 pkg_release="$(make_value PKG_RELEASE)"
