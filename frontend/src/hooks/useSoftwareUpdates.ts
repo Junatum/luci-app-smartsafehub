@@ -61,7 +61,7 @@ export function useSoftwareUpdates(active = true) {
 
     lastObservedInstallAt.current = lastInstallAt;
 
-    // Version information in /tmp/smartsafehub-updates.state can be stale after
+    // Version information in /tmp/smartsafehub/updates.state can be stale after
     // a manual APK install or while LuCI is still serving a cached entry
     // template. A raw version mismatch must therefore never reload by itself.
     // Reload only when this mounted page observes a newly completed updater

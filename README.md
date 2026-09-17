@@ -156,7 +156,9 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 
 예약 재부팅은 `/usr/libexec/smartsafehub-maintenance`와 `smartsafehub-maintenance` procd service가 담당합니다. 단순 cron reboot를 사용하지 않고 SmartSafeHub updater와 firmware updater의 상태/lock을 확인한 뒤 안전한 경우에만 재부팅합니다. 업데이트 작업과 겹치면 15분 뒤 재시도하며 최대 2시간이 지나도 안전하지 않으면 해당 예약은 건너뜁니다.
 
-설정 백업 다운로드는 LuCI의 인증된 `/cgi-bin/cgi-backup` 경로를 통해 OpenWrt `sysupgrade --create-backup` 형식을 그대로 사용합니다. 복원은 `/cgi-bin/cgi-upload`로 전용 `/tmp/smartsafehub-config-backup.tar.gz` 경로에만 업로드한 뒤 `/usr/libexec/smartsafehub-backup`이 archive 구조와 업데이트 충돌 여부를 확인하고 `sysupgrade --restore-backup`을 실행합니다. 따라서 SmartSafeHub 백업은 기본 LuCI/CLI와 상호 호환되며 별도의 독자 백업 포맷을 만들지 않습니다.
+설정 백업 다운로드는 LuCI의 인증된 `/cgi-bin/cgi-backup` 경로를 통해 OpenWrt `sysupgrade --create-backup` 형식을 그대로 사용합니다. 복원은 `/cgi-bin/cgi-upload`로 전용 `/tmp/smartsafehub/config-backup.tar.gz` 경로에만 업로드한 뒤 `/usr/libexec/smartsafehub-backup`이 archive 구조와 업데이트 충돌 여부를 확인하고 `sysupgrade --restore-backup`을 실행합니다. 따라서 SmartSafeHub 백업은 기본 LuCI/CLI와 상호 호환되며 별도의 독자 백업 포맷을 만들지 않습니다.
+
+SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tmp/smartsafehub/` 한 디렉터리에 모읍니다. 업데이트 상태와 릴리즈 노트, 펌웨어 상태·다운로드 이미지, 예약 재부팅 상태, Wi-Fi 변경 lock, 설정 백업 업로드 파일이 이 경로를 공유하며 `updater/`나 `firmware/` 같은 추가 하위 분류 디렉터리는 만들지 않습니다. `/tmp` 기반이므로 재부팅 시 함께 초기화되고 flash 저장 공간에는 기록하지 않습니다. 각 helper와 init script가 필요할 때 디렉터리를 다시 생성합니다.
 
 진단 파일은 설정 화면에 이미 로드된 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다.
 
@@ -395,9 +397,10 @@ safeshield.license_update
 `smartsafehub` ubus 객체가 등록되지 않으면 진입점을 직접 컴파일합니다.
 
 ```bash
-rm -f /tmp/smartsafehub.ucb
+mkdir -p /tmp/smartsafehub
+rm -f /tmp/smartsafehub/smartsafehub.ucb
 ucode -c \
-  -o /tmp/smartsafehub.ucb \
+  -o /tmp/smartsafehub/smartsafehub.ucb \
   /usr/share/rpcd/ucode/smartsafehub.uc
 
 echo "compile exit=$?"
@@ -465,7 +468,8 @@ make package/luci-app-smartsafehub/compile V=s
 실제 장치에서:
 
 ```bash
-ucode -c -o /tmp/smartsafehub.ucb /usr/share/rpcd/ucode/smartsafehub.uc
+mkdir -p /tmp/smartsafehub
+ucode -c -o /tmp/smartsafehub/smartsafehub.ucb /usr/share/rpcd/ucode/smartsafehub.uc
 /etc/init.d/rpcd restart
 ubus -v list smartsafehub
 ubus call smartsafehub status '{}'

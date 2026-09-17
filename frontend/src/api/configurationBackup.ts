@@ -2,7 +2,7 @@ import type { ConfigurationBackupUploadReply } from '../types/backup';
 import { cgiUrl } from '../utils/luci';
 import { RpcError } from './rpc';
 
-const BACKUP_UPLOAD_PATH = '/tmp/smartsafehub-config-backup.tar.gz';
+const BACKUP_UPLOAD_PATH = '/tmp/smartsafehub/config-backup.tar.gz';
 const BACKUP_DOWNLOAD_ENDPOINT = '/cgi-backup';
 const BACKUP_UPLOAD_ENDPOINT = '/cgi-upload';
 

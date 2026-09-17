@@ -2,7 +2,7 @@ import type { FirmwareUploadReply } from '../types/firmware';
 import { RpcError } from './rpc';
 import { cgiUrl } from '../utils/luci';
 
-const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';
+const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub/firmware.bin';
 const FIRMWARE_UPLOAD_ENDPOINT = '/cgi-upload';
 
 export function uploadFirmwareFile(

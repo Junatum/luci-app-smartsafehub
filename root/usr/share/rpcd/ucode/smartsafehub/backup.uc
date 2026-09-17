@@ -10,7 +10,7 @@ import {
 	success
 } from './core.uc';
 
-const BACKUP_FILE = '/tmp/smartsafehub-config-backup.tar.gz';
+const BACKUP_FILE = '/tmp/smartsafehub/config-backup.tar.gz';
 const BACKUP_HELPER = '/usr/libexec/smartsafehub-backup';
 const MAX_BACKUP_BYTES = 16777216;
 

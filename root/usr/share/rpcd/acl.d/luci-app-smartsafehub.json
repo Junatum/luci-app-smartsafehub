@@ -59,10 +59,10 @@
         "upload"
       ],
       "file": {
-        "/tmp/smartsafehub-firmware.bin": [
+        "/tmp/smartsafehub/firmware.bin": [
           "write"
         ],
-        "/tmp/smartsafehub-config-backup.tar.gz": [
+        "/tmp/smartsafehub/config-backup.tar.gz": [
           "write"
         ]
       }

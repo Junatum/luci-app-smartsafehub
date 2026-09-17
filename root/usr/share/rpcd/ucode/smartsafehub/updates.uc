@@ -10,14 +10,14 @@ import {
 	success
 } from './core.uc';
 
-const UPDATE_STATE_FILE = '/tmp/smartsafehub-updates.state';
-const RELEASE_NOTES_FILE = '/tmp/smartsafehub-release-notes.json';
+const UPDATE_STATE_FILE = '/tmp/smartsafehub/updates.state';
+const RELEASE_NOTES_FILE = '/tmp/smartsafehub/release-notes.json';
 const UPDATE_REPOSITORY_FILE = '/etc/apk/repositories.d/smartsafehub.list';
 const MAX_RELEASE_NOTES_BYTES = 1048576;
 const MAX_RELEASE_NOTES = 32;
 const MAX_RELEASE_NOTE_SECTIONS = 12;
 const MAX_RELEASE_NOTE_ITEMS = 30;
-const AUTO_INSTALL_MARKER = '/tmp/smartsafehub-updater-auto-date';
+const AUTO_INSTALL_MARKER = '/tmp/smartsafehub/updater-auto-date';
 const UPDATE_PACKAGE = 'luci-app-smartsafehub';
 const MIN_CHECK_INTERVAL_S = 900;
 const MAX_CHECK_INTERVAL_S = 604800;

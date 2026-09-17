@@ -68,9 +68,9 @@ jq -e '."luci-app-smartsafehub".read."cgi-io" | index("backup") != null' "$ACL" 
 	fail 'configuration backup download must be allowed through cgi-io backup ACL'
 jq -e '."luci-app-smartsafehub".write."cgi-io" | index("upload") != null' "$ACL" >/dev/null || \
 	fail 'firmware and configuration backup uploads must be allowed through cgi-io upload ACL'
-jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub-firmware.bin"] | index("write") != null' "$ACL" >/dev/null || \
+jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub/firmware.bin"] | index("write") != null' "$ACL" >/dev/null || \
 	fail 'firmware upload ACL must grant write access to the dedicated temporary image path'
-jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub-config-backup.tar.gz"] | index("write") != null' "$ACL" >/dev/null || \
+jq -e '."luci-app-smartsafehub".write.file["/tmp/smartsafehub/config-backup.tar.gz"] | index("write") != null' "$ACL" >/dev/null || \
 	fail 'configuration restore upload ACL must grant write access only to the dedicated temporary backup path'
 
 jq -e \
@@ -83,7 +83,7 @@ grep -Fq 'UPDATE_PACKAGE="luci-app-smartsafehub"' "$UPDATER" || \
 	fail 'shell updater target must be luci-app-smartsafehub'
 grep -Fq 'SAFESHIELD_PACKAGE="safeshield"' "$UPDATER" || \
 	fail 'shell updater must manage SafeShield dependency identity pins'
-grep -Fq "const RELEASE_NOTES_FILE = '/tmp/smartsafehub-release-notes.json';" "$UPDATES_MODULE" || \
+grep -Fq "const RELEASE_NOTES_FILE = '/tmp/smartsafehub/release-notes.json';" "$UPDATES_MODULE" || \
 	fail 'rpc update status must read the release-note bundle cache'
 grep -Fq 'state.releaseNotes = release_notes.notes;' "$UPDATES_MODULE" || \
 	fail 'updates_status must expose validated release note metadata'

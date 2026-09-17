@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.15-r6] - 2026-09-17
+
+### 개선
+
+- `/tmp` 최상위에 흩어져 있던 SmartSafeHub 런타임 파일을 `/tmp/smartsafehub/` 한 단계 아래로 통합했습니다. 관리 소프트웨어 업데이트 상태/릴리즈 노트/marker, 펌웨어 상태/resolve/image/lock, 예약 재부팅 상태, Wi-Fi 변경 lock, 설정 백업 업로드 파일이 모두 같은 제품 전용 런타임 디렉터리를 사용합니다.
+- `smartsafehub-updater`, `smartsafehub-firmware`, `smartsafehub-maintenance`, `smartsafehub-backup` helper가 실행 전에 런타임 디렉터리를 직접 생성하도록 했고, procd init script도 부팅 후 `/tmp`가 초기화된 뒤 디렉터리를 다시 생성하도록 했습니다. 패키지 설치/업그레이드 직후의 수동 업로드를 위해 post-install hook에서도 디렉터리를 생성합니다.
+- 펌웨어/설정 백업 CGI 업로드 경로와 rpcd ACL, ucode 상태 파일 경로, 프런트엔드 업로드 destination을 새 런타임 경로에 맞춰 함께 변경했습니다. 별도의 `updater/`, `firmware/` 하위 디렉터리는 추가하지 않습니다.
+
+### 테스트
+
+- production 소스에 `/tmp/smartsafehub-*` 형태의 최상위 런타임 경로가 다시 추가되지 않는지, 각 helper/init script가 `/tmp/smartsafehub/`를 생성하는지, rpcd/ACL/프런트엔드 업로드 경로가 동일한 디렉터리를 사용하는지 검증하는 runtime path contract를 추가했습니다.
+- helper를 직접 실행하는 경우에도 지정한 runtime directory가 자동 생성되고 상태 파일이 그 아래에 기록되는지 검증합니다.
+
 ## [0.2.15-r5] - 2026-09-17
 
 ### 개선

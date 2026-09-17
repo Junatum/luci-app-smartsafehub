@@ -367,7 +367,7 @@ Wi-Fi 조회 RPC와 변경 작업:
 - UCI commit
 - `/sbin/wifi reload`
 - 적용 실패 시 snapshot 복원과 reload 재시도
-- `/tmp/smartsafehub-wifi-update.lock`으로 동시 변경 직렬화
+- `/tmp/smartsafehub/wifi-update.lock`으로 동시 변경 직렬화
 - 잠금은 120초 뒤 stale 상태로 판단해 복구 가능
 - 기존 키 재사용 시 WPA2/WPA3 비밀번호 형식 재검증
 
@@ -634,7 +634,7 @@ make package/luci-app-smartsafehub/compile V=s
 
 ```bash
 ucode -c \
-  -o /tmp/smartsafehub.ucb \
+  -o /tmp/smartsafehub/smartsafehub.ucb \
   /usr/share/rpcd/ucode/smartsafehub.uc
 
 /etc/init.d/rpcd restart
@@ -672,10 +672,12 @@ ubus call smartsafehub connected_devices '{}'
 
 ## 12. SmartSafeHub 패키지 업데이트
 
-업데이트 기능은 rpcd와 실제 APK 작업을 분리합니다. `updates_check`와 `updates_install`은 요청을 검증한 뒤 `/usr/libexec/smartsafehub-updater`를 백그라운드에서 시작하고 즉시 반환합니다. updater는 `apk update`와 패키지 조회·설치를 수행하고 `/tmp/smartsafehub-updates.state`에 결과를 atomic write합니다. `updates_status`는 이 로컬 상태 파일과 UCI 설정만 읽으므로 저장소 응답 속도가 제품 UI API에 영향을 주지 않습니다.
+SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 아래에 통합합니다. 업데이트, 펌웨어, 예약 재부팅, Wi-Fi 변경 lock, 설정 백업 업로드가 같은 제품 전용 디렉터리를 사용하며 기능별 추가 하위 디렉터리는 두지 않습니다. init script와 helper가 `/tmp` 초기화 이후 디렉터리 존재를 보장합니다.
+
+업데이트 기능은 rpcd와 실제 APK 작업을 분리합니다. `updates_check`와 `updates_install`은 요청을 검증한 뒤 `/usr/libexec/smartsafehub-updater`를 백그라운드에서 시작하고 즉시 반환합니다. updater는 `apk update`와 패키지 조회·설치를 수행하고 `/tmp/smartsafehub/updates.state`에 결과를 atomic write합니다. `updates_status`는 이 로컬 상태 파일과 UCI 설정만 읽으므로 저장소 응답 속도가 제품 UI API에 영향을 주지 않습니다.
 
 업데이트 감지 대상은 `luci-app-smartsafehub` 하나입니다. 새 버전이 확인되면 `apk add --upgrade luci-app-smartsafehub`만 실행합니다. Makefile은 `LUCI_DEPENDS:=... +safeshield`와 `EXTRA_DEPENDS:=safeshield (>= 0.3.10)`를 함께 선언합니다. 따라서 빌드 시 SafeShield 선택 관계를 유지하면서, 설치·업데이트 시 APK dependency resolver가 최소 `0.3.10` 조건을 만족하도록 필요한 경우 SafeShield를 함께 갱신합니다.
 
-새 버전이 있으면 updater는 SmartSafeHub 전용 `/etc/apk/repositories.d/smartsafehub.list`의 APK repository URL에서 `https://repo.smartsafehub.com/<channel>` base를 유도하고 먼저 `releases/luci-app-smartsafehub/index.json`을 조회합니다. 다른 repository 파일은 release channel 결정에 사용하지 않습니다. index의 newest-first 순서를 이용해 현재 설치 버전 이후부터 APK가 제시한 최신 버전까지의 `<version>.json`만 내려받고 `/tmp/smartsafehub-release-notes.json` 하나의 bundle로 atomic cache합니다. rpcd는 bundle의 설치/최신 버전 범위, 각 릴리즈의 schema·package·version과 크기 제한을 검증한 뒤 `updates_status.releaseNotes`와 `releaseNotesComplete`로 노출합니다. index 또는 일부 릴리즈 노트를 가져오지 못한 경우에도 가능한 노트만 표시하며, 이 메타데이터는 signed APK metadata를 대체하지 않는 표시용 보조 정보이므로 다운로드·파싱 실패는 update check/install 결과에 영향을 주지 않습니다.
+새 버전이 있으면 updater는 SmartSafeHub 전용 `/etc/apk/repositories.d/smartsafehub.list`의 APK repository URL에서 `https://repo.smartsafehub.com/<channel>` base를 유도하고 먼저 `releases/luci-app-smartsafehub/index.json`을 조회합니다. 다른 repository 파일은 release channel 결정에 사용하지 않습니다. index의 newest-first 순서를 이용해 현재 설치 버전 이후부터 APK가 제시한 최신 버전까지의 `<version>.json`만 내려받고 `/tmp/smartsafehub/release-notes.json` 하나의 bundle로 atomic cache합니다. rpcd는 bundle의 설치/최신 버전 범위, 각 릴리즈의 schema·package·version과 크기 제한을 검증한 뒤 `updates_status.releaseNotes`와 `releaseNotesComplete`로 노출합니다. index 또는 일부 릴리즈 노트를 가져오지 못한 경우에도 가능한 노트만 표시하며, 이 메타데이터는 signed APK metadata를 대체하지 않는 표시용 보조 정보이므로 다운로드·파싱 실패는 update check/install 결과에 영향을 주지 않습니다.
 
 자동화 설정은 `/etc/config/smartsafehub`의 `updates` section에 보존됩니다. `smartsafehub-updater` procd 서비스는 기본 6시간 주기로 확인하며, 자동 설치는 기본 비활성화 상태입니다. 자동 설치를 활성화하면 지정 시각의 다음 실행 기회에 하루 한 번만 설치를 시도합니다. 공유기가 예약 시각 이후에 부팅된 경우 그날의 지난 예약을 즉시 소급 실행하지 않고 다음 예약 시각까지 기다립니다.

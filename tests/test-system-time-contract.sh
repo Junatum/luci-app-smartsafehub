@@ -37,7 +37,7 @@ grep -Fq "SYSTEM_TIMEZONE_UNSUPPORTED" "$SYSTEM_MODULE" || \
 grep -Fq "restore_system_time(" "$SYSTEM_MODULE" || \
 	fail 'timezone update must restore the previous UCI values when runtime apply fails'
 
-grep -Fq "const AUTO_INSTALL_MARKER = '/tmp/smartsafehub-updater-auto-date';" "$SYSTEM_MODULE" || \
+grep -Fq "const AUTO_INSTALL_MARKER = '/tmp/smartsafehub/updater-auto-date';" "$SYSTEM_MODULE" || \
 	fail 'timezone changes must know the software auto-install day marker'
 grep -Fq "fs.unlink(AUTO_INSTALL_MARKER);" "$SYSTEM_MODULE" || \
 	fail 'timezone changes must clear the auto-install day marker'

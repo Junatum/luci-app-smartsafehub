@@ -102,7 +102,7 @@ grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
 
 grep -Fq "const BACKUP_DOWNLOAD_ENDPOINT = '/cgi-backup';" "$BACKUP_API" || \
 	fail 'backup downloads must use the authenticated cgi-backup endpoint'
-grep -Fq "const BACKUP_UPLOAD_PATH = '/tmp/smartsafehub-config-backup.tar.gz';" "$BACKUP_API" || \
+grep -Fq "const BACKUP_UPLOAD_PATH = '/tmp/smartsafehub/config-backup.tar.gz';" "$BACKUP_API" || \
 	fail 'restore uploads must target the dedicated temporary archive path'
 grep -Fq 'await requestConfigurationBackupValidation(file.name);' "$BACKUP_HOOK" || \
 	fail 'uploaded backups must be validated by the backend before restore is enabled'

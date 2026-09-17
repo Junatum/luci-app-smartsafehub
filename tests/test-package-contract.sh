@@ -63,6 +63,7 @@ require_executable "$ROOT_DIR/tests/test-scheduled-reboot.sh"
 require_executable "$ROOT_DIR/tests/test-backup-restore.sh"
 require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
+require_executable "$ROOT_DIR/tests/test-runtime-path-contract.sh"
 
 pkg_version="$(make_value PKG_VERSION)"
 pkg_release="$(make_value PKG_RELEASE)"
@@ -126,6 +127,8 @@ postinst_block="$(awk '
 [ -n "$postinst_block" ] || fail 'package postinst hook is missing'
 printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package postinst must limit service enable to runtime installation'
+printf '%s\n' "$postinst_block" | grep -Fq 'mkdir -p /tmp/smartsafehub' ||
+	fail 'package postinst must create the SmartSafeHub runtime directory'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
 	fail 'package postinst must force-enable smartsafehub-firmware'
 printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.check_enabled' ||

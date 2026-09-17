@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
-STATE_FILE="${SMARTSAFEHUB_UPDATER_STATE_FILE:-/tmp/smartsafehub-updates.state}"
-RELEASE_NOTES_FILE="${SMARTSAFEHUB_UPDATER_RELEASE_NOTES_FILE:-/tmp/smartsafehub-release-notes.json}"
-LOCK_DIR="${SMARTSAFEHUB_UPDATER_LOCK_DIR:-/tmp/smartsafehub-updater.lock}"
-AUTO_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_MARKER:-/tmp/smartsafehub-updater-auto-date}"
-AUTO_RETRY_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_RETRY_MARKER:-/tmp/smartsafehub-updater-auto-retry-at}"
-AUTO_RETRY_COUNT_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_RETRY_COUNT_MARKER:-/tmp/smartsafehub-updater-auto-retry-count}"
+RUNTIME_DIR="${SMARTSAFEHUB_RUNTIME_DIR:-/tmp/smartsafehub}"
+STATE_FILE="${SMARTSAFEHUB_UPDATER_STATE_FILE:-$RUNTIME_DIR/updates.state}"
+RELEASE_NOTES_FILE="${SMARTSAFEHUB_UPDATER_RELEASE_NOTES_FILE:-$RUNTIME_DIR/release-notes.json}"
+LOCK_DIR="${SMARTSAFEHUB_UPDATER_LOCK_DIR:-$RUNTIME_DIR/updater.lock}"
+AUTO_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_MARKER:-$RUNTIME_DIR/updater-auto-date}"
+AUTO_RETRY_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_RETRY_MARKER:-$RUNTIME_DIR/updater-auto-retry-at}"
+AUTO_RETRY_COUNT_MARKER="${SMARTSAFEHUB_UPDATER_AUTO_RETRY_COUNT_MARKER:-$RUNTIME_DIR/updater-auto-retry-count}"
 APK_WORLD_FILE="${SMARTSAFEHUB_UPDATER_APK_WORLD_FILE:-/etc/apk/world}"
 REPOSITORY_DIR="${SMARTSAFEHUB_UPDATER_REPOSITORY_DIR:-/etc/apk/repositories.d}"
 REPOSITORY_FILE="${SMARTSAFEHUB_UPDATER_REPOSITORY_FILE:-$REPOSITORY_DIR/smartsafehub.list}"
@@ -367,7 +368,7 @@ refresh_release_notes() {
 		return 0
 	fi
 
-	work_dir="/tmp/smartsafehub-updater-release-notes.$$"
+	work_dir="$RUNTIME_DIR/updater-release-notes.$$"
 	index_file="$work_dir/index.json"
 	versions_file="$work_dir/versions"
 	bundle_tmp="${RELEASE_NOTES_FILE}.$$"
@@ -608,8 +609,8 @@ collect_packages_with_live_installed() {
 
 perform_check_locked() {
 	local log_file packages_file now last_install_at message
-	log_file="/tmp/smartsafehub-updater-apk.$$.log"
-	packages_file="/tmp/smartsafehub-updater-packages.$$.state"
+	log_file="$RUNTIME_DIR/updater-apk.$$.log"
+	packages_file="$RUNTIME_DIR/updater-packages.$$.state"
 	last_install_at="$(state_value last_install_at)"
 	[ -n "$last_install_at" ] || last_install_at=0
 	set_phase checking
@@ -649,9 +650,9 @@ perform_check() {
 
 perform_install_locked() {
 	local log_file packages_file after_file now last_check_at message upgradable target_version installed_after
-	log_file="/tmp/smartsafehub-updater-apk.$$.log"
-	packages_file="/tmp/smartsafehub-updater-packages.$$.state"
-	after_file="/tmp/smartsafehub-updater-packages-after.$$.state"
+	log_file="$RUNTIME_DIR/updater-apk.$$.log"
+	packages_file="$RUNTIME_DIR/updater-packages.$$.state"
+	after_file="$RUNTIME_DIR/updater-packages-after.$$.state"
 	set_phase installing
 
 	if ! refresh_indexes "$log_file"; then
@@ -875,6 +876,8 @@ run_daemon() {
 		sleep "$DAEMON_TICK_S"
 	done
 }
+
+mkdir -p "$RUNTIME_DIR" || exit 1
 
 case "${1:-}" in
 	check)

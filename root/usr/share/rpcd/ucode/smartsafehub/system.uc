@@ -14,9 +14,9 @@ import {
 	success
 } from './core.uc';
 
-const AUTO_INSTALL_MARKER = '/tmp/smartsafehub-updater-auto-date';
-const AUTO_RETRY_MARKER = '/tmp/smartsafehub-updater-auto-retry-at';
-const AUTO_RETRY_COUNT_MARKER = '/tmp/smartsafehub-updater-auto-retry-count';
+const AUTO_INSTALL_MARKER = '/tmp/smartsafehub/updater-auto-date';
+const AUTO_RETRY_MARKER = '/tmp/smartsafehub/updater-auto-retry-at';
+const AUTO_RETRY_COUNT_MARKER = '/tmp/smartsafehub/updater-auto-retry-count';
 const MAINTENANCE_HELPER = '/usr/libexec/smartsafehub-maintenance';
 const MAINTENANCE_INIT = '/etc/init.d/smartsafehub-maintenance';
 

@@ -2,10 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
-STATE_FILE="${SMARTSAFEHUB_FIRMWARE_STATE_FILE:-/tmp/smartsafehub-firmware.state}"
-RESOLVE_FILE="${SMARTSAFEHUB_FIRMWARE_RESOLVE_FILE:-/tmp/smartsafehub-firmware-resolve.json}"
-IMAGE_FILE="${SMARTSAFEHUB_FIRMWARE_IMAGE_FILE:-/tmp/smartsafehub-firmware.bin}"
-LOCK_DIR="${SMARTSAFEHUB_FIRMWARE_LOCK_DIR:-/tmp/smartsafehub-firmware.lock}"
+RUNTIME_DIR="${SMARTSAFEHUB_RUNTIME_DIR:-/tmp/smartsafehub}"
+STATE_FILE="${SMARTSAFEHUB_FIRMWARE_STATE_FILE:-$RUNTIME_DIR/firmware.state}"
+RESOLVE_FILE="${SMARTSAFEHUB_FIRMWARE_RESOLVE_FILE:-$RUNTIME_DIR/firmware-resolve.json}"
+IMAGE_FILE="${SMARTSAFEHUB_FIRMWARE_IMAGE_FILE:-$RUNTIME_DIR/firmware.bin}"
+LOCK_DIR="${SMARTSAFEHUB_FIRMWARE_LOCK_DIR:-$RUNTIME_DIR/firmware.lock}"
 FIRMWARE_METADATA_FILE="${SMARTSAFEHUB_FIRMWARE_METADATA_FILE:-/usr/share/smartsafehub/firmware.json}"
 BOARD_NAME_FILE="${SMARTSAFEHUB_FIRMWARE_BOARD_NAME_FILE:-/tmp/sysinfo/board_name}"
 REPOSITORY_FILE="${SMARTSAFEHUB_FIRMWARE_REPOSITORY_FILE:-/etc/apk/repositories.d/smartsafehub.list}"
@@ -618,6 +619,8 @@ run_daemon() {
 		sleep "$DAEMON_TICK_S"
 	done
 }
+
+mkdir -p "$RUNTIME_DIR" || exit 1
 
 case "${1:-}" in
 	check)

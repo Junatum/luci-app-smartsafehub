@@ -10,8 +10,8 @@ import {
 	success
 } from './core.uc';
 
-const FIRMWARE_STATE_FILE = '/tmp/smartsafehub-firmware.state';
-const FIRMWARE_RESOLVE_FILE = '/tmp/smartsafehub-firmware-resolve.json';
+const FIRMWARE_STATE_FILE = '/tmp/smartsafehub/firmware.state';
+const FIRMWARE_RESOLVE_FILE = '/tmp/smartsafehub/firmware-resolve.json';
 const FIRMWARE_METADATA_FILE = '/usr/share/smartsafehub/firmware.json';
 const BOARD_NAME_FILE = '/tmp/sysinfo/board_name';
 const OPENWRT_RELEASE_FILE = '/etc/openwrt_release';

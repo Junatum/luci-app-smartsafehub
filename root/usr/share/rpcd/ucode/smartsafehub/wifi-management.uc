@@ -17,7 +17,7 @@ import {
 	wifi_summary_payload
 } from './wifi.uc';
 
-const WIFI_UPDATE_LOCK = '/tmp/smartsafehub-wifi-update.lock';
+const WIFI_UPDATE_LOCK = '/tmp/smartsafehub/wifi-update.lock';
 const WIFI_UPDATE_LOCK_STALE_SECONDS = 120;
 
 export function read_wifi_summary() {

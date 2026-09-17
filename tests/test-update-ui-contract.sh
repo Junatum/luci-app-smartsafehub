@@ -298,7 +298,7 @@ grep -Fq '현재 설정 유지' "$FIRMWARE_CARD" || \
 	fail 'firmware install confirmation must expose the keep-settings choice'
 grep -Fq '강제 설치는 제공하지 않습니다.' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must clearly avoid force-upgrade behavior'
-grep -Fq "const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub-firmware.bin';" "$FIRMWARE_UPLOAD" || \
+grep -Fq "const FIRMWARE_UPLOAD_PATH = '/tmp/smartsafehub/firmware.bin';" "$FIRMWARE_UPLOAD" || \
 	fail 'manual firmware upload must use the dedicated temporary image path'
 grep -Fq "const FIRMWARE_UPLOAD_ENDPOINT = '/cgi-upload';" "$FIRMWARE_UPLOAD" || \
 	fail 'manual firmware upload must declare the raw cgi-upload endpoint'
