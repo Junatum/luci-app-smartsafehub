@@ -22,6 +22,8 @@ REQUEST_TIMEOUT_S=10
 ACTIVATION_STALE_S=60
 
 ACTIVATION_REQUEST_FILE=''
+ACTIVATION_KEY=''
+ACTIVATION_BODY_FILE=''
 ACTIVATION_RESPONSE_FILE=''
 STATUS_REQUEST_FILE=''
 STATUS_RESPONSE_FILE=''
@@ -29,6 +31,7 @@ SAFESHIELD_STATUS_FILE=''
 LICENSE_FILE=''
 
 cleanup_files() {
+	[ -n "$ACTIVATION_BODY_FILE" ] && rm -f "$ACTIVATION_BODY_FILE"
 	[ -n "$ACTIVATION_RESPONSE_FILE" ] && rm -f "$ACTIVATION_RESPONSE_FILE"
 	[ -n "$STATUS_REQUEST_FILE" ] && rm -f "$STATUS_REQUEST_FILE"
 	[ -n "$STATUS_RESPONSE_FILE" ] && rm -f "$STATUS_RESPONSE_FILE"
@@ -161,6 +164,63 @@ read_physical_fingerprint() {
 	printf '%s' "$fingerprint"
 }
 
+build_activation_body() {
+	local request_file="$1" key fingerprint fingerprint_version identity_provider identity_source
+	local identity_strength identity_profile installation_id vendor model arch memory_mb version memory_json
+
+	key="$(json_value "$request_file" '@.license_key')"
+	[ -n "$key" ] || return 12
+
+	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/license-safeshield.$$.json"
+	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then
+		return 10
+	fi
+
+	fingerprint="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.physical_fingerprint')"
+	case "$fingerprint" in
+		????????????????????????????????????????????????????????????????)
+			case "$fingerprint" in *[!0-9a-fA-F]*) return 10 ;; esac
+			;;
+		*) return 10 ;;
+	esac
+
+	fingerprint_version="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.fingerprint_version')"
+	case "$fingerprint_version" in
+		''|*[!0-9]*) fingerprint_version=1 ;;
+	esac
+	[ "$fingerprint_version" -ge 1 ] 2>/dev/null || fingerprint_version=1
+
+	identity_provider="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_provider')"
+	identity_source="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_source')"
+	identity_strength="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_strength')"
+	identity_profile="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_profile')"
+	installation_id="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.installation_id')"
+	vendor="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.vendor')"
+	model="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.model')"
+	arch="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.arch')"
+	memory_mb="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.memory_mb')"
+	version="$(json_value "$SAFESHIELD_STATUS_FILE" '@.version')"
+
+	[ -n "$vendor" ] && [ -n "$model" ] && [ -n "$arch" ] && [ -n "$version" ] || return 11
+	case "$memory_mb" in
+		''|*[!0-9]*) memory_json='null' ;;
+		*)
+			if [ "$memory_mb" -gt 0 ] 2>/dev/null; then
+				memory_json="$memory_mb"
+			else
+				memory_json='null'
+			fi
+			;;
+	esac
+
+	ACTIVATION_BODY_FILE="$RUNTIME_DIR/license-activate-body.$$.json"
+	cat > "$ACTIVATION_BODY_FILE" <<EOF_ACTIVATION_BODY
+{"license_key":"$(json_escape "$key")","device":{"physical_fingerprint":"$(json_escape "$fingerprint")","fingerprint_version":$fingerprint_version,"identity_provider":"$(json_escape "$identity_provider")","identity_source":"$(json_escape "$identity_source")","identity_strength":"$(json_escape "$identity_strength")","identity_profile":"$(json_escape "$identity_profile")","installation_id":$(json_string_or_null "$installation_id"),"vendor":"$(json_escape "$vendor")","model":"$(json_escape "$model")","arch":"$(json_escape "$arch")","memory_mb":$memory_json,"safeshield_version":"$(json_escape "$version")"}}
+EOF_ACTIVATION_BODY
+	ACTIVATION_KEY="$key"
+	return 0
+}
+
 post_json() {
 	local body_file="$1" output_file="$2" url="$3"
 	"$UCLIENT_FETCH_BIN" -q -T "$REQUEST_TIMEOUT_S" \
@@ -214,7 +274,7 @@ activation_in_progress() {
 }
 
 activate_license() {
-	local request_file='' now previous_checked previous_activated base key licensed activation_status plan license_status error_code interval
+	local request_file='' now previous_checked previous_activated base key build_rc licensed activation_status plan license_status error_code interval
 
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
@@ -234,8 +294,23 @@ activate_license() {
 	previous_activated="$(read_previous_number '@.lastActivatedAt')"
 	write_state activating activating '' "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
 
+	build_rc=0
+	build_activation_body "$request_file" || build_rc=$?
+	if [ "$build_rc" -ne 0 ]; then
+		case "$build_rc" in
+			10) error_code='LICENSE_DEVICE_IDENTITY_UNAVAILABLE' ;;
+			11) error_code='LICENSE_DEVICE_PROFILE_UNAVAILABLE' ;;
+			*) error_code='LICENSE_KEY_INVALID' ;;
+		esac
+		write_state error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
+		log_message "$error_code: 라이선스 등록 요청에 필요한 장치 정보를 준비하지 못했습니다."
+		activation_cleanup
+		return 1
+	fi
+	key="$ACTIVATION_KEY"
+
 	base="$(api_base_url)"
-	if ! post_json "$request_file" "$ACTIVATION_RESPONSE_FILE" "$base/licenses/activate"; then
+	if ! post_json "$ACTIVATION_BODY_FILE" "$ACTIVATION_RESPONSE_FILE" "$base/licenses/activate"; then
 		error_code="$(server_error_code "$ACTIVATION_RESPONSE_FILE")"
 		[ -n "$error_code" ] || error_code='LICENSE_ACTIVATE_HTTP_FAILED'
 		write_state error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
@@ -261,7 +336,6 @@ activate_license() {
 		return 1
 	fi
 
-	key="$(json_value "$request_file" '@.license_key')"
 	if [ -z "$key" ] || ! update_local_license "$key"; then
 		write_state error failed LICENSE_LOCAL_UPDATE_FAILED "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none
 		log_message 'LICENSE_LOCAL_UPDATE_FAILED: SafeShield에 라이선스 키를 저장하지 못했습니다.'

@@ -109,7 +109,8 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
 - DHCP 식별 정보를 이용한 기기별 DNS 요청·차단 수·차단율과 IP/MAC 표시
 - 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지
-- 새 라이선스 등록·변경은 `smartsafehub.license_activate`를 통해 Hub `/api/v1/licenses/activate`에서 먼저 검증한 뒤 성공한 경우에만 SafeShield 공식 `license_update` API로 로컬 저장
+- 새 라이선스 등록·변경은 `smartsafehub.license_activate`가 키만 private request로 넘기고 즉시 반환한 뒤 detached `smartsafehub-license activate` helper가 SafeShield 장치 identity를 조회해 Hub `/api/v1/licenses/activate`에서 검증합니다. Hub 성공 뒤에만 SafeShield 공식 `license_update` API로 로컬 저장하며 rpcd 안에서 nested ubus 호출을 수행하지 않습니다.
+- 라이선스 등록·조회·제거의 진행/성공/오류 피드백은 SafeShield 페이지 상단이 아니라 라이선스 입력 카드 안에 표시합니다. activation 상태 조회는 1초 간격, 5초 RPC timeout을 사용하고 일시적인 통신 오류를 제한적으로 재시도합니다.
 - `smartsafehub-license` daemon이 기본 5분마다 Hub `/api/v1/licenses/status`를 확인하고, 서버가 명시적으로 `clear_license`를 반환한 경우에만 SafeShield 공식 API로 로컬 키 제거
 - Hub 상태 확인 실패만으로는 로컬 라이선스를 제거하지 않는 fail-open 동작을 사용하며, 활성화와 주기 확인은 single-flight 경계로 직렬화
 - 현재 라이선스 키는 사용자가 `현재 키 불러오기`를 선택했을 때만 `safeshield.license_get`으로 평문 조회
@@ -458,8 +459,9 @@ Hub 계정과 장치의 라이선스 연결 lifecycle은 SafeShield 엔진이 �
 ```text
 사용자가 라이선스 등록/변경
   → smartsafehub.license_activate
-  → safeshield.status에서 authoritative device identity 조회
-  → /usr/libexec/smartsafehub-license activate
+  → mode 0600 private request에 키만 기록
+  → detached /usr/libexec/smartsafehub-license activate 시작 후 RPC 즉시 반환
+  → helper가 safeshield.status에서 authoritative device identity 조회
   → POST /api/v1/licenses/activate
   → 성공한 경우에만 safeshield.license_update
 
@@ -473,7 +475,7 @@ smartsafehub-license daemon
       └─ 네트워크/API 실패: 오류만 기록하고 로컬 키 유지
 ```
 
-`smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` 명령을 독립 subcommand로 제공합니다. 이는 현재는 작은 독립 procd 서비스로 장애 범위와 디버깅 경계를 유지하면서, 향후 주기적인 Hub 동기화 작업이 늘어나면 명령 경계를 그대로 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 하기 위한 구조입니다. updater처럼 장시간 설치·재부팅 상태 머신을 가지는 기능은 별도 서비스로 유지하는 것을 전제로 합니다.
+`smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` 명령을 독립 subcommand로 제공합니다. `license_activate` RPC 자체는 SafeShield를 동기 호출하지 않으며, 장치 identity와 profile 구성은 detached `activate` subcommand 안에서 수행합니다. 이는 현재는 작은 독립 procd 서비스로 장애 범위와 디버깅 경계를 유지하면서, 향후 주기적인 Hub 동기화 작업이 늘어나면 명령 경계를 그대로 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 하기 위한 구조입니다. updater처럼 장시간 설치·재부팅 상태 머신을 가지는 기능은 별도 서비스로 유지하는 것을 전제로 합니다.
 
 런타임 상태는 `/tmp/smartsafehub/license.json`에 atomic write하며 평문 라이선스 키를 저장하지 않습니다. 명시적 활성화와 주기 `status-sync`가 겹치면 activation single-flight lock이 우선하며, status-sync는 활성화 결과를 덮어쓰지 않고 다음 주기까지 건너뜁니다. SafeShield의 `license_get` 자체가 실패한 경우는 미설정 상태로 오인하지 않고 `LICENSE_LOCAL_READ_FAILED`로 기록합니다.
 

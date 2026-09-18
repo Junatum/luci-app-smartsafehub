@@ -48,6 +48,10 @@ grep -Fq 'ssh-safeshield-license-input' "$PAGE" || \
 	fail 'SafeShield license key field must remain visually recognizable as an input'
 grep -Fq 'ssh-safeshield-license-secondary-action' "$PAGE" || \
 	fail 'SafeShield current license key action must remain recognizable as a button'
+grep -Fq "actionFeedbackTarget === 'license' ? actionError : null" "$PAGE" || \
+	fail 'SafeShield license action errors must render inside the license card'
+grep -Fq '라이선스를 확인하고 이 기기에 적용하고 있습니다…' "$PAGE" || \
+	fail 'SafeShield license card must expose activation progress near the input'
 grep -Fq 'border border-teal-700 bg-teal-700' "$PAGE" || \
 	fail 'SafeShield custom rules action must remain recognizable as a primary button'
 
@@ -209,7 +213,7 @@ if grep -Fq '차단 목록 갱신 작업을 시작했습니다.' "$ACTIONS" || \
 fi
 grep -Fq 'await requestSafeShieldRefresh();' "$ACTIONS" || \
 	fail 'SafeShield manual refresh must still request the backend refresh operation'
-grep -Fq 'setState({ action: null, error: null, message: null });' "$ACTIONS" || \
+grep -Fq 'setState({ action: null, error: null, feedbackTarget: null, message: null });' "$ACTIONS" || \
 	fail 'SafeShield manual refresh must clear action feedback after the request is accepted'
 if grep -Fq '차단 목록 갱신 작업을 시작했습니다.' "$ASSET_JS" || \
 	grep -Fq '차단 목록을 이미 갱신하고 있습니다.' "$ASSET_JS" || \

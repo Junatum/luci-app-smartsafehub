@@ -47,7 +47,7 @@ export function fetchStatus(): Promise<SmartSafeHubStatus> {
 }
 
 export function fetchSmartSafeHubLicenseStatus(): Promise<SmartSafeHubLicenseStatus> {
-  return callApi(API_OBJECT, 'license_status');
+  return callApi(API_OBJECT, 'license_status', {}, { timeoutMs: 5000 });
 }
 
 export function requestSmartSafeHubLicenseActivation(

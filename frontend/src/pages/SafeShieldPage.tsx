@@ -14,7 +14,10 @@ import {
 } from '../components/Icons';
 import { SafeShieldStatisticsPanel } from '../components/SafeShieldStatisticsPanel';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
-import type { SafeShieldAction } from '../hooks/useSafeShieldActions';
+import type {
+  SafeShieldAction,
+  SafeShieldFeedbackTarget,
+} from '../hooks/useSafeShieldActions';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import {
   getSafeShieldRefreshErrorMessage,
@@ -33,6 +36,7 @@ const SMARTSAFEHUB_PRICING_URL = 'https://www.smartsafehub.com/pricing/';
 interface SafeShieldPageProps {
   action: SafeShieldAction | null;
   actionError: string | null;
+  actionFeedbackTarget: SafeShieldFeedbackTarget | null;
   actionMessage: string | null;
   data: SafeShieldStatus | null;
   error: string | null;
@@ -547,6 +551,7 @@ function ActionFeedback({
 export function SafeShieldPage({
   action,
   actionError,
+  actionFeedbackTarget,
   actionMessage,
   data,
   error,
@@ -757,8 +762,8 @@ export function SafeShieldPage({
       </section>
 
       <ActionFeedback
-        error={actionError}
-        message={actionMessage}
+        error={actionFeedbackTarget === 'license' ? null : actionError}
+        message={actionFeedbackTarget === 'license' ? null : actionMessage}
         onDismiss={onDismissFeedback}
       />
 
@@ -964,6 +969,21 @@ export function SafeShieldPage({
                   </button>
                 ) : null}
               </div>
+              {action === 'license-update' ? (
+                <div
+                  aria-live="polite"
+                  class="mt-4 flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800"
+                  role="status"
+                >
+                  <span class="size-2 shrink-0 animate-pulse rounded-full bg-teal-500" />
+                  라이선스를 확인하고 이 기기에 적용하고 있습니다…
+                </div>
+              ) : null}
+              <ActionFeedback
+                error={actionFeedbackTarget === 'license' ? actionError : null}
+                message={actionFeedbackTarget === 'license' ? actionMessage : null}
+                onDismiss={onDismissFeedback}
+              />
             </form>
           </article>
 

@@ -11,7 +11,10 @@ import {
   fetchSmartSafeHubLicenseStatus,
   requestSmartSafeHubLicenseActivation,
 } from '../api/smartsafehub';
+import { RpcError } from '../api/rpc';
 import { errorMessage } from '../utils/errors';
+
+export type SafeShieldFeedbackTarget = 'global' | 'license';
 
 export type SafeShieldAction =
   | 'enable'
@@ -26,12 +29,14 @@ export type SafeShieldAction =
 interface SafeShieldActionState {
   action: SafeShieldAction | null;
   error: string | null;
+  feedbackTarget: SafeShieldFeedbackTarget | null;
   message: string | null;
 }
 
 const SUCCESS_FEEDBACK_TIMEOUT_MS = 4500;
-const LICENSE_ACTIVATION_POLL_INTERVAL_MS = 500;
+const LICENSE_ACTIVATION_POLL_INTERVAL_MS = 1000;
 const LICENSE_ACTIVATION_MAX_POLLS = 30;
+const LICENSE_ACTIVATION_MAX_TRANSIENT_ERRORS = 2;
 
 function licenseActivationErrorMessage(code: string | null): string {
   switch (code) {
@@ -55,6 +60,17 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+function feedbackTargetForAction(action: SafeShieldAction): SafeShieldFeedbackTarget {
+  return action.startsWith('license-') ? 'license' : 'global';
+}
+
+function isTransientLicenseStatusError(error: unknown): boolean {
+  return (
+    error instanceof RpcError &&
+    ['RPC_TIMEOUT', 'NETWORK_ERROR', 'UBUS_10'].includes(error.code)
+  );
+}
+
 export function useSafeShieldActions(
   refreshStatus: () => Promise<void>,
   refreshStatistics: () => Promise<void>,
@@ -62,6 +78,7 @@ export function useSafeShieldActions(
   const [state, setState] = useState<SafeShieldActionState>({
     action: null,
     error: null,
+    feedbackTarget: null,
     message: null,
   });
   const statusTimers = useRef<number[]>([]);
@@ -94,21 +111,26 @@ export function useSafeShieldActions(
   const beginAction = useCallback(
     (action: SafeShieldAction) => {
       clearFeedbackTimer();
-      setState({ action, error: null, message: null });
+      setState({
+        action,
+        error: null,
+        feedbackTarget: feedbackTargetForAction(action),
+        message: null,
+      });
     },
     [clearFeedbackTimer],
   );
 
   const showSuccessMessage = useCallback(
-    (message: string) => {
+    (message: string, feedbackTarget: SafeShieldFeedbackTarget = 'global') => {
       clearFeedbackTimer();
-      setState({ action: null, error: null, message });
+      setState({ action: null, error: null, feedbackTarget, message });
       feedbackTimer.current = window.setTimeout(() => {
         feedbackTimer.current = null;
         setState((current) =>
           current.error !== null || current.action !== null
             ? current
-            : { ...current, message: null },
+            : { ...current, feedbackTarget: null, message: null },
         );
       }, SUCCESS_FEEDBACK_TIMEOUT_MS);
     },
@@ -172,6 +194,7 @@ export function useSafeShieldActions(
         setState({
           action: null,
           error: errorMessage(error, 'SafeShield 작업을 수행하지 못했습니다.'),
+          feedbackTarget: 'global',
           message: null,
         });
       }
@@ -213,6 +236,7 @@ export function useSafeShieldActions(
         setState({
           action: null,
           error: errorMessage(error, '차단 통계 설정을 변경하지 못했습니다.'),
+          feedbackTarget: 'global',
           message: null,
         });
       }
@@ -225,12 +249,13 @@ export function useSafeShieldActions(
 
     try {
       await requestSafeShieldRefresh();
-      setState({ action: null, error: null, message: null });
+      setState({ action: null, error: null, feedbackTarget: null, message: null });
       scheduleRefreshes([700, 2500, 6000, 12000]);
     } catch (error) {
       setState({
         action: null,
         error: errorMessage(error, 'SafeShield 작업을 수행하지 못했습니다.'),
+        feedbackTarget: 'global',
         message: null,
       });
     }
@@ -245,6 +270,7 @@ export function useSafeShieldActions(
         setState({
           action: null,
           error: '라이선스 키를 입력해 주세요.',
+          feedbackTarget: 'license',
           message: null,
         });
         return false;
@@ -259,9 +285,23 @@ export function useSafeShieldActions(
         }
 
         let completed = false;
+        let transientErrors = 0;
         for (let attempt = 0; attempt < LICENSE_ACTIVATION_MAX_POLLS; attempt += 1) {
           await wait(LICENSE_ACTIVATION_POLL_INTERVAL_MS);
-          const status = await fetchSmartSafeHubLicenseStatus();
+
+          let status: Awaited<ReturnType<typeof fetchSmartSafeHubLicenseStatus>>;
+          try {
+            status = await fetchSmartSafeHubLicenseStatus();
+          } catch (error) {
+            if (
+              isTransientLicenseStatusError(error) &&
+              transientErrors < LICENSE_ACTIVATION_MAX_TRANSIENT_ERRORS
+            ) {
+              transientErrors += 1;
+              continue;
+            }
+            throw error;
+          }
 
           if (
             status.phase === 'active' &&
@@ -280,10 +320,12 @@ export function useSafeShieldActions(
         }
 
         if (!completed) {
-          throw new Error('라이선스 등록 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          throw new Error(
+            '라이선스 등록 결과 확인이 지연되고 있습니다. 잠시 후 상태를 다시 확인해 주세요.',
+          );
         }
 
-        showSuccessMessage('라이선스를 서버에 등록하고 이 기기에 적용했습니다.');
+        showSuccessMessage('라이선스를 서버에 등록하고 이 기기에 적용했습니다.', 'license');
         await refreshStatus();
         scheduleRefreshes([800, 2500, 6000, 12000]);
         return true;
@@ -291,6 +333,7 @@ export function useSafeShieldActions(
         setState({
           action: null,
           error: errorMessage(error, '라이선스를 등록하지 못했습니다.'),
+          feedbackTarget: 'license',
           message: null,
         });
         return false;
@@ -304,12 +347,13 @@ export function useSafeShieldActions(
 
     try {
       const result = await fetchSafeShieldLicense();
-      setState({ action: null, error: null, message: null });
+      setState({ action: null, error: null, feedbackTarget: null, message: null });
       return result.key;
     } catch (error) {
       setState({
         action: null,
         error: errorMessage(error, '라이선스 키를 불러오지 못했습니다.'),
+        feedbackTarget: 'license',
         message: null,
       });
       return null;
@@ -323,6 +367,7 @@ export function useSafeShieldActions(
       const result = await updateSafeShieldLicense('');
       showSuccessMessage(
         result.changed ? '라이선스 키를 제거했습니다.' : '설정된 라이선스 키가 없습니다.',
+        'license',
       );
       await refreshStatus();
 
@@ -335,6 +380,7 @@ export function useSafeShieldActions(
       setState({
         action: null,
         error: errorMessage(error, '라이선스 키를 제거하지 못했습니다.'),
+        feedbackTarget: 'license',
         message: null,
       });
       return false;
@@ -343,7 +389,12 @@ export function useSafeShieldActions(
 
   const dismissFeedback = useCallback(() => {
     clearFeedbackTimer();
-    setState((current) => ({ ...current, error: null, message: null }));
+    setState((current) => ({
+      ...current,
+      error: null,
+      feedbackTarget: null,
+      message: null,
+    }));
   }, [clearFeedbackTimer]);
 
   return {

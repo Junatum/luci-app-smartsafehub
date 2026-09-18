@@ -7,8 +7,6 @@ import {
 	failure,
 	number_value,
 	run_command,
-	safe_call,
-	string_value,
 	success
 } from './core.uc';
 
@@ -56,59 +54,12 @@ function license_state() {
 	return read_json_file(LICENSE_STATE_FILE) ?? default_state();
 }
 
-function valid_fingerprint(value) {
-	return type(value) == 'string' && match(value, /^[0-9a-fA-F]{64}$/) != null;
-}
-
-function build_activation_payload(license_key) {
-	const status = safe_call('safeshield', 'status', {});
-	const device = status?.device ?? {};
-	const configured = device?.configured ?? {};
-	const fingerprint = string_value(device?.physical_fingerprint, '');
-	const vendor = string_value(configured?.vendor, '');
-	const model = string_value(configured?.model, '');
-	const arch = string_value(configured?.arch, '');
-	const version = string_value(status?.version, '');
-	const memory_mb = number_value(configured?.memory_mb);
-
-	if (!valid_fingerprint(fingerprint)) {
-		return failure(
-			'LICENSE_DEVICE_IDENTITY_UNAVAILABLE',
-			'SafeShield 장치 식별 정보를 확인하지 못했습니다.'
-		);
-	}
-	if (!length(vendor) || !length(model) || !length(arch) || !length(version)) {
-		return failure(
-			'LICENSE_DEVICE_PROFILE_UNAVAILABLE',
-			'라이선스 등록에 필요한 장치 정보를 확인하지 못했습니다.'
-		);
-	}
-
-	return success({
-		license_key: license_key,
-		device: {
-			physical_fingerprint: fingerprint,
-			fingerprint_version: number_value(device?.fingerprint_version) || 1,
-			identity_provider: string_value(device?.identity_provider, ''),
-			identity_source: string_value(device?.identity_source, ''),
-			identity_strength: string_value(device?.identity_strength, ''),
-			identity_profile: string_value(device?.identity_profile, ''),
-			installation_id: string_value(device?.installation_id, null),
-			vendor: vendor,
-			model: model,
-			arch: arch,
-			memory_mb: memory_mb > 0 ? memory_mb : null,
-			safeshield_version: version,
-		},
-	});
-}
-
 function cleanup_activation_request() {
 	run_command([ '/bin/rm', '-f', ACTIVATION_REQUEST_FILE ], 1000);
 	run_command([ '/bin/rmdir', ACTIVATION_LOCK ], 1000);
 }
 
-function write_private_request(payload) {
+function write_private_request(license_key) {
 	if (!run_command([ '/bin/mkdir', '-p', RUNTIME_DIR ], 1000)) {
 		return false;
 	}
@@ -117,7 +68,7 @@ function write_private_request(payload) {
 	}
 
 	try {
-		fs.writefile(ACTIVATION_REQUEST_FILE, sprintf('%J\n', payload));
+		fs.writefile(ACTIVATION_REQUEST_FILE, sprintf('%J\n', { license_key: license_key }));
 	}
 	catch (e) {
 		return false;
@@ -127,8 +78,8 @@ function write_private_request(payload) {
 }
 
 function start_activation_helper() {
-	// The helper performs HTTPS I/O and later calls the SafeShield ubus API.
-	// Run it detached so rpcd never blocks while waiting for a nested ubus call.
+	// The helper resolves SafeShield identity, performs HTTPS I/O, and applies
+	// the local key. Run it detached so rpcd never waits on a nested ubus call.
 	return run_command([
 		'/bin/sh',
 		'-c',
@@ -183,12 +134,10 @@ export function activate_license(request) {
 		);
 	}
 
-	const payload_result = build_activation_payload(license_key);
-	if (payload_result.ok != true) {
-		cleanup_activation_request();
-		return payload_result;
-	}
-	if (!write_private_request(payload_result.data)) {
+	// rpcd must not synchronously call SafeShield from inside this RPC. The
+	// detached helper resolves authoritative device identity after this method
+	// returns, avoiding a nested ubus/rpcd wait on low-resource routers.
+	if (!write_private_request(license_key)) {
 		cleanup_activation_request();
 		return failure(
 			'LICENSE_ACTIVATION_REQUEST_WRITE_FAILED',

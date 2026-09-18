@@ -12,13 +12,15 @@ ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 API="$ROOT_DIR/frontend/src/api/smartsafehub.ts"
 HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldActions.ts"
 TYPES="$ROOT_DIR/frontend/src/types/license.ts"
+PAGE="$ROOT_DIR/frontend/src/pages/SafeShieldPage.tsx"
+APP="$ROOT_DIR/frontend/src/app/App.tsx"
 
 fail() {
 	printf 'FAIL: %s\n' "$*" >&2
 	exit 1
 }
 
-for file in "$HELPER" "$INIT_SCRIPT" "$CONFIG" "$LICENSE_MODULE" "$RPC_ENTRY" "$ACL" "$API" "$HOOK" "$TYPES"; do
+for file in "$HELPER" "$INIT_SCRIPT" "$CONFIG" "$LICENSE_MODULE" "$RPC_ENTRY" "$ACL" "$API" "$HOOK" "$TYPES" "$PAGE" "$APP"; do
 	[ -f "$file" ] || fail "라이선스 소스 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
@@ -41,9 +43,23 @@ if grep -Fq 'updateSafeShieldLicense(normalizedKey)' "$HOOK"; then
 	fail '새 라이선스 등록 시 Hub activate 전에 SafeShield에 직접 저장하면 안 됩니다.'
 fi
 
-grep -Fq "device?.physical_fingerprint" "$LICENSE_MODULE" || fail 'Hub activate는 SafeShield의 authoritative physical fingerprint를 재사용해야 합니다.'
-grep -Fq "configured?.vendor" "$LICENSE_MODULE" || fail 'Hub activate는 SafeShield status의 configured device profile을 재사용해야 합니다.'
-grep -Fq "safeshield_version: version" "$LICENSE_MODULE" || fail 'Hub activate payload에 현재 SafeShield 버전이 포함되어야 합니다.'
+grep -Fq 'const LICENSE_ACTIVATION_POLL_INTERVAL_MS = 1000;' "$HOOK" || fail '라이선스 activation polling은 공유기 부하를 줄이기 위해 1초 간격이어야 합니다.'
+grep -Fq 'const LICENSE_ACTIVATION_MAX_TRANSIENT_ERRORS = 2;' "$HOOK" || fail '일시적인 status RPC 오류는 제한적으로 재시도해야 합니다.'
+grep -Fq "feedbackTarget: 'license'" "$HOOK" || fail '라이선스 오류/성공 피드백은 license 영역으로 라우팅해야 합니다.'
+grep -Fq "actionFeedbackTarget === 'license' ? actionError : null" "$PAGE" || fail '라이선스 오류는 라이선스 카드 안에 표시해야 합니다.'
+grep -Fq '라이선스를 확인하고 이 기기에 적용하고 있습니다…' "$PAGE" || fail '라이선스 카드 안에서 activation 진행 상태를 안내해야 합니다.'
+grep -Fq 'actionFeedbackTarget={safeshieldActions.feedbackTarget}' "$APP" || fail 'SafeShield page에 feedback target을 전달해야 합니다.'
+grep -Fq "callApi(API_OBJECT, 'license_status', {}, { timeoutMs: 5000 })" "$API" || fail 'license_status polling은 짧은 RPC timeout으로 UI 지연을 제한해야 합니다.'
+
+if grep -Fq "safe_call('safeshield', 'status'" "$LICENSE_MODULE"; then
+	fail 'license_activate RPC 안에서 SafeShield status를 동기 호출하면 rpcd nested ubus 대기가 발생할 수 있습니다.'
+fi
+grep -Fq 'write_private_request(license_key)' "$LICENSE_MODULE" || fail 'license_activate RPC는 키만 private request에 기록하고 즉시 helper로 넘겨야 합니다.'
+grep -Fq 'build_activation_body()' "$HELPER" || fail 'detached helper가 Hub activate device payload를 구성해야 합니다.'
+grep -Fq '"$UBUS_BIN" call safeshield status' "$HELPER" || fail 'detached helper가 SafeShield authoritative device identity를 조회해야 합니다.'
+grep -Fq "'@.device.configured.vendor'" "$HELPER" || fail 'Hub activate는 SafeShield status의 configured vendor를 재사용해야 합니다.'
+grep -Fq "'@.device.configured.model'" "$HELPER" || fail 'Hub activate는 SafeShield status의 configured model을 재사용해야 합니다.'
+grep -Fq "'@.version'" "$HELPER" || fail 'Hub activate payload에 현재 SafeShield 버전이 포함되어야 합니다.'
 grep -Fq "run_command([ '/bin/mkdir', '-p', RUNTIME_DIR ]" "$LICENSE_MODULE" || fail '첫 부팅에도 activate 전에 runtime 디렉터리를 준비해야 합니다.'
 if grep -Eq 'license_key.*LICENSE_HELPER|LICENSE_HELPER.*license_key' "$LICENSE_MODULE"; then
 	fail '평문 라이선스 키를 helper command line에 노출하면 안 됩니다.'
@@ -97,6 +113,7 @@ case "${2:-}:${3:-}" in
 		printf '{"license":{"configured":%s,"key":"%s"}}\n' "${MOCK_LICENSE_CONFIGURED:-true}" "${MOCK_LICENSE_KEY:-LIC-LOCAL-001}"
 		;;
 	safeshield:status)
+		[ "${MOCK_SAFESHIELD_STATUS_EXIT:-0}" -eq 0 ] || exit "${MOCK_SAFESHIELD_STATUS_EXIT}"
 		cat <<'EOF_STATUS'
 {"version":"0.3.23-r1","device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint_version":1,"identity_provider":"factory_mac","identity_source":"mtd:Factory:0x4:mac","identity_strength":"hardware_soft","identity_profile":"iptime_ax3000sm","installation_id":"11111111-1111-4111-8111-111111111111","configured":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","vendor":"ipTIME","model":"ipTIME AX3000SM","arch":"aarch64_cortex-a53","memory_mb":256}}}
 EOF_STATUS
@@ -186,6 +203,7 @@ reset_mocks() {
 	MOCK_LICENSE_KEY='LIC-LOCAL-001'
 	MOCK_LICENSE_GET_EXIT=0
 	MOCK_LICENSE_UPDATE_EXIT=0
+	MOCK_SAFESHIELD_STATUS_EXIT=0
 	MOCK_ACTIVATE_FETCH_EXIT=0
 	MOCK_ACTIVATE_ERROR_CODE='license_invalid'
 	MOCK_STATUS_FETCH_EXIT=0
@@ -205,6 +223,7 @@ run_license() {
 	MOCK_LICENSE_KEY="${MOCK_LICENSE_KEY:-LIC-LOCAL-001}" \
 	MOCK_LICENSE_GET_EXIT="${MOCK_LICENSE_GET_EXIT:-0}" \
 	MOCK_LICENSE_UPDATE_EXIT="${MOCK_LICENSE_UPDATE_EXIT:-0}" \
+	MOCK_SAFESHIELD_STATUS_EXIT="${MOCK_SAFESHIELD_STATUS_EXIT:-0}" \
 	MOCK_ACTIVATE_FETCH_EXIT="${MOCK_ACTIVATE_FETCH_EXIT:-0}" \
 	MOCK_ACTIVATE_ERROR_CODE="${MOCK_ACTIVATE_ERROR_CODE:-license_invalid}" \
 	MOCK_STATUS_FETCH_EXIT="${MOCK_STATUS_FETCH_EXIT:-0}" \
@@ -233,13 +252,15 @@ run_license() {
 reset_mocks
 ACTIVATION_REQUEST="$TMP/runtime/license-activate.request.json"
 cat > "$ACTIVATION_REQUEST" <<'EOF_REQUEST'
-{"license_key":"LIC-ACTIVATE-001","device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint_version":1,"identity_provider":"factory_mac","identity_source":"mtd:Factory:0x4:mac","identity_strength":"hardware_soft","identity_profile":"iptime_ax3000sm","installation_id":"11111111-1111-4111-8111-111111111111","vendor":"ipTIME","model":"ipTIME AX3000SM","arch":"aarch64_cortex-a53","memory_mb":256,"safeshield_version":"0.3.23-r1"}}
+{"license_key":"LIC-ACTIVATE-001"}
 EOF_REQUEST
 mkdir "$LOCK_DIR"
 run_license activate --request-file "$ACTIVATION_REQUEST" || fail '유효한 라이선스 activate 요청이 성공해야 합니다.'
 grep -Fq '/api/v1/licenses/activate' "$FETCH_URL_LOG" || fail 'activate endpoint가 호출되어야 합니다.'
 grep -Fq '"license_key":"LIC-ACTIVATE-001"' "$FETCH_BODY_LOG" || fail 'activate payload에 입력한 키가 포함되어야 합니다.'
 grep -Fq '"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$FETCH_BODY_LOG" || fail 'activate payload에 SafeShield physical fingerprint가 포함되어야 합니다.'
+grep -Fq '"vendor":"ipTIME"' "$FETCH_BODY_LOG" || fail 'activate helper가 SafeShield vendor를 Hub payload에 포함해야 합니다.'
+grep -Fq '"safeshield_version":"0.3.23-r1"' "$FETCH_BODY_LOG" || fail 'activate helper가 SafeShield 버전을 Hub payload에 포함해야 합니다.'
 grep -Fq 'LIC-ACTIVATE-001' "$UPDATE_LOG" || fail 'Hub activation 성공 뒤에만 SafeShield license_update가 호출되어야 합니다.'
 [ ! -e "$ACTIVATION_REQUEST" ] || fail 'activate 요청 임시 파일은 완료 후 삭제되어야 합니다.'
 [ ! -d "$LOCK_DIR" ] || fail 'activate single-flight lock은 완료 후 해제되어야 합니다.'
@@ -328,11 +349,27 @@ MOCK_LICENSE_CONFIGURED=false MOCK_LICENSE_KEY='' MOCK_EPOCH=1800001200 run_lice
 [ ! -s "$FETCH_URL_LOG" ] || fail '로컬 라이선스가 없으면 Hub status API를 호출하면 안 됩니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'unconfigured' ] || fail '로컬 라이선스가 없으면 unconfigured 상태여야 합니다.'
 
+# SafeShield identity lookup happens only in the detached helper. Failure must
+# become an activation error without calling Hub or storing the supplied key.
+reset_mocks
+: > "$FETCH_URL_LOG"
+: > "$UPDATE_LOG"
+ACTIVATION_REQUEST="$TMP/runtime/license-activate.request.json"
+printf '%s\n' '{"license_key":"LIC-IDENTITY-FAIL"}' > "$ACTIVATION_REQUEST"
+mkdir "$LOCK_DIR"
+if MOCK_SAFESHIELD_STATUS_EXIT=1 MOCK_EPOCH=1800001350 run_license activate --request-file "$ACTIVATION_REQUEST"; then
+	fail 'SafeShield identity 조회 실패 시 activate helper가 실패해야 합니다.'
+fi
+[ ! -s "$FETCH_URL_LOG" ] || fail '장치 identity를 읽지 못하면 Hub activate API를 호출하면 안 됩니다.'
+[ ! -s "$UPDATE_LOG" ] || fail '장치 identity를 읽지 못하면 로컬 라이선스를 저장하면 안 됩니다.'
+[ "$(jq -r '.lastErrorCode' "$STATE_FILE")" = 'LICENSE_DEVICE_IDENTITY_UNAVAILABLE' ] || fail '장치 identity 조회 실패 코드를 기록해야 합니다.'
+[ ! -d "$LOCK_DIR" ] || fail 'identity 조회 실패 뒤 activate lock을 해제해야 합니다.'
+
 # Hub activation rejection must not persist the supplied key locally.
 reset_mocks
 : > "$UPDATE_LOG"
 ACTIVATION_REQUEST="$TMP/runtime/license-activate.request.json"
-printf '%s\n' '{"license_key":"BAD-LICENSE","device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","vendor":"ipTIME","model":"ipTIME AX3000SM","arch":"aarch64_cortex-a53"}}' > "$ACTIVATION_REQUEST"
+printf '%s\n' '{"license_key":"BAD-LICENSE"}' > "$ACTIVATION_REQUEST"
 mkdir "$LOCK_DIR"
 if MOCK_ACTIVATE_FETCH_EXIT=1 MOCK_ACTIVATE_ERROR_CODE=license_invalid MOCK_EPOCH=1800001500 run_license activate --request-file "$ACTIVATION_REQUEST"; then
 	fail 'Hub가 거부한 activate 요청은 실패해야 합니다.'

@@ -1,5 +1,24 @@
 # 변경 기록
 
+## [0.2.16-r4] - 2026-09-18
+
+### 라이선스 활성화 안정성
+
+- `smartsafehub.license_activate` RPC 안에서 `safeshield.status`를 동기 호출하던 경로를 제거했습니다. RPC는 라이선스 키를 mode 0600 임시 요청에 기록하고 detached `smartsafehub-license activate` helper를 시작한 뒤 즉시 반환하며, SafeShield 장치 identity 조회와 Hub `/licenses/activate` 요청은 helper 프로세스에서 수행합니다. 이로써 rpcd 내부의 nested ubus 대기로 라이선스 등록 요청이 20초 후 timeout되던 문제를 방지합니다.
+- detached helper가 SafeShield의 authoritative physical fingerprint, configured vendor/model/arch/memory 및 SafeShield 버전을 읽어 기존 Hub activate payload를 동일하게 구성합니다. Hub activation이 성공한 뒤에만 SafeShield 공식 `license_update` API로 키를 저장하는 기존 보안 경계는 유지합니다.
+- SafeShield identity/profile 조회 실패를 각각 `LICENSE_DEVICE_IDENTITY_UNAVAILABLE`, `LICENSE_DEVICE_PROFILE_UNAVAILABLE`로 상태 파일에 기록하고 Hub 요청이나 로컬 키 저장을 진행하지 않도록 했습니다.
+
+### 라이선스 UI 피드백
+
+- 라이선스 등록·조회·제거의 성공/오류 피드백을 페이지 상단 공통 배너가 아니라 사용자가 작업한 라이선스 카드 내부에 표시하도록 분리했습니다. 등록 중에는 카드 안에서 `라이선스를 확인하고 이 기기에 적용하고 있습니다…` 상태를 즉시 보여줍니다.
+- 라이선스 status polling을 0.5초에서 1초 간격으로 완화하고, 각 상태 조회 timeout을 5초로 제한했습니다. 일시적인 timeout/네트워크 오류는 최대 2회 재시도하며, 최종 확인이 늦어지는 경우 실제 실패로 단정하지 않고 상태 확인 지연 안내를 표시합니다.
+- 라이선스 카드의 진행 안내는 기존 teal 계열 테마 토큰을 사용해 라이트/다크 모드 모두에서 배경, 테두리와 텍스트 대비가 유지되도록 했습니다.
+
+### 테스트 및 문서
+
+- `tests/test-license.sh`에 rpcd 경로에서 SafeShield 동기 호출 금지, detached helper의 device payload 구성, identity 조회 실패 시 fail-closed 동작, 카드 내부 feedback routing과 완화된 polling 계약을 추가했습니다.
+- README와 아키텍처 문서에 비동기 activation 경계와 라이선스 카드 피드백 동작을 반영했습니다.
+
 ## [0.2.16-r3] - 2026-09-18
 
 ### 테스트 안정성

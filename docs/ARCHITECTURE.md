@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.16-r3`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.16-r4`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -153,7 +153,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.16-r3
+0.2.16-r4
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -702,9 +702,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.16-r3
-  → app.js?v=0.2.16-r3
-  → app.css?v=0.2.16-r3
+  → data-asset-version = 0.2.16-r4
+  → app.js?v=0.2.16-r4
+  → app.css?v=0.2.16-r4
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -843,3 +843,9 @@ LAN 화면은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, 
 ### Hash route 새로고침 보존
 
 SmartSafeHub는 현재 route를 별도 storage에 복제하지 않고 브라우저의 URL fragment를 직접 사용한다. uHTTPd exact-root handler가 `/`을 내부 rewrite하면 브라우저 navigation이 발생하지 않으므로 `/#settings`, `/#system` 같은 fragment는 일반 새로고침에서도 그대로 유지된다.
+
+### License activation RPC 경계
+
+`smartsafehub.license_activate`는 rpcd 실행 컨텍스트에서 `safeshield.status`를 다시 동기 호출하지 않습니다. RPC는 mode 0600 request 파일에 라이선스 키만 기록하고 detached `smartsafehub-license activate` helper를 시작한 뒤 즉시 반환합니다. helper가 별도 프로세스에서 SafeShield authoritative device identity/profile을 읽고 Hub `/api/v1/licenses/activate`를 호출하며, 성공한 경우에만 SafeShield `license_update`로 로컬 키를 저장합니다. 이 경계는 rpcd nested ubus 대기를 피하고 향후 `smartsafehub-agent license activate`로 이동할 때도 그대로 유지합니다.
+
+프런트엔드는 activation 상태를 1초 간격으로 확인하되 `license_status` RPC timeout을 5초로 제한하고 일시적인 timeout/네트워크 오류를 최대 2회 재시도합니다. 라이선스 관련 진행/성공/오류 피드백은 작업 위치인 라이선스 카드 안에서 표시합니다.

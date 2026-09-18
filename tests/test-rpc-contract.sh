@@ -181,10 +181,15 @@ grep -Fq "'SYSTEM_ROOT_PASSWORD_REQUIRED'" "$RPC_ENTRY" || \
 
 grep -Fq "const LICENSE_HELPER = '/usr/libexec/smartsafehub-license';" "$LICENSE_MODULE" || \
 	fail 'license RPC must delegate Hub activation to the dedicated helper'
-grep -Fq "safe_call('safeshield', 'status'" "$LICENSE_MODULE" || \
-	fail 'license activation must reuse SafeShield authoritative device identity'
-grep -Fq 'physical_fingerprint: fingerprint' "$LICENSE_MODULE" || \
-	fail 'license activation payload must forward the SafeShield physical fingerprint'
+if grep -Fq "safe_call('safeshield', 'status'" "$LICENSE_MODULE"; then
+	fail 'license activation RPC must not synchronously call SafeShield inside rpcd'
+fi
+grep -Fq 'write_private_request(license_key)' "$LICENSE_MODULE" || \
+	fail 'license activation RPC must persist only the key to the private helper request'
+grep -Fq 'build_activation_body()' "$LICENSE_HELPER" || \
+	fail 'license helper must build the Hub activate device payload outside rpcd'
+grep -Fq "'@.device.physical_fingerprint'" "$LICENSE_HELPER" || \
+	fail 'license helper must reuse SafeShield authoritative physical fingerprint'
 grep -Fq "LICENSE_HELPER + ' activate --request-file" "$LICENSE_MODULE" || \
 	fail 'license activation RPC must launch the helper with a request file instead of a key argument'
 grep -Fq 'activation_in_progress && return 0' "$LICENSE_HELPER" || \
