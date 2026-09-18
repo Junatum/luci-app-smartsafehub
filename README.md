@@ -477,11 +477,15 @@ smartsafehub-license daemon
 
 `smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` 명령을 독립 subcommand로 제공합니다. `license_activate` RPC 자체는 SafeShield를 동기 호출하지 않으며, 장치 identity와 profile 구성은 detached `activate` subcommand 안에서 수행합니다. 이는 현재는 작은 독립 procd 서비스로 장애 범위와 디버깅 경계를 유지하면서, 향후 주기적인 Hub 동기화 작업이 늘어나면 명령 경계를 그대로 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 하기 위한 구조입니다. updater처럼 장시간 설치·재부팅 상태 머신을 가지는 기능은 별도 서비스로 유지하는 것을 전제로 합니다.
 
+daemon의 startup/check 대기는 foreground `sleep`이 아니라 interrupt 가능한 child wait로 처리합니다. SIGTERM/SIGINT를 받으면 대기 중인 sleep child를 깨우고 loop를 종료하므로 5분 상태 확인 주기 중에도 procd stop/restart가 오래 기다리지 않습니다. Hub 요청 자체는 10초 timeout을 사용하고 procd `term_timeout`은 15초로 두어, 요청 중 종료가 들어와도 정상 정리 시간을 확보한 뒤 강제 종료하도록 합니다.
+
 런타임 상태는 `/tmp/smartsafehub/license.json`에 atomic write하며 평문 라이선스 키를 저장하지 않습니다. 명시적 활성화와 주기 `status-sync`가 겹치면 activation single-flight lock이 우선하며, status-sync는 활성화 결과를 덮어쓰지 않고 다음 주기까지 건너뜁니다. SafeShield의 `license_get` 자체가 실패한 경우는 미설정 상태로 오인하지 않고 `LICENSE_LOCAL_READ_FAILED`로 기록합니다.
+
+운영 진단을 위해 상태 파일에는 `lastHttpStatus`, `lastActivationResult`, `lastActivationErrorCode`도 기록합니다. 정상 Hub JSON 응답은 현재 API 계약에 따라 HTTP 200으로 기록하며, `uclient-fetch`가 transport/HTTP 실패로 종료되어 실제 상태 코드를 신뢰할 수 없는 경우 `lastHttpStatus`는 `null`로 기록합니다. `lastActivationResult`와 `lastActivationErrorCode`는 이후의 주기 `status-sync`나 `unconfigured` 전환에서도 유지되어 마지막 명시적 activation 결과를 별도로 추적할 수 있습니다.
 
 ### 라이선스 셸 계약 테스트
 
-`tests/test-license.sh`는 activate/status 동기화와 stale activation lock 복구를 검증합니다. 각 시나리오는 mock 환경을 명시적으로 초기화해 Linux `dash`와 macOS `/bin/sh`처럼 함수 앞 임시 환경 변수의 처리 차이가 있는 환경에서도 이전 실패 주기의 값이 다음 테스트에 누적되지 않도록 합니다.
+`tests/test-license.sh`는 activate/status 동기화, stale activation lock 복구, activation 진단 필드 보존과 장기 sleep 중 SIGTERM 정상 종료를 검증합니다. 각 시나리오는 mock 환경을 명시적으로 초기화해 Linux `dash`와 macOS `/bin/sh`처럼 함수 앞 임시 환경 변수의 처리 차이가 있는 환경에서도 이전 실패 주기의 값이 다음 테스트에 누적되지 않도록 합니다.
 
 ## ucode 컴파일 검사
 

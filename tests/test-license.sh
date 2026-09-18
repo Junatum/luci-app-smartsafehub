@@ -14,6 +14,7 @@ HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldActions.ts"
 TYPES="$ROOT_DIR/frontend/src/types/license.ts"
 PAGE="$ROOT_DIR/frontend/src/pages/SafeShieldPage.tsx"
 APP="$ROOT_DIR/frontend/src/app/App.tsx"
+REAL_SLEEP_BIN="$(command -v sleep)"
 
 fail() {
 	printf 'FAIL: %s\n' "$*" >&2
@@ -30,8 +31,14 @@ sh -n "$INIT_SCRIPT" || fail 'License init script가 POSIX shell 문법 검사�
 grep -Fq "config license 'license'" "$CONFIG" || fail 'smartsafehub license UCI section이 필요합니다.'
 grep -Fq "option check_interval_s '300'" "$CONFIG" || fail '라이선스 상태 확인 기본 주기는 300초여야 합니다.'
 grep -Fq 'procd_set_param command "$PROG" daemon' "$INIT_SCRIPT" || fail '라이선스 서비스는 독립 procd daemon으로 실행되어야 합니다.'
+grep -Fq 'procd_set_param term_timeout 15' "$INIT_SCRIPT" || fail '라이선스 daemon은 Hub 요청 timeout보다 긴 정상 종료 유예 시간을 가져야 합니다.'
 grep -Fq 'smartsafehub-license' "$INIT_SCRIPT" || fail '라이선스 init script가 전용 helper를 실행해야 합니다.'
 grep -Fq 'umask 077' "$HELPER" || fail '라이선스 helper의 임시 request/response 파일은 root 전용 권한이어야 합니다.'
+grep -Fq 'interruptible_sleep()' "$HELPER" || fail '라이선스 daemon의 장기 sleep은 SIGTERM으로 중단 가능해야 합니다.'
+grep -Fq 'kill "$WAIT_PID"' "$HELPER" || fail '라이선스 daemon 종료 시 대기 중인 sleep child를 깨워야 합니다.'
+grep -Fq '"lastHttpStatus"' "$HELPER" || fail '라이선스 상태 파일에 마지막 Hub HTTP 상태를 기록해야 합니다.'
+grep -Fq '"lastActivationResult"' "$HELPER" || fail '라이선스 상태 파일에 마지막 activation 결과를 기록해야 합니다.'
+grep -Fq '"lastActivationErrorCode"' "$HELPER" || fail '라이선스 상태 파일에 마지막 activation 오류를 기록해야 합니다.'
 
 grep -Fq "activate --request-file" "$HELPER" || fail '향후 agent license 모듈로 옮길 수 있는 activate subcommand가 필요합니다.'
 grep -Fq 'status-sync' "$HELPER" || fail '향후 agent license 모듈로 옮길 수 있는 status-sync subcommand가 필요합니다.'
@@ -69,7 +76,16 @@ grep -Fq '"license_status"' "$ACL" || fail 'license_status RPC read ACL이 필�
 grep -Fq '"license_activate"' "$ACL" || fail 'license_activate RPC write ACL이 필요합니다.'
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT INT TERM
+DAEMON_PID=''
+
+cleanup_test() {
+	if [ -n "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+		kill -KILL "$DAEMON_PID" 2>/dev/null || true
+		wait "$DAEMON_PID" 2>/dev/null || true
+	fi
+	rm -rf "$TMP"
+}
+trap cleanup_test EXIT INT TERM
 mkdir -p "$TMP/bin" "$TMP/runtime"
 
 cat > "$TMP/bin/uci" <<'EOF_UCI'
@@ -266,6 +282,9 @@ grep -Fq 'LIC-ACTIVATE-001' "$UPDATE_LOG" || fail 'Hub activation 성공 뒤에�
 [ ! -d "$LOCK_DIR" ] || fail 'activate single-flight lock은 완료 후 해제되어야 합니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'active' ] || fail 'activate 성공 상태는 active여야 합니다.'
 [ "$(jq -r '.lastResult' "$STATE_FILE")" = 'activated' ] || fail 'activate 성공 결과는 activated여야 합니다.'
+[ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = '200' ] || fail 'activate 성공 시 마지막 Hub HTTP 상태를 200으로 기록해야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'active' ] || fail '마지막 activation 성공 결과를 별도로 보존해야 합니다.'
+[ "$(jq -r '.lastActivationErrorCode' "$STATE_FILE")" = 'null' ] || fail 'activate 성공 후 마지막 activation 오류는 비어 있어야 합니다.'
 if grep -Fq 'LIC-ACTIVATE-001' "$STATE_FILE"; then
 	fail 'runtime 상태 파일에는 평문 라이선스 키를 저장하면 안 됩니다.'
 fi
@@ -280,6 +299,8 @@ grep -Fq '/api/v1/licenses/status' "$FETCH_URL_LOG" || fail 'status endpoint가 
 grep -Fq '"license_key":"LIC-LOCAL-001"' "$FETCH_BODY_LOG" || fail 'status payload는 현재 SafeShield 키를 일시적으로 사용해야 합니다.'
 [ ! -s "$UPDATE_LOG" ] || fail 'active status 응답은 SafeShield 라이선스를 변경하면 안 됩니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'active' ] || fail 'active status 응답은 active 상태로 기록해야 합니다.'
+[ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = '200' ] || fail 'status 성공 시 마지막 Hub HTTP 상태를 갱신해야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'active' ] || fail '주기 status-sync가 마지막 activation 결과를 덮어쓰면 안 됩니다.'
 
 # Explicit server revocation is authoritative and clears the local key through
 # SafeShield, never by writing SafeShield UCI directly.
@@ -303,6 +324,8 @@ if MOCK_EPOCH=1800000900 MOCK_STATUS_FETCH_EXIT=1 run_license status-sync; then
 fi
 [ ! -s "$UPDATE_LOG" ] || fail 'status HTTP 실패만으로 로컬 라이선스를 제거하면 안 됩니다.'
 [ "$(jq -r '.lastErrorCode' "$STATE_FILE")" = 'LICENSE_STATUS_HTTP_FAILED' ] || fail 'status HTTP 실패 코드를 기록해야 합니다.'
+[ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = 'null' ] || fail 'HTTP 상태를 확인할 수 없는 fetch 실패는 null로 기록해야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'active' ] || fail 'status 통신 실패가 마지막 activation 결과를 지우면 안 됩니다.'
 
 # A SafeShield API failure is not the same thing as an unconfigured license.
 # Keep the local state intact and surface a diagnosable error instead.
@@ -348,6 +371,7 @@ reset_mocks
 MOCK_LICENSE_CONFIGURED=false MOCK_LICENSE_KEY='' MOCK_EPOCH=1800001200 run_license status-sync || fail '미설정 라이선스 상태 확인은 정상 종료해야 합니다.'
 [ ! -s "$FETCH_URL_LOG" ] || fail '로컬 라이선스가 없으면 Hub status API를 호출하면 안 됩니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'unconfigured' ] || fail '로컬 라이선스가 없으면 unconfigured 상태여야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'active' ] || fail '미설정 상태 전환 뒤에도 마지막 activation 결과는 진단용으로 남아야 합니다.'
 
 # SafeShield identity lookup happens only in the detached helper. Failure must
 # become an activation error without calling Hub or storing the supplied key.
@@ -363,6 +387,8 @@ fi
 [ ! -s "$FETCH_URL_LOG" ] || fail '장치 identity를 읽지 못하면 Hub activate API를 호출하면 안 됩니다.'
 [ ! -s "$UPDATE_LOG" ] || fail '장치 identity를 읽지 못하면 로컬 라이선스를 저장하면 안 됩니다.'
 [ "$(jq -r '.lastErrorCode' "$STATE_FILE")" = 'LICENSE_DEVICE_IDENTITY_UNAVAILABLE' ] || fail '장치 identity 조회 실패 코드를 기록해야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'failed' ] || fail 'identity 조회 실패를 마지막 activation 결과에 보존해야 합니다.'
+[ "$(jq -r '.lastActivationErrorCode' "$STATE_FILE")" = 'LICENSE_DEVICE_IDENTITY_UNAVAILABLE' ] || fail 'identity 조회 실패 코드를 activation 진단 필드에도 보존해야 합니다.'
 [ ! -d "$LOCK_DIR" ] || fail 'identity 조회 실패 뒤 activate lock을 해제해야 합니다.'
 
 # Hub activation rejection must not persist the supplied key locally.
@@ -376,5 +402,62 @@ if MOCK_ACTIVATE_FETCH_EXIT=1 MOCK_ACTIVATE_ERROR_CODE=license_invalid MOCK_EPOC
 fi
 [ ! -s "$UPDATE_LOG" ] || fail 'Hub activate 실패 시 SafeShield에 키를 저장하면 안 됩니다.'
 [ "$(jq -r '.lastErrorCode' "$STATE_FILE")" = 'license_invalid' ] || fail 'Hub 오류 코드를 activation 상태에 보존해야 합니다.'
+[ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = 'null' ] || fail 'Hub activate fetch 실패에서 알 수 없는 HTTP 상태는 null이어야 합니다.'
+[ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'failed' ] || fail 'Hub activate 거부를 마지막 activation 실패로 보존해야 합니다.'
+[ "$(jq -r '.lastActivationErrorCode' "$STATE_FILE")" = 'license_invalid' ] || fail 'Hub activation 오류 코드를 별도 진단 필드에 보존해야 합니다.'
 
-printf 'PASS: SmartSafeHub license daemon, Hub activate/status sync, SafeShield reconciliation and future agent module boundaries are valid\n'
+# The daemon must exit promptly while waiting for the next 5-minute sync.
+# Run the real sleep command so SIGTERM exercises the parent/child wait path
+# that previously left procd waiting until it sent SIGKILL.
+reset_mocks
+: > "$FETCH_URL_LOG"
+: > "$FETCH_BODY_LOG"
+: > "$UPDATE_LOG"
+MOCK_LICENSE_UPDATE_LOG="$UPDATE_LOG" \
+MOCK_FETCH_URL_LOG="$FETCH_URL_LOG" \
+MOCK_FETCH_BODY_LOG="$FETCH_BODY_LOG" \
+MOCK_LICENSE_CONFIGURED=true \
+MOCK_LICENSE_KEY='LIC-LOCAL-001' \
+MOCK_LICENSE_GET_EXIT=0 \
+MOCK_LICENSE_UPDATE_EXIT=0 \
+MOCK_SAFESHIELD_STATUS_EXIT=0 \
+MOCK_STATUS_FETCH_EXIT=0 \
+MOCK_STATUS_ACTION=none \
+MOCK_STATUS_LICENSED=true \
+MOCK_STATUS_PLAN=ultimate \
+MOCK_STATUS_LICENSE_STATUS=active \
+MOCK_STATUS_ACTIVATION=active \
+MOCK_EPOCH=1800001800 \
+MOCK_CHECK_INTERVAL=300 \
+MOCK_STARTUP_DELAY=0 \
+SMARTSAFEHUB_LICENSE_RUNTIME_DIR="$TMP/runtime" \
+SMARTSAFEHUB_LICENSE_STATE_FILE="$STATE_FILE" \
+SMARTSAFEHUB_LICENSE_ACTIVATION_LOCK="$LOCK_DIR" \
+SMARTSAFEHUB_LICENSE_UCI_BIN="$TMP/bin/uci" \
+SMARTSAFEHUB_LICENSE_UBUS_BIN="$TMP/bin/ubus" \
+SMARTSAFEHUB_LICENSE_JSONFILTER_BIN="$TMP/bin/jsonfilter" \
+SMARTSAFEHUB_LICENSE_UCLIENT_FETCH_BIN="$TMP/bin/uclient-fetch" \
+SMARTSAFEHUB_LICENSE_DATE_BIN="$TMP/bin/date" \
+SMARTSAFEHUB_LICENSE_LOGGER_BIN="$TMP/bin/logger" \
+SMARTSAFEHUB_LICENSE_SLEEP_BIN="$REAL_SLEEP_BIN" \
+PATH="$TMP/bin:$PATH" \
+"$HELPER" daemon > "$TMP/daemon.out" 2>&1 &
+DAEMON_PID=$!
+
+"$REAL_SLEEP_BIN" 1
+kill -0 "$DAEMON_PID" 2>/dev/null || fail '종료 테스트 전에 license daemon이 실행 중이어야 합니다.'
+kill -TERM "$DAEMON_PID" 2>/dev/null || fail 'license daemon에 SIGTERM을 전달할 수 있어야 합니다.'
+
+stop_wait=0
+while kill -0 "$DAEMON_PID" 2>/dev/null && [ "$stop_wait" -lt 3 ]; do
+	"$REAL_SLEEP_BIN" 1
+	stop_wait=$((stop_wait + 1))
+done
+if kill -0 "$DAEMON_PID" 2>/dev/null; then
+	kill -KILL "$DAEMON_PID" 2>/dev/null || true
+	wait "$DAEMON_PID" 2>/dev/null || true
+	fail 'license daemon이 장기 sleep 중 SIGTERM에 신속히 종료되어야 합니다.'
+fi
+wait "$DAEMON_PID" 2>/dev/null || true
+
+printf 'PASS: SmartSafeHub license daemon shutdown, diagnostics, Hub activate/status sync, SafeShield reconciliation and future agent module boundaries are valid\n'

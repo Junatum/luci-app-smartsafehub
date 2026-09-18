@@ -1,5 +1,23 @@
 # 변경 기록
 
+## [0.2.16-r5] - 2026-09-18
+
+### 라이선스 daemon 종료 안정성
+
+- `smartsafehub-license daemon`의 30초 startup/300초 상태 확인 대기를 interrupt 가능한 child `sleep` + `wait` 구조로 변경했습니다. SIGTERM/SIGINT를 받으면 대기 중인 child를 깨우고 scheduler loop를 종료해 서비스 stop/restart 시 장기 sleep 때문에 procd가 SIGKILL을 보내던 상황을 방지합니다.
+- Hub 요청 timeout 10초보다 긴 `procd term_timeout 15`를 설정해 HTTP 요청 처리 중 종료가 들어온 경우에도 정상 정리 시간을 확보했습니다.
+
+### 라이선스 진단 상태
+
+- `/tmp/smartsafehub/license.json`에 `lastHttpStatus`, `lastActivationResult`, `lastActivationErrorCode`를 추가했습니다. 성공한 Hub JSON API 요청은 HTTP 200으로 기록하고 실제 상태 코드를 신뢰할 수 없는 fetch 실패는 `null`로 남깁니다.
+- 마지막 명시적 activation의 성공/실패 결과와 오류 코드를 주기 `status-sync`, revoke 후 로컬 clear, unconfigured 전환과 분리해 보존하도록 했습니다. 현재 동작 상태와 마지막 사용자 activation 결과를 각각 확인할 수 있습니다.
+- 평문 라이선스 키를 상태 파일에 저장하지 않는 기존 보안 계약과 atomic write 동작은 유지합니다.
+
+### 테스트 및 문서
+
+- `tests/test-license.sh`에 daemon 장기 sleep 중 SIGTERM 종료, Hub HTTP 진단 상태, activation 결과/오류 보존 계약을 추가했습니다.
+- README와 아키텍처 문서에 daemon 종료 경계와 새 진단 필드 의미를 반영했습니다.
+
 ## [0.2.16-r4] - 2026-09-18
 
 ### 라이선스 활성화 안정성

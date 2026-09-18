@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.16-r4`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.16-r5`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -153,7 +153,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.16-r4
+0.2.16-r5
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -662,6 +662,10 @@ SafeShield는 키 저장과 device identity의 authoritative source이며 Hub �
 
 `smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` subcommand로 구성합니다. 이 명령 경계와 상태 모델은 향후 `smartsafehub-agent license ...`로 통합할 때 기능 코드를 큰 단일 loop로 합치지 않고 license 모듈 단위로 그대로 옮길 수 있게 의도한 것입니다. 현재는 독립 procd 서비스라 장애 격리와 `logread -e smartsafehub-license`, 수동 `status-sync` 같은 디버깅 경로를 유지합니다.
 
+daemon의 startup/check interval은 interrupt 가능한 child `sleep` + `wait` 경계로 구현합니다. SIGTERM/SIGINT 시 wait 중인 child를 종료하고 scheduler loop를 빠져나오므로 300초 대기 중 procd stop/restart가 SIGKILL까지 지연되지 않습니다. HTTP 요청은 최대 10초이므로 init script의 `term_timeout`은 15초로 두어 요청 중 종료에도 정상 정리 여유를 둡니다.
+
+`/tmp/smartsafehub/license.json`은 현재 동작 상태와 별도로 마지막 Hub/activation 진단을 유지합니다. `lastHttpStatus`는 성공한 Hub JSON API 요청에서 200을 기록하고 실제 HTTP 상태를 신뢰할 수 없는 fetch 실패에서는 `null`을 기록합니다. `lastActivationResult`와 `lastActivationErrorCode`는 마지막 명시적 activate의 성공/실패 결과이며, 이후 `status-sync`, 서버 revoke에 따른 clear, 로컬 unconfigured 전환이 발생해도 덮어쓰지 않습니다. 따라서 현재 상태(`phase`, `lastResult`)와 마지막 사용자 activation 결과를 독립적으로 진단할 수 있습니다.
+
 라이선스 입력란은 비밀번호 필드로 취급하지 않고 일반 텍스트 입력으로 사용합니다. 브라우저 비밀번호 관리자 대상이 되지 않도록 autocomplete 및 주요 password-manager ignore 속성을 적용합니다.
 
 ### 7.8 진단 파일
@@ -702,9 +706,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.16-r4
-  → app.js?v=0.2.16-r4
-  → app.css?v=0.2.16-r4
+  → data-asset-version = 0.2.16-r5
+  → app.js?v=0.2.16-r5
+  → app.css?v=0.2.16-r5
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

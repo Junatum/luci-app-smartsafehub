@@ -29,6 +29,8 @@ STATUS_REQUEST_FILE=''
 STATUS_RESPONSE_FILE=''
 SAFESHIELD_STATUS_FILE=''
 LICENSE_FILE=''
+STOP_REQUESTED=0
+WAIT_PID=''
 
 cleanup_files() {
 	[ -n "$ACTIVATION_BODY_FILE" ] && rm -f "$ACTIVATION_BODY_FILE"
@@ -38,7 +40,16 @@ cleanup_files() {
 	[ -n "$SAFESHIELD_STATUS_FILE" ] && rm -f "$SAFESHIELD_STATUS_FILE"
 	[ -n "$LICENSE_FILE" ] && rm -f "$LICENSE_FILE"
 }
-trap cleanup_files EXIT INT TERM
+
+request_stop() {
+	STOP_REQUESTED=1
+	if [ -n "$WAIT_PID" ]; then
+		kill "$WAIT_PID" 2>/dev/null || true
+	fi
+}
+
+trap cleanup_files EXIT
+trap request_stop INT TERM
 
 log_message() {
 	"$LOGGER_BIN" -t smartsafehub-license -- "$*" 2>/dev/null || true
@@ -109,18 +120,49 @@ sanitize_code() {
 	printf '%s' "$1" | tr -cd 'A-Za-z0-9_.:-' | cut -c 1-120
 }
 
-write_state() {
+write_state_fields() {
 	local phase="$1" result="$2" error="$3" last_attempt_at="$4" last_checked_at="$5"
 	local last_activated_at="$6" next_check_at="$7" plan="$8" license_status="$9"
 	shift 9
-	local activation_status="$1" device_action="$2" tmp
+	local activation_status="$1" device_action="$2" http_status_override="$3"
+	local activation_result_override="$4" activation_error_override="$5"
+	local last_http_status last_activation_result last_activation_error http_json tmp
+
+	last_http_status="$(json_value "$STATE_FILE" '@.lastHttpStatus')"
+	last_activation_result="$(json_value "$STATE_FILE" '@.lastActivationResult')"
+	last_activation_error="$(json_value "$STATE_FILE" '@.lastActivationErrorCode')"
+
+	case "$http_status_override" in
+		keep) ;;
+		null) last_http_status='' ;;
+		*) last_http_status="$http_status_override" ;;
+	esac
+	case "$activation_result_override" in
+		keep) ;;
+		null) last_activation_result='' ;;
+		*) last_activation_result="$activation_result_override" ;;
+	esac
+	case "$activation_error_override" in
+		keep) ;;
+		null) last_activation_error='' ;;
+		*) last_activation_error="$activation_error_override" ;;
+	esac
+
+	case "$last_http_status" in
+		''|*[!0-9]*) http_json='null' ;;
+		*) http_json="$last_http_status" ;;
+	esac
 
 	mkdir -p "$RUNTIME_DIR" || return 1
 	tmp="${STATE_FILE}.tmp.$$"
 	cat > "$tmp" <<EOF_STATE
-{"schema":1,"component":"license","phase":"$(json_escape "$phase")","lastResult":"$(json_escape "$result")","lastErrorCode":$(json_string_or_null "$(sanitize_code "$error")"),"lastAttemptAt":$last_attempt_at,"lastCheckedAt":$last_checked_at,"lastActivatedAt":$last_activated_at,"nextCheckAt":$next_check_at,"plan":$(json_string_or_null "$(sanitize_code "$plan")"),"licenseStatus":$(json_string_or_null "$(sanitize_code "$license_status")"),"activationStatus":$(json_string_or_null "$(sanitize_code "$activation_status")"),"deviceAction":$(json_string_or_null "$(sanitize_code "$device_action")")}
+{"schema":1,"component":"license","phase":"$(json_escape "$phase")","lastResult":"$(json_escape "$result")","lastErrorCode":$(json_string_or_null "$(sanitize_code "$error")"),"lastAttemptAt":$last_attempt_at,"lastCheckedAt":$last_checked_at,"lastActivatedAt":$last_activated_at,"nextCheckAt":$next_check_at,"plan":$(json_string_or_null "$(sanitize_code "$plan")"),"licenseStatus":$(json_string_or_null "$(sanitize_code "$license_status")"),"activationStatus":$(json_string_or_null "$(sanitize_code "$activation_status")"),"deviceAction":$(json_string_or_null "$(sanitize_code "$device_action")"),"lastHttpStatus":$http_json,"lastActivationResult":$(json_string_or_null "$(sanitize_code "$last_activation_result")"),"lastActivationErrorCode":$(json_string_or_null "$(sanitize_code "$last_activation_error")")}
 EOF_STATE
 	mv "$tmp" "$STATE_FILE"
+}
+
+write_state() {
+	write_state_fields "$@" keep keep keep
 }
 
 read_previous_number() {
@@ -292,7 +334,7 @@ activate_license() {
 	now="$(now_epoch)"
 	previous_checked="$(read_previous_number '@.lastCheckedAt')"
 	previous_activated="$(read_previous_number '@.lastActivatedAt')"
-	write_state activating activating '' "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
+	write_state_fields activating activating '' "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none keep activating null
 
 	build_rc=0
 	build_activation_body "$request_file" || build_rc=$?
@@ -302,7 +344,7 @@ activate_license() {
 			11) error_code='LICENSE_DEVICE_PROFILE_UNAVAILABLE' ;;
 			*) error_code='LICENSE_KEY_INVALID' ;;
 		esac
-		write_state error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
+		write_state_fields error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none keep failed "$error_code"
 		log_message "$error_code: 라이선스 등록 요청에 필요한 장치 정보를 준비하지 못했습니다."
 		activation_cleanup
 		return 1
@@ -313,7 +355,7 @@ activate_license() {
 	if ! post_json "$ACTIVATION_BODY_FILE" "$ACTIVATION_RESPONSE_FILE" "$base/licenses/activate"; then
 		error_code="$(server_error_code "$ACTIVATION_RESPONSE_FILE")"
 		[ -n "$error_code" ] || error_code='LICENSE_ACTIVATE_HTTP_FAILED'
-		write_state error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none
+		write_state_fields error failed "$error_code" "$now" "$previous_checked" "$previous_activated" 0 '' '' '' none null failed "$error_code"
 		log_message "$error_code: 라이선스 활성화 요청에 실패했습니다."
 		activation_cleanup
 		return 1
@@ -324,20 +366,20 @@ activate_license() {
 	plan="$(json_value "$ACTIVATION_RESPONSE_FILE" '@.license.plan')"
 	license_status="$(json_value "$ACTIVATION_RESPONSE_FILE" '@.license.status')"
 	if [ "$licensed" != 'true' ] && [ "$licensed" != '1' ]; then
-		write_state error failed LICENSE_ACTIVATE_RESPONSE_INVALID "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none
+		write_state_fields error failed LICENSE_ACTIVATE_RESPONSE_INVALID "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none 200 failed LICENSE_ACTIVATE_RESPONSE_INVALID
 		log_message 'LICENSE_ACTIVATE_RESPONSE_INVALID: 활성화 응답이 유효하지 않습니다.'
 		activation_cleanup
 		return 1
 	fi
 	if [ "$activation_status" != 'active' ]; then
-		write_state error failed LICENSE_ACTIVATE_RESPONSE_INVALID "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none
+		write_state_fields error failed LICENSE_ACTIVATE_RESPONSE_INVALID "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none 200 failed LICENSE_ACTIVATE_RESPONSE_INVALID
 		log_message 'LICENSE_ACTIVATE_RESPONSE_INVALID: activation 상태가 active가 아닙니다.'
 		activation_cleanup
 		return 1
 	fi
 
 	if [ -z "$key" ] || ! update_local_license "$key"; then
-		write_state error failed LICENSE_LOCAL_UPDATE_FAILED "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none
+		write_state_fields error failed LICENSE_LOCAL_UPDATE_FAILED "$now" "$previous_checked" "$previous_activated" 0 "$plan" "$license_status" "$activation_status" none 200 failed LICENSE_LOCAL_UPDATE_FAILED
 		log_message 'LICENSE_LOCAL_UPDATE_FAILED: SafeShield에 라이선스 키를 저장하지 못했습니다.'
 		activation_cleanup
 		return 1
@@ -345,7 +387,7 @@ activate_license() {
 
 	now="$(now_epoch)"
 	interval="$(check_interval_s)"
-	write_state active activated '' "$now" "$now" "$now" $((now + interval)) "$plan" "$license_status" "$activation_status" none
+	write_state_fields active activated '' "$now" "$now" "$now" $((now + interval)) "$plan" "$license_status" "$activation_status" none 200 active null
 	log_message '라이선스 활성화와 로컬 적용을 완료했습니다.'
 	activation_cleanup
 	return 0
@@ -389,7 +431,7 @@ EOF_REQUEST
 	write_state checking checking '' "$now" "$now" "$previous_activated" "$next_check" '' '' '' none
 	base="$(api_base_url)"
 	if ! post_json "$STATUS_REQUEST_FILE" "$STATUS_RESPONSE_FILE" "$base/licenses/status"; then
-		write_state error failed LICENSE_STATUS_HTTP_FAILED "$now" "$now" "$previous_activated" "$next_check" '' '' '' none
+		write_state_fields error failed LICENSE_STATUS_HTTP_FAILED "$now" "$now" "$previous_activated" "$next_check" '' '' '' none null keep keep
 		log_message 'LICENSE_STATUS_HTTP_FAILED: 라이선스 상태를 확인하지 못했습니다.'
 		return 1
 	fi
@@ -401,22 +443,22 @@ EOF_REQUEST
 	activation_status="$(json_value "$STATUS_RESPONSE_FILE" '@.activation.status')"
 
 	if [ "$action" = 'none' ] && { [ "$licensed" = 'true' ] || [ "$licensed" = '1' ]; }; then
-		write_state active active '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" none
+		write_state_fields active active '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" none 200 keep keep
 		return 0
 	fi
 
 	if [ "$action" = 'clear_license' ]; then
 		if ! update_local_license ''; then
-			write_state error failed LICENSE_LOCAL_CLEAR_FAILED "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license
+			write_state_fields error failed LICENSE_LOCAL_CLEAR_FAILED "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license 200 keep keep
 			log_message 'LICENSE_LOCAL_CLEAR_FAILED: 서버 해제 지시를 로컬에 적용하지 못했습니다.'
 			return 1
 		fi
-		write_state cleared cleared '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license
+		write_state_fields cleared cleared '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license 200 keep keep
 		log_message "서버 라이선스 상태($activation_status)에 따라 로컬 라이선스를 제거했습니다."
 		return 0
 	fi
 
-	write_state error failed LICENSE_STATUS_RESPONSE_INVALID "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" "$action"
+	write_state_fields error failed LICENSE_STATUS_RESPONSE_INVALID "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" "$action" 200 keep keep
 	log_message 'LICENSE_STATUS_RESPONSE_INVALID: 상태 API 응답 계약이 올바르지 않습니다.'
 	return 1
 }
@@ -425,19 +467,39 @@ show_status() {
 	if [ -s "$STATE_FILE" ]; then
 		cat "$STATE_FILE"
 	else
-		printf '%s\n' '{"schema":1,"component":"license","phase":"unknown","lastResult":"never","lastErrorCode":null,"lastAttemptAt":0,"lastCheckedAt":0,"lastActivatedAt":0,"nextCheckAt":0,"plan":null,"licenseStatus":null,"activationStatus":null,"deviceAction":null}'
+		printf '%s\n' '{"schema":1,"component":"license","phase":"unknown","lastResult":"never","lastErrorCode":null,"lastAttemptAt":0,"lastCheckedAt":0,"lastActivatedAt":0,"nextCheckAt":0,"plan":null,"licenseStatus":null,"activationStatus":null,"deviceAction":null,"lastHttpStatus":null,"lastActivationResult":null,"lastActivationErrorCode":null}'
 	fi
+}
+
+interruptible_sleep() {
+	local duration="$1" wait_rc=0
+	[ "$duration" -gt 0 ] 2>/dev/null || return 0
+	[ "$STOP_REQUESTED" -eq 0 ] || return 1
+
+	"$SLEEP_BIN" "$duration" &
+	WAIT_PID=$!
+	wait "$WAIT_PID" 2>/dev/null || wait_rc=$?
+	WAIT_PID=''
+
+	[ "$STOP_REQUESTED" -eq 0 ] || return 1
+	return "$wait_rc"
 }
 
 daemon_loop() {
 	local delay interval
+	STOP_REQUESTED=0
 	delay="$(startup_delay_s)"
-	[ "$delay" -eq 0 ] || "$SLEEP_BIN" "$delay"
-	while true; do
+	if [ "$delay" -gt 0 ] 2>/dev/null; then
+		interruptible_sleep "$delay" || return 0
+	fi
+
+	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		status_sync || true
+		[ "$STOP_REQUESTED" -eq 0 ] || break
 		interval="$(check_interval_s)"
-		"$SLEEP_BIN" "$interval"
+		interruptible_sleep "$interval" || break
 	done
+	return 0
 }
 
 usage() {
