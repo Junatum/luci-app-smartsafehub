@@ -52,14 +52,32 @@ grep -Fq 'IP 임시 식별' "$DEVICE_LIST" || \
   fail 'device statistics list must show temporary IP identification state'
 grep -Fq 'device.blocked' "$DEVICE_LIST" || \
   fail 'device statistics list must render blocked request counts'
+grep -Fq 'const DEVICE_PREVIEW_COUNT = 3;' "$DEVICE_LIST" || \
+  fail 'device statistics list must preview three devices by default'
+grep -Fq 'const [expanded, setExpanded] = useState(false);' "$DEVICE_LIST" || \
+  fail 'device statistics list must start in compact preview mode'
+grep -Fq ': orderedDevices.slice(0, DEVICE_PREVIEW_COUNT);' "$DEVICE_LIST" || \
+  fail 'compact device statistics mode must render only the top three devices'
+grep -Fq 'aria-expanded={expanded}' "$DEVICE_LIST" || \
+  fail 'device statistics expand control must expose its expanded state'
+grep -Fq 'aria-controls="safeshield-device-statistics-list"' "$DEVICE_LIST" || \
+  fail 'device statistics expand control must identify the controlled list'
+grep -Fq '전체 ${formatNumber(orderedDevices.length)}개 기기 보기 ↓' "$DEVICE_LIST" || \
+  fail 'compact device statistics mode must provide an explicit full-list control'
+grep -Fq "'간단히 보기 ↑'" "$DEVICE_LIST" || \
+  fail 'expanded device statistics mode must provide a compact-view control'
 grep -Fq 'const DEVICES_PER_PAGE = 10;' "$DEVICE_LIST" || \
-  fail 'device statistics list must paginate ten devices at a time'
+  fail 'expanded device statistics list must paginate ten devices at a time'
 grep -Fq 'orderedDevices.slice(pageStart, pageEnd)' "$DEVICE_LIST" || \
-  fail 'device statistics list must render only the current page slice'
+  fail 'expanded device statistics list must render only the current page slice'
+grep -Fq '{expanded && orderedDevices.length > DEVICES_PER_PAGE ? (' "$DEVICE_LIST" || \
+  fail 'device statistics pagination must only be visible in expanded mode'
 grep -Fq 'aria-label="기기별 통계 페이지"' "$DEVICE_LIST" || \
   fail 'device statistics pagination must expose an accessible navigation label'
 grep -Fq 'setPage((current) => Math.min(current, pageCount));' "$DEVICE_LIST" || \
   fail 'device statistics pagination must clamp the current page after refreshes'
+grep -Fq '                setPage(1);' "$DEVICE_LIST" || \
+  fail 'device statistics view toggle must reset pagination to the first page'
 grep -Fq '              이전' "$DEVICE_LIST" || \
   fail 'device statistics pagination must provide a previous-page control'
 grep -Fq '              다음' "$DEVICE_LIST" || \

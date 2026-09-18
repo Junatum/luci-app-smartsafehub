@@ -4,6 +4,7 @@ import { formatNumber } from '../app/format';
 import type { SafeShieldDeviceStatistics } from '../types/safeshield';
 import { DevicesIcon } from './Icons';
 
+const DEVICE_PREVIEW_COUNT = 3;
 const DEVICES_PER_PAGE = 10;
 
 interface SafeShieldDeviceStatisticsListProps {
@@ -58,6 +59,7 @@ export function SafeShieldDeviceStatisticsList({
   truncated,
 }: SafeShieldDeviceStatisticsListProps) {
   const orderedDevices = sortedDevices(devices);
+  const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(1);
   const pageCount = Math.max(
     1,
@@ -66,7 +68,10 @@ export function SafeShieldDeviceStatisticsList({
   const currentPage = Math.min(page, pageCount);
   const pageStart = (currentPage - 1) * DEVICES_PER_PAGE;
   const pageEnd = Math.min(pageStart + DEVICES_PER_PAGE, orderedDevices.length);
-  const visibleDevices = orderedDevices.slice(pageStart, pageEnd);
+  const visibleDevices = expanded
+    ? orderedDevices.slice(pageStart, pageEnd)
+    : orderedDevices.slice(0, DEVICE_PREVIEW_COUNT);
+  const canExpand = orderedDevices.length > DEVICE_PREVIEW_COUNT;
 
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
@@ -84,10 +89,28 @@ export function SafeShieldDeviceStatisticsList({
             DHCP 정보가 있는 기기는 MAC 주소를 기준으로 식별하며, 기기별 숫자만 현재 부팅 세션 동안 메모리에 집계합니다.
           </p>
         </div>
-        <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-slate-200">
-          <DevicesIcon class="size-4 text-teal-700" />
-          {formatNumber(orderedDevices.length)}개 항목
-        </span>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-slate-200">
+            <DevicesIcon class="size-4 text-teal-700" />
+            {formatNumber(orderedDevices.length)}개 항목
+          </span>
+          {canExpand ? (
+            <button
+              aria-controls="safeshield-device-statistics-list"
+              aria-expanded={expanded}
+              class="rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-teal-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+              onClick={() => {
+                setExpanded((current) => !current);
+                setPage(1);
+              }}
+              type="button"
+            >
+              {expanded
+                ? '간단히 보기 ↑'
+                : `전체 ${formatNumber(orderedDevices.length)}개 기기 보기 ↓`}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {orderedDevices.length === 0 ? (
@@ -95,7 +118,10 @@ export function SafeShieldDeviceStatisticsList({
           아직 기기별 DNS 통계가 없습니다. 클라이언트에서 DNS 요청이 발생하면 다음 통계 갱신 시 표시됩니다.
         </p>
       ) : (
-        <div class="mt-4 grid gap-3">
+        <div
+          class="mt-4 grid gap-3"
+          id="safeshield-device-statistics-list"
+        >
           {visibleDevices.map((device) => (
             <article
               class="grid gap-4 rounded-xl bg-white p-4 ring-1 ring-slate-100 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -156,7 +182,7 @@ export function SafeShieldDeviceStatisticsList({
         </div>
       )}
 
-      {orderedDevices.length > DEVICES_PER_PAGE ? (
+      {expanded && orderedDevices.length > DEVICES_PER_PAGE ? (
         <nav
           aria-label="기기별 통계 페이지"
           class="mt-4 flex flex-wrap items-center justify-between gap-3"
