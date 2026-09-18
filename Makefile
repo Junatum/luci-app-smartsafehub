@@ -38,7 +38,7 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 		/etc/init.d/smartsafehub-health restart >/dev/null 2>&1 || true
 	fi
 	if [ -f /usr/libexec/smartsafehub-root-entry ]; then
-		/bin/sh /usr/libexec/smartsafehub-root-entry --install --reload
+		/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile
 	fi
 	rm -f /tmp/luci-indexcache
 	if [ -x /etc/init.d/rpcd ]; then
@@ -51,7 +51,7 @@ endef
 define Package/luci-app-smartsafehub/prerm
 #!/bin/sh
 if [ -z "$${IPKG_INSTROOT}" ] && [ -f /usr/libexec/smartsafehub-root-entry ]; then
-	/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reload
+	/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reconcile
 fi
 exit 0
 endef

@@ -157,7 +157,7 @@ fi
 if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
 	fail 'firmware service enable must not depend on upgrade or previous enabled state'
 fi
-printf '%s\n' "$postinst_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reload' ||
+printf '%s\n' "$postinst_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile' ||
 	fail 'package postinst must register the SmartSafeHub exact-root uHTTPd rewrite at runtime via /bin/sh'
 
 prerm_block="$(awk '
@@ -168,7 +168,7 @@ prerm_block="$(awk '
 [ -n "$prerm_block" ] || fail 'package prerm hook is missing'
 printf '%s\n' "$prerm_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package prerm must limit uHTTPd cleanup to runtime removal'
-printf '%s\n' "$prerm_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reload' ||
+printf '%s\n' "$prerm_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reconcile' ||
 	fail 'package prerm must unregister only the SmartSafeHub root rewrite via /bin/sh'
 
 firmware_config_block="$(awk '

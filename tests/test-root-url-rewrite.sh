@@ -31,23 +31,29 @@ if [ -e "$ROOT_DIR/root/www/index.html" ]; then
 	fail 'SmartSafeHub package must not replace /www/index.html owned by the base web UI'
 fi
 
-grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reload' "$MAKEFILE" || \
-	fail 'runtime package install must register the root rewrite via /bin/sh and reload uHTTPd'
-grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reload' "$MAKEFILE" || \
-	fail 'package removal must unregister only the SmartSafeHub root rewrite via /bin/sh'
+grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile' "$MAKEFILE" || \
+	fail 'runtime package install must register and reconcile the root rewrite via /bin/sh'
+grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --remove --reconcile' "$MAKEFILE" || \
+	fail 'package removal must unregister and reconcile only the SmartSafeHub root rewrite via /bin/sh'
 grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install' "$UCI_DEFAULT" || \
 	fail 'firmware first boot must register the root rewrite handler via /bin/sh'
-if grep -Fq -- '--reload' "$UCI_DEFAULT"; then
-	fail 'uci-default must not reload uHTTPd during first-boot configuration'
+if grep -Fq -- '--reconcile' "$UCI_DEFAULT"; then
+	fail 'uci-default must not restart uHTTPd during first-boot configuration'
 fi
+if grep -Fq '"$UHTTPD_INIT" reload' "$HELPER"; then
+	fail 'runtime reconciliation must not rely on uHTTPd reload for command-line -H changes'
+fi
+grep -Fq '"$UHTTPD_INIT" restart' "$HELPER" || \
+	fail 'runtime reconciliation must restart uHTTPd when the configured -H handler is missing or stale'
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
-mkdir -p "$TMP_DIR/bin"
+mkdir -p "$TMP_DIR/bin" "$TMP_DIR/proc/4242"
 STATE_FILE="$TMP_DIR/json-script.state"
 LOG_FILE="$TMP_DIR/uci.log"
 COMMIT_FILE="$TMP_DIR/commit.count"
-RELOAD_FILE="$TMP_DIR/reload.count"
+RESTART_FILE="$TMP_DIR/restart.count"
+CMDLINE_FILE="$TMP_DIR/proc/4242/cmdline"
 
 cat > "$TMP_DIR/bin/uci" <<'STUB'
 #!/bin/sh
@@ -102,13 +108,38 @@ esac
 STUB
 chmod +x "$TMP_DIR/bin/uci"
 
+cat > "$TMP_DIR/bin/pidof" <<'STUB'
+#!/bin/sh
+set -eu
+[ "${1:-}" = 'uhttpd' ] || exit 1
+printf '%s\n' '4242'
+STUB
+chmod +x "$TMP_DIR/bin/pidof"
+
 cat > "$TMP_DIR/uhttpd" <<'STUB'
 #!/bin/sh
 set -eu
-: "${SMARTSAFEHUB_TEST_RELOAD:?}"
-[ "${1:-}" = 'reload' ] || exit 1
-count="$(cat "$SMARTSAFEHUB_TEST_RELOAD" 2>/dev/null || printf '0')"
-printf '%s\n' "$((count + 1))" > "$SMARTSAFEHUB_TEST_RELOAD"
+: "${SMARTSAFEHUB_TEST_RESTART:?}"
+: "${SMARTSAFEHUB_TEST_STATE:?}"
+: "${SMARTSAFEHUB_TEST_HANDLER:?}"
+: "${SMARTSAFEHUB_TEST_CMDLINE:?}"
+[ "${1:-}" = 'restart' ] || exit 1
+count="$(cat "$SMARTSAFEHUB_TEST_RESTART" 2>/dev/null || printf '0')"
+printf '%s\n' "$((count + 1))" > "$SMARTSAFEHUB_TEST_RESTART"
+
+has_handler=0
+for item in $(cat "$SMARTSAFEHUB_TEST_STATE" 2>/dev/null || true); do
+	if [ "$item" = "$SMARTSAFEHUB_TEST_HANDLER" ]; then
+		has_handler=1
+		break
+	fi
+done
+
+if [ "$has_handler" -eq 1 ]; then
+	printf '/usr/sbin/uhttpd\0-f\0-H\0%s\0' "$SMARTSAFEHUB_TEST_HANDLER" > "$SMARTSAFEHUB_TEST_CMDLINE"
+else
+	printf '/usr/sbin/uhttpd\0-f\0' > "$SMARTSAFEHUB_TEST_CMDLINE"
+fi
 STUB
 chmod +x "$TMP_DIR/uhttpd"
 
@@ -116,44 +147,63 @@ existing_a='/etc/uhttpd/existing-a.json'
 existing_b='/etc/uhttpd/existing-b.json'
 printf '%s %s\n' "$existing_a" "$existing_b" > "$STATE_FILE"
 printf '0\n' > "$COMMIT_FILE"
-printf '0\n' > "$RELOAD_FILE"
+printf '0\n' > "$RESTART_FILE"
+printf '/usr/sbin/uhttpd\0-f\0' > "$CMDLINE_FILE"
 : > "$LOG_FILE"
 
 export SMARTSAFEHUB_TEST_STATE="$STATE_FILE"
 export SMARTSAFEHUB_TEST_LOG="$LOG_FILE"
 export SMARTSAFEHUB_TEST_COMMIT="$COMMIT_FILE"
-export SMARTSAFEHUB_TEST_RELOAD="$RELOAD_FILE"
+export SMARTSAFEHUB_TEST_RESTART="$RESTART_FILE"
+export SMARTSAFEHUB_TEST_HANDLER="$HANDLER"
+export SMARTSAFEHUB_TEST_CMDLINE="$CMDLINE_FILE"
 export SMARTSAFEHUB_ROOT_HANDLER="$HANDLER"
 export SMARTSAFEHUB_UHTTPD_INIT="$TMP_DIR/uhttpd"
+export SMARTSAFEHUB_PROC_ROOT="$TMP_DIR/proc"
 PATH="$TMP_DIR/bin:$PATH"
 export PATH
 
-sh "$HELPER" --install --reload
+sh "$HELPER" --install --reconcile
 expected="$existing_a $existing_b $HANDLER"
 [ "$(cat "$STATE_FILE")" = "$expected" ] || \
 	fail 'install must append the SmartSafeHub handler without replacing existing json_script handlers'
 [ "$(cat "$COMMIT_FILE")" = '1' ] || fail 'first install must commit uhttpd once'
-[ "$(cat "$RELOAD_FILE")" = '1' ] || fail 'first runtime install must reload uhttpd once'
+[ "$(cat "$RESTART_FILE")" = '1' ] || fail 'runtime install must restart uhttpd when -H is missing'
+tr '\000' '\n' < "$CMDLINE_FILE" | grep -Fxq "$HANDLER" || \
+	fail 'restart must make the SmartSafeHub -H handler visible in the runtime command line'
 
-sh "$HELPER" --install --reload
-[ "$(cat "$STATE_FILE")" = "$expected" ] || fail 'repeated install must be idempotent'
+sh "$HELPER" --install --reconcile
+[ "$(cat "$STATE_FILE")" = "$expected" ] || fail 'repeated install must preserve configured handlers'
 [ "$(cat "$COMMIT_FILE")" = '1' ] || fail 'idempotent install must not commit again'
-[ "$(cat "$RELOAD_FILE")" = '1' ] || fail 'idempotent install must not reload again'
+[ "$(cat "$RESTART_FILE")" = '1' ] || fail 'synchronized runtime install must not restart uhttpd again'
 
-sh "$HELPER" --remove --reload
+# Reproduce the field failure: UCI already contains the handler, but the running
+# process was started without -H. The helper must heal runtime without another commit.
+printf '/usr/sbin/uhttpd\0-f\0' > "$CMDLINE_FILE"
+sh "$HELPER" --install --reconcile
+[ "$(cat "$STATE_FILE")" = "$expected" ] || fail 'runtime repair must not alter configured handlers'
+[ "$(cat "$COMMIT_FILE")" = '1' ] || fail 'runtime-only repair must not commit unchanged uhttpd config'
+[ "$(cat "$RESTART_FILE")" = '2' ] || fail 'runtime-only repair must restart uhttpd when configured -H is absent'
+tr '\000' '\n' < "$CMDLINE_FILE" | grep -Fxq "$HANDLER" || \
+	fail 'runtime-only repair must restore the configured -H handler'
+
+sh "$HELPER" --remove --reconcile
 expected="$existing_a $existing_b"
 [ "$(cat "$STATE_FILE")" = "$expected" ] || \
 	fail 'remove must preserve all json_script handlers owned by other packages'
 [ "$(cat "$COMMIT_FILE")" = '2' ] || fail 'remove must commit uhttpd once'
-[ "$(cat "$RELOAD_FILE")" = '2' ] || fail 'runtime remove must reload uhttpd once'
+[ "$(cat "$RESTART_FILE")" = '3' ] || fail 'runtime remove must restart uhttpd while stale -H is still active'
+if tr '\000' '\n' < "$CMDLINE_FILE" | grep -Fxq "$HANDLER"; then
+	fail 'runtime remove must clear the SmartSafeHub -H handler'
+fi
 
-sh "$HELPER" --remove --reload
+sh "$HELPER" --remove --reconcile
 [ "$(cat "$STATE_FILE")" = "$expected" ] || fail 'repeated remove must be idempotent'
 [ "$(cat "$COMMIT_FILE")" = '2' ] || fail 'idempotent remove must not commit again'
-[ "$(cat "$RELOAD_FILE")" = '2' ] || fail 'idempotent remove must not reload again'
+[ "$(cat "$RESTART_FILE")" = '3' ] || fail 'synchronized repeated remove must not restart uhttpd again'
 
 if grep -Fq 'index_page' "$LOG_FILE"; then
 	fail 'root entry helper must never read or write index_page'
 fi
 
-echo 'PASS: root URL rewrite is exact, preserves other uHTTPd handlers and avoids index_page side effects'
+echo 'PASS: exact-root rewrite preserves other handlers and self-heals uHTTPd runtime -H state'

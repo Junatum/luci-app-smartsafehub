@@ -76,7 +76,7 @@ root/usr/share/luci/menu.d/luci-app-smartsafehub.json
 
 공식 사용자 URL은 공유기 루트 `/`입니다. `/etc/uhttpd/smartsafehub-root.json`은 uHTTPd `json_script`의 request rule로 `REQUEST_URI == "/"`인 경우에만 `/cgi-bin/luci/`로 내부 rewrite합니다. `uhttpd.main.index_page`나 `/www/index.html`은 변경하지 않으므로 다른 디렉터리 index, `/cgi-bin/cgi-upload`, `/ubus`, 정적 자산과 다른 패키지의 명시적 endpoint에는 적용되지 않습니다.
 
-`/usr/libexec/smartsafehub-root-entry`는 기존 `uhttpd.main.json_script` 값을 덮어쓰지 않고 SmartSafeHub handler를 뒤에 추가합니다. 패키지 제거 시에는 자기 handler만 `del_list`하며 다른 패키지 handler의 순서와 값은 유지합니다. 패키지 설치/업그레이드에서는 postinst가 변경이 있을 때만 uHTTPd를 reload하고, 펌웨어 기본 포함 설치에서는 `uci-defaults`가 첫 부팅에 등록합니다.
+`/usr/libexec/smartsafehub-root-entry`는 기존 `uhttpd.main.json_script` 값을 덮어쓰지 않고 SmartSafeHub handler를 뒤에 추가합니다. 패키지 제거 시에는 자기 handler만 `del_list`하며 다른 패키지 handler의 순서와 값은 유지합니다. 패키지 설치/업그레이드에서는 postinst가 UCI 설정뿐 아니라 실행 중 uHTTPd의 command line도 확인합니다. UCI와 runtime의 SmartSafeHub `-H` 적용 여부가 서로 다를 때만 uHTTPd를 restart하므로, 설정에 handler가 이미 존재하지만 과거 reload 실패로 runtime에 반영되지 않은 상태도 스스로 복구합니다. 펌웨어 기본 포함 설치에서는 `uci-defaults`가 첫 부팅에 handler만 등록합니다.
 
 LuCI의 `smartsafehub` 경로는 `auth: {}`인 공개 shell입니다. 따라서 비로그인 요청도 dispatcher 인증 단계에서 막히지 않고 항상 `smartsafehub/login` 템플릿과 Preact 번들을 로드합니다.
 
@@ -815,4 +815,4 @@ LAN 화면은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, 
 
 ### Hash route 새로고침 보존
 
-현재 탭의 유효 hash route는 `sessionStorage`에 저장하고 reload navigation에서만 빈 hash를 복원한다. 일반 navigation은 저장값을 제거한다.
+SmartSafeHub는 현재 route를 별도 storage에 복제하지 않고 브라우저의 URL fragment를 직접 사용한다. uHTTPd exact-root handler가 `/`을 내부 rewrite하면 브라우저 navigation이 발생하지 않으므로 `/#settings`, `/#system` 같은 fragment는 일반 새로고침에서도 그대로 유지된다.

@@ -4,11 +4,12 @@ set -eu
 
 HANDLER_FILE="${SMARTSAFEHUB_ROOT_HANDLER:-/etc/uhttpd/smartsafehub-root.json}"
 UHTTPD_INIT="${SMARTSAFEHUB_UHTTPD_INIT:-/etc/init.d/uhttpd}"
+PROC_ROOT="${SMARTSAFEHUB_PROC_ROOT:-/proc}"
 ACTION='install'
-RELOAD=0
+RECONCILE_RUNTIME=0
 
 usage() {
-	echo "usage: $0 [--install|--remove] [--reload]" >&2
+	echo "usage: $0 [--install|--remove] [--reconcile]" >&2
 	exit 2
 }
 
@@ -16,10 +17,47 @@ for arg in "$@"; do
 	case "$arg" in
 		--install) ACTION='install' ;;
 		--remove) ACTION='remove' ;;
-		--reload) RELOAD=1 ;;
+		--reconcile) RECONCILE_RUNTIME=1 ;;
 		*) usage ;;
 	esac
 done
+
+runtime_has_handler() {
+	local pid cmdline
+
+	for pid in $(pidof uhttpd 2>/dev/null || true); do
+		[ -r "$PROC_ROOT/$pid/cmdline" ] || continue
+		cmdline="$(tr '\000' ' ' < "$PROC_ROOT/$pid/cmdline")"
+		case " $cmdline " in
+			*" -H $HANDLER_FILE "*) return 0 ;;
+		esac
+	done
+
+	return 1
+}
+
+restart_uhttpd_if_mismatched() {
+	local should_have_handler="$1"
+	local runtime_has=0
+
+	[ "$RECONCILE_RUNTIME" -eq 1 ] || return 0
+	[ -x "$UHTTPD_INIT" ] || return 0
+	pidof uhttpd >/dev/null 2>&1 || return 0
+
+	if runtime_has_handler; then
+		runtime_has=1
+	fi
+
+	[ "$runtime_has" -ne "$should_have_handler" ] || return 0
+
+	"$UHTTPD_INIT" restart >/dev/null 2>&1
+
+	if [ "$should_have_handler" -eq 1 ]; then
+		runtime_has_handler
+	else
+		! runtime_has_handler
+	fi
+}
 
 uci -q show uhttpd.main >/dev/null 2>&1 || exit 0
 
@@ -49,9 +87,11 @@ case "$ACTION" in
 		;;
 esac
 
-[ "$changed" -eq 1 ] || exit 0
-uci -q commit uhttpd
-
-if [ "$RELOAD" -eq 1 ] && [ -x "$UHTTPD_INIT" ]; then
-	"$UHTTPD_INIT" reload >/dev/null 2>&1 || true
+if [ "$changed" -eq 1 ]; then
+	uci -q commit uhttpd
 fi
+
+case "$ACTION" in
+	install) restart_uhttpd_if_mismatched 1 ;;
+	remove) restart_uhttpd_if_mismatched 0 ;;
+esac

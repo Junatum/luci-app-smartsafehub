@@ -37,7 +37,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - `uhttpd.main.index_page`와 OpenWrt가 소유하는 `/www/index.html`은 변경하지 않음. `/cgi-bin/cgi-upload`, `/ubus`, `/luci-static/...`, 다른 디렉터리 index 등 기존 uHTTPd 경로는 rewrite 대상이 아님
 - 기존 `uhttpd.main.json_script` handler가 있으면 순서를 보존하고 SmartSafeHub handler를 뒤에 추가하며, 패키지 제거 시 SmartSafeHub 항목만 제거
 - `/cgi-bin/luci/`, `/cgi-bin/luci/smartsafehub`, `/cgi-bin/luci/admin/smartsafehub`는 호환 진입 경로로 유지하되 shell이 로드되면 History API로 `/` 주소로 정규화
-- `/#settings`, `/#system` 등 현재 유효 hash route는 탭의 `sessionStorage`에 보존하며, 새로고침 중 LuCI 진입 과정에서 fragment가 사라진 경우에만 reload navigation에서 복원합니다. 주소창에서 `/`을 직접 입력하거나 새 탭으로 여는 일반 navigation은 이전 route를 복원하지 않습니다.
+- `/#settings`, `/#system` 같은 hash route는 별도 저장소에 복제하지 않고 브라우저 fragment를 그대로 사용합니다. exact-root 내부 rewrite가 활성화된 상태에서는 새 HTTP navigation이 발생하지 않으므로 일반 새로고침에서도 현재 hash가 유지됩니다.
 - 공개 shell은 `auth: {}`로 항상 로드되므로 비로그인 상태에서도 LuCI dispatcher가 stock 로그인 화면이나 403을 먼저 반환하지 않음
 - Preact가 보호된 `/cgi-bin/luci/smartsafehub/session` endpoint를 조회해 현재 LuCI cookie session을 확인
 - 세션이 없으면 `LoginApp`, 유효한 세션 ID를 받으면 제품 `App`을 같은 Shadow DOM에서 렌더링
@@ -47,7 +47,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 비밀번호 표시/숨김, Caps Lock 안내, 모바일 안전 영역 지원
 - 추가 인증 등 특수 LuCI 구성에서는 보호된 session endpoint의 기본 LuCI 로그인 화면으로 계속할 수 있는 fallback 제공
 
-루트 URL 등록은 `/usr/libexec/smartsafehub-root-entry`가 담당합니다. 실행 중인 공유기에 패키지를 설치/업그레이드하면 `postinst`가 handler를 추가한 뒤 uHTTPd를 reload하고, 펌웨어 이미지에 기본 포함된 경우 `uci-defaults`가 첫 부팅 설정에 handler를 등록합니다. 제거 시에는 기존 다른 `json_script` 항목은 보존하고 SmartSafeHub handler만 해제합니다. helper는 패치 적용 방식에 따른 executable bit 차이에 의존하지 않도록 `/bin/sh`로 명시 실행합니다.
+루트 URL 등록은 `/usr/libexec/smartsafehub-root-entry`가 담당합니다. 실행 중인 공유기에 패키지를 설치/업그레이드하면 `postinst`가 handler 설정과 실제 uHTTPd 실행 인자를 함께 확인합니다. UCI에는 handler가 있는데 실행 중 프로세스에 `-H /etc/uhttpd/smartsafehub-root.json`이 없거나, 제거 후에도 해당 `-H`가 남아 있는 경우에만 uHTTPd를 restart해 runtime을 설정과 동기화합니다. 이미 일치하면 웹 서버를 건드리지 않습니다. 펌웨어 이미지에 기본 포함된 경우 `uci-defaults`는 첫 부팅 설정에 handler만 등록하고, 제거 시에는 기존 다른 `json_script` 항목은 보존한 채 SmartSafeHub handler만 해제합니다. helper는 패치 적용 방식에 따른 executable bit 차이에 의존하지 않도록 `/bin/sh`로 명시 실행합니다.
 
 내부 LuCI/RPC/펌웨어 업로드 endpoint는 계속 기존 경로를 직접 사용합니다. 특히 펌웨어 업로드의 `/cgi-bin/cgi-upload` 등 `/`이 아닌 요청은 root rewrite와 무관합니다.
 
