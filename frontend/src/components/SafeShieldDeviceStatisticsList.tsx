@@ -81,7 +81,14 @@ export function SafeShieldDeviceStatisticsList({
     <div class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 sm:p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="m-0 text-xs font-bold text-slate-500">기기별 통계</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <p class="m-0 text-xs font-bold text-slate-500">기기별 통계</p>
+            {canExpand && !expanded ? (
+              <span class="inline-flex items-center rounded-full bg-teal-50 px-2 py-1 text-[10px] font-extrabold tracking-wide text-teal-700 ring-1 ring-teal-100">
+                차단 TOP 3
+              </span>
+            ) : null}
+          </div>
           <h3 class="mt-1 mb-0 text-base font-extrabold text-slate-950">
             어떤 기기에서 차단되었는지 확인
           </h3>
@@ -181,6 +188,12 @@ export function SafeShieldDeviceStatisticsList({
           ))}
         </div>
       )}
+
+      {canExpand && !expanded ? (
+        <p class="mt-3 mb-0 text-xs font-semibold leading-5 text-slate-500">
+          전체 {formatNumber(orderedDevices.length)}개 기기 중 차단 수 기준 상위 {DEVICE_PREVIEW_COUNT}개를 표시하고 있습니다.
+        </p>
+      ) : null}
 
       {expanded && orderedDevices.length > DEVICES_PER_PAGE ? (
         <nav

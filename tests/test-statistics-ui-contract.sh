@@ -56,6 +56,10 @@ grep -Fq 'const DEVICE_PREVIEW_COUNT = 3;' "$DEVICE_LIST" || \
   fail 'device statistics list must preview three devices by default'
 grep -Fq 'const [expanded, setExpanded] = useState(false);' "$DEVICE_LIST" || \
   fail 'device statistics list must start in compact preview mode'
+grep -Fq '차단 TOP 3' "$DEVICE_LIST" || \
+  fail 'compact device statistics mode must visibly label the top-three preview'
+grep -Fq '전체 {formatNumber(orderedDevices.length)}개 기기 중 차단 수 기준 상위 {DEVICE_PREVIEW_COUNT}개를 표시하고 있습니다.' "$DEVICE_LIST" || \
+  fail 'compact device statistics mode must explain that the preview is ranked by blocked requests'
 grep -Fq ': orderedDevices.slice(0, DEVICE_PREVIEW_COUNT);' "$DEVICE_LIST" || \
   fail 'compact device statistics mode must render only the top three devices'
 grep -Fq 'aria-expanded={expanded}' "$DEVICE_LIST" || \
