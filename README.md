@@ -37,6 +37,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - `uhttpd.main.index_page`와 OpenWrt가 소유하는 `/www/index.html`은 변경하지 않음. `/cgi-bin/cgi-upload`, `/ubus`, `/luci-static/...`, 다른 디렉터리 index 등 기존 uHTTPd 경로는 rewrite 대상이 아님
 - 기존 `uhttpd.main.json_script` handler가 있으면 순서를 보존하고 SmartSafeHub handler를 뒤에 추가하며, 패키지 제거 시 SmartSafeHub 항목만 제거
 - `/cgi-bin/luci/`, `/cgi-bin/luci/smartsafehub`, `/cgi-bin/luci/admin/smartsafehub`는 호환 진입 경로로 유지하되 shell이 로드되면 History API로 `/` 주소로 정규화
+- `/#settings`, `/#system` 등 현재 유효 hash route는 탭의 `sessionStorage`에 보존하며, 새로고침 중 LuCI 진입 과정에서 fragment가 사라진 경우에만 reload navigation에서 복원합니다. 주소창에서 `/`을 직접 입력하거나 새 탭으로 여는 일반 navigation은 이전 route를 복원하지 않습니다.
 - 공개 shell은 `auth: {}`로 항상 로드되므로 비로그인 상태에서도 LuCI dispatcher가 stock 로그인 화면이나 403을 먼저 반환하지 않음
 - Preact가 보호된 `/cgi-bin/luci/smartsafehub/session` endpoint를 조회해 현재 LuCI cookie session을 확인
 - 세션이 없으면 `LoginApp`, 유효한 세션 ID를 받으면 제품 `App`을 같은 Shadow DOM에서 렌더링

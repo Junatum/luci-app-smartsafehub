@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r26`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r27`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -149,7 +149,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r26
+0.2.15-r27
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -675,9 +675,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r26
-  → app.js?v=0.2.15-r26
-  → app.css?v=0.2.15-r26
+  → data-asset-version = 0.2.15-r27
+  → app.js?v=0.2.15-r27
+  → app.css?v=0.2.15-r27
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.
@@ -811,3 +811,8 @@ SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 �
 ### LAN 입력 UX 안전장치
 
 LAN 화면은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, DHCP 시작/종료 주소는 공유기 주소의 앞 3개 octet을 읽기 전용 prefix로 사용한다. 공유기 prefix가 바뀌면 DHCP host octet은 유지하면서 같은 prefix로 동기화한다. 이 프런트엔드 제약은 사용자 입력 오류를 줄이기 위한 것이며, 최종 subnet·DHCP 범위 검증은 계속 `network-management.uc` backend가 담당한다.
+
+
+### Hash route 새로고침 보존
+
+현재 탭의 유효 hash route는 `sessionStorage`에 저장하고 reload navigation에서만 빈 hash를 복원한다. 일반 navigation은 저장값을 제거한다.

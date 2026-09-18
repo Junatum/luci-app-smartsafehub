@@ -154,4 +154,24 @@ grep -Fq ".ssh-app[data-theme='dark'] .ssh-sidebar-toggle" "$STYLES" || \
 grep -Fq ".ssh-app[data-theme='dark']" "$STYLES" || \
 	fail 'authenticated application must provide dark theme styles'
 
-echo 'PASS: collapsible sidebar, header theme actions and dark theme contracts are present'
+# A browser refresh can lose the fragment while `/` is internally rewritten through
+# LuCI. Keep only the current tab's valid route and restore it exclusively for reloads.
+grep -Fq "const ROUTE_STORAGE_KEY = 'smartsafehub.route.hash';" "$HASH_ROUTE" || \
+	fail 'hash navigation must persist the current route with a dedicated session key'
+grep -Fq "window.sessionStorage.setItem(ROUTE_STORAGE_KEY, hash);" "$HASH_ROUTE" || \
+	fail 'valid hash routes must be persisted in sessionStorage'
+grep -Fq "window.sessionStorage.removeItem(ROUTE_STORAGE_KEY);" "$HASH_ROUTE" || \
+	fail 'direct or invalid navigation must clear the stored route'
+grep -Fq "window.performance.getEntriesByType('navigation')[0]" "$HASH_ROUTE" || \
+	fail 'route restoration must inspect the Navigation Timing entry'
+grep -Fq "navigation?.type === 'reload'" "$HASH_ROUTE" || \
+	fail 'stored routes must only be restored for browser reload navigation'
+grep -Fq 'if (currentHash || !isReloadNavigation()) {' "$HASH_ROUTE" || \
+	fail 'direct root navigation must not restore a stale hash route'
+grep -Fq '`${window.location.pathname}${window.location.search}${storedHash}`' "$HASH_ROUTE" || \
+	fail 'reload restoration must preserve the current path and query while restoring the hash'
+grep -Fq 'window.history.replaceState(' "$HASH_ROUTE" || \
+	fail 'reload route restoration must not trigger an additional browser navigation'
+
+
+echo 'PASS: collapsible sidebar, header theme actions, dark theme and reload route persistence contracts are present'

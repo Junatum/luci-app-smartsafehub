@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.15-r27] - 2026-09-18
+
+### 새로고침 경로 유지
+
+- `/#settings`, `/#system` 같은 유효한 SmartSafeHub hash route를 현재 탭의 `sessionStorage`에 저장하고, 브라우저 새로고침 과정에서 LuCI 진입 경로가 fragment를 잃은 경우 reload navigation에서만 마지막 route를 복원합니다.
+- 주소창에서 `/`을 직접 열거나 새 탭으로 진입하는 일반 navigation에서는 저장된 route를 제거해 이전 화면이 의도치 않게 복원되지 않도록 했습니다. 잘못된 hash도 복원 대상으로 사용하지 않습니다.
+- route 복원은 History API의 `replaceState()`를 사용해 추가 navigation이나 `hashchange`를 발생시키지 않으며, storage 사용이 제한된 브라우저에서는 기존 `home` fallback 동작을 유지합니다.
+
+### 테스트 및 문서
+
+- 내비게이션 계약 테스트에 `sessionStorage` 기반 유효 route 저장, Navigation Timing의 reload 판별, History API 복원, 일반 navigation 초기화 계약을 추가했습니다.
+- README와 아키텍처 문서에 hash route 새로고침 보존 정책을 반영했습니다.
+
 ## [0.2.15-r26] - 2026-09-18
 
 ### 루트 URL 진입
