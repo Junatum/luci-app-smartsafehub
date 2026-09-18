@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r28`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r29`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -149,7 +149,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r28
+0.2.15-r29
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -323,6 +323,8 @@ smartsafehub-health daemon
 ```
 
 로컬 진단은 멤버십과 관계없이 항상 사용할 수 있습니다. Health Reporter는 `reporter_enabled=0`을 기본값으로 하며 유료/Trial 사용자가 설정 화면에서 직접 활성화해야 합니다. OFF 상태에서는 heartbeat, 이상 발생/복구 보고를 포함해 Reporter의 서버 요청을 수행하지 않습니다.
+
+Reporter 토글 UI는 사용자의 입력 직후 로컬 화면 상태를 optimistic하게 전환하고 RPC 저장이 실패하면 직전 상태로 rollback합니다. 활성화 직후 detached `run-cycle`이 첫 보고를 처리하는 동안 상태 파일에 이전 `disabled`/`never` 값이 잠시 남더라도 UI는 이를 `첫 보고 준비 중/진행 중`으로 해석합니다. 저장 성공 뒤에는 0.4~4초 범위의 짧은 확인 조회를 수행해 첫 보고 성공/실패를 정규 60초 polling보다 빠르게 반영하며, mutation sequence로 이전 토글의 늦은 응답이 최신 상태를 덮어쓰지 않게 합니다.
 
 진단 대상은 가용 메모리, CPU 코어 대비 1분 load, `/overlay` 여유 공간, WAN, dnsmasq, SafeShield 런타임, 관리 소프트웨어/펌웨어 업데이트 오류와 시스템 시간입니다. 주기 결과는 flash에 쓰지 않고 `/tmp/smartsafehub/health.json`에 atomic write합니다. 부팅 후 기본 120초의 `startup_grace_s` 동안 SafeShield가 첫 갱신 stage에 있거나 DNS 런타임/차단 목록/상태 API가 아직 준비되지 않은 경우에는 `initializing`으로 기록하고 issue fingerprint를 만들지 않습니다. grace가 끝난 뒤에도 준비되지 않으면 실제 warning/critical 상태로 승격합니다.
 
@@ -677,9 +679,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r28
-  → app.js?v=0.2.15-r28
-  → app.css?v=0.2.15-r28
+  → data-asset-version = 0.2.15-r29
+  → app.js?v=0.2.15-r29
+  → app.css?v=0.2.15-r29
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

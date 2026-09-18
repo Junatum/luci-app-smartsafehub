@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 
 import {
   fetchHealthStatus,
@@ -11,6 +11,7 @@ import { useAsyncResource } from './useAsyncResource';
 const HEALTH_REFRESH_INTERVAL_MS = 60_000;
 const HEALTH_PENDING_REFRESH_INTERVAL_MS = 1_000;
 const HEALTH_RUN_POLL_DELAYS_MS = [400, 800, 1_200, 1_600] as const;
+const HEALTH_REPORTER_CONFIRM_DELAYS_MS = [400, 800, 1_200, 2_000, 4_000] as const;
 
 interface HealthMutationState {
   running: boolean;
@@ -34,6 +35,7 @@ export function useHealth(active: boolean) {
         : HEALTH_PENDING_REFRESH_INTERVAL_MS,
     refreshOnFocus: true,
   });
+  const reporterMutationSequence = useRef(0);
   const [mutation, setMutation] = useState<HealthMutationState>({
     running: false,
     savingReporter: false,
@@ -86,8 +88,55 @@ export function useHealth(active: boolean) {
     }
   }, [resource.data, resource.replaceData]);
 
+  const confirmReporterState = useCallback(
+    async (enabled: boolean, sequence: number): Promise<void> => {
+      for (const delay of HEALTH_REPORTER_CONFIRM_DELAYS_MS) {
+        await sleep(delay);
+        if (reporterMutationSequence.current !== sequence) {
+          return;
+        }
+
+        try {
+          const latest = await fetchHealthStatus();
+          if (reporterMutationSequence.current !== sequence) {
+            return;
+          }
+          resource.replaceData(latest);
+
+          if (latest.reporter.enabled !== enabled) {
+            continue;
+          }
+          if (!enabled || !['disabled', 'never', 'initializing'].includes(latest.reporter.lastResult)) {
+            return;
+          }
+        } catch {
+          // The regular Health polling remains the fallback if a short
+          // post-toggle confirmation request temporarily fails.
+        }
+      }
+    },
+    [resource.replaceData],
+  );
+
   const setReporterEnabled = useCallback(
     async (enabled: boolean): Promise<boolean> => {
+      const sequence = reporterMutationSequence.current + 1;
+      reporterMutationSequence.current = sequence;
+      const previousData = resource.data;
+
+      if (previousData) {
+        resource.replaceData({
+          ...previousData,
+          reporter: {
+            ...previousData.reporter,
+            enabled,
+            lastResult: enabled ? 'initializing' : 'disabled',
+            lastErrorCode: null,
+            nextReportAt: enabled ? previousData.reporter.nextReportAt : 0,
+          },
+        });
+      }
+
       setMutation({
         running: false,
         savingReporter: true,
@@ -97,27 +146,36 @@ export function useHealth(active: boolean) {
 
       try {
         const result = await updateHealthReporter(enabled);
+        if (reporterMutationSequence.current !== sequence) {
+          return true;
+        }
         resource.replaceData(result);
         setMutation({
           running: false,
           savingReporter: false,
           actionError: null,
           actionMessage: enabled
-            ? '원격 상태 보고를 활성화했습니다.'
-            : '원격 상태 보고를 비활성화했습니다.',
+            ? '원격 상태 보고를 켰습니다. 첫 서버 보고를 준비합니다.'
+            : '원격 상태 보고를 껐습니다. 로컬 진단은 계속 동작합니다.',
         });
+        void confirmReporterState(enabled, sequence);
         return true;
       } catch (error) {
-        setMutation({
-          running: false,
-          savingReporter: false,
-          actionError: errorMessage(error, '원격 상태 보고 설정을 변경하지 못했습니다.'),
-          actionMessage: null,
-        });
+        if (reporterMutationSequence.current === sequence) {
+          if (previousData) {
+            resource.replaceData(previousData);
+          }
+          setMutation({
+            running: false,
+            savingReporter: false,
+            actionError: errorMessage(error, '원격 상태 보고 설정을 변경하지 못했습니다.'),
+            actionMessage: null,
+          });
+        }
         return false;
       }
     },
-    [resource.replaceData],
+    [confirmReporterState, resource.data, resource.replaceData],
   );
 
   const dismissActionFeedback = useCallback(() => {

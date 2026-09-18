@@ -171,6 +171,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 모든 사용자를 대상으로 메모리, 시스템 부하, `/overlay` 저장 공간, WAN, dnsmasq, SafeShield, 업데이트 상태와 시스템 시간을 5분 주기로 로컬 진단하고 설정 화면에서 정상/준비 중/주의/이상 결과와 `지금 진단` 기능 제공
 - 부팅 후 기본 120초(`smartsafehub.health.startup_grace_s`) 동안 SafeShield가 첫 갱신 중이거나 상태 API가 아직 준비되지 않은 경우에는 장애가 아닌 `준비 중`으로 처리합니다. 이 동안 warning/critical issue와 원격 Health 보고를 만들지 않으며, 정규 5분 주기 대신 daemon tick에서 다시 확인합니다. grace 이후에도 준비되지 않으면 실제 주의/이상 판정으로 전환합니다.
 - 유료 멤버십 또는 Trial 장치에서는 사용자가 명시적으로 opt-in한 경우에만 Health Reporter를 사용할 수 있습니다. 기본값은 OFF이며 정상 상태는 30분 heartbeat, 이상 상태 fingerprint가 바뀌면 정기 주기 전에도 한 번 보고합니다. 사용자가 OFF로 변경하면 이후 자동 상태 보고 네트워크 요청을 수행하지 않습니다.
+- Reporter 토글은 사용자 입력 즉시 화면에 `켜짐/꺼짐` 상태를 반영하고, 서버 보고가 아직 한 번도 완료되지 않은 활성 상태는 `꺼짐`이 아니라 `첫 보고 준비 중/대기 중`으로 표시합니다. 설정 저장 뒤에는 짧은 확인 조회로 첫 서버 보고 결과를 빠르게 갱신하며, 실패하면 토글을 이전 상태로 되돌립니다.
 - Health Reporter는 서버 전송용 payload를 whitelist 방식으로 별도 생성해 메모리/부하/저장 공간 수치, 전체 진단 상태와 이상 코드만 전송합니다. 호스트명, WAN IP, Wi-Fi SSID/MAC, DNS 요청 내용과 시스템 로그 원문은 자동 보고에 포함하지 않습니다.
 - 장치, Wi-Fi, SafeShield와 로컬 Health 상태를 JSON 진단 파일로 다운로드
 - 진단 파일에 Wi-Fi 비밀번호와 SafeShield 라이선스 키를 포함하지 않음

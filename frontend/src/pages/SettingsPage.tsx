@@ -23,7 +23,7 @@ import type { ConfigurationBackupAction } from '../hooks/useConfigurationBackup'
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { ConfigurationBackupValidation } from '../types/backup';
 import type { FirmwareStatus } from '../types/firmware';
-import type { HealthSeverity, HealthStatus } from '../types/health';
+import type { HealthReporterStatus, HealthSeverity, HealthStatus } from '../types/health';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
   ScheduledRebootDayOfWeek,
@@ -391,12 +391,16 @@ function healthTone(status: HealthSeverity): {
   };
 }
 
-function reporterResultLabel(result: string): string {
-  switch (result) {
+function reporterResultLabel(reporter: HealthReporterStatus): string {
+  if (!reporter.enabled) {
+    return '보고 중지됨';
+  }
+
+  switch (reporter.lastResult) {
     case 'reported':
       return '정상 보고';
     case 'initializing':
-      return '초기화 대기';
+      return reporter.lastReportAt > 0 ? '상태 갱신 중' : '첫 보고 진행 중';
     case 'failed':
       return '최근 보고 실패';
     case 'idle':
@@ -404,10 +408,28 @@ function reporterResultLabel(result: string): string {
     case 'ineligible':
       return '멤버십 확인 필요';
     case 'disabled':
-      return '꺼짐';
+    case 'never':
+      return '첫 보고 준비 중';
     default:
-      return '아직 보고하지 않음';
+      return '보고 준비 중';
   }
+}
+
+function reporterLastReportLabel(reporter: HealthReporterStatus): string {
+  if (reporter.lastReportAt > 0) {
+    return formatRelativeTime(reporter.lastReportAt);
+  }
+  return reporter.enabled ? '첫 보고 대기 중' : '보고 기록 없음';
+}
+
+function reporterMembershipLabel(reporter: HealthReporterStatus | undefined): string {
+  const plan = reporter?.plan?.trim().toUpperCase();
+  const licenseStatus = reporter?.licenseStatus?.trim().toLowerCase();
+
+  if (plan && (licenseStatus === 'trial' || licenseStatus === 'trialing')) {
+    return `${plan} · 체험`;
+  }
+  return plan || '유료 · Trial';
 }
 
 function HealthDiagnosticCard(props: {
@@ -434,7 +456,18 @@ function HealthDiagnosticCard(props: {
         ['system.memory', 'network.wan', 'service.dnsmasq', 'safeshield.runtime'].includes(check.id),
       ) ?? [];
   const reporter = data?.reporter;
-  const canToggleReporter = reporter?.eligible === true || reporter?.enabled === true;
+  const reporterEnabled = reporter?.enabled === true;
+  const canToggleReporter = reporter?.eligible === true || reporterEnabled;
+  const reporterStateTitle = props.savingReporter
+    ? reporterEnabled
+      ? '원격 상태 보고를 켜고 있습니다.'
+      : '원격 상태 보고를 끄고 있습니다.'
+    : reporterEnabled
+      ? '원격 상태 보고가 켜져 있습니다.'
+      : '원격 상태 보고가 꺼져 있습니다.';
+  const reporterStateDescription = reporterEnabled
+    ? '장치 상태가 바뀌면 즉시 보고하고, 정상 상태에서도 주기적으로 SmartSafeHub 서버에 보고합니다.'
+    : '로컬 진단은 계속 동작하지만 장치 상태는 SmartSafeHub 서버에 자동으로 전송되지 않습니다.';
 
   return (
     <ActionCard
@@ -565,7 +598,7 @@ function HealthDiagnosticCard(props: {
                 <div class="flex flex-wrap items-center gap-2">
                   <p class="m-0 text-sm font-black text-slate-950">원격 상태 보고</p>
                   <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
-                    유료 · Trial
+                    {reporterMembershipLabel(reporter)}
                   </span>
                 </div>
                 <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
@@ -596,17 +629,52 @@ function HealthDiagnosticCard(props: {
 
             {reporter?.eligible ? (
               <div class="mt-4 rounded-xl bg-slate-50 p-4">
+                <div
+                  class={`mb-4 flex items-start gap-3 rounded-xl border p-3 ${
+                    reporterEnabled
+                      ? 'border-emerald-200 bg-emerald-50'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <span class="mt-0.5 shrink-0">
+                    {reporterEnabled ? (
+                      <CheckCircleIcon class="size-5 text-emerald-700" />
+                    ) : (
+                      <PowerIcon class="size-5 text-slate-500" />
+                    )}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <p class="m-0 text-sm font-black text-slate-950">{reporterStateTitle}</p>
+                      <span
+                        class={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                          props.savingReporter
+                            ? 'bg-slate-200 text-slate-700'
+                            : reporterEnabled
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {props.savingReporter ? '설정 중' : reporterEnabled ? '켜짐' : '꺼짐'}
+                      </span>
+                    </div>
+                    <p class="mt-1 mb-0 text-xs leading-5 text-slate-600">
+                      {reporterStateDescription}
+                    </p>
+                  </div>
+                </div>
+
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <p class="m-0 text-[11px] font-extrabold text-slate-500">보고 상태</p>
+                    <p class="m-0 text-[11px] font-extrabold text-slate-500">최근 전송 상태</p>
                     <p class="mt-1 mb-0 text-sm font-black text-slate-900">
-                      {props.savingReporter ? '설정 저장 중' : reporterResultLabel(reporter.lastResult)}
+                      {props.savingReporter ? '설정 반영 중' : reporterResultLabel(reporter)}
                     </p>
                   </div>
                   <div>
                     <p class="m-0 text-[11px] font-extrabold text-slate-500">마지막 서버 보고</p>
                     <p class="mt-1 mb-0 text-sm font-black text-slate-900">
-                      {reporter.lastReportAt > 0 ? formatRelativeTime(reporter.lastReportAt) : '기록 없음'}
+                      {reporterLastReportLabel(reporter)}
                     </p>
                   </div>
                 </div>
