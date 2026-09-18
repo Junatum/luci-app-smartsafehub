@@ -532,7 +532,11 @@ read_license_key() {
 		rm -f "$file"
 		return 1
 	fi
-	key="$(json_value "$file" '@.key')"
+	# SafeShield license_get returns the sensitive value under .license.key.
+	# Keep the old top-level key only as a compatibility fallback for older
+	# development builds; current packages must use the nested contract.
+	key="$(json_value "$file" '@.license.key')"
+	[ -n "$key" ] || key="$(json_value "$file" '@.key')"
 	rm -f "$file"
 	[ -n "$key" ] || return 1
 	printf '%s' "$key"

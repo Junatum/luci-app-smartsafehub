@@ -1,5 +1,17 @@
 # 변경 기록
 
+## [0.2.15-r28] - 2026-09-18
+
+### Health Reporter 라이선스 인증 수정
+
+- Health Reporter가 SafeShield `license_get`의 실제 응답 구조인 `license.key`에서 평문 라이선스 키를 읽도록 수정했습니다. 유료/Trial eligibility 판정은 정상인데도 업로드 직전에 키를 찾지 못해 `HEALTH_REPORTER_LICENSE_UNAVAILABLE`이 발생하던 문제를 해결합니다.
+- 이전 개발 빌드의 최상위 `key` 응답은 호환 fallback으로만 유지하며, 현재 중첩 응답을 우선 사용합니다. 라이선스 키를 런타임 상태 파일이나 Health payload에 기록하지 않는 기존 개인정보 보호 정책은 그대로 유지합니다.
+
+### 테스트 및 문서
+
+- Health 테스트의 `license_get` mock을 실제 SafeShield 중첩 응답과 동일하게 변경하고, 중첩 키가 `X-SafeShield-License-Key` 인증 헤더까지 전달되는 기존 통합 시나리오와 실제 응답 경로 계약을 회귀 검증합니다.
+- README와 아키텍처 문서에 `license_get` 응답 구조와 Health Reporter 인증 경로를 반영했습니다.
+
 ## [0.2.15-r27] - 2026-09-18
 
 ### 새로고침 경로 유지

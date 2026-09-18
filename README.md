@@ -441,6 +441,8 @@ safeshield.license_update
 
 `license_get`은 평문 라이선스 키를 반환하므로 브라우저의 일반 상태 조회에는 사용하지 않습니다. 사용자가 현재 키를 명시적으로 불러올 때 호출하며 LuCI ACL에서도 일반 read 권한과 분리합니다. 로컬 Health 진단, 진단 다운로드와 주기적 UI polling은 `safeshield.status`의 마스킹된 라이선스 정보만 사용합니다. 예외적으로 opt-in된 유료/Trial Health Reporter daemon은 실제 HTTPS 보고 직전에 서버 인증 헤더를 만들기 위해 평문 키를 일시적으로 조회하며, 키를 런타임 상태 파일이나 보고 payload에 기록하지 않습니다.
 
+SafeShield `license_get`의 현재 응답 계약은 `{ "license": { "configured": true, "key": "..." } }` 형태이며 Health Reporter는 `license.key`에서 키를 읽습니다. 이전 개발 빌드의 최상위 `key` 응답은 호환 fallback으로만 허용합니다.
+
 ## ucode 컴파일 검사
 
 `smartsafehub` ubus 객체가 등록되지 않으면 진입점을 직접 컴파일합니다.

@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r27`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r28`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -149,7 +149,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r27
+0.2.15-r28
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -665,6 +665,8 @@ SettingsPage의 기존 system snapshot
               → POST /api/v1/health/reports
 ```
 
+Health Reporter가 서버 인증 헤더를 만들 때 사용하는 `safeshield.license_get` 응답은 `license.key`에 평문 키를 담는 중첩 구조를 사용합니다. Reporter는 이 실제 계약을 우선 읽고, 과거 개발 빌드의 최상위 `key`는 호환 fallback으로만 처리합니다. 키는 상태 파일이나 보고 payload에 저장하지 않습니다.
+
 Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으로 검증해야 합니다. 공유기의 클라이언트 측 gating은 서버 권한 검사를 대신하지 않습니다.
 
 ### 7.10 다크 테마 상태 패널
@@ -675,9 +677,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r27
-  → app.js?v=0.2.15-r27
-  → app.css?v=0.2.15-r27
+  → data-asset-version = 0.2.15-r28
+  → app.js?v=0.2.15-r28
+  → app.css?v=0.2.15-r28
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

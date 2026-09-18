@@ -93,7 +93,7 @@ case "${2:-}:${3:-}" in
 EOF_STATUS
 		;;
 	safeshield:license_get)
-		printf '{"configured":true,"key":"%s"}\n' "${MOCK_LICENSE_KEY:-secret-license-key}"
+		printf '{"license":{"configured":true,"key":"%s"}}\n' "${MOCK_LICENSE_KEY:-secret-license-key}"
 		;;
 	*) exit 1 ;;
 esac
@@ -385,5 +385,7 @@ grep -Fq "updateHealthReporter" "$HOOK" || fail 'Health hook이 Reporter opt-in 
 grep -Fq '로컬 진단은 멤버십과 관계없이 사용할 수 있습니다.' "$SETTINGS_PAGE" || fail '설정 UI가 무료 로컬 진단을 설명해야 합니다.'
 grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || fail '설정 UI가 Reporter opt-in과 opt-out을 설명해야 합니다.'
 grep -Fq '전송하지 않는 정보' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 개인정보 제외 항목을 안내해야 합니다.'
+grep -Fq "'@.license.key'" "$HELPER" || \
+	fail 'Health Reporter는 SafeShield license_get의 실제 중첩 응답(.license.key)에서 라이선스 키를 읽어야 합니다.'
 
 echo 'PASS: 무료 로컬 진단과 유료/Trial opt-in 원격 상태 보고 계약이 정상입니다.'
