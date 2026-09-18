@@ -7,6 +7,10 @@ import {
   setSafeShieldStatisticsEnabled,
   updateSafeShieldLicense,
 } from '../api/safeshield';
+import {
+  fetchSmartSafeHubLicenseStatus,
+  requestSmartSafeHubLicenseActivation,
+} from '../api/smartsafehub';
 import { errorMessage } from '../utils/errors';
 
 export type SafeShieldAction =
@@ -26,6 +30,30 @@ interface SafeShieldActionState {
 }
 
 const SUCCESS_FEEDBACK_TIMEOUT_MS = 4500;
+const LICENSE_ACTIVATION_POLL_INTERVAL_MS = 500;
+const LICENSE_ACTIVATION_MAX_POLLS = 30;
+
+function licenseActivationErrorMessage(code: string | null): string {
+  switch (code) {
+    case 'license_invalid':
+      return '유효하지 않은 라이선스 키입니다.';
+    case 'safeshield_upgrade_required':
+      return '라이선스를 등록하려면 SafeShield를 먼저 업데이트해 주세요.';
+    case 'LICENSE_DEVICE_IDENTITY_UNAVAILABLE':
+    case 'LICENSE_DEVICE_PROFILE_UNAVAILABLE':
+      return '라이선스 등록에 필요한 장치 정보를 확인하지 못했습니다.';
+    case 'LICENSE_LOCAL_UPDATE_FAILED':
+      return '서버 등록은 완료했지만 이 기기에 라이선스 키를 적용하지 못했습니다.';
+    case 'LICENSE_ACTIVATE_HTTP_FAILED':
+      return '라이선스 서버에 연결하지 못했습니다.';
+    default:
+      return '라이선스 등록을 완료하지 못했습니다.';
+  }
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
 
 export function useSafeShieldActions(
   refreshStatus: () => Promise<void>,
@@ -225,23 +253,44 @@ export function useSafeShieldActions(
       beginAction('license-update');
 
       try {
-        const result = await updateSafeShieldLicense(normalizedKey);
-        showSuccessMessage(
-          result.changed
-            ? '라이선스 키를 저장했습니다.'
-            : '입력한 라이선스 키가 이미 설정되어 있습니다.',
-        );
-        await refreshStatus();
-
-        if (result.refresh.requested) {
-          scheduleRefreshes([800, 2500, 6000, 12000]);
+        const activation = await requestSmartSafeHubLicenseActivation(normalizedKey);
+        if (!activation.accepted) {
+          throw new Error('라이선스 등록 요청을 시작하지 못했습니다.');
         }
 
+        let completed = false;
+        for (let attempt = 0; attempt < LICENSE_ACTIVATION_MAX_POLLS; attempt += 1) {
+          await wait(LICENSE_ACTIVATION_POLL_INTERVAL_MS);
+          const status = await fetchSmartSafeHubLicenseStatus();
+
+          if (
+            status.phase === 'active' &&
+            status.lastActivatedAt >= activation.startedAt
+          ) {
+            completed = true;
+            break;
+          }
+
+          if (
+            status.phase === 'error' &&
+            status.lastAttemptAt >= activation.startedAt
+          ) {
+            throw new Error(licenseActivationErrorMessage(status.lastErrorCode));
+          }
+        }
+
+        if (!completed) {
+          throw new Error('라이선스 등록 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        }
+
+        showSuccessMessage('라이선스를 서버에 등록하고 이 기기에 적용했습니다.');
+        await refreshStatus();
+        scheduleRefreshes([800, 2500, 6000, 12000]);
         return true;
       } catch (error) {
         setState({
           action: null,
-          error: errorMessage(error, '라이선스 키를 저장하지 못했습니다.'),
+          error: errorMessage(error, '라이선스를 등록하지 못했습니다.'),
           message: null,
         });
         return false;

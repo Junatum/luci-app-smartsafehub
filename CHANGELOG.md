@@ -1,5 +1,32 @@
 # 변경 기록
 
+## [0.2.16-r3] - 2026-09-18
+
+### 테스트 안정성
+
+- `tests/test-license.sh`의 라이선스 mock 상태를 각 시나리오 시작 전에 명시적으로 초기화하도록 변경해 macOS `/bin/sh`를 포함한 셸 구현 차이로 이전 실패 시나리오의 `MOCK_*` 값이 다음 stale-lock 복구 테스트에 영향을 주지 않도록 했습니다.
+- stale activation lock 복구 시나리오는 `license_get`과 Hub status mock을 정상 상태로 명시한 뒤 lock 제거, 임시 activation request 정리, `/licenses/status` 재개까지 독립적으로 검증합니다.
+
+## [0.2.16-r2] - 2026-09-18
+
+### 라이선스 lifecycle 분리
+
+- SmartSafeHub Hub의 `/api/v1/licenses/activate`와 `/api/v1/licenses/status`를 사용하는 `smartsafehub-license` procd daemon과 helper를 추가했습니다. 새 라이선스는 Hub activation이 성공한 뒤에만 SafeShield 공식 `license_update` API로 저장합니다.
+- 기본 5분 주기의 상태 동기화가 서버의 명시적 `clear_license` 지시를 받았을 때만 로컬 라이선스를 제거하도록 했습니다. Hub 통신 오류나 비정상 응답만으로 기존 로컬 라이선스를 삭제하지 않습니다.
+- Hub 요청의 physical fingerprint와 장치 프로필은 별도 계산하지 않고 `safeshield.status.device`의 authoritative identity를 재사용합니다. SafeShield UCI나 내부 파일은 직접 수정하지 않습니다.
+- `daemon`, `activate`, `status-sync`, `status` 명령 경계와 `/tmp/smartsafehub/license.json` 상태 모델을 분리해 향후 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 구성했습니다. updater처럼 별도 상태 머신인 기능과는 결합하지 않습니다.
+
+### 안정성 및 보안
+
+- 명시적 activate와 주기 status-sync가 겹칠 때 activation single-flight lock을 우선해 상태 파일이나 로컬 키 갱신이 서로 덮어쓰지 않도록 했습니다. SafeShield `license_get` 실패는 라이선스 미설정으로 오인하지 않고 `LICENSE_LOCAL_READ_FAILED`로 기록합니다.
+- 평문 라이선스 키를 helper command line이나 runtime 상태 파일에 넣지 않고 mode 0600의 일시 request file을 통해 전달하며 activate 처리 후 제거합니다.
+- `license_status`와 `license_activate` RPC/ACL, 프런트엔드 activation polling을 추가하고 기존의 새 키 직접 `safeshield.license_update` 경로를 Hub activation 경로로 전환했습니다. 사용자의 명시적 로컬 라이선스 제거와 현재 키 불러오기는 기존 SafeShield 공식 API 계약을 유지합니다.
+
+### 테스트 및 문서
+
+- Hub activate 성공/거부, active/revoked status, `clear_license`, 서버 장애 fail-open, SafeShield 로컬 조회 실패, 미설정 상태와 activate/status 경쟁 조건을 검증하는 `test-license.sh`를 추가했습니다.
+- RPC/ACL, 패키지 설치 서비스, shell 정적 검증 계약에 새 라이선스 모듈을 포함하고 README 및 아키텍처 문서를 갱신했습니다.
+
 ## [0.2.16-r1] - 2026-09-18
 
 ### 기능

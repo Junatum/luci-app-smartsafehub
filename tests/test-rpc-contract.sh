@@ -10,6 +10,8 @@ FIRMWARE_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 BACKUP_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/backup.uc"
 BACKUP_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 SECURITY_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/security.uc"
+LICENSE_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/license.uc"
+LICENSE_HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-license"
 LAN_RPC_ENTRY="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub-network.uc"
 LAN_MODULE="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/network-management.uc"
 UPDATER="$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
@@ -49,6 +51,7 @@ for method in system_root_password_status system_root_password_set \
 	system_time_settings system_timezone_update system_time_sync \
 	system_scheduled_reboot_settings system_scheduled_reboot_update \
 	health_status health_run health_reporter_update \
+	license_status license_activate \
 	system_backup_validate system_backup_restore system_backup_discard; do
 	assert_rpc_method "$method"
 done
@@ -99,6 +102,8 @@ assert_acl_method write system_scheduled_reboot_update
 assert_acl_method read health_status
 assert_acl_method write health_run
 assert_acl_method write health_reporter_update
+assert_acl_method read license_status
+assert_acl_method write license_activate
 for method in system_backup_validate system_backup_restore system_backup_discard; do
 	assert_acl_method write "$method"
 done
@@ -173,6 +178,21 @@ grep -Fq "defer_call('session', 'destroy'" "$SECURITY_MODULE" || \
 	fail 'initial security setup must invalidate the bootstrap session after setting a password'
 grep -Fq "'SYSTEM_ROOT_PASSWORD_REQUIRED'" "$RPC_ENTRY" || \
 	fail 'normal SmartSafeHub RPC methods must enforce the root password setup gate'
+
+grep -Fq "const LICENSE_HELPER = '/usr/libexec/smartsafehub-license';" "$LICENSE_MODULE" || \
+	fail 'license RPC must delegate Hub activation to the dedicated helper'
+grep -Fq "safe_call('safeshield', 'status'" "$LICENSE_MODULE" || \
+	fail 'license activation must reuse SafeShield authoritative device identity'
+grep -Fq 'physical_fingerprint: fingerprint' "$LICENSE_MODULE" || \
+	fail 'license activation payload must forward the SafeShield physical fingerprint'
+grep -Fq "LICENSE_HELPER + ' activate --request-file" "$LICENSE_MODULE" || \
+	fail 'license activation RPC must launch the helper with a request file instead of a key argument'
+grep -Fq 'activation_in_progress && return 0' "$LICENSE_HELPER" || \
+	fail 'periodic license status sync must not race an explicit activation'
+grep -Fq 'const ACTIVATION_STALE_S = 60;' "$LICENSE_MODULE" || \
+	fail 'license RPC must recover abandoned activation locks after a bounded interval'
+grep -Fq 'LICENSE_LOCAL_READ_FAILED' "$LICENSE_HELPER" || \
+	fail 'SafeShield license read failures must be distinguishable from an unconfigured license'
 
 grep -Fq "const BACKUP_HELPER = '/usr/libexec/smartsafehub-backup';" "$BACKUP_MODULE" || \
 	fail 'configuration restore RPC must delegate privileged work to the dedicated backup helper'

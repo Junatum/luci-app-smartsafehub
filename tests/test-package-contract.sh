@@ -48,10 +48,12 @@ require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-maintenance"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-health"
+require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-license"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-maintenance"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-health"
+require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-license"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 require_file "$ROOT_DIR/root/usr/libexec/smartsafehub-root-entry"
 require_executable "$ROOT_DIR/root/etc/uci-defaults/99-smartsafehub-root-entry"
@@ -65,6 +67,7 @@ require_executable "$ROOT_DIR/tests/test-rpc-contract.sh"
 require_executable "$ROOT_DIR/tests/test-system-time-contract.sh"
 require_executable "$ROOT_DIR/tests/test-scheduled-reboot.sh"
 require_executable "$ROOT_DIR/tests/test-health.sh"
+require_executable "$ROOT_DIR/tests/test-license.sh"
 require_executable "$ROOT_DIR/tests/test-backup-restore.sh"
 require_executable "$ROOT_DIR/tests/test-initial-password-setup.sh"
 require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
@@ -142,6 +145,10 @@ printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health enab
 	fail 'package postinst must force-enable smartsafehub-health'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health restart' ||
 	fail 'package postinst must start or restart smartsafehub-health immediately after installation'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-license enable' ||
+	fail 'package postinst must force-enable smartsafehub-license'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-license restart' ||
+	fail 'package postinst must start or restart smartsafehub-license immediately after installation'
 printf '%s\n' "$postinst_block" | grep -Fq 'rm -f /tmp/luci-indexcache' ||
 	fail 'package postinst must clear the LuCI index cache after installing RPC/menu changes'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd reload' ||

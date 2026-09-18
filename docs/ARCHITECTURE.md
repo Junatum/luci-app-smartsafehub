@@ -1,6 +1,6 @@
 # SmartSafeHub 아키텍처
 
-이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.15-r29`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
+이 문서는 SmartSafeHub LuCI 애플리케이션 **`0.2.16-r3`**의 구조, 런타임 흐름, 성능·안정성 설계와 확장 원칙을 설명합니다.
 
 ## 1. 설계 목표
 
@@ -53,12 +53,14 @@ rpcd ucode: smartsafehub       rpcd ucode: safeshield
        ├─ system / network           ├─ status / config
        ├─ wireless / hostapd         ├─ enable / refresh
        ├─ DHCP leases / ARP          ├─ local rules
-       ├─ reboot / wifi reload       └─ license
-       └─ update status/settings
+       ├─ reboot / wifi reload       ├─ license storage / identity
+       ├─ update status/settings     └─ DNS protection lifecycle
+       └─ license lifecycle
               │
-              ▼
-       smartsafehub-updater (procd)
-              └─ apk update / targeted package upgrade
+              ├─ smartsafehub-license (procd)
+              │    └─ Hub activate / periodic status sync
+              └─ smartsafehub-updater (procd)
+                   └─ apk update / targeted package upgrade
 
 SmartSafeHub backend는 SafeShield의 UCI, 규칙 파일, init script를 직접 다루지 않습니다.
 SafeShield 관련 읽기·변경은 `safeshield` 패키지가 제공하는 공식 ubus API만 호출합니다.
@@ -99,6 +101,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.wifi_summary`
 - `smartsafehub.updates_status`
 - `smartsafehub.health_status`
+- `smartsafehub.license_status`
 - `safeshield.status`
 - `safeshield.config`
 - `safeshield.rules_list`
@@ -112,6 +115,7 @@ root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 - `smartsafehub.updates_settings_update`
 - `smartsafehub.health_run`
 - `smartsafehub.health_reporter_update`
+- `smartsafehub.license_activate`
 - `safeshield.set_enabled`
 - `safeshield.config_update` (통계 수집 설정에 한정)
 - `safeshield.refresh`
@@ -149,7 +153,7 @@ rpcd는 로그인 시점에 ACL 그룹을 세션 권한으로 확장하므로 �
 현재 자산 버전:
 
 ```text
-0.2.15-r29
+0.2.16-r3
 ```
 
 별도 `SMARTSAFEHUB_FRONTEND_BUILD_ID` 또는 `FRONTEND_BUILD_ID`는 사용하지 않습니다.
@@ -479,12 +483,14 @@ SafeShield가 소유하는 기능:
 - enable/disable lifecycle
 - 수동 refresh
 - local allow/block 규칙
-- 라이선스 키 조회·등록·변경·제거
+- 라이선스 키 저장·조회·제거와 장치 identity 제공
 - 규칙 파일, dnsmasq, procd와 refresh scheduling
 
 SmartSafeHub는 API 응답을 화면 모델로 정규화할 뿐 SafeShield의 UCI, `/etc/safeshield/*`, `/tmp/dnsmasq.d/*` 또는 `/etc/init.d/safeshield`를 직접 수정하지 않습니다. 통계 수집 ON/OFF는 SafeShield 공식 `safeshield.config_update`에 `statistics_enabled`만 전달해 변경하며, 그 외 일반 설정 편집에는 사용하지 않습니다. `set_enabled`는 비동기 요청이므로 mutation 응답으로 최종 상태를 추정하지 않고 `safeshield.status`를 다시 조회해 runtime 수렴을 확인합니다.
 
-라이선스 상태의 기본 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 브라우저가 평문 키를 가져오는 것은 사용자가 **현재 키 불러오기**를 명시적으로 실행한 경우뿐이며, 새 키 등록과 변경은 `license_update`, 제거는 `license_update`에 빈 키를 전달하는 기존 SafeShield 계약을 사용합니다. 로컬 Health 진단·진단 다운로드·일반 polling에도 평문 키가 포함되지 않습니다. 단, opt-in된 유료/Trial Health Reporter daemon은 서버 보고 직전에 `safeshield.license_get`으로 키를 메모리에 일시 조회해 HTTPS 인증 헤더에 사용하고 즉시 폐기합니다.
+라이선스 상태의 기본 화면 조회는 `safeshield.status`의 `configured`, `key_masked`, plan/status 정보만 사용합니다. 브라우저가 평문 키를 가져오는 것은 사용자가 **현재 키 불러오기**를 명시적으로 실행한 경우뿐입니다. 새 키 등록과 변경은 SmartSafeHub의 `license_activate` RPC가 SafeShield `status.device` identity를 사용해 Hub `/api/v1/licenses/activate`를 먼저 통과시킨 뒤 성공한 경우에만 `safeshield.license_update`로 저장합니다. 사용자의 로컬 제거는 기존처럼 `license_update`에 빈 키를 전달합니다.
+
+서버에서 해제한 라이선스의 로컬 수렴은 `/usr/libexec/smartsafehub-license` daemon이 담당합니다. 기본 300초마다 `license_get`으로 현재 키를 메모리에 일시 조회하고 `/api/v1/licenses/status`를 호출하며, 성공 응답이 명시적으로 `device_action=clear_license`를 지시한 경우에만 `safeshield.license_update`로 제거합니다. 서버/API 장애는 로컬 권한을 즉시 파괴하지 않는 fail-open 상태로 기록합니다. 명시적 activate와 status-sync는 activation lock으로 직렬화해 상태 파일과 키 갱신이 서로 덮어쓰지 않게 합니다. 로컬 Health 진단·진단 다운로드·일반 UI polling에는 평문 키가 포함되지 않습니다. opt-in된 유료/Trial Health Reporter daemon 역시 실제 서버 보고 직전에만 `safeshield.license_get`으로 키를 메모리에 조회해 HTTPS 인증 헤더에 사용하고 즉시 폐기합니다.
 
 #### `system.uc`
 
@@ -619,10 +625,10 @@ SafeShieldRulesPage
 
 SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지만, 규칙 파일과 적용 lifecycle의 authoritative source는 SafeShield입니다.
 
-### 7.7 SafeShield 라이선스
+### 7.7 SmartSafeHub / SafeShield 라이선스 lifecycle
 
 ```text
-기본 상태 조회
+기본 화면 상태 조회
   → safeshield.status
   → configured + key_masked만 사용
 
@@ -632,12 +638,29 @@ SmartSafeHub는 규칙 입력 형식을 프런트엔드에서 1차 검증하지�
   → 평문 키를 입력란에 채워 수정 가능
 
 등록 / 변경
-  → safeshield.license_update { license_key: "..." }
+  → smartsafehub.license_activate
+  → safeshield.status.device에서 authoritative identity 수집
+  → private /tmp request file 생성
+  → smartsafehub-license activate --request-file ...
+  → POST /api/v1/licenses/activate
+  → Hub 성공 시에만 safeshield.license_update { license_key: "..." }
 
-제거
+주기적 서버 상태 수렴
+  → smartsafehub-license daemon (기본 300초)
+  → safeshield.license_get + safeshield.status.device.physical_fingerprint
+  → POST /api/v1/licenses/status
+      ├─ none + licensed: 유지
+      ├─ clear_license: safeshield.license_update { license_key: "" }
+      └─ 통신 실패/비정상 응답: 로컬 키 유지 + 진단 오류 기록
+
+사용자 로컬 제거
   → 사용자 확인
   → safeshield.license_update { license_key: "" }
 ```
+
+SafeShield는 키 저장과 device identity의 authoritative source이며 Hub 계정/장치 activation lifecycle은 SmartSafeHub가 소유합니다. SmartSafeHub는 SafeShield UCI를 직접 수정하지 않고 항상 공식 ubus API를 사용합니다. activate 요청의 평문 키는 command line이나 `/tmp/smartsafehub/license.json`에 기록하지 않고 mode 0600의 일시 request file로 helper에 넘긴 뒤 완료 시 제거합니다.
+
+`smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` subcommand로 구성합니다. 이 명령 경계와 상태 모델은 향후 `smartsafehub-agent license ...`로 통합할 때 기능 코드를 큰 단일 loop로 합치지 않고 license 모듈 단위로 그대로 옮길 수 있게 의도한 것입니다. 현재는 독립 procd 서비스라 장애 격리와 `logread -e smartsafehub-license`, 수동 `status-sync` 같은 디버깅 경로를 유지합니다.
 
 라이선스 입력란은 비밀번호 필드로 취급하지 않고 일반 텍스트 입력으로 사용합니다. 브라우저 비밀번호 관리자 대상이 되지 않도록 autocomplete 및 주요 password-manager ignore 속성을 적용합니다.
 
@@ -679,9 +702,9 @@ Hub 수신 API는 라이선스/Trial eligibility를 서버에서도 독립적으
 
 ```text
 PKG_VERSION + PKG_RELEASE
-  → data-asset-version = 0.2.15-r29
-  → app.js?v=0.2.15-r29
-  → app.css?v=0.2.15-r29
+  → data-asset-version = 0.2.16-r3
+  → app.js?v=0.2.16-r3
+  → app.css?v=0.2.16-r3
 ```
 
 통합 진입 템플릿은 패키지 릴리스를 정적 자산 query version으로 사용합니다. 로그인과 제품 화면은 동일한 `app.js` / `app.css`를 재사용하며, Shadow DOM의 stylesheet URL도 host의 `data-asset-version`을 따릅니다.

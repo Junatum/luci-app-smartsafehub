@@ -109,7 +109,9 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
 - DHCP 식별 정보를 이용한 기기별 DNS 요청·차단 수·차단율과 IP/MAC 표시
 - 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지
-- 새 라이선스 키는 일반 텍스트 입력란에서 확인하며 등록·변경·제거 가능
+- 새 라이선스 등록·변경은 `smartsafehub.license_activate`를 통해 Hub `/api/v1/licenses/activate`에서 먼저 검증한 뒤 성공한 경우에만 SafeShield 공식 `license_update` API로 로컬 저장
+- `smartsafehub-license` daemon이 기본 5분마다 Hub `/api/v1/licenses/status`를 확인하고, 서버가 명시적으로 `clear_license`를 반환한 경우에만 SafeShield 공식 API로 로컬 키 제거
+- Hub 상태 확인 실패만으로는 로컬 라이선스를 제거하지 않는 fail-open 동작을 사용하며, 활성화와 주기 확인은 single-flight 경계로 직렬화
 - 현재 라이선스 키는 사용자가 `현재 키 불러오기`를 선택했을 때만 `safeshield.license_get`으로 평문 조회
 - 사용자 허용 목록과 차단 목록 관리
 - 규칙 저장과 유효성 검사는 SafeShield 공식 API가 담당
@@ -269,9 +271,13 @@ luci-app-smartsafehub/
 │   ├── etc/config/smartsafehub
 │   ├── etc/init.d/smartsafehub-updater
 │   ├── etc/init.d/smartsafehub-firmware
+│   ├── etc/init.d/smartsafehub-health
+│   ├── etc/init.d/smartsafehub-license
 │   ├── etc/init.d/smartsafehub-maintenance
 │   ├── usr/libexec/smartsafehub-updater
 │   ├── usr/libexec/smartsafehub-firmware
+│   ├── usr/libexec/smartsafehub-health
+│   ├── usr/libexec/smartsafehub-license
 │   ├── usr/libexec/smartsafehub-maintenance
 │   ├── usr/libexec/smartsafehub-backup
 │   ├── usr/share/luci/menu.d/
@@ -286,6 +292,7 @@ luci-app-smartsafehub/
 │   │       ├── system.uc
 │   │       ├── firmware.uc
 │   │       ├── updates.uc
+│   │       ├── license.uc
 │   │       ├── network-management.uc
 │   │       ├── wifi-management.uc
 │   │       └── wifi.uc
@@ -442,7 +449,37 @@ safeshield.license_update
 
 `license_get`은 평문 라이선스 키를 반환하므로 브라우저의 일반 상태 조회에는 사용하지 않습니다. 사용자가 현재 키를 명시적으로 불러올 때 호출하며 LuCI ACL에서도 일반 read 권한과 분리합니다. 로컬 Health 진단, 진단 다운로드와 주기적 UI polling은 `safeshield.status`의 마스킹된 라이선스 정보만 사용합니다. 예외적으로 opt-in된 유료/Trial Health Reporter daemon은 실제 HTTPS 보고 직전에 서버 인증 헤더를 만들기 위해 평문 키를 일시적으로 조회하며, 키를 런타임 상태 파일이나 보고 payload에 기록하지 않습니다.
 
-SafeShield `license_get`의 현재 응답 계약은 `{ "license": { "configured": true, "key": "..." } }` 형태이며 Health Reporter는 `license.key`에서 키를 읽습니다. 이전 개발 빌드의 최상위 `key` 응답은 호환 fallback으로만 허용합니다.
+SafeShield `license_get`의 현재 응답 계약은 `{ "license": { "configured": true, "key": "..." } }` 형태이며 Health Reporter와 라이선스 상태 동기화 daemon은 필요한 순간에만 `license.key`를 메모리에서 읽습니다. 이전 개발 빌드의 최상위 `key` 응답은 Health Reporter 호환 fallback으로만 허용합니다.
+
+### SmartSafeHub 라이선스 lifecycle
+
+Hub 계정과 장치의 라이선스 연결 lifecycle은 SafeShield 엔진이 아니라 SmartSafeHub 관리 계층이 소유합니다. SafeShield는 계속해서 실제 키 저장소와 장치 identity의 authoritative source 역할만 담당합니다.
+
+```text
+사용자가 라이선스 등록/변경
+  → smartsafehub.license_activate
+  → safeshield.status에서 authoritative device identity 조회
+  → /usr/libexec/smartsafehub-license activate
+  → POST /api/v1/licenses/activate
+  → 성공한 경우에만 safeshield.license_update
+
+smartsafehub-license daemon
+  → 기본 300초 주기
+  → safeshield.license_get으로 현재 키를 일시 조회
+  → safeshield.status에서 physical_fingerprint 조회
+  → POST /api/v1/licenses/status
+      ├─ device_action=none: 로컬 상태 유지
+      ├─ device_action=clear_license: safeshield.license_update { license_key: "" }
+      └─ 네트워크/API 실패: 오류만 기록하고 로컬 키 유지
+```
+
+`smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` 명령을 독립 subcommand로 제공합니다. 이는 현재는 작은 독립 procd 서비스로 장애 범위와 디버깅 경계를 유지하면서, 향후 주기적인 Hub 동기화 작업이 늘어나면 명령 경계를 그대로 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 하기 위한 구조입니다. updater처럼 장시간 설치·재부팅 상태 머신을 가지는 기능은 별도 서비스로 유지하는 것을 전제로 합니다.
+
+런타임 상태는 `/tmp/smartsafehub/license.json`에 atomic write하며 평문 라이선스 키를 저장하지 않습니다. 명시적 활성화와 주기 `status-sync`가 겹치면 activation single-flight lock이 우선하며, status-sync는 활성화 결과를 덮어쓰지 않고 다음 주기까지 건너뜁니다. SafeShield의 `license_get` 자체가 실패한 경우는 미설정 상태로 오인하지 않고 `LICENSE_LOCAL_READ_FAILED`로 기록합니다.
+
+### 라이선스 셸 계약 테스트
+
+`tests/test-license.sh`는 activate/status 동기화와 stale activation lock 복구를 검증합니다. 각 시나리오는 mock 환경을 명시적으로 초기화해 Linux `dash`와 macOS `/bin/sh`처럼 함수 앞 임시 환경 변수의 처리 차이가 있는 환경에서도 이전 실패 주기의 값이 다음 테스트에 누적되지 않도록 합니다.
 
 ## ucode 컴파일 검사
 

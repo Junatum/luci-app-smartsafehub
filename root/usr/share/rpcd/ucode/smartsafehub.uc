@@ -45,6 +45,10 @@ import {
 	run_health_diagnostic,
 	update_health_reporter
 } from './smartsafehub/health.uc';
+import {
+	activate_license,
+	read_license_status
+} from './smartsafehub/license.uc';
 
 function require_root_password(handler) {
 	return function(request) {
@@ -235,6 +239,19 @@ const methods = {
 		},
 		call: require_root_password(function(request) {
 			return reboot_system(request);
+		}),
+	},
+	license_status: {
+		call: require_root_password(function(request) {
+			return read_license_status(request);
+		}),
+	},
+	license_activate: {
+		args: {
+			license_key: '',
+		},
+		call: require_root_password(function(request) {
+			return activate_license(request);
 		}),
 	},
 	health_status: {

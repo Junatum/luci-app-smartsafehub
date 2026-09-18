@@ -14,6 +14,11 @@ config maintenance 'maintenance'
 	option scheduled_reboot_day 'sun'
 	option scheduled_reboot_time '04:00'
 
+config license 'license'
+	option check_interval_s '300'
+	option startup_delay_s '30'
+	option api_base_url 'https://www.smartsafehub.com/api/v1'
+
 config health 'health'
 	option check_interval_s '300'
 	option startup_grace_s '120'

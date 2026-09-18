@@ -12,6 +12,7 @@
           "firmware_status",
           "system_time_settings",
           "system_scheduled_reboot_settings",
+          "license_status",
           "health_status"
         ],
         "safeshield": [
@@ -48,6 +49,7 @@
           "system_backup_validate",
           "system_backup_restore",
           "system_backup_discard",
+          "license_activate",
           "health_run",
           "health_reporter_update"
         ],

@@ -121,6 +121,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'SmartSafeHub 라이선스 daemon과 Hub 동기화 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-license.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '설정 백업과 복원 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-backup-restore.sh"
     The status should be success
