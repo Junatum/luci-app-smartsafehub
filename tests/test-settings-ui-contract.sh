@@ -118,10 +118,22 @@ grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_STYLES" || \
 	fail 'scheduled reboot unsaved marker background must retain a dark-theme mapping'
 grep -Fq "[class~='text-amber-800']" "$APP_STYLES" || \
 	fail 'scheduled reboot unsaved marker text must retain dark-theme contrast mapping'
-grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE" || \
-	fail 'router reboot must remain a first-class system management action'
-grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \
-	fail 'legacy advanced settings entry must remain inside SettingsPage'
+grep -Fq 'function SystemToolsCard(props:' "$SETTINGS_PAGE" || \
+	fail 'reboot and advanced actions must be grouped into one compact system tools card'
+grep -Fq 'title="시스템 도구"' "$SETTINGS_PAGE" || \
+	fail 'system management must expose the combined system tools card'
+grep -Fq 'aria-labelledby="router-reboot-heading"' "$SETTINGS_PAGE" || \
+	fail 'router reboot must remain an accessible first-class action inside system tools'
+grep -Fq 'id="advanced-tools-heading"' "$SETTINGS_PAGE" || \
+	fail 'advanced tools must remain clearly labeled inside system tools'
+grep -Fq '고급 도구' "$SETTINGS_PAGE" || \
+	fail 'advanced LuCI and log actions must remain visible inside system tools'
+if grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE"; then
+	fail 'router reboot must not remain as a separate full ActionCard'
+fi
+if grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE"; then
+	fail 'advanced settings must not remain as a separate full ActionCard'
+fi
 grep -Fq "luciAdminUrl('/admin/system')" "$SETTINGS_PAGE" || \
 	fail 'SettingsPage must retain the LuCI advanced-settings fallback'
 grep -Fq 'LuCI 고급 설정 열기' "$SETTINGS_PAGE" || \
@@ -161,6 +173,13 @@ grep -Fq 'System management' "$SETTINGS_PAGE" || \
 	fail 'settings page must retain a dedicated system management section'
 grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
 	fail 'settings action groups must use responsive two-column layout on desktop'
+if sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -Fq 'className="lg:col-span-2"'; then
+	fail 'configuration backup must share the desktop row instead of spanning both columns'
+fi
+sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -Fq 'grid min-w-0 grid-cols-1 gap-3' || \
+	fail 'configuration backup internals must use a compact vertical layout at half-row width'
+grep -Fq '<SystemToolsCard' "$SETTINGS_PAGE" || \
+	fail 'system management must render the combined system tools card beside backup/restore'
 
 grep -Fq "const BACKUP_DOWNLOAD_ENDPOINT = '/cgi-backup';" "$BACKUP_API" || \
 	fail 'backup downloads must use the authenticated cgi-backup endpoint'

@@ -109,38 +109,23 @@ function ActionCard(props: {
   description: string;
   icon: ComponentChildren;
   children?: ComponentChildren;
-  danger?: boolean;
   className?: string;
 }) {
   return (
     <article
-      class={`min-w-0 rounded-2xl border bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 ${
-        props.danger ? 'border-rose-200' : 'border-slate-200'
-      } ${props.className ?? ''}`}
+      class={`min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 ${props.className ?? ''}`}
     >
       <div class="flex min-w-0 items-start gap-4">
         <div
-          class={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
-            props.danger
-              ? 'bg-rose-50 text-rose-700'
-              : 'bg-slate-100 text-slate-600'
-          }`}
+          class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"
         >
           {props.icon}
         </div>
         <div class="min-w-0">
-          <h2
-            class={`m-0 text-lg font-black ${
-              props.danger ? 'text-rose-950' : 'text-slate-950'
-            }`}
-          >
+          <h2 class="m-0 text-lg font-black text-slate-950">
             {props.title}
           </h2>
-          <p
-            class={`mt-1.5 mb-0 text-sm leading-6 ${
-              props.danger ? 'text-rose-700' : 'text-slate-500'
-            }`}
-          >
+          <p class="mt-1.5 mb-0 text-sm leading-6 text-slate-500">
             {props.description}
           </p>
         </div>
@@ -781,7 +766,6 @@ function ConfigurationBackupCard(props: {
 
   return (
     <ActionCard
-      className="lg:col-span-2"
       description="펌웨어 업데이트나 복구 전에 현재 OpenWrt 설정을 표준 백업 파일로 저장하고, 필요할 때 검증 후 복원합니다."
       icon={<DatabaseIcon class="size-5" />}
       title="설정 백업 및 복원"
@@ -807,11 +791,11 @@ function ConfigurationBackupCard(props: {
         </div>
       )}
 
-      <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+      <div class="grid min-w-0 grid-cols-1 gap-3">
         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
           <p class="m-0 text-sm font-black text-slate-900">현재 설정 백업</p>
           <p class="mt-2 mb-0 text-xs leading-5 text-slate-600">
-            네트워크, Wi-Fi, 시스템, SmartSafeHub와 SafeShield 등 OpenWrt가 보존 대상으로 관리하는 설정을 백업합니다. 펌웨어 이미지와 설치 패키지 자체는 포함하지 않습니다.
+            네트워크, Wi-Fi, SmartSafeHub와 SafeShield 등 OpenWrt가 관리하는 설정을 표준 백업 파일로 저장합니다.
           </p>
           <button
             class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
@@ -830,7 +814,7 @@ function ConfigurationBackupCard(props: {
         <div class="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <p class="m-0 text-sm font-black text-slate-900">설정 복원</p>
           <p class="mt-2 mb-0 text-xs leading-5 text-slate-600">
-            SmartSafeHub 또는 OpenWrt에서 생성한 설정 백업을 업로드합니다. 최대 16MB이며, 압축 구조와 OpenWrt 설정 파일 구성을 검증한 뒤에만 복원할 수 있습니다.
+            SmartSafeHub 또는 OpenWrt 백업을 업로드하고 검증한 뒤 복원합니다. 최대 16MB까지 사용할 수 있습니다.
           </p>
 
           {!props.validated ? (
@@ -939,6 +923,119 @@ function ConfigurationBackupCard(props: {
             </div>
           )}
         </div>
+      </div>
+    </ActionCard>
+  );
+}
+
+
+function SystemToolsCard(props: {
+  action: SystemAction;
+  advancedSystemUrl: string;
+  confirmingReboot: boolean;
+  logsUrl: string;
+  rebootAccepted: boolean;
+  onCancelReboot: () => void;
+  onConfirmReboot: () => void;
+  onReboot: () => void;
+}) {
+  return (
+    <ActionCard
+      description="공유기 재부팅과 SmartSafeHub에서 제공하지 않는 고급 관리 도구를 한곳에서 제공합니다."
+      icon={<SettingsIcon class="size-5" />}
+      title="시스템 도구"
+    >
+      <div class="space-y-3">
+        <section
+          aria-labelledby="router-reboot-heading"
+          class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex min-w-0 items-start gap-3">
+              <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
+                <PowerIcon class="size-4" />
+              </span>
+              <div class="min-w-0">
+                <p
+                  class="m-0 text-sm font-black text-rose-950"
+                  id="router-reboot-heading"
+                >
+                  공유기 재부팅
+                </p>
+                <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                  재부팅 중에는 인터넷과 Wi-Fi 연결이 잠시 중단됩니다.
+                </p>
+              </div>
+            </div>
+            {!props.confirmingReboot && (
+              <button
+                class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 sm:w-auto"
+                disabled={props.action !== null || props.rebootAccepted}
+                onClick={props.onConfirmReboot}
+                type="button"
+              >
+                재부팅
+              </button>
+            )}
+          </div>
+
+          {props.confirmingReboot && (
+            <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <p class="m-0 text-xs font-extrabold leading-5 text-rose-900">
+                지금 공유기를 재부팅하시겠습니까? 저장되지 않은 LuCI 설정이 있다면 먼저 저장해 주세요.
+              </p>
+              <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                  disabled={props.action !== null}
+                  onClick={props.onCancelReboot}
+                  type="button"
+                >
+                  취소
+                </button>
+                <button
+                  class="inline-flex min-h-10 w-full items-center justify-center rounded-xl bg-rose-700 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                  disabled={props.action !== null}
+                  onClick={props.onReboot}
+                  type="button"
+                >
+                  {props.action === 'reboot' ? '재부팅 요청 중' : '지금 재부팅'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="advanced-tools-heading"
+          class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+        >
+          <div class="min-w-0">
+            <p
+              class="m-0 text-sm font-black text-slate-900"
+              id="advanced-tools-heading"
+            >
+              고급 도구
+            </p>
+            <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+              SmartSafeHub에서 아직 제공하지 않는 상세 시스템 설정이나 원본 로그가 필요할 때 사용합니다.
+            </p>
+          </div>
+          <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <a
+              class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
+              href={props.advancedSystemUrl}
+            >
+              LuCI 고급 설정 열기
+            </a>
+            <a
+              class="inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
+              href={props.logsUrl}
+            >
+              시스템 로그 열기
+            </a>
+          </div>
+        </section>
       </div>
     </ActionCard>
   );
@@ -1417,7 +1514,7 @@ export function SettingsPage({
           </p>
           <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            설정 백업·복원, 즉시 재부팅과 고급 시스템 관리 기능을 제공합니다.
+            설정 백업·복원, 공유기 재부팅과 고급 시스템 도구를 한곳에서 관리합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1436,71 +1533,16 @@ export function SettingsPage({
           />
 
 
-          <ActionCard
-            danger
-            description="재부팅하는 동안 인터넷과 Wi-Fi 연결이 잠시 중단됩니다. 저장되지 않은 LuCI 설정이 있다면 먼저 저장해 주세요."
-            icon={<PowerIcon class="size-5" />}
-            title="공유기 재부팅"
-          >
-            {!confirmingReboot ? (
-              <button
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-rose-300 bg-white px-4 py-2.5 text-sm font-extrabold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 sm:w-auto"
-                disabled={action !== null || rebootAccepted}
-                onClick={() => setConfirmingReboot(true)}
-                type="button"
-              >
-                재부팅 준비
-              </button>
-            ) : (
-              <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                <p class="m-0 text-sm font-extrabold text-rose-900">
-                  지금 공유기를 재부팅하시겠습니까?
-                </p>
-                <div class="mt-4 flex flex-wrap gap-3">
-                  <button
-                    class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 sm:min-h-10 sm:w-auto"
-                    disabled={action !== null}
-                    onClick={() => setConfirmingReboot(false)}
-                    type="button"
-                  >
-                    취소
-                  </button>
-                  <button
-                    class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-rose-700 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-rose-800 disabled:cursor-wait disabled:opacity-60 sm:min-h-10 sm:w-auto"
-                    disabled={action !== null}
-                    onClick={onReboot}
-                    type="button"
-                  >
-                    {action === 'reboot' ? '재부팅 요청 중' : '지금 재부팅'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </ActionCard>
-
-          <ActionCard
-            description="SmartSafeHub에서 아직 제공하지 않는 상세 시스템 설정이나 원본 로그가 필요한 경우에만 LuCI 관리 화면을 사용합니다."
-            icon={<SettingsIcon class="size-5" />}
-            title="고급 설정"
-          >
-            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <a
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
-                href={advancedSystemUrl}
-              >
-                LuCI 고급 설정 열기
-              </a>
-              <a
-                class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 no-underline transition hover:bg-slate-50 sm:w-auto"
-                href={logsUrl}
-              >
-                시스템 로그 열기
-              </a>
-            </div>
-            <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-              SmartSafeHub에서 아직 제공하지 않는 상세 시스템 기능이나 원본 로그가 필요할 때만 사용해 주세요.
-            </p>
-          </ActionCard>
+          <SystemToolsCard
+            action={action}
+            advancedSystemUrl={advancedSystemUrl}
+            confirmingReboot={confirmingReboot}
+            logsUrl={logsUrl}
+            onCancelReboot={() => setConfirmingReboot(false)}
+            onConfirmReboot={() => setConfirmingReboot(true)}
+            onReboot={onReboot}
+            rebootAccepted={rebootAccepted}
+          />
         </div>
       </section>
     </section>
