@@ -25,6 +25,7 @@ for script in \
 	root/usr/libexec/smartsafehub-backup \
 	spec/contracts_spec.sh \
 	tests/test-static-validation.sh \
+	tests/test-shell-pipeline-safety.sh \
 	tests/test-package-contract.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-document-ui-contract.sh \
