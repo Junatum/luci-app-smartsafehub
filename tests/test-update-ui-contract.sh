@@ -48,6 +48,22 @@ fi
 grep -Fq '업데이트 설치' "$UPDATES_CARD" || \
 	fail 'update card must provide an explicit install action'
 
+# Product descriptions should stay compact on desktop instead of leaving a short orphaned line.
+grep -Fq '시스템 펌웨어를 확인하고 설치합니다. 온라인·수동 설치는 안전성 검증 후 진행됩니다.' "$FIRMWARE_CARD" || \
+	fail 'firmware update card must use the compact customer-facing description'
+grep -Fq 'text-slate-500 lg:whitespace-nowrap' "$FIRMWARE_CARD" || \
+	fail 'firmware description must stay on one line when the desktop card has enough width'
+grep -Fq '새 버전을 확인하고 안전하게 설치합니다.' "$UPDATES_CARD" || \
+	fail 'management software card must use the compact customer-facing description'
+grep -Fq 'text-slate-500 xl:whitespace-nowrap' "$UPDATES_CARD" || \
+	fail 'management software description must stay on one line in the wide two-column layout'
+if grep -Fq 'SmartSafeHub 기기의 시스템 펌웨어를 확인하고 설치합니다. 온라인 업데이트와 수동 파일 설치 모두 안전성 검증을 통과한 경우에만 진행할 수 있습니다.' "$FIRMWARE_CARD"; then
+	fail 'firmware update card must not keep the long wrapping description'
+fi
+if grep -Fq 'SmartSafeHub 관리 화면과 관련 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.' "$UPDATES_CARD"; then
+	fail 'management software card must not keep the long wrapping description'
+fi
+
 # Management-software status and automatic settings belong to one responsive card.
 grep -Fq 'data-component="management-software-update-card"' "$UPDATES_CARD" || \
 	fail 'management software must render as one product card'

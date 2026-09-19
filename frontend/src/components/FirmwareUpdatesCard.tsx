@@ -210,8 +210,8 @@ export function FirmwareUpdatesCard({
                 Firmware update
               </p>
               <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">펌웨어 업데이트</h2>
-              <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-                SmartSafeHub 기기의 시스템 펌웨어를 확인하고 설치합니다. 온라인 업데이트와 수동 파일 설치 모두 안전성 검증을 통과한 경우에만 진행할 수 있습니다.
+              <p class="mt-2 mb-0 text-sm leading-6 text-slate-500 lg:whitespace-nowrap">
+                시스템 펌웨어를 확인하고 설치합니다. 온라인·수동 설치는 안전성 검증 후 진행됩니다.
               </p>
             </div>
           </div>

@@ -272,8 +272,8 @@ export function SoftwareUpdatesCard({
                 <h2 class="mt-2 mb-0 text-xl font-black text-slate-950 sm:text-2xl">
                   관리 소프트웨어 업데이트
                 </h2>
-                <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-                  SmartSafeHub 관리 화면과 관련 소프트웨어의 새 버전을 확인하고 안전하게 설치합니다.
+                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500 xl:whitespace-nowrap">
+                  새 버전을 확인하고 안전하게 설치합니다.
                 </p>
               </div>
             </div>
