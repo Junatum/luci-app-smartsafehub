@@ -319,6 +319,8 @@ grep -Fq 'group mx-5 mb-5 rounded-xl border border-slate-200 bg-slate-50/70 sm:m
 	fail 'manual firmware fallback must render as an inset panel inside the firmware card'
 grep -Fq 'data-layout="firmware-card-subsection"' "$FIRMWARE_CARD" || \
 	fail 'manual firmware fallback must declare its firmware-card subsection layout'
+grep -Fq 'class="border-t border-slate-200 px-5 pb-5 pt-3 sm:px-6"' "$FIRMWARE_CARD" || \
+	fail 'expanded manual firmware body must keep compact top spacing'
 grep -Fq 'data-layout="firmware-file-picker"' "$FIRMWARE_CARD" || \
 	fail 'manual firmware upload must use the SmartSafeHub file-picker layout'
 grep -Fq 'aria-label="펌웨어 파일 선택"' "$FIRMWARE_CARD" || \
