@@ -255,11 +255,18 @@ jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("system_schedule
 grep -Fq "callApi(API_OBJECT, 'system_scheduled_reboot_settings')" "$API" || fail 'frontend must load scheduled reboot settings through RPC'
 grep -Fq "callApi(API_OBJECT, 'system_scheduled_reboot_update'" "$API" || fail 'frontend must save scheduled reboot settings through RPC'
 grep -Fq 'export function useScheduledRebootSettings(active: boolean)' "$HOOK" || fail 'scheduled reboot needs a dedicated frontend hook'
-grep -Fq 'title="예약 재부팅"' "$SETTINGS_PAGE" || fail 'settings UI must expose scheduled reboot management'
+grep -Fq 'function ScheduledRebootSection(props:' "$SETTINGS_PAGE" || fail 'settings UI must expose scheduled reboot management'
+grep -Fq 'aria-labelledby="scheduled-reboot-heading"' "$SETTINGS_PAGE" || fail 'scheduled reboot section must have an accessible label'
+grep -Fq 'id="scheduled-reboot-heading"' "$SETTINGS_PAGE" || fail 'scheduled reboot section heading must be addressable'
 grep -Fq 'role="switch"' "$SETTINGS_PAGE" || fail 'scheduled reboot enable control must use switch semantics'
 grep -Fq '<option value="weekly">매주</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support weekly cadence'
 grep -Fq '<option value="daily">매일</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support daily cadence'
 grep -Fq '업데이트 작업 중이면 15분 단위로 최대 2시간 연기합니다.' "$SETTINGS_PAGE" || fail 'UI must explain update-conflict deferral behavior'
-grep -Fq 'className="lg:col-span-2"' "$SETTINGS_PAGE" || fail 'scheduled reboot controls should span the system-management grid on desktop'
+if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -Fq '<ScheduledRebootSection'; then
+	fail 'scheduled reboot section must be rendered inside the time and timezone card'
+fi
+if sed -n '/^function ScheduledRebootSection/,/^export function SettingsPage/p' "$SETTINGS_PAGE" | grep -Fq '<ActionCard'; then
+	fail 'scheduled reboot must not create a second standalone card inside time settings'
+fi
 
 echo 'PASS: scheduled reboot settings, update-safe deferral and reboot-loop protection contracts are consistent'

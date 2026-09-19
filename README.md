@@ -169,6 +169,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 시간대, Wi-Fi 보안 방식, 업데이트 확인 주기 등 드롭다운은 공통 inset 화살표 스타일을 사용해 화면마다 동일한 선택 컨트롤 여백과 정렬을 유지
 - 시간대 변경 시 관리 소프트웨어 자동 설치의 날짜·시각 marker를 초기화하고 updater와 예약 재부팅 maintenance daemon을 다시 시작해 새 로컬 시간 기준으로 일정을 재계산
 - 기본 비활성화된 예약 재부팅을 `매일` 또는 `매주` 주기, 요일과 로컬 시각으로 설정 가능. 기본 제안값은 매주 일요일 04:00
+- 예약 재부팅 설정은 시간대와 같은 기준 시각을 사용하므로 설정 화면의 `시간 및 시간대` 카드 하단에 함께 배치해 관련 시간 설정을 한 곳에서 관리하고 불필요한 세로 스크롤을 줄임
 - 예약 재부팅 시 관리 소프트웨어 또는 펌웨어 작업이 진행 중이면 15분 단위로 최대 2시간 연기하고, 설치 준비된 펌웨어가 있는 경우에도 사용자의 pending 작업을 보존하기 위해 재부팅을 미룸
 - 부팅 후 10분 이내에는 예약 재부팅을 건너뛰고 동일 예약 key의 중복 실행을 막아 재부팅 루프를 방지
 - 모든 사용자를 대상으로 메모리, 시스템 부하, `/overlay` 저장 공간, WAN, dnsmasq, SafeShield, 업데이트 상태와 시스템 시간을 5분 주기로 로컬 진단하고 설정 화면에서 정상/준비 중/주의/이상 결과와 `지금 진단` 기능 제공
@@ -190,6 +191,8 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 시간대 설정은 로그와 통계뿐 아니라 관리 소프트웨어의 예약 설치 시각과 예약 재부팅 시각에도 영향을 줍니다. 저장 시 LuCI가 제공하는 시간대 목록에서 선택 값을 검증하고 IANA `zonename`과 POSIX `timezone`을 함께 기록합니다. 런타임 적용에 실패하면 이전 UCI 값을 복원합니다. NTP가 활성화되어 있으면 설정 화면에서 `지금 동기화`를 실행해 OpenWrt `sysntpd`를 즉시 다시 시작하고 잠시 뒤 장치 시간을 재조회할 수 있습니다.
 
 예약 재부팅은 `/usr/libexec/smartsafehub-maintenance`와 `smartsafehub-maintenance` procd service가 담당합니다. 단순 cron reboot를 사용하지 않고 SmartSafeHub updater와 firmware updater의 상태/lock을 확인한 뒤 안전한 경우에만 재부팅합니다. 업데이트 작업과 겹치면 15분 뒤 재시도하며 최대 2시간이 지나도 안전하지 않으면 해당 예약은 건너뜁니다.
+
+설정 UI에서는 예약 재부팅을 별도 시스템 관리 카드로 분리하지 않고 `시간 및 시간대` 카드의 하위 섹션으로 표시합니다. 시간대 변경과 예약 시각의 관계를 한 화면에서 확인할 수 있고, 데스크톱에서는 주기·요일·시각을 한 행에 배치하며 모바일에서는 세로로 자연스럽게 쌓입니다.
 
 설정 백업 다운로드는 LuCI의 인증된 `/cgi-bin/cgi-backup` 경로를 통해 OpenWrt `sysupgrade --create-backup` 형식을 그대로 사용합니다. 복원은 `/cgi-bin/cgi-upload`로 전용 `/tmp/smartsafehub/config-backup.tar.gz` 경로에만 업로드한 뒤 `/usr/libexec/smartsafehub-backup`이 archive 구조와 업데이트 충돌 여부를 확인하고 `sysupgrade --restore-backup`을 실행합니다. 따라서 SmartSafeHub 백업은 기본 LuCI/CLI와 상호 호환되며 별도의 독자 백업 포맷을 만들지 않습니다.
 

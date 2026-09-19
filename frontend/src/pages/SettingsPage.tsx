@@ -166,9 +166,17 @@ function TimeSettingsCard(props: {
   saveMessage: string | null;
   saving: boolean;
   syncing: boolean;
+  scheduledRebootData: ScheduledRebootSettings | null;
+  scheduledRebootError: string | null;
+  scheduledRebootLoading: boolean;
+  scheduledRebootSaveError: string | null;
+  scheduledRebootSaveMessage: string | null;
+  scheduledRebootSaving: boolean;
   onDismissFeedback: () => void;
+  onDismissScheduledRebootFeedback: () => void;
   onRetry: () => void;
   onSave: (zonename: string) => Promise<boolean>;
+  onSaveScheduledReboot: (input: ScheduledRebootSettingsInput) => Promise<boolean>;
   onSync: () => Promise<boolean>;
 }) {
   const [selectedTimezone, setSelectedTimezone] = useState('');
@@ -346,6 +354,18 @@ function TimeSettingsCard(props: {
           </div>
         </>
       )}
+
+      <ScheduledRebootSection
+        data={props.scheduledRebootData}
+        error={props.scheduledRebootError}
+        loading={props.scheduledRebootLoading}
+        onDismissFeedback={props.onDismissScheduledRebootFeedback}
+        onRetry={props.onRetry}
+        onSave={props.onSaveScheduledReboot}
+        saveError={props.scheduledRebootSaveError}
+        saveMessage={props.scheduledRebootSaveMessage}
+        saving={props.scheduledRebootSaving}
+      />
     </ActionCard>
   );
 }
@@ -938,7 +958,7 @@ const scheduledRebootDays: Array<{
   { value: 'sun', label: '일요일' },
 ];
 
-function ScheduledRebootCard(props: {
+function ScheduledRebootSection(props: {
   data: ScheduledRebootSettings | null;
   error: string | null;
   loading: boolean;
@@ -983,15 +1003,54 @@ function ScheduledRebootCard(props: {
     : '예약 재부팅 꺼짐';
 
   return (
-    <ActionCard
-      className="lg:col-span-2"
-      description="공유기를 정해진 시간에 자동으로 재부팅합니다. 장기간 연속 사용 중 발생할 수 있는 일시적인 장애를 완화하는 운영 안전장치입니다."
-      icon={<CalendarIcon class="size-5" />}
-      title="예약 재부팅"
+    <section
+      aria-labelledby="scheduled-reboot-heading"
+      class="mt-6 border-t border-slate-200 pt-6"
     >
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <CalendarIcon class="size-5" />
+          </span>
+          <div class="min-w-0">
+            <h3 class="m-0 text-base font-black text-slate-950" id="scheduled-reboot-heading">
+              예약 재부팅
+            </h3>
+            <p class="mt-1.5 mb-0 text-xs leading-5 text-slate-500">
+              공유기를 정해진 시간에 자동으로 재부팅합니다. 기본값은 꺼짐이며 필요한 장치에서만 사용하세요.
+            </p>
+          </div>
+        </div>
+        <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+          <span class="text-xs font-extrabold text-slate-500">
+            {enabled ? '사용 중' : '꺼짐'}
+          </span>
+          <button
+            aria-checked={enabled}
+            aria-label="예약 재부팅 사용"
+            class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+              enabled
+                ? 'border-teal-600 bg-teal-600'
+                : 'border-slate-300 bg-slate-200'
+            }`}
+            disabled={props.loading || props.saving || !props.data}
+            onClick={() => setEnabled((current) => !current)}
+            role="switch"
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+                enabled ? 'left-6' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       {(props.saveError || props.saveMessage) && (
         <div
-          class={`mb-5 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+          class={`mt-4 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
             props.saveError
               ? 'border-rose-200 bg-rose-50 text-rose-800'
               : 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -1009,7 +1068,7 @@ function ScheduledRebootCard(props: {
       )}
 
       {props.error && !props.data ? (
-        <div class="rounded-xl border border-rose-200 bg-rose-50 p-4">
+        <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
           <p class="m-0 text-sm font-bold text-rose-800">{props.error}</p>
           <button
             class="mt-3 inline-flex min-h-10 items-center rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100"
@@ -1021,36 +1080,7 @@ function ScheduledRebootCard(props: {
         </div>
       ) : (
         <>
-          <div class="flex flex-col gap-4 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div class="min-w-0">
-              <p class="m-0 text-sm font-extrabold text-slate-900">예약 재부팅 사용</p>
-              <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
-                기본값은 꺼짐입니다. 필요한 장치에서만 일정에 맞춰 사용하세요.
-              </p>
-            </div>
-            <button
-              aria-checked={enabled}
-              aria-label="예약 재부팅 사용"
-              class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
-                enabled
-                  ? 'border-teal-600 bg-teal-600'
-                  : 'border-slate-300 bg-slate-200'
-              }`}
-              disabled={props.loading || props.saving || !props.data}
-              onClick={() => setEnabled((current) => !current)}
-              role="switch"
-              type="button"
-            >
-              <span
-                aria-hidden="true"
-                class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
-                  enabled ? 'left-6' : 'left-1'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div class="mt-5 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="mt-4 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-frequency">
                 주기
@@ -1108,12 +1138,12 @@ function ScheduledRebootCard(props: {
             </div>
           </div>
 
-          <div class="mt-5 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+          <div class="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-end sm:justify-between">
             <div class="min-w-0">
               <p class="m-0 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-500">
                 예약 일정
               </p>
-              <p class="mt-2 mb-0 text-sm font-extrabold text-slate-900">
+              <p class="mt-1.5 mb-0 text-sm font-extrabold text-slate-900">
                 {scheduleSummary}
               </p>
               <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
@@ -1138,7 +1168,7 @@ function ScheduledRebootCard(props: {
           </div>
         </>
       )}
-    </ActionCard>
+    </section>
   );
 }
 
@@ -1299,7 +1329,7 @@ export function SettingsPage({
             label="Uptime"
             value={data ? formatUptime(data.runtime.uptime) : '미확인'}
             description={
-              data ? `커널 ${data.software.kernel}` : '실행 시간을 확인할 수 없습니다.'
+              data ? `커널: ${data.software.kernel}` : '실행 시간을 확인할 수 없습니다.'
             }
           />
           <InfoCard
@@ -1326,7 +1356,7 @@ export function SettingsPage({
           </p>
           <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">장치 설정</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            시간 기준과 진단 정보를 SmartSafeHub에서 직접 관리합니다.
+            시간 기준과 예약 재부팅, 진단 정보를 SmartSafeHub에서 직접 관리합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1335,12 +1365,20 @@ export function SettingsPage({
             error={timeError}
             loading={timeLoading}
             onDismissFeedback={onDismissTimeFeedback}
+            onDismissScheduledRebootFeedback={onDismissScheduledRebootFeedback}
             onRetry={onRetry}
             onSave={onSaveTimezone}
+            onSaveScheduledReboot={onSaveScheduledReboot}
             onSync={onSyncTime}
             saveError={timeSaveError}
             saveMessage={timeSaveMessage}
             saving={timeSaving}
+            scheduledRebootData={scheduledRebootData}
+            scheduledRebootError={scheduledRebootError}
+            scheduledRebootLoading={scheduledRebootLoading}
+            scheduledRebootSaveError={scheduledRebootSaveError}
+            scheduledRebootSaveMessage={scheduledRebootSaveMessage}
+            scheduledRebootSaving={scheduledRebootSaving}
             syncing={timeSyncing}
           />
 
@@ -1369,7 +1407,7 @@ export function SettingsPage({
           </p>
           <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
           <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            설정 백업·복원, 예약 재부팅, 즉시 재부팅과 고급 시스템 관리 기능을 제공합니다.
+            설정 백업·복원, 즉시 재부팅과 고급 시스템 관리 기능을 제공합니다.
           </p>
         </div>
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
@@ -1387,17 +1425,6 @@ export function SettingsPage({
             validated={backupValidated}
           />
 
-          <ScheduledRebootCard
-            data={scheduledRebootData}
-            error={scheduledRebootError}
-            loading={scheduledRebootLoading}
-            onDismissFeedback={onDismissScheduledRebootFeedback}
-            onRetry={onRetry}
-            onSave={onSaveScheduledReboot}
-            saveError={scheduledRebootSaveError}
-            saveMessage={scheduledRebootSaveMessage}
-            saving={scheduledRebootSaving}
-          />
 
           <ActionCard
             danger

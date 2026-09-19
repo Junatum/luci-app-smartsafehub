@@ -6,6 +6,7 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 APP="$ROOT_DIR/frontend/src/app/App.tsx"
 ROUTES="$ROOT_DIR/frontend/src/app/routes.ts"
 SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
+APP_STYLES="$ROOT_DIR/frontend/src/styles/app.css"
 UPDATE_PAGE="$ROOT_DIR/frontend/src/pages/UpdatePage.tsx"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
 TIME_HOOK="$ROOT_DIR/frontend/src/hooks/useSystemTimeSettings.ts"
@@ -19,7 +20,7 @@ fail() {
 	exit 1
 }
 
-for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK" "$SCHEDULE_HOOK" "$BACKUP_HOOK" "$BACKUP_API" "$HEALTH_HOOK"; do
+for file in "$APP" "$ROUTES" "$SETTINGS_PAGE" "$APP_STYLES" "$UPDATE_PAGE" "$NAVIGATION" "$TIME_HOOK" "$SCHEDULE_HOOK" "$BACKUP_HOOK" "$BACKUP_API" "$HEALTH_HOOK"; do
 	[ -f "$file" ] || fail "missing settings split source: ${file#$ROOT_DIR/}"
 done
 
@@ -85,8 +86,26 @@ grep -Fq '설정 복원 및 재부팅' "$SETTINGS_PAGE" || \
 	fail 'restore flow must clearly communicate the reboot side effect'
 grep -Fq 'Wi-Fi 비밀번호, 관리자 설정, VPN 키나 라이선스 정보' "$SETTINGS_PAGE" || \
 	fail 'backup UI must warn that preserved configuration can contain secrets'
-grep -Fq 'title="예약 재부팅"' "$SETTINGS_PAGE" || \
-	fail 'settings page must expose scheduled reboot management'
+grep -Fq 'function ScheduledRebootSection(props:' "$SETTINGS_PAGE" || \
+	fail 'settings page must expose scheduled reboot management as an embedded section'
+grep -Fq 'aria-labelledby="scheduled-reboot-heading"' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot section must expose an accessible section label'
+if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -Fq '<ScheduledRebootSection'; then
+	fail 'scheduled reboot controls must be grouped inside the time and timezone card'
+fi
+grep -Fq 'scheduledRebootData={scheduledRebootData}' "$SETTINGS_PAGE" || \
+	fail 'time settings card must receive scheduled reboot state'
+if grep -Fq '<ScheduledRebootCard' "$SETTINGS_PAGE"; then
+	fail 'scheduled reboot must not remain as a standalone system-management card'
+fi
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-slate-50']" "$APP_STYLES" || \
+	fail 'scheduled reboot inset background must retain a dark-theme mapping'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-slate-100']" "$APP_STYLES" || \
+	fail 'scheduled reboot section icon background must retain a dark-theme mapping'
+grep -Fq "[class~='border-slate-200']" "$APP_STYLES" || \
+	fail 'scheduled reboot divider must retain a dark-theme border mapping'
+grep -Fq "[class~='text-slate-500']" "$APP_STYLES" || \
+	fail 'scheduled reboot secondary text must retain dark-theme contrast mapping'
 grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE" || \
 	fail 'router reboot must remain a first-class system management action'
 grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \
@@ -120,10 +139,12 @@ grep -Fq '`${data.software.distribution} ${data.software.version}`' "$SETTINGS_P
 	fail 'settings system status must retain OpenWrt firmware fallback for legacy images'
 grep -Fq '`리비전 ${data.software.revision}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must retain OpenWrt revision fallback for legacy images'
-grep -Fq '`커널 ${data.software.kernel}`' "$SETTINGS_PAGE" || \
+grep -Fq '`커널: ${data.software.kernel}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must keep the actual running kernel version'
 grep -Fq 'Device settings' "$SETTINGS_PAGE" || \
 	fail 'settings page must visually separate device settings from system management'
+grep -Fq '시간 기준과 예약 재부팅, 진단 정보를 SmartSafeHub에서 직접 관리합니다.' "$SETTINGS_PAGE" || \
+	fail 'device settings description must include scheduled reboot after regrouping'
 grep -Fq 'System management' "$SETTINGS_PAGE" || \
 	fail 'settings page must retain a dedicated system management section'
 grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
