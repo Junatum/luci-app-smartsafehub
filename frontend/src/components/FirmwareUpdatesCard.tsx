@@ -516,7 +516,7 @@ export function FirmwareUpdatesCard({
         </summary>
 
         <div class="border-t border-slate-200 px-5 py-5 sm:px-6">
-          <p class="mt-0 mb-4 max-w-3xl text-xs leading-5 text-slate-500">
+          <p class="mt-0 mb-4 text-xs leading-5 text-slate-500 lg:whitespace-nowrap">
             이 장치에 맞는 Sysupgrade 이미지(.bin)만 사용하세요. 업로드한 파일은 이미지 검증과 `sysupgrade --test`를 모두 통과해야 설치할 수 있으며 강제 설치는 제공하지 않습니다.
           </p>
           <div

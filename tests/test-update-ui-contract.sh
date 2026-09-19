@@ -64,6 +64,13 @@ if grep -Fq 'SmartSafeHub 관리 화면과 관련 소프트웨어의 새 버전�
 	fail 'management software card must not keep the long wrapping description'
 fi
 
+# Manual firmware safety guidance should use the full card width on desktop and avoid an orphaned second line.
+grep -Fq 'class="mt-0 mb-4 text-xs leading-5 text-slate-500 lg:whitespace-nowrap"' "$FIRMWARE_CARD" || \
+	fail 'manual firmware safety guidance must stay on one line in the desktop layout'
+if grep -Fq 'class="mt-0 mb-4 max-w-3xl text-xs leading-5 text-slate-500"' "$FIRMWARE_CARD"; then
+	fail 'manual firmware safety guidance must not keep the narrow max-width that forces wrapping'
+fi
+
 # Management-software status and automatic settings belong to one responsive card.
 grep -Fq 'data-component="management-software-update-card"' "$UPDATES_CARD" || \
 	fail 'management software must render as one product card'

@@ -141,7 +141,7 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 공유기는 `firmware.json`의 `build_id`를 resolve API에 보내고 Hub가 이를 현재 `release_version`으로 역조회합니다. 업데이트 가능 여부는 Hub가 현재/최신 릴리즈 버전을 비교해 결정하며, 공유기 UI는 `current_version`과 `release.version`을 제품 펌웨어 버전으로 표시하고 OpenWrt 버전과 build ID는 진단 정보로 구분합니다.
 - 펌웨어 업데이트 확인은 비활성화 옵션 없이 항상 수행하며 기본 6시간 간격으로 최신 버전을 확인합니다. 기존 설치에 남아 있는 `smartsafehub.firmware.check_enabled` 값은 패키지 설치/업그레이드 시 정리합니다. 관리 소프트웨어의 업데이트 확인 여부는 기존처럼 사용자가 선택할 수 있으며, 실제 펌웨어 자동 설치는 제공하지 않고 사용자의 명시적인 최종 확인이 있어야 설치
 - 온라인 펌웨어는 Hub가 제공한 파일 크기와 SHA-256을 검증한 뒤 OpenWrt `system.validate_firmware_image`와 `sysupgrade --test`를 모두 통과한 경우에만 설치 준비 완료로 표시
-- `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용. 수동 설치는 온라인 펌웨어 업데이트와 같은 카드 안에서 접이식 보조 영역으로 제공하고, 브라우저 기본 file input 대신 파일명·크기와 선택/검증 동작을 일관되게 표시하는 전용 파일 선택 UI를 사용
+- `.bin` Sysupgrade 파일을 SmartSafeHub 화면에서 직접 수동 업로드할 수 있으며 온라인 이미지와 동일한 OpenWrt 검증 경로를 사용. 수동 설치는 온라인 펌웨어 업데이트와 같은 카드 안에서 접이식 보조 영역으로 제공하고, 브라우저 기본 file input 대신 파일명·크기와 선택/검증 동작을 일관되게 표시하는 전용 파일 선택 UI를 사용. 안전 안내 문구는 충분한 폭이 있는 데스크톱에서 영역 전체 폭을 활용해 한 줄로 표시하고 작은 화면에서는 자연스럽게 줄바꿈
 - 수동 업로드 검증은 비동기 firmware helper의 실제 상태를 `ready` 또는 `error`까지 추적하며, 이전 작업의 stale error를 새 검증 결과로 오인하지 않습니다. 검증이 `ready`로 완료되면 backend `prepared` 정보를 기준으로 설정 유지 옵션과 펌웨어 설치 동작을 즉시 표시합니다.
 - 수동 펌웨어 파일은 LuCI dispatcher(`/cgi-bin/luci`)가 아니라 전용 CGI endpoint인 `/cgi-bin/cgi-upload`로 전송하며, 업로드 실패 시 브라우저 콘솔에 endpoint·HTTP 상태·destination·파일 정보를 기록해 ACL/HTTP/네트워크 오류를 구분할 수 있도록 함
 - 설정 유지가 가능한 이미지에서는 기본적으로 현재 설정을 유지하고, 검증 결과가 설정 보존을 허용하지 않는 이미지는 해당 선택을 비활성화
