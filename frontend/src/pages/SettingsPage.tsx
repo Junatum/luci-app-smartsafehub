@@ -1292,7 +1292,7 @@ export function SettingsPage({
         ? firmwareError
         : customFirmwareAvailable
           ? firmware?.current.buildId
-            ? `빌드 ID: ${firmware.current.buildId}`
+            ? `빌드 ID ${firmware.current.buildId}`
             : '빌드 ID를 확인할 수 없습니다.'
           : `리비전 ${data.software.revision}`;
 
@@ -1339,7 +1339,7 @@ export function SettingsPage({
             label="Uptime"
             value={data ? formatUptime(data.runtime.uptime) : '미확인'}
             description={
-              data ? `커널: ${data.software.kernel}` : '실행 시간을 확인할 수 없습니다.'
+              data ? `커널 ${data.software.kernel}` : '실행 시간을 확인할 수 없습니다.'
             }
           />
           <InfoCard

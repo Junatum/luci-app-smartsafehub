@@ -270,7 +270,7 @@ grep -Fq 'current.releaseVersion = resolved.currentVersion;' "$FIRMWARE_RPC" || 
 	fail 'firmware RPC must attach the Hub-resolved release version to the current firmware status'
 grep -Fq "{data.current.releaseVersion || '미확인'}" "$FIRMWARE_CARD" || \
 	fail 'firmware UI must display the product release version as the current version'
-grep -Fq 'Build {data.current.buildId}' "$FIRMWARE_CARD" || \
+grep -Fq '빌드 ID {data.current.buildId}' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must keep build_id as secondary diagnostic identity'
 grep -Fq 'data.release?.version' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must use the Hub release version for the available firmware version'

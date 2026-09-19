@@ -145,13 +145,13 @@ grep -Fq "const customFirmwareAvailable = Boolean(firmware?.current.metadataAvai
 	fail 'settings system status must detect SmartSafeHub custom firmware metadata'
 grep -Fq '`SmartSafeHub ${firmware.current.releaseVersion}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must prefer the SmartSafeHub product firmware version'
-grep -Fq '`빌드 ID: ${firmware.current.buildId}`' "$SETTINGS_PAGE" || \
+grep -Fq '`빌드 ID ${firmware.current.buildId}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must show the immutable SmartSafeHub build ID'
 grep -Fq '`${data.software.distribution} ${data.software.version}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must retain OpenWrt firmware fallback for legacy images'
 grep -Fq '`리비전 ${data.software.revision}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must retain OpenWrt revision fallback for legacy images'
-grep -Fq '`커널: ${data.software.kernel}`' "$SETTINGS_PAGE" || \
+grep -Fq '`커널 ${data.software.kernel}`' "$SETTINGS_PAGE" || \
 	fail 'settings system status must keep the actual running kernel version'
 grep -Fq 'Device settings' "$SETTINGS_PAGE" || \
 	fail 'settings page must visually separate device settings from system management'

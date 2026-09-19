@@ -353,7 +353,7 @@ export function FirmwareUpdatesCard({
                 </dd>
                 {data.current.buildId ? (
                   <span class="mt-1 block break-all text-[11px] leading-5 text-slate-400">
-                    Build {data.current.buildId}
+                    빌드 ID {data.current.buildId}
                   </span>
                 ) : data.current.openwrtVersion ? (
                   <span class="mt-1 block text-[11px] leading-5 text-slate-400">
