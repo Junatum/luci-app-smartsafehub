@@ -1021,7 +1021,17 @@ function ScheduledRebootSection(props: {
             </p>
           </div>
         </div>
-        <div class="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 sm:justify-end">
+          {changed && (
+            <span
+              aria-live="polite"
+              class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
+              role="status"
+            >
+              <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
+              저장되지 않음
+            </span>
+          )}
           <span class="text-xs font-extrabold text-slate-500">
             {enabled ? '사용 중' : '꺼짐'}
           </span>

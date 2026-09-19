@@ -106,6 +106,18 @@ grep -Fq "[class~='border-slate-200']" "$APP_STYLES" || \
 	fail 'scheduled reboot divider must retain a dark-theme border mapping'
 grep -Fq "[class~='text-slate-500']" "$APP_STYLES" || \
 	fail 'scheduled reboot secondary text must retain dark-theme contrast mapping'
+grep -Fq '저장되지 않음' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot must visibly mark unsaved local changes'
+grep -Fq 'role="status"' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot unsaved marker must expose status semantics'
+grep -Fq 'aria-live="polite"' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot unsaved marker must announce state changes without interrupting the user'
+grep -Fq 'border-amber-200 bg-amber-50' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot unsaved marker must use warning styling rather than error styling'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_STYLES" || \
+	fail 'scheduled reboot unsaved marker background must retain a dark-theme mapping'
+grep -Fq "[class~='text-amber-800']" "$APP_STYLES" || \
+	fail 'scheduled reboot unsaved marker text must retain dark-theme contrast mapping'
 grep -Fq 'title="공유기 재부팅"' "$SETTINGS_PAGE" || \
 	fail 'router reboot must remain a first-class system management action'
 grep -Fq 'title="고급 설정"' "$SETTINGS_PAGE" || \
