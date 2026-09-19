@@ -140,6 +140,32 @@ grep -Fq 'rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 tex
 grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$UPDATES_CARD" || \
 	fail 'update form controls must use the shared teal focus treatment'
 
+# Unsaved automatic-update edits must be visible and reversible before saving.
+grep -Fq 'const hasSettingsChanges = (next: Partial<SoftwareUpdateSettingsInput> = {}) =>' "$UPDATES_CARD" || \
+	fail 'automatic update settings must compare edited values with persisted settings'
+grep -Fq 'if (!data || settingsDirty)' "$UPDATES_CARD" || \
+	fail 'background update status refresh must not overwrite unsaved automatic-update edits'
+grep -Fq 'setSettingsDirty(hasSettingsChanges({ checkEnabled: checked }))' "$UPDATES_CARD" || \
+	fail 'automatic update switch changes must derive dirty state from persisted values'
+grep -Fq 'hasSettingsChanges({ autoInstallTime: nextAutoInstallTime })' "$UPDATES_CARD" || \
+	fail 'automatic update time changes must derive dirty state from persisted values'
+grep -Fq '{settingsDirty ? (' "$UPDATES_CARD" || \
+	fail 'automatic update settings must render an unsaved marker only while edited'
+grep -Fq '저장되지 않음' "$UPDATES_CARD" || \
+	fail 'automatic update settings must warn when local changes have not been saved'
+grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$UPDATES_CARD" || \
+	fail 'automatic update unsaved state must include a warning icon'
+grep -Fq 'aria-live="polite"' "$UPDATES_CARD" || \
+	fail 'automatic update unsaved state must announce state changes without interrupting the user'
+grep -Fq 'role="status"' "$UPDATES_CARD" || \
+	fail 'automatic update unsaved marker must expose status semantics'
+grep -Fq "disabled={!settingsDirty || action === 'settings' || busy}" "$UPDATES_CARD" || \
+	fail 'automatic update save action must remain disabled until settings change'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_CSS" || \
+	fail 'automatic update unsaved marker background must retain a dark-theme mapping'
+grep -Fq "[class~='text-amber-800']" "$APP_CSS" || \
+	fail 'automatic update unsaved marker text must retain dark-theme contrast mapping'
+
 # Switches should have an explicit right/left thumb position rather than a browser checkbox.
 grep -Fq 'role="switch"' "$UPDATES_CARD" || \
 	fail 'automatic update settings must use switch controls'

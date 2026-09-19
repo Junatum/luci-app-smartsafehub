@@ -72,6 +72,21 @@ function hostOctet(value: string): string {
   return splitIpv4(value)[3];
 }
 
+function lanFormValues(data: LanSettings): LanSettingsInput {
+  const prefix = lanPrefix(data.lan.address);
+  const startHost = hostOctet(data.dhcp.start ?? '');
+  const endHost = hostOctet(data.dhcp.end ?? '');
+
+  return {
+    ipAddress: data.lan.address,
+    prefixLength: data.lan.prefixLength,
+    dhcpEnabled: data.dhcp.enabled,
+    dhcpStart: prefix && startHost ? `${prefix}.${startHost}` : (data.dhcp.start ?? ''),
+    dhcpEnd: prefix && endHost ? `${prefix}.${endHost}` : (data.dhcp.end ?? ''),
+    leaseTime: data.dhcp.leaseTime,
+  };
+}
+
 function Ipv4OctetInput({
   disabled,
   value,
@@ -296,38 +311,88 @@ export function LanPage({
   const [dhcpStart, setDhcpStart] = useState('');
   const [dhcpEnd, setDhcpEnd] = useState('');
   const [leaseTime, setLeaseTime] = useState('12h');
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const hasSettingsChanges = (next: Partial<LanSettingsInput> = {}) => {
+    if (!data) {
+      return false;
+    }
+
+    const persisted = lanFormValues(data);
+    return (
+      (next.ipAddress ?? ipAddress).trim() !== persisted.ipAddress ||
+      (next.prefixLength ?? prefixLength) !== persisted.prefixLength ||
+      (next.dhcpEnabled ?? dhcpEnabled) !== persisted.dhcpEnabled ||
+      (next.dhcpStart ?? dhcpStart).trim() !== persisted.dhcpStart ||
+      (next.dhcpEnd ?? dhcpEnd).trim() !== persisted.dhcpEnd ||
+      (next.leaseTime ?? leaseTime) !== persisted.leaseTime
+    );
+  };
 
   const updateIpAddress = (nextAddress: string) => {
     const nextPrefix = lanPrefix(nextAddress);
     setIpAddress(nextAddress);
 
     if (!nextPrefix) {
+      setSettingsDirty(hasSettingsChanges({ ipAddress: nextAddress }));
       return;
     }
 
     const startHost = hostOctet(dhcpStart);
     const endHost = hostOctet(dhcpEnd);
-    setDhcpStart(startHost ? `${nextPrefix}.${startHost}` : '');
-    setDhcpEnd(endHost ? `${nextPrefix}.${endHost}` : '');
+    const nextDhcpStart = startHost ? `${nextPrefix}.${startHost}` : '';
+    const nextDhcpEnd = endHost ? `${nextPrefix}.${endHost}` : '';
+    setDhcpStart(nextDhcpStart);
+    setDhcpEnd(nextDhcpEnd);
+    setSettingsDirty(
+      hasSettingsChanges({
+        ipAddress: nextAddress,
+        dhcpStart: nextDhcpStart,
+        dhcpEnd: nextDhcpEnd,
+      }),
+    );
+  };
+
+  const updateDhcpStart = (nextDhcpStart: string) => {
+    setDhcpStart(nextDhcpStart);
+    setSettingsDirty(hasSettingsChanges({ dhcpStart: nextDhcpStart }));
+  };
+
+  const updateDhcpEnd = (nextDhcpEnd: string) => {
+    setDhcpEnd(nextDhcpEnd);
+    setSettingsDirty(hasSettingsChanges({ dhcpEnd: nextDhcpEnd }));
+  };
+
+  const updatePrefixLength = (nextPrefixLength: number) => {
+    setPrefixLength(nextPrefixLength);
+    setSettingsDirty(hasSettingsChanges({ prefixLength: nextPrefixLength }));
+  };
+
+  const updateLeaseTime = (nextLeaseTime: string) => {
+    setLeaseTime(nextLeaseTime);
+    setSettingsDirty(hasSettingsChanges({ leaseTime: nextLeaseTime }));
+  };
+
+  const updateDhcpEnabled = (nextDhcpEnabled: boolean) => {
+    setDhcpEnabled(nextDhcpEnabled);
+    setSettingsDirty(hasSettingsChanges({ dhcpEnabled: nextDhcpEnabled }));
   };
 
   useEffect(() => {
-    if (!data) {
+    if (!data || settingsDirty) {
       return;
     }
 
-    setIpAddress(data.lan.address);
-    setPrefixLength(data.lan.prefixLength);
-    setDhcpEnabled(data.dhcp.enabled);
-    const prefix = lanPrefix(data.lan.address);
-    const startHost = hostOctet(data.dhcp.start ?? '');
-    const endHost = hostOctet(data.dhcp.end ?? '');
-    setDhcpStart(prefix && startHost ? `${prefix}.${startHost}` : (data.dhcp.start ?? ''));
-    setDhcpEnd(prefix && endHost ? `${prefix}.${endHost}` : (data.dhcp.end ?? ''));
-    setLeaseTime(data.dhcp.leaseTime);
+    const persisted = lanFormValues(data);
+    setIpAddress(persisted.ipAddress);
+    setPrefixLength(persisted.prefixLength);
+    setDhcpEnabled(persisted.dhcpEnabled);
+    setDhcpStart(persisted.dhcpStart);
+    setDhcpEnd(persisted.dhcpEnd);
+    setLeaseTime(persisted.leaseTime);
     setValidationError(null);
-  }, [data]);
+  }, [data, settingsDirty]);
 
   const prefixOptions = useMemo(() => {
     const options = [...PREFIX_OPTIONS];
@@ -380,7 +445,7 @@ export function LanPage({
     }
 
     setValidationError(null);
-    await onSave({
+    const saved = await onSave({
       ipAddress: ipAddress.trim(),
       prefixLength,
       dhcpEnabled,
@@ -388,6 +453,9 @@ export function LanPage({
       dhcpEnd: dhcpEnd.trim(),
       leaseTime,
     });
+    if (saved) {
+      setSettingsDirty(false);
+    }
   };
 
   const applyRecommendation = async () => {
@@ -403,7 +471,10 @@ export function LanPage({
     }
 
     setValidationError(null);
-    await onApplyRecommendation();
+    const applied = await onApplyRecommendation();
+    if (applied) {
+      setSettingsDirty(false);
+    }
   };
 
   return (
@@ -447,19 +518,31 @@ export function LanPage({
         class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
         onSubmit={(event) => void submit(event)}
       >
-        <div class="flex items-start gap-3">
-          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
-            <CableIcon class="size-6" />
-          </span>
-          <div>
-            <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-              내부 네트워크
-            </p>
-            <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">LAN 및 DHCP 설정</h2>
-            <p class="mt-2 mb-0 text-sm font-semibold leading-6 text-slate-600">
-              상위 공유기와 다른 주소 대역을 사용해야 안정적으로 라우팅할 수 있습니다.
-            </p>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex min-w-0 items-start gap-3">
+            <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
+              <CableIcon class="size-6" />
+            </span>
+            <div class="min-w-0">
+              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                내부 네트워크
+              </p>
+              <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">LAN 및 DHCP 설정</h2>
+              <p class="mt-2 mb-0 text-sm font-semibold leading-6 text-slate-600">
+                상위 공유기와 다른 주소 대역을 사용해야 안정적으로 라우팅할 수 있습니다.
+              </p>
+            </div>
           </div>
+          {settingsDirty ? (
+            <span
+              aria-live="polite"
+              class="inline-flex shrink-0 self-start items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
+              role="status"
+            >
+              <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
+              저장되지 않음
+            </span>
+          ) : null}
         </div>
 
         <div class="mt-6 grid gap-5 lg:grid-cols-2">
@@ -482,7 +565,7 @@ export function LanPage({
             disabled={busy}
             label="DHCP 시작 주소"
             lanAddress={ipAddress}
-            onChange={setDhcpStart}
+            onChange={updateDhcpStart}
             value={dhcpStart}
           />
 
@@ -490,7 +573,7 @@ export function LanPage({
             disabled={busy}
             label="DHCP 종료 주소"
             lanAddress={ipAddress}
-            onChange={setDhcpEnd}
+            onChange={updateDhcpEnd}
             value={dhcpEnd}
           />
         </div>
@@ -505,7 +588,7 @@ export function LanPage({
               <select
                 class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={busy}
-                onChange={(event) => setPrefixLength(Number(event.currentTarget.value))}
+                onChange={(event) => updatePrefixLength(Number(event.currentTarget.value))}
                 value={prefixLength}
               >
                 {prefixOptions.map((prefix) => (
@@ -524,7 +607,7 @@ export function LanPage({
               <select
                 class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
                 disabled={busy}
-                onChange={(event) => setLeaseTime(event.currentTarget.value)}
+                onChange={(event) => updateLeaseTime(event.currentTarget.value)}
                 value={leaseTime}
               >
                 {leaseOptions.map(([value, label]) => (
@@ -540,7 +623,7 @@ export function LanPage({
                 checked={dhcpEnabled}
                 class="size-5 accent-teal-700"
                 disabled={busy}
-                onChange={(event) => setDhcpEnabled(event.currentTarget.checked)}
+                onChange={(event) => updateDhcpEnabled(event.currentTarget.checked)}
                 type="checkbox"
               />
               SmartSafeHub DHCP 서버 사용
@@ -564,7 +647,7 @@ export function LanPage({
           </p>
           <button
             class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border-0 bg-teal-700 px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
-            disabled={busy}
+            disabled={busy || !settingsDirty}
             type="submit"
           >
             <CheckCircleIcon class={`size-5 ${action === 'saving' ? 'animate-pulse' : ''}`} />

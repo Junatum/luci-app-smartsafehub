@@ -30,6 +30,36 @@ grep -Fq 'cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 p
 grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$WIFI_PAGE" || \
 	fail 'Wi-Fi security select must use the shared teal focus treatment'
 
+# Wi-Fi cards use the same explicit unsaved-state contract as other editable settings.
+grep -Fq 'const settingsDirty =' "$WIFI_PAGE" || \
+	fail 'Wi-Fi settings must derive whether local values differ from the persisted network state'
+grep -Fq 'ssid.trim() !== network.ssid' "$WIFI_PAGE" || \
+	fail 'Wi-Fi dirty state must include SSID changes'
+grep -Fq 'enabled !== network.enabled' "$WIFI_PAGE" || \
+	fail 'Wi-Fi dirty state must include enabled-state changes'
+grep -Fq 'security !== savedSecurity' "$WIFI_PAGE" || \
+	fail 'Wi-Fi dirty state must include security changes'
+grep -Fq 'password.length > 0' "$WIFI_PAGE" || \
+	fail 'Wi-Fi dirty state must include an entered replacement password'
+grep -Fq '{settingsDirty ? (' "$WIFI_PAGE" || \
+	fail 'Wi-Fi cards must render an unsaved marker only while edited'
+grep -Fq '저장되지 않음' "$WIFI_PAGE" || \
+	fail 'Wi-Fi cards must visibly mark unsaved local changes'
+grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$WIFI_PAGE" || \
+	fail 'Wi-Fi unsaved state must include a warning icon'
+grep -Fq 'aria-live="polite"' "$WIFI_PAGE" || \
+	fail 'Wi-Fi unsaved state must announce state changes without interrupting the user'
+grep -Fq 'role="status"' "$WIFI_PAGE" || \
+	fail 'Wi-Fi unsaved marker must expose status semantics'
+grep -Fq "if (next === 'none' || next === 'keep')" "$WIFI_PAGE" || \
+	fail 'Wi-Fi custom-security revert must discard a password that can no longer be applied'
+grep -Fq 'disabled={busy || !settingsDirty}' "$WIFI_PAGE" || \
+	fail 'Wi-Fi save action must remain disabled until the card has local changes'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_STYLE" || \
+	fail 'Wi-Fi unsaved marker background must retain a dark-theme mapping'
+grep -Fq "[class~='text-amber-800']" "$APP_STYLE" || \
+	fail 'Wi-Fi unsaved marker text must retain dark-theme contrast mapping'
+
 grep -Fq '.ssh-app select {' "$APP_STYLE" || \
 	fail 'all product select controls must share one normalized native-arrow override'
 grep -Fq 'background-position: right 1rem center;' "$APP_STYLE" || \

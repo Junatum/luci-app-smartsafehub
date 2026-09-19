@@ -217,6 +217,19 @@ export function SoftwareUpdatesCard({
     data?.packages[0] ??
     null;
 
+  const hasSettingsChanges = (next: Partial<SoftwareUpdateSettingsInput> = {}) => {
+    if (!data) {
+      return false;
+    }
+
+    return (
+      (next.checkEnabled ?? checkEnabled) !== data.settings.checkEnabled ||
+      (next.checkIntervalSeconds ?? checkIntervalSeconds) !== data.settings.checkIntervalSeconds ||
+      (next.autoInstall ?? autoInstall) !== data.settings.autoInstall ||
+      (next.autoInstallTime ?? autoInstallTime) !== data.settings.autoInstallTime
+    );
+  };
+
   const saveSettings = async () => {
     const saved = await onSaveSettings({
       checkEnabled,
@@ -538,19 +551,31 @@ export function SoftwareUpdatesCard({
             class="min-w-0 border-t border-slate-200 p-5 sm:p-6 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:self-stretch xl:border-t-0 xl:border-l"
             data-section="software-update-settings"
           >
-            <div class="flex gap-4">
-              <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">
-                <SettingsIcon class="size-5" />
-              </span>
-              <div class="min-w-0">
-                <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                  Settings
-                </p>
-                <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">자동 업데이트</h3>
-                <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-                  관리 소프트웨어의 자동 확인과 자동 설치를 설정합니다.
-                </p>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="flex min-w-0 gap-4">
+                <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">
+                  <SettingsIcon class="size-5" />
+                </span>
+                <div class="min-w-0">
+                  <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                    Settings
+                  </p>
+                  <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">자동 업데이트</h3>
+                  <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
+                    관리 소프트웨어의 자동 확인과 자동 설치를 설정합니다.
+                  </p>
+                </div>
               </div>
+              {settingsDirty ? (
+                <span
+                  aria-live="polite"
+                  class="inline-flex shrink-0 self-start items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
+                  role="status"
+                >
+                  <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
+                  저장되지 않음
+                </span>
+              ) : null}
             </div>
 
             <div class="mt-4 grid gap-4 lg:grid-cols-2">
@@ -584,7 +609,7 @@ export function SoftwareUpdatesCard({
                     label="자동 업데이트 확인"
                     onChange={(checked) => {
                       setCheckEnabled(checked);
-                      setSettingsDirty(true);
+                      setSettingsDirty(hasSettingsChanges({ checkEnabled: checked }));
                     }}
                   />
                 </div>
@@ -595,8 +620,11 @@ export function SoftwareUpdatesCard({
                     class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                     disabled={!checkEnabled}
                     onChange={(event) => {
-                      setCheckIntervalSeconds(Number(event.currentTarget.value));
-                      setSettingsDirty(true);
+                      const nextIntervalSeconds = Number(event.currentTarget.value);
+                      setCheckIntervalSeconds(nextIntervalSeconds);
+                      setSettingsDirty(
+                        hasSettingsChanges({ checkIntervalSeconds: nextIntervalSeconds }),
+                      );
                     }}
                     value={checkIntervalSeconds}
                   >
@@ -622,7 +650,7 @@ export function SoftwareUpdatesCard({
                     label="자동 업데이트 설치"
                     onChange={(checked) => {
                       setAutoInstall(checked);
-                      setSettingsDirty(true);
+                      setSettingsDirty(hasSettingsChanges({ autoInstall: checked }));
                     }}
                   />
                 </div>
@@ -637,8 +665,11 @@ export function SoftwareUpdatesCard({
                       class="min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                       disabled={!autoInstall}
                       onChange={(event) => {
-                        setAutoInstallTime(event.currentTarget.value);
-                        setSettingsDirty(true);
+                        const nextAutoInstallTime = event.currentTarget.value;
+                        setAutoInstallTime(nextAutoInstallTime);
+                        setSettingsDirty(
+                          hasSettingsChanges({ autoInstallTime: nextAutoInstallTime }),
+                        );
                       }}
                       type="time"
                       value={autoInstallTime}

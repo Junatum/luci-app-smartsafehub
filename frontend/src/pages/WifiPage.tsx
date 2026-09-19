@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
-import { CheckCircleIcon, RouterIcon } from '../components/Icons';
+import { AlertIcon, CheckCircleIcon, RouterIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { WifiFeedback } from '../hooks/useWifi';
 import type {
@@ -85,6 +85,13 @@ function WifiNetworkCard({
     network.security === 'custom' && security === 'keep';
   const securityRequiresPassword =
     security === 'psk2' || security === 'sae-mixed' || security === 'sae';
+  const savedSecurity: WifiSecurityChoice =
+    network.security === 'custom' ? 'keep' : network.security;
+  const settingsDirty =
+    ssid.trim() !== network.ssid ||
+    enabled !== network.enabled ||
+    security !== savedSecurity ||
+    password.length > 0;
 
   const submit = async (
     event: JSX.TargetedSubmitEvent<HTMLFormElement>,
@@ -156,18 +163,30 @@ function WifiNetworkCard({
             </p>
           </div>
         </div>
-        <span
-          class={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${
-            network.runtimeUp
-              ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-              : 'bg-slate-100 text-slate-600 ring-slate-200'
-          }`}
-        >
+        <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+          {settingsDirty ? (
+            <span
+              aria-live="polite"
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
+              role="status"
+            >
+              <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
+              저장되지 않음
+            </span>
+          ) : null}
           <span
-            class={`size-2 rounded-full ${network.runtimeUp ? 'bg-emerald-500' : 'bg-slate-400'}`}
-          />
-          {network.runtimeUp ? '동작 중' : network.enabled ? '시작 대기' : '꺼짐'}
-        </span>
+            class={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${
+              network.runtimeUp
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                : 'bg-slate-100 text-slate-600 ring-slate-200'
+            }`}
+          >
+            <span
+              class={`size-2 rounded-full ${network.runtimeUp ? 'bg-emerald-500' : 'bg-slate-400'}`}
+            />
+            {network.runtimeUp ? '동작 중' : network.enabled ? '시작 대기' : '꺼짐'}
+          </span>
+        </div>
       </div>
 
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
@@ -191,7 +210,7 @@ function WifiNetworkCard({
             onChange={(event) => {
               const next = event.currentTarget.value as WifiSecurityChoice;
               setSecurity(next);
-              if (next === 'none') {
+              if (next === 'none' || next === 'keep') {
                 setPassword('');
               }
             }}
@@ -247,7 +266,7 @@ function WifiNetworkCard({
         </label>
         <button
           class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-0 bg-teal-700 px-5 sm:w-auto py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 disabled:cursor-wait disabled:opacity-60"
-          disabled={busy}
+          disabled={busy || !settingsDirty}
           type="submit"
         >
           <CheckCircleIcon class={`size-5 ${saving ? 'animate-pulse' : ''}`} />

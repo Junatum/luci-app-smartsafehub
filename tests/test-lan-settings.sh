@@ -10,6 +10,7 @@ ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 API="$ROOT_DIR/frontend/src/api/smartsafehub.ts"
 HOOK="$ROOT_DIR/frontend/src/hooks/useLan.ts"
 PAGE="$ROOT_DIR/frontend/src/pages/LanPage.tsx"
+APP_STYLE="$ROOT_DIR/frontend/src/styles/app.css"
 ROUTES="$ROOT_DIR/frontend/src/app/routes.ts"
 HASH_ROUTE="$ROOT_DIR/frontend/src/hooks/useHashRoute.ts"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
@@ -177,14 +178,28 @@ grep -Fq 'function Ipv4OctetInput' "$PAGE" || fail '공유기 IP는 4개 octet �
 grep -Fq 'maxLength={3}' "$PAGE" || fail '각 IPv4 octet 입력은 최대 3자리로 제한해야 합니다.'
 grep -Fq 'function DhcpHostInput' "$PAGE" || fail 'DHCP 주소는 공유기 대역 prefix와 마지막 octet을 분리해 입력해야 합니다.'
 grep -Fq '앞 3개 주소는 공유기 IP 주소와 동일하게 유지됩니다.' "$PAGE" || fail 'DHCP 앞 3개 octet 고정 안내가 필요합니다.'
-grep -Fq 'setDhcpStart(startHost ? `${nextPrefix}.${startHost}`' "$PAGE" || fail '공유기 IP 앞 3개 octet 변경 시 DHCP 시작 주소가 같은 prefix를 따라가야 합니다.'
-grep -Fq 'setDhcpEnd(endHost ? `${nextPrefix}.${endHost}`' "$PAGE" || fail '공유기 IP 앞 3개 octet 변경 시 DHCP 종료 주소가 같은 prefix를 따라가야 합니다.'
+grep -Fq 'const nextDhcpStart = startHost ? `${nextPrefix}.${startHost}`' "$PAGE" || fail '공유기 IP 앞 3개 octet 변경 시 DHCP 시작 주소가 같은 prefix를 따라가야 합니다.'
+grep -Fq 'const nextDhcpEnd = endHost ? `${nextPrefix}.${endHost}`' "$PAGE" || fail '공유기 IP 앞 3개 octet 변경 시 DHCP 종료 주소가 같은 prefix를 따라가야 합니다.'
 grep -Fq 'DHCP 시작 주소' "$PAGE" || fail 'DHCP 시작 주소 입력이 필요합니다.'
 grep -Fq 'DHCP 종료 주소' "$PAGE" || fail 'DHCP 종료 주소 입력이 필요합니다.'
 grep -Fq '고급 DHCP 설정' "$PAGE" || fail '고급 DHCP 설정 영역이 필요합니다.'
 grep -Fq '서브넷 마스크' "$PAGE" || fail '고급 subnet 설정이 필요합니다.'
 grep -Fq 'DHCP 임대 시간' "$PAGE" || fail 'DHCP 임대 시간 설정이 필요합니다.'
 grep -Fq 'SmartSafeHub DHCP 서버 사용' "$PAGE" || fail 'DHCP 서버 ON/OFF 설정이 필요합니다.'
+grep -Fq 'function lanFormValues(data: LanSettings): LanSettingsInput' "$PAGE" || fail 'LAN 저장값을 편집 폼 기준으로 정규화해야 합니다.'
+grep -Fq 'const [settingsDirty, setSettingsDirty] = useState(false);' "$PAGE" || fail 'LAN 설정은 저장되지 않은 로컬 변경 상태를 추적해야 합니다.'
+grep -Fq 'const hasSettingsChanges = (next: Partial<LanSettingsInput> = {}) =>' "$PAGE" || fail 'LAN 설정은 편집값을 저장된 설정과 비교해야 합니다.'
+grep -Fq 'if (!data || settingsDirty)' "$PAGE" || fail '저장되지 않은 LAN 편집값을 상태 갱신이 덮어쓰면 안 됩니다.'
+grep -Fq '{settingsDirty ? (' "$PAGE" || fail 'LAN 설정은 저장되지 않은 변경이 있을 때만 경고를 표시해야 합니다.'
+grep -Fq '저장되지 않음' "$PAGE" || fail 'LAN 설정은 저장되지 않은 변경사항을 사용자에게 알려야 합니다.'
+grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$PAGE" || fail 'LAN 저장 전 상태에는 경고 아이콘이 필요합니다.'
+grep -Fq 'aria-live="polite"' "$PAGE" || fail 'LAN 저장 전 상태는 접근 가능한 비중단 알림을 사용해야 합니다.'
+grep -Fq 'role="status"' "$PAGE" || fail 'LAN 저장 전 상태는 status semantics를 제공해야 합니다.'
+grep -Fq 'if (saved) {' "$PAGE" || fail 'LAN 저장 성공 뒤 dirty state를 초기화해야 합니다.'
+grep -Fq 'if (applied) {' "$PAGE" || fail '추천 LAN 대역 적용 성공 뒤 dirty state를 초기화해야 합니다.'
+grep -Fq 'disabled={busy || !settingsDirty}' "$PAGE" || fail 'LAN 저장 버튼은 실제 변경사항이 있을 때만 활성화되어야 합니다.'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_STYLE" || fail 'LAN 저장 전 경고 배경은 다크 테마 매핑을 유지해야 합니다.'
+grep -Fq "[class~='text-amber-800']" "$APP_STYLE" || fail 'LAN 저장 전 경고 텍스트는 다크 테마 대비를 유지해야 합니다.'
 grep -Fq 'window.confirm(' "$PAGE" || fail 'LAN 적용 전 연결 중단 경고 확인이 필요합니다.'
 grep -Fq '새 공유기 주소' "$PAGE" || fail 'LAN IP 변경 뒤 새 관리 주소 안내가 필요합니다.'
 
