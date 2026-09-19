@@ -90,7 +90,7 @@ grep -Fq 'function ScheduledRebootSection(props:' "$SETTINGS_PAGE" || \
 	fail 'settings page must expose scheduled reboot management as an embedded section'
 grep -Fq 'aria-labelledby="scheduled-reboot-heading"' "$SETTINGS_PAGE" || \
 	fail 'scheduled reboot section must expose an accessible section label'
-if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -Fq '<ScheduledRebootSection'; then
+if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -F '<ScheduledRebootSection' >/dev/null; then
 	fail 'scheduled reboot controls must be grouped inside the time and timezone card'
 fi
 grep -Fq 'scheduledRebootData={scheduledRebootData}' "$SETTINGS_PAGE" || \
@@ -173,10 +173,10 @@ grep -Fq 'System management' "$SETTINGS_PAGE" || \
 	fail 'settings page must retain a dedicated system management section'
 grep -Fq 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE" || \
 	fail 'settings action groups must use responsive two-column layout on desktop'
-if sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -Fq 'className="lg:col-span-2"'; then
+if sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -F 'className="lg:col-span-2"' >/dev/null; then
 	fail 'configuration backup must share the desktop row instead of spanning both columns'
 fi
-sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -Fq 'grid min-w-0 grid-cols-1 gap-3' || \
+sed -n '/^function ConfigurationBackupCard/,/^function SystemToolsCard/p' "$SETTINGS_PAGE" | grep -F 'grid min-w-0 grid-cols-1 gap-3' >/dev/null || \
 	fail 'configuration backup internals must use a compact vertical layout at half-row width'
 grep -Fq '<SystemToolsCard' "$SETTINGS_PAGE" || \
 	fail 'system management must render the combined system tools card beside backup/restore'

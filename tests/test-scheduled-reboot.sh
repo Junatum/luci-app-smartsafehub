@@ -266,10 +266,10 @@ grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$SETTINGS
 grep -Fq '<option value="weekly">매주</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support weekly cadence'
 grep -Fq '<option value="daily">매일</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support daily cadence'
 grep -Fq '업데이트 작업 중이면 15분 단위로 최대 2시간 연기합니다.' "$SETTINGS_PAGE" || fail 'UI must explain update-conflict deferral behavior'
-if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -Fq '<ScheduledRebootSection'; then
+if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -F '<ScheduledRebootSection' >/dev/null; then
 	fail 'scheduled reboot section must be rendered inside the time and timezone card'
 fi
-if sed -n '/^function ScheduledRebootSection/,/^export function SettingsPage/p' "$SETTINGS_PAGE" | grep -Fq '<ActionCard'; then
+if sed -n '/^function ScheduledRebootSection/,/^export function SettingsPage/p' "$SETTINGS_PAGE" | grep -F '<ActionCard' >/dev/null; then
 	fail 'scheduled reboot must not create a second standalone card inside time settings'
 fi
 
