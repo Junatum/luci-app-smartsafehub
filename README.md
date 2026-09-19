@@ -241,10 +241,10 @@ ucode-mod-uci
 procd
 uclient-fetch
 jsonfilter
-safeshield (>= 0.3.23)
+safeshield (>= 0.3.24)
 ```
 
-`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.23)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
+`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.24)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
 
 프런트엔드 빌드에는 **Node.js 24 이상**이 필요합니다.
 

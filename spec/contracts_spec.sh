@@ -15,7 +15,6 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
-
   It '루트 URL 내부 rewrite 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-root-url-rewrite.sh"
     The status should be success

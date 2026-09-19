@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.16
-PKG_RELEASE:=14
+PKG_RELEASE:=15
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -17,7 +17,7 @@ LUCI_TITLE:=SmartSafeHub
 LUCI_URL:=https://github.com/Junatum/luci-app-smartsafehub
 LUCI_DESCRIPTION:=A modern, user-friendly OpenWrt management platform with Wi-Fi control, device management, system monitoring, and SafeShield DNS protection.
 LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +uclient-fetch +jsonfilter +safeshield
-LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.23)
+LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.24)
 LUCI_PKGARCH:=all
 
 define Package/luci-app-smartsafehub/conffiles
