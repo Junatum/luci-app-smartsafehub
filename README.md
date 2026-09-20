@@ -158,6 +158,7 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 - 데몬 시작 시 펌웨어는 10초 뒤, 관리 소프트웨어는 20초 뒤 최초 업데이트 확인을 수행합니다. 초기 네트워크가 아직 준비되지 않아 실패하면 60초 간격으로 최대 3회까지만 재시도하며, 이후에는 설정된 일반 확인 주기로 돌아갑니다. 관리 소프트웨어는 실패한 확인 시도 시각도 별도로 기록해 저장소 장애 중 `apk update`가 1분마다 반복되지 않도록 제한합니다.
 - 관리 소프트웨어 자동 확인이 켜져 있는데 마지막 성공 확인이 설정 주기의 2배 이상 지연되면 대시보드와 업데이트 페이지 모두 amber `업데이트 확인 지연` 상태로 표시합니다. 패키지 설치·업그레이드 시 `smartsafehub-updater` 부팅 시작 링크를 다시 활성화해 기존 설치에서 자동 확인 데몬이 비활성 상태로 남는 경우를 복구합니다. updater가 자기 자신을 설치하는 중일 수 있으므로 post-install hook에서는 서비스를 강제 재시작하지 않습니다.
 - `luci-app-smartsafehub`를 실제 공유기에 설치하거나 업그레이드할 때마다 `smartsafehub-firmware` 서비스를 강제로 enable합니다. 기존 설치에서 신규 펌웨어 데몬의 `S96smartsafehub-firmware` 링크가 없던 경우도 다음 패키지 업데이트 시 자동 복구되며, 사용자가 이전에 수동으로 disable했더라도 패키지 업데이트 정책이 다시 활성화합니다.
+- 예약 재부팅을 담당하는 `smartsafehub-maintenance`도 패키지 설치·업그레이드 시 강제로 enable합니다. 기존 장치가 maintenance 서비스 도입 이전 버전에서 업그레이드되어 rc.d 시작 링크가 없는 경우에도 다음 재부팅부터 예약 재부팅 데몬이 정상 시작되도록 복구합니다.
 - 기존 장치에 `auto_install` 값이 이미 저장되어 있으면 그 사용자의 선택을 그대로 유지
 - 애플리케이션 자동 설치는 `luci-app-smartsafehub`만 대상으로 수행하며 `safeshield`의 최소 버전은 패키지 dependency로 함께 관리
 - 로컬 APK 설치로 SmartSafeHub 또는 SafeShield가 `/etc/apk/world`의 identity hash에 고정된 경우 해당 두 항목만 일반 패키지 항목으로 정규화한 뒤 `apk upgrade luci-app-smartsafehub`를 실행합니다. identity pin 해제를 위해 `apk add --upgrade --latest`나 전역 `apk upgrade --available`을 사용하지 않아 관계없는 OpenWrt 패키지와 커널 모듈을 갱신 범위에 포함시키지 않습니다.
@@ -222,7 +223,7 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 
 시간대 설정은 로그와 통계뿐 아니라 관리 소프트웨어의 예약 설치 시각과 예약 재부팅 시각에도 영향을 줍니다. 저장 시 LuCI가 제공하는 시간대 목록에서 선택 값을 검증하고 IANA `zonename`과 POSIX `timezone`을 함께 기록합니다. 런타임 적용에 실패하면 이전 UCI 값을 복원합니다. NTP가 활성화되어 있으면 설정 화면에서 `지금 동기화`를 실행해 OpenWrt `sysntpd`를 즉시 다시 시작하고 잠시 뒤 장치 시간을 재조회할 수 있습니다.
 
-예약 재부팅은 `/usr/libexec/smartsafehub-maintenance`와 `smartsafehub-maintenance` procd service가 담당합니다. 단순 cron reboot를 사용하지 않고 SmartSafeHub updater와 firmware updater의 상태/lock을 확인한 뒤 안전한 경우에만 재부팅합니다. 업데이트 작업과 겹치면 15분 뒤 재시도하며 최대 2시간이 지나도 안전하지 않으면 해당 예약은 건너뜁니다.
+예약 재부팅은 `/usr/libexec/smartsafehub-maintenance`와 `smartsafehub-maintenance` procd service가 담당합니다. 단순 cron reboot를 사용하지 않고 SmartSafeHub updater와 firmware updater의 상태/lock을 확인한 뒤 안전한 경우에만 재부팅합니다. 업데이트 작업과 겹치면 15분 뒤 재시도하며 최대 2시간이 지나도 안전하지 않으면 해당 예약은 건너뜁니다. 패키지 postinst는 서비스가 새로 추가된 업그레이드 경로에서도 rc.d 시작 링크가 보장되도록 maintenance 서비스를 명시적으로 enable합니다.
 
 설정 UI에서는 예약 재부팅을 별도 시스템 관리 카드로 분리하지 않고 `시간 및 시간대` 카드의 하위 섹션으로 표시합니다. 시간대 변경과 예약 시각의 관계를 한 화면에서 확인할 수 있고, 데스크톱에서는 주기·요일·시각을 한 행에 배치하며 모바일에서는 세로로 자연스럽게 쌓입니다.
 
@@ -412,7 +413,7 @@ apk add --allow-untrusted /tmp/luci-app-smartsafehub-*.apk
 
 정확한 현재 버전은 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`, 또는 설치된 장치의 `apk info luci-app-smartsafehub`로 확인합니다.
 
-패키지의 postinst는 설치/업그레이드 후 LuCI 메뉴 캐시를 지우고 `rpcd reload`를 실행해 새 ucode RPC와 ACL을 즉시 다시 읽습니다. OpenWrt의 rpcd plugin 패키지와 같은 방식으로 `restart` 대신 `reload`를 사용해 기존 세션을 가능한 한 유지합니다. 수동 설치 환경에서 확인이 필요하면 아래 명령을 직접 실행할 수 있습니다.
+패키지의 postinst는 설치/업그레이드 후 updater, firmware, maintenance 등 항상 동작해야 하는 SmartSafeHub 서비스를 명시적으로 enable하고, LuCI 메뉴 캐시를 지운 뒤 `rpcd reload`를 실행해 새 ucode RPC와 ACL을 즉시 다시 읽습니다. 이 과정은 기존 장치에서 새 서비스가 추가된 업그레이드 후에도 다음 부팅 시 서비스가 빠지지 않도록 합니다. OpenWrt의 rpcd plugin 패키지와 같은 방식으로 `restart` 대신 `reload`를 사용해 기존 세션을 가능한 한 유지합니다. 수동 설치 환경에서 확인이 필요하면 아래 명령을 직접 실행할 수 있습니다.
 
 ```bash
 rm -f /tmp/luci-indexcache

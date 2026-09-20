@@ -191,6 +191,8 @@ if printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-updater 
 fi
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
 	fail 'package postinst must force-enable smartsafehub-firmware'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-maintenance enable' ||
+	fail 'package postinst must force-enable smartsafehub-maintenance so scheduled reboots survive upgrades'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health enable' ||
 	fail 'package postinst must force-enable smartsafehub-health'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health restart' ||
@@ -216,6 +218,9 @@ if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-updater 
 fi
 if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
 	fail 'firmware service enable must not depend on upgrade or previous enabled state'
+fi
+if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-maintenance enabled'; then
+	fail 'maintenance service enable must not depend on upgrade or previous enabled state'
 fi
 printf '%s\n' "$postinst_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile' ||
 	fail 'package postinst must register the SmartSafeHub exact-root uHTTPd rewrite at runtime via /bin/sh'
@@ -254,4 +259,4 @@ if grep -Fq 'checkEnabled' "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/fir
 	fail 'firmware status contract must not expose checkEnabled'
 fi
 
-echo "PASS: package metadata, versions, conffile, forced firmware enable, firmware check policy and executable permissions are consistent"
+echo "PASS: package metadata, versions, conffile, forced service enable policy, firmware check policy and executable permissions are consistent"

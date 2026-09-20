@@ -1,5 +1,17 @@
 # 변경 기록
 
+## [0.2.18-r4] - 2026-09-20
+
+### 수정
+
+- 패키지 설치·업그레이드 시 `smartsafehub-maintenance` procd 서비스를 명시적으로 enable하도록 수정했습니다. maintenance 서비스가 추가되기 전 버전에서 업그레이드한 장치에서도 rc.d 시작 링크를 복구해 재부팅 이후 예약 재부팅 기능이 계속 동작하도록 합니다.
+- postinst에서는 maintenance 서비스를 강제 restart하지 않고 enable만 수행해 패키지 설치 시 불필요한 중복 재시작을 피합니다.
+
+### 테스트 및 문서
+
+- 패키지 계약 테스트에 `smartsafehub-maintenance enable`이 항상 포함되고 `PKG_UPGRADE` 또는 기존 enabled 상태에 따라 조건부로 생략되지 않는지 검증하는 회귀 테스트를 추가했습니다.
+- README에 maintenance 서비스의 업그레이드 복구 정책과 postinst 서비스 enable 동작을 문서화했습니다. 프런트엔드 빌드 산출물은 생성하지 않습니다.
+
 ## [0.2.18-r3] - 2026-09-20
 
 ### 개선
