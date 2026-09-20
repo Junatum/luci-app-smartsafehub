@@ -53,6 +53,8 @@ SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1
 
 로컬 SmartSafeHub 화면은 LuCI 세션 API가 필요하므로 `SMARTSAFEHUB_DEV_ROUTER`가 없으면 Vite 개발 서버가 즉시 오류를 내고 시작하지 않습니다. 이렇게 해서 proxy가 비활성화된 채 `/cgi-bin/luci/smartsafehub/session` 요청이 localhost의 Vite 서버로 들어가 404가 되는 상태를 방지합니다. 환경 변수에는 `http://` 또는 `https://`를 포함한 절대 URL을 사용해야 합니다. 이 값은 `npm run dev`처럼 Vite가 `serve` 모드일 때만 읽고 검증하며, production `vite build`에서는 환경 변수가 존재하거나 잘못된 값이어도 읽지 않습니다. 개발 proxy와 Vite `server` 설정도 production build 설정에는 포함되지 않으므로 기존 `/luci-static/smartsafehub/` asset base와 OpenWrt 런타임 동작은 유지됩니다. 펌웨어 설치, Wi-Fi reload, 재부팅, uHTTPd root rewrite처럼 장치 런타임 자체가 관여하는 기능은 최종적으로 실제 패키지를 설치한 공유기에서 확인합니다.
 
+Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@property`로 등록하지만 현재 브라우저의 ShadowRoot 안에서는 해당 등록이 안정적으로 적용되지 않습니다. SmartSafeHub는 UI 전체를 Shadow DOM에 격리하므로 `frontend/src/styles/app.css`의 가장 낮은 `properties` layer에서 Tailwind 자체 fallback과 같은 custom property 기본값을 명시합니다. 이 fallback을 제거하면 로컬 Vite에서는 정상이어도 실제 공유기 production asset에서 `border-r`가 `border-style: none`으로 계산되는 등 환경별 차이가 다시 발생할 수 있습니다. 관련 Tailwind 이슈는 `tailwindlabs/tailwindcss#15005`와 그 duplicate인 `#16025`입니다.
+
 ### 로그인과 단일 진입 URL
 
 - 공식 사용자 URL은 공유기 루트 `/#home`이며 일반 접속은 `http://192.168.1.1/`처럼 `/cgi-bin/luci`를 노출하지 않음

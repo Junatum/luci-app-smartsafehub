@@ -48,6 +48,7 @@ for script in \
 	tests/test-shell-pipeline-safety.sh \
 	tests/test-package-contract.sh \
 	tests/test-navigation-contract.sh \
+	tests/test-tailwind-shadow-dom.sh \
 	tests/test-document-ui-contract.sh \
 	tests/test-login-ui-contract.sh \
 	tests/test-initial-password-setup.sh \
