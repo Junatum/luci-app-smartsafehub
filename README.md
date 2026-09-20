@@ -33,6 +33,25 @@ SmartSafeHub는 OpenWrt 공유기에서 장치 상태, 기본 Wi-Fi, 연결된 �
 - 데스크톱 본문은 최대 `1600px` 폭을 유지하되 가용 영역이 그보다 넓어지면 더 이상 가운데로 이동하지 않고 사이드바 다음의 왼쪽 gutter를 기준으로 정렬합니다. 상단 헤더는 전체 가용 폭을 사용하여 페이지 제목은 같은 왼쪽 기준선에, 테마·새로고침 액션은 오른쪽 gutter에 배치합니다.
 - 데스크톱 상단의 테마·새로고침은 Cloud Console과 같은 `40x40px` 둥근 사각형 버튼과 `20px` 아이콘을 사용하며, 다크 모드에서도 버튼 경계가 헤더 배경과 구분되도록 별도 대비를 유지합니다.
 
+### 로컬 프론트엔드 개발
+
+실제 공유기에 패키지를 반복 설치하지 않고 UI와 API 연동을 빠르게 확인하려면 Vite 개발 서버가 `/cgi-bin/*` 요청만 테스트 공유기로 프록시하도록 실행할 수 있습니다. 공유기 주소는 소스에 고정하지 않고 `SMARTSAFEHUB_DEV_ROUTER` 환경 변수로 지정합니다.
+
+```bash
+cd frontend
+SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1 npm run dev
+```
+
+매번 환경 변수를 입력하고 싶지 않다면 `frontend/.env.example`을 참고해 Git에서 제외되는 `frontend/.env.local`을 만들 수 있습니다.
+
+```dotenv
+SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1
+```
+
+이 경우에는 `frontend` 디렉터리에서 `npm run dev`만 실행하면 됩니다. 브라우저에서는 Vite가 출력한 `http://localhost:5173/` 주소로 접속합니다. 프론트엔드 소스와 Shadow DOM용 Tailwind CSS는 로컬 Vite 서버에서 제공하고, `/cgi-bin/luci/...` RPC·세션 요청과 `/cgi-bin/cgi-upload` 업로드 요청은 실제 공유기로 전달합니다. `https://` 장치를 지정했을 때 개발용 자체 서명 인증서도 사용할 수 있도록 proxy의 TLS 검증은 개발 환경에서만 비활성화합니다.
+
+로컬 SmartSafeHub 화면은 LuCI 세션 API가 필요하므로 `SMARTSAFEHUB_DEV_ROUTER`가 없으면 Vite 개발 서버가 즉시 오류를 내고 시작하지 않습니다. 이렇게 해서 proxy가 비활성화된 채 `/cgi-bin/luci/smartsafehub/session` 요청이 localhost의 Vite 서버로 들어가 404가 되는 상태를 방지합니다. 환경 변수에는 `http://` 또는 `https://`를 포함한 절대 URL을 사용해야 합니다. 이 값은 `npm run dev`처럼 Vite가 `serve` 모드일 때만 읽고 검증하며, production `vite build`에서는 환경 변수가 존재하거나 잘못된 값이어도 읽지 않습니다. 개발 proxy와 Vite `server` 설정도 production build 설정에는 포함되지 않으므로 기존 `/luci-static/smartsafehub/` asset base와 OpenWrt 런타임 동작은 유지됩니다. 펌웨어 설치, Wi-Fi reload, 재부팅, uHTTPd root rewrite처럼 장치 런타임 자체가 관여하는 기능은 최종적으로 실제 패키지를 설치한 공유기에서 확인합니다.
+
 ### 로그인과 단일 진입 URL
 
 - 공식 사용자 URL은 공유기 루트 `/#home`이며 일반 접속은 `http://192.168.1.1/`처럼 `/cgi-bin/luci`를 노출하지 않음

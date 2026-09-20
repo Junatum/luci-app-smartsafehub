@@ -1,5 +1,43 @@
 # 변경 기록
 
+## [0.2.17-r7] - 2026-09-20
+
+### 안정성
+
+- 로컬 개발용 `SMARTSAFEHUB_DEV_ROUTER` 환경 변수를 Vite 설정 모듈 로드 시점에 읽지 않고 `command === 'serve'`인 경우에만 읽도록 변경했습니다. production build에서는 해당 환경 변수가 설정되어 있거나 잘못된 값이어도 읽거나 검증하지 않습니다.
+- 개발용 `/cgi-bin/*` proxy 설정도 실제 dev proxy가 구성된 경우에만 Vite `server` 설정에 포함되도록 분리해 production build 설정과 개발 서버 설정의 경계를 명확히 했습니다.
+
+### 테스트 및 문서
+
+- 패키지 계약 테스트에 `SMARTSAFEHUB_DEV_ROUTER`가 `defineConfig` callback 안에서만 읽히는지, production build base가 기존 `/luci-static/smartsafehub/`로 유지되는지 검증하는 회귀 계약을 추가했습니다.
+- README에 production build에서는 개발용 router 환경 변수를 읽거나 검증하지 않는다는 점을 명시했습니다.
+
+## [0.2.17-r6] - 2026-09-20
+
+### 수정
+
+- 로컬 Vite 개발 서버가 production과 같은 `/luci-static/smartsafehub/` base를 사용하면서 `/cgi-bin/luci/*` 요청을 Vite 자체 경로로 처리해 `did you mean to visit /luci-static/smartsafehub/cgi-bin/...` 오류가 발생하던 문제를 수정했습니다.
+- `npm run dev`에서는 Vite public base를 `/`로 사용하고, production build에서는 기존 `/luci-static/smartsafehub/` base를 그대로 유지하도록 분리했습니다. 이에 따라 로컬 개발 주소는 `http://localhost:5173/`가 되며 `/cgi-bin/*` 요청이 `SMARTSAFEHUB_DEV_ROUTER` proxy에 정상적으로 전달됩니다.
+- 개발용 Shadow DOM stylesheet 경로도 root dev base에 맞춰 `/src/styles/`로 되돌렸습니다. production asset 경로와 빌드 결과물에는 영향을 주지 않습니다.
+
+### 테스트 및 문서
+
+- 패키지 계약 테스트에 Vite serve/build base 분리, 개발용 stylesheet root 경로, `/cgi-bin` proxy 계약을 추가했습니다.
+- README의 로컬 개발 접속 주소를 `http://localhost:5173/`로 갱신하고 production base가 유지된다는 점을 명시했습니다.
+
+## [0.2.17-r5] - 2026-09-20
+
+### 개발 환경
+
+- `SMARTSAFEHUB_DEV_ROUTER` 환경 변수를 지정해 `npm run dev`를 실행하면 Vite가 `/cgi-bin/*` 요청을 실제 SmartSafeHub 공유기로 프록시하도록 개발 서버 설정을 추가했습니다. 공유기 주소를 소스에 하드코딩하지 않으며 HTTP/HTTPS 장치를 모두 지원합니다.
+- Vite의 `/luci-static/smartsafehub/` base 아래에서 Shadow DOM용 `app.css`가 정상 로드되도록 개발용 `index.html`의 asset base를 수정했습니다. 로컬 개발 화면에서 Tailwind 유틸리티가 빠져 SVG 아이콘과 레이아웃이 비정상적으로 커지는 문제를 방지합니다.
+- 개발 proxy는 환경 변수가 있을 때만 실제 공유기로 요청을 전달하며 production build와 OpenWrt 런타임 경로에는 영향을 주지 않습니다.
+
+### 테스트 및 문서
+
+- 패키지 계약 테스트에 개발용 Shadow DOM stylesheet 경로, `SMARTSAFEHUB_DEV_ROUTER` 기반 proxy, `/cgi-bin` 전달, production base 유지 계약을 추가했습니다.
+- README에 실제 공유기 API를 사용한 로컬 Vite 개발 방법과 최종 장치 검증이 필요한 범위를 문서화했습니다.
+
 ## [0.2.17-r4] - 2026-09-20
 
 ### 수정

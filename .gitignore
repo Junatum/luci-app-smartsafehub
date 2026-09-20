@@ -20,6 +20,8 @@ npm-debug.log*
 # Project specific
 frontend/node_modules/
 frontend/.vite/
+frontend/.env.local
+frontend/.env.*.local
 
 # etc
 *.orig

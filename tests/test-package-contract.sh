@@ -9,6 +9,10 @@ PACKAGE_LOCK="$ROOT_DIR/frontend/package-lock.json"
 CONFIG_FILE="$ROOT_DIR/root/etc/config/smartsafehub"
 LOGIN_TEMPLATE="$ROOT_DIR/root/usr/share/ucode/luci/template/smartsafehub/login.ut"
 FRONTEND_ENTRY="$ROOT_DIR/frontend/src/main.tsx"
+FRONTEND_INDEX="$ROOT_DIR/frontend/index.html"
+VITE_CONFIG="$ROOT_DIR/frontend/vite.config.ts"
+DEV_ENV_EXAMPLE="$ROOT_DIR/frontend/.env.example"
+GITIGNORE="$ROOT_DIR/.gitignore"
 README="$ROOT_DIR/README.md"
 FAVICON_FILE="$ROOT_DIR/root/www/luci-static/smartsafehub/favicon.svg"
 SHELLSPEC_CONFIG="$ROOT_DIR/.shellspec"
@@ -38,6 +42,8 @@ require_file "$PACKAGE_LOCK"
 require_file "$CONFIG_FILE"
 require_file "$LOGIN_TEMPLATE"
 require_file "$FRONTEND_ENTRY"
+require_file "$FRONTEND_INDEX"
+require_file "$VITE_CONFIG"
 require_file "$README"
 require_file "$FAVICON_FILE"
 require_file "$SHELLSPEC_CONFIG"
@@ -108,6 +114,42 @@ grep -Fq "favicon.svg?v=$package_release_version" "$LOGIN_TEMPLATE" || \
 	fail "favicon cache key must be $package_release_version"
 grep -Fq "assetVersion: host.dataset.assetVersion ?? '$package_release_version'" "$FRONTEND_ENTRY" || \
 	fail "frontend fallback asset version must be $package_release_version"
+
+grep -Fq 'data-asset-base="/src/styles/"' "$FRONTEND_INDEX" || \
+	fail 'Vite dev index must load the Shadow DOM stylesheet from the root dev base'
+grep -Fq "const isDevServer = command === 'serve';" "$VITE_CONFIG" || \
+	fail 'Vite config must explicitly distinguish dev serve from production build'
+grep -Fq "import { defineConfig, loadEnv } from 'vite';" "$VITE_CONFIG" || \
+	fail 'Vite dev server must support SMARTSAFEHUB_DEV_ROUTER from local Vite env files'
+grep -Fq "loadEnv(mode, frontendDirectory, 'SMARTSAFEHUB_')" "$VITE_CONFIG" || \
+	fail 'Vite dev server must load only SmartSafeHub-prefixed local environment values'
+grep -Fq 'process.env.SMARTSAFEHUB_DEV_ROUTER ?? fileEnv.SMARTSAFEHUB_DEV_ROUTER' "$VITE_CONFIG" || \
+	fail 'explicit process environment must take precedence over frontend/.env.local'
+grep -Fq 'SMARTSAFEHUB_DEV_ROUTER is required for local development.' "$VITE_CONFIG" || \
+	fail 'Vite dev server must fail fast instead of silently running without the router proxy'
+grep -Fq 'const devRouterTarget = isDevServer ? resolveDevRouterTarget(mode) : undefined;' "$VITE_CONFIG" || \
+	fail 'router target resolution must run only for Vite serve, never production build'
+grep -Fq "'/cgi-bin': {" "$VITE_CONFIG" || \
+	fail 'Vite dev server must proxy SmartSafeHub LuCI and upload requests under /cgi-bin'
+grep -Fq 'target: devRouterTarget,' "$VITE_CONFIG" || \
+	fail 'Vite dev proxy must use the validated router target instead of a hard-coded address'
+grep -Fq 'changeOrigin: true,' "$VITE_CONFIG" || \
+	fail 'Vite dev proxy must rewrite the Host header for the target router'
+grep -Fq 'secure: false,' "$VITE_CONFIG" || \
+	fail 'Vite dev proxy must permit self-signed HTTPS router certificates during development'
+grep -Fq "cookieDomainRewrite: ''," "$VITE_CONFIG" || \
+	fail 'Vite dev proxy must strip router cookie domains for localhost sessions'
+grep -Fq "base: isDevServer ? '/' : '/luci-static/smartsafehub/'," "$VITE_CONFIG" || \
+	fail 'Vite must use root base for dev serve and preserve /luci-static/smartsafehub/ for production builds'
+[ "$(grep -Fc 'resolveDevRouterTarget(mode)' "$VITE_CONFIG")" -eq 1 ] || \
+	fail 'router target resolution must have exactly one serve-only call site'
+grep -Fq 'SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1' "$DEV_ENV_EXAMPLE" || \
+	fail 'frontend/.env.example must document the local router proxy target'
+grep -Fq 'frontend/.env.local' "$GITIGNORE" || \
+	fail 'local router environment overrides must stay out of git'
+if grep -Eq 'target:.*(192\.168\.|10\.|172\.)' "$VITE_CONFIG"; then
+	fail 'Vite dev proxy must not hard-code a private router address'
+fi
 
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+safeshield([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +safeshield'
