@@ -65,6 +65,16 @@
   border-radius: 0;
 }
 
+/* Match only the desktop header action border colors to Cloud Console.
+ * Keep the router button geometry, icons, background, shadow and spacing unchanged. */
+.ssh-product-header-action {
+  border-color: #e2e8f0 !important;
+}
+
+.ssh-product-header-action:hover {
+  border-color: #5eead4 !important;
+}
+
 
 :host {
   -webkit-tap-highlight-color: transparent;
@@ -494,17 +504,16 @@
   border-color: #475569;
 }
 
-/* Keep desktop header actions visually consistent with the Cloud Console.
- * The generic dark palette maps border-slate-200 too close to the header
- * surface, so these controls intentionally use the stronger slate-700 edge. */
+/* Keep only the desktop header action border colors aligned with Cloud Console.
+ * Other dark-mode button styling remains unchanged. */
 .ssh-app[data-theme='dark'] .ssh-product-header-action {
-  border-color: #334155;
+  border-color: #334155 !important;
   background-color: #0f172a;
   color: #cbd5e1;
 }
 
 .ssh-app[data-theme='dark'] .ssh-product-header-action:hover {
-  border-color: #0f766e;
+  border-color: #0f766e !important;
   color: #5eead4;
 }
 

@@ -157,6 +157,20 @@ if grep -Fq 'export function LoaderIcon' "$ICONS" || grep -Fq 'export function R
 	fail 'refresh/loading states must not keep legacy spinner or refresh icon variants'
 fi
 
+grep -Fq '.ssh-product-header-action {' "$STYLES" || \
+	fail 'desktop header actions must provide an explicit light-theme border color'
+grep -Fq 'border-color: #e2e8f0 !important;' "$STYLES" || \
+	fail 'light desktop header border must match Cloud Console slate-200'
+grep -Fq '.ssh-product-header-action:hover {' "$STYLES" || \
+	fail 'desktop header actions must provide an explicit light hover border color'
+grep -Fq 'border-color: #5eead4 !important;' "$STYLES" || \
+	fail 'light desktop header hover border must match Cloud Console teal-300'
+grep -Fq ".ssh-app[data-theme='dark'] .ssh-product-header-action" "$STYLES" || \
+	fail 'desktop header actions must provide a dark-theme border color'
+grep -Fq 'border-color: #334155 !important;' "$STYLES" || \
+	fail 'dark desktop header border must match Cloud Console slate-700'
+grep -Fq 'border-color: #0f766e !important;' "$STYLES" || \
+	fail 'dark desktop header hover border must match Cloud Console teal-700'
 grep -Fq '.ssh-sidebar-toggle {' "$STYLES" || \
 	fail 'sidebar toggle must use a dedicated low-emphasis style'
 grep -Fq ".ssh-app[data-theme='dark'] .ssh-sidebar-toggle" "$STYLES" || \
@@ -167,8 +181,8 @@ grep -Fq ".ssh-app[data-theme='dark']" "$STYLES" || \
 	fail 'desktop product header must use the shared Cloud Console-style action class for theme and refresh'
 grep -Fq ".ssh-app[data-theme='dark'] .ssh-product-header-action {" "$STYLES" || \
 	fail 'desktop header actions must provide an explicit dark-theme surface contract'
-grep -A4 -F ".ssh-app[data-theme='dark'] .ssh-product-header-action {" "$STYLES" | grep -Fq 'border-color: #334155;' || \
-	fail 'desktop header actions must keep a visible slate-700 border in dark mode'
+grep -A4 -F ".ssh-app[data-theme='dark'] .ssh-product-header-action {" "$STYLES" | grep -Fq 'border-color: #334155 !important;' || \
+	fail 'desktop header actions must keep the Cloud Console slate-700 border in dark mode'
 
 # The exact-root uHTTPd rewrite keeps the browser on the same document URL, so
 # hash routing should rely on the browser fragment directly instead of maintaining
