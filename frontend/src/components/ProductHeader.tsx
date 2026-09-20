@@ -20,8 +20,8 @@ export function ProductHeader({
   title,
 }: ProductHeaderProps) {
   return (
-    <header class="ssh-product-hero border-b border-slate-200 bg-white px-4 py-4 sm:px-6 lg:px-8 xl:px-10">
-      <div class="flex w-full items-center justify-between gap-4">
+    <header class="ssh-product-hero border-b border-slate-200 bg-white px-4 py-4 sm:px-6 md:h-[4.5rem] md:py-0 lg:px-8 xl:px-10">
+      <div class="flex w-full items-center justify-between gap-4 md:h-full">
         <div class="min-w-0">
           <p class="m-0 text-[0.68rem] font-extrabold uppercase tracking-[0.18em] text-teal-700">
             SmartSafeHub

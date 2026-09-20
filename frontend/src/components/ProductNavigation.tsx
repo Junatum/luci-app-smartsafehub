@@ -267,7 +267,7 @@ export function ProductNavigation({
       >
         <div class="sticky top-0 flex h-screen flex-col">
           <div
-            class={`flex min-h-20 items-center border-b border-slate-100 ${
+            class={`flex h-[4.5rem] min-h-[4.5rem] shrink-0 items-center border-b border-slate-100 ${
               collapsed ? 'justify-center px-2' : 'gap-3 px-4'
             }`}
           >
@@ -297,7 +297,7 @@ export function ProductNavigation({
               aria-controls="smartsafehub-desktop-navigation"
               aria-expanded={!collapsed}
               aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              class="ssh-sidebar-toggle absolute right-0 top-20 z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+              class="ssh-sidebar-toggle absolute right-0 top-[4.5rem] z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2 shrink-0 items-center justify-center rounded-full transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
               onClick={onToggleCollapsed}
               title={collapsed ? '사이드바 펼치기' : '사이드바 접기'}
               type="button"

@@ -40,8 +40,10 @@ grep -Fq 'class={`ssh-product-main w-full max-w-[1600px]' "$APP_SHELL" || \
 if grep -Fq 'ssh-product-main mx-auto' "$APP_SHELL"; then
 	fail 'desktop content must not recenter after reaching its maximum width'
 fi
-grep -Fq 'class="flex w-full items-center justify-between gap-4"' "$HEADER" || \
-	fail 'desktop product header must use the full available width so actions stay on the right gutter'
+grep -Fq 'md:h-[4.5rem] md:py-0' "$HEADER" || \
+	fail 'desktop product header must use the shared 72px application-shell height'
+grep -Fq 'class="flex w-full items-center justify-between gap-4 md:h-full"' "$HEADER" || \
+	fail 'desktop product header content must stay vertically centered within the 72px shell'
 if grep -Fq 'max-w-[1600px]' "$HEADER" || grep -Fq 'mx-auto' "$HEADER"; then
 	fail 'desktop product header must not center its title and global actions inside the content max-width'
 fi
@@ -54,8 +56,10 @@ grep -Fq "title={collapsed ? 'SmartSafeHub' : undefined}" "$NAVIGATION" || \
 	fail 'collapsed sidebar must retain the SmartSafeHub logo mark'
 grep -Fq "aria-label={collapsed ? '사이드바 펼치기' : '사이드바 접기'}" "$NAVIGATION" || \
 	fail 'desktop navigation must expose an accessible sidebar toggle'
-grep -Fq 'class="ssh-sidebar-toggle absolute right-0 top-20 z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2' "$NAVIGATION" || \
-	fail 'sidebar toggle must stay on the brand-header/right-boundary intersection in both states'
+grep -Fq 'h-[4.5rem] min-h-[4.5rem] shrink-0 items-center border-b border-slate-100' "$NAVIGATION" || \
+	fail 'desktop sidebar brand area must use the shared 72px application-shell height'
+grep -Fq 'class="ssh-sidebar-toggle absolute right-0 top-[4.5rem] z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2' "$NAVIGATION" || \
+	fail 'sidebar toggle must stay centered on the shared 72px brand/header boundary'
 grep -Fq 'title={collapsed ? item.label : undefined}' "$NAVIGATION" || \
 	fail 'collapsed navigation items must retain hover labels'
 grep -Fq 'data-collapsed={collapsed ? '\''true'\'' : '\''false'\''}' "$NAVIGATION" || \
@@ -90,6 +94,12 @@ grep -Fq 'ReloadIcon class="size-5"' "$HEADER" || \
 	fail 'desktop refresh action must use the Cloud Console-sized reload icon while idle'
 grep -Fq 'ReloadIcon class="size-5 animate-spin"' "$HEADER" || \
 	fail 'desktop refresh action must spin the Cloud Console-sized reload icon while refreshing'
+grep -Fq 'text-[0.68rem] font-extrabold uppercase tracking-[0.18em] text-teal-700' "$HEADER" || \
+	fail '72px desktop header must retain the SmartSafeHub eyebrow hierarchy'
+grep -Fq 'text-xl font-black tracking-tight text-slate-950 sm:text-2xl' "$HEADER" || \
+	fail '72px desktop header must retain the strong page-title hierarchy'
+grep -Fq 'class="flex min-h-16 items-center justify-between gap-3"' "$NAVIGATION" || \
+	fail 'mobile navigation height must remain unchanged while desktop header height is compacted'
 if grep -Fq '<span class="hidden sm:inline">' "$HEADER"; then
 	fail 'desktop refresh action must not restore a visible text label'
 fi
