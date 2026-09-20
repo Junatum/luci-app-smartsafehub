@@ -91,7 +91,7 @@ export function AppShell({
           title={copy.title}
         />
         <main
-          class={`ssh-product-main mx-auto w-full max-w-[1600px] bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8 lg:pb-12 xl:px-10 ${
+          class={`ssh-product-main w-full max-w-[1600px] bg-slate-50 px-4 pb-8 sm:px-6 sm:pb-10 lg:px-8 lg:pb-12 xl:px-10 ${
             loading
               ? 'pt-2 sm:pt-2 lg:pt-3'
               : 'pt-5 sm:pt-6 lg:pt-8'

@@ -494,6 +494,24 @@
   border-color: #475569;
 }
 
+/* Keep desktop header actions visually consistent with the Cloud Console.
+ * The generic dark palette maps border-slate-200 too close to the header
+ * surface, so these controls intentionally use the stronger slate-700 edge. */
+.ssh-app[data-theme='dark'] .ssh-product-header-action {
+  border-color: #334155;
+  background-color: #0f172a;
+  color: #cbd5e1;
+}
+
+.ssh-app[data-theme='dark'] .ssh-product-header-action:hover {
+  border-color: #0f766e;
+  color: #5eead4;
+}
+
+.ssh-app[data-theme='dark'] .ssh-product-header-action:focus-visible {
+  --tw-ring-color: #134e4a;
+}
+
 .ssh-initial-setup-probe {
   display: grid;
   min-height: 100dvh;

@@ -35,6 +35,16 @@ grep -Fq "'md:grid-cols-[5rem_minmax(0,1fr)]'" "$APP_SHELL" || \
 	fail 'AppShell must provide a compact desktop sidebar column'
 grep -Fq "'md:grid-cols-[16rem_minmax(0,1fr)]'" "$APP_SHELL" || \
 	fail 'AppShell must provide the expanded desktop sidebar column'
+grep -Fq 'class={`ssh-product-main w-full max-w-[1600px]' "$APP_SHELL" || \
+	fail 'desktop content must keep its 1600px maximum width while using the left gutter as its large-screen anchor'
+if grep -Fq 'ssh-product-main mx-auto' "$APP_SHELL"; then
+	fail 'desktop content must not recenter after reaching its maximum width'
+fi
+grep -Fq 'class="flex w-full items-center justify-between gap-4"' "$HEADER" || \
+	fail 'desktop product header must use the full available width so actions stay on the right gutter'
+if grep -Fq 'max-w-[1600px]' "$HEADER" || grep -Fq 'mx-auto' "$HEADER"; then
+	fail 'desktop product header must not center its title and global actions inside the content max-width'
+fi
 grep -Fq 'collapsed={sidebarCollapsed}' "$APP_SHELL" || \
 	fail 'AppShell must pass collapsed state into ProductNavigation'
 grep -Fq 'onToggleCollapsed={() => setSidebarCollapsed((collapsed) => !collapsed)}' "$APP_SHELL" || \
@@ -74,12 +84,12 @@ grep -Fq 'refreshing={refreshing}' "$APP_SHELL" || \
 	fail 'theme action must not remain duplicated inside sidebar or mobile drawer menus'
 [ "$(grep -Fc 'onClick={onRefresh}' "$HEADER")" -eq 1 ] || \
 	fail 'desktop product header must expose exactly one refresh action'
-grep -Fq 'class={`hidden size-10 shrink-0 items-center justify-center rounded-xl' "$HEADER" || \
-	fail 'desktop refresh action must be an icon-only header button'
-grep -Fq 'ReloadIcon class="size-4.5"' "$HEADER" || \
-	fail 'desktop refresh action must use the dedicated reload icon while idle'
-grep -Fq 'ReloadIcon class="size-4.5 animate-spin"' "$HEADER" || \
-	fail 'desktop refresh action must spin the shared reload icon while refreshing'
+grep -Fq 'class={`ssh-product-header-action hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl' "$HEADER" || \
+	fail 'desktop refresh action must use the Cloud Console-sized header button'
+grep -Fq 'ReloadIcon class="size-5"' "$HEADER" || \
+	fail 'desktop refresh action must use the Cloud Console-sized reload icon while idle'
+grep -Fq 'ReloadIcon class="size-5 animate-spin"' "$HEADER" || \
+	fail 'desktop refresh action must spin the Cloud Console-sized reload icon while refreshing'
 if grep -Fq '<span class="hidden sm:inline">' "$HEADER"; then
 	fail 'desktop refresh action must not restore a visible text label'
 fi
@@ -153,6 +163,12 @@ grep -Fq ".ssh-app[data-theme='dark'] .ssh-sidebar-toggle" "$STYLES" || \
 	fail 'sidebar toggle must provide a dark-theme style'
 grep -Fq ".ssh-app[data-theme='dark']" "$STYLES" || \
 	fail 'authenticated application must provide dark theme styles'
+[ "$(grep -Fc 'ssh-product-header-action' "$HEADER")" -eq 2 ] || \
+	fail 'desktop product header must use the shared Cloud Console-style action class for theme and refresh'
+grep -Fq ".ssh-app[data-theme='dark'] .ssh-product-header-action {" "$STYLES" || \
+	fail 'desktop header actions must provide an explicit dark-theme surface contract'
+grep -A4 -F ".ssh-app[data-theme='dark'] .ssh-product-header-action {" "$STYLES" | grep -Fq 'border-color: #334155;' || \
+	fail 'desktop header actions must keep a visible slate-700 border in dark mode'
 
 # The exact-root uHTTPd rewrite keeps the browser on the same document URL, so
 # hash routing should rely on the browser fragment directly instead of maintaining
