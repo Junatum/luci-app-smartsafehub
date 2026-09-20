@@ -98,8 +98,8 @@ export function IptvPage({
               </span>
             </div>
             <p class="mt-2 mb-0 text-sm leading-6 text-amber-900/80">
-              현재 SK Broadband와 LG U+의 일반적인 IGMP Proxy 방식만 지원합니다. 설치 환경이나
-              셋톱박스 구성에 따라 추가 VLAN 설정이 필요한 경우에는 동작하지 않을 수 있습니다.
+              현재 SK Broadband와 LG U+를 지원하며 두 통신사에는 동일한 멀티캐스트 IPTV
+              프로파일을 적용합니다. KT IPTV는 별도 네트워크 방식이 필요해 아직 지원하지 않습니다.
             </p>
           </div>
         </div>
@@ -143,50 +143,80 @@ export function IptvPage({
             </div>
           </div>
 
-          <button
-            aria-checked={enabled}
-            aria-label="IPTV 사용"
-            class={`relative h-8 w-14 shrink-0 rounded-full border-0 transition ${
-              enabled ? 'bg-teal-700' : 'bg-slate-300'
-            } disabled:cursor-not-allowed disabled:opacity-60`}
-            disabled={saving || !data.available}
-            onClick={() => setEnabled((current) => !current)}
-            role="switch"
-            type="button"
-          >
-            <span
-              aria-hidden="true"
-              class={`absolute top-1 size-6 rounded-full bg-white shadow-sm transition-[left] ${
-                enabled ? 'left-7' : 'left-1'
-              }`}
-            />
-          </button>
+          <div class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            {dirty ? (
+              <span
+                aria-live="polite"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
+                role="status"
+              >
+                <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
+                저장되지 않음
+              </span>
+            ) : null}
+            <button
+              aria-checked={enabled}
+              aria-label="IPTV 사용"
+              class={`relative h-8 w-14 shrink-0 rounded-full border-0 transition ${
+                enabled ? 'bg-teal-700' : 'bg-slate-300'
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+              disabled={saving || !data.available}
+              onClick={() => setEnabled((current) => !current)}
+              role="switch"
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                class={`absolute top-1 size-6 rounded-full bg-white shadow-sm transition-[left] ${
+                  enabled ? 'left-7' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         <div class="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div>
-            <label class="mb-2 block text-xs font-extrabold text-slate-600" htmlFor="iptv-provider">
-              통신사
-            </label>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <label class="block text-xs font-extrabold text-slate-600" htmlFor="iptv-provider">
+                  통신사
+                </label>
+                <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">
+                  IPTV를 제공하는 회선 사업자를 선택하세요.
+                </p>
+              </div>
+              <span class="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[10px] font-black text-teal-700">
+                멀티캐스트 방식
+              </span>
+            </div>
             <CustomSelect
               ariaLabel="IPTV 통신사"
+              className="mt-3"
               disabled={saving || !enabled}
               id="iptv-provider"
               onChange={(value) => setProvider(value as IptvProvider)}
               options={PROVIDER_OPTIONS}
               value={provider}
             />
-            <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
-              {providerLabel(provider)}의 일반적인 멀티캐스트 IPTV 구성을 적용합니다.
-            </p>
+            <div class="mt-3 flex items-start gap-2 rounded-lg border border-slate-200 bg-white p-3">
+              <CheckCircleIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0 text-teal-700" />
+              <p class="m-0 text-xs leading-5 text-slate-600">
+                {providerLabel(provider)}에는 현재 SK Broadband/LG U+ 공통 IGMP Proxy 프로파일을
+                적용합니다. KT는 추후 별도 IPTV 프로파일로 지원할 예정입니다.
+              </p>
+            </div>
           </div>
 
           <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p class="m-0 text-xs font-extrabold text-slate-500">적용 방식</p>
+            <div class="flex items-center justify-between gap-3">
+              <p class="m-0 text-xs font-extrabold text-slate-500">현재 지원 프로파일</p>
+              <span class="text-xs font-extrabold text-slate-500">SKB · LG U+</span>
+            </div>
             <p class="mt-2 mb-0 text-sm font-black text-slate-950">WAN → IGMP Proxy → LAN</p>
             <p class="mt-1 mb-0 text-xs leading-5 text-slate-600">
-              LAN bridge에는 IGMP snooping을 함께 켜서 필요하지 않은 포트와 Wi-Fi로 멀티캐스트가
-              불필요하게 퍼지는 것을 줄입니다.
+              WAN을 upstream, LAN을 downstream으로 사용하고 LAN bridge에는 IGMP snooping을 함께
+              활성화해 필요하지 않은 포트와 Wi-Fi로 멀티캐스트가 불필요하게 퍼지는 것을 줄입니다.
             </p>
           </div>
         </div>
@@ -229,6 +259,13 @@ export function IptvPage({
             {runtimeHealthy ? (data.enabled ? '정상' : '꺼짐') : '확인 필요'}
           </span>
         </div>
+
+        {dirty ? (
+          <div class="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">
+            <AlertIcon aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
+            아래 동작 상태는 마지막으로 적용된 설정 기준입니다. 변경사항을 적용하면 새 설정으로 갱신됩니다.
+          </div>
+        ) : null}
 
         <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatusItem

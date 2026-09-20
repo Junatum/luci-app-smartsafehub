@@ -112,6 +112,20 @@ grep -Fq '<CustomSelect' "$PAGE" || fail '통신사 선택은 공통 CustomSelec
 if grep -Fq '<select' "$PAGE"; then
   fail 'IPTV 페이지에 native select를 사용하면 안 됩니다.'
 fi
+grep -Fq "const dirty = enabled !== data.enabled || provider !== data.provider;" "$PAGE" || \
+  fail 'IPTV dirty state는 사용 여부와 provider 변경을 모두 감지해야 합니다.'
+grep -Fq '저장되지 않음' "$PAGE" || \
+  fail 'IPTV 설정이 저장 상태와 다르면 저장되지 않음 경고를 표시해야 합니다.'
+grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$PAGE" || \
+  fail 'IPTV 저장되지 않음 상태는 다른 설정 화면과 같은 경고 아이콘을 사용해야 합니다.'
+grep -Fq 'role="status"' "$PAGE" || \
+  fail 'IPTV 저장되지 않음 경고는 접근 가능한 status로 노출해야 합니다.'
+grep -Fq '아래 동작 상태는 마지막으로 적용된 설정 기준입니다.' "$PAGE" || \
+  fail '저장 전 runtime 상태가 마지막 적용 설정 기준임을 안내해야 합니다.'
+grep -Fq 'SK Broadband/LG U+ 공통 IGMP Proxy 프로파일' "$PAGE" || \
+  fail 'SKB/LG U+가 현재 공통 IPTV 프로파일을 사용한다는 설명이 필요합니다.'
+grep -Fq 'KT IPTV는 별도 네트워크 방식이 필요해 아직 지원하지 않습니다.' "$PAGE" || \
+  fail 'Beta 안내에서 KT가 현재 미지원임을 명확히 표시해야 합니다.'
 grep -Fq 'role="switch"' "$PAGE" || fail 'IPTV 활성화는 접근 가능한 switch control을 사용해야 합니다.'
 grep -Fq 'IGMP Proxy' "$PAGE" || fail 'IPTV runtime에서 IGMP Proxy 상태를 보여줘야 합니다.'
 grep -Fq 'IGMP Snooping' "$PAGE" || fail 'IPTV runtime에서 IGMP Snooping 상태를 보여줘야 합니다.'

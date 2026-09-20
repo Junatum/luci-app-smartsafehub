@@ -118,7 +118,8 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 
 ### IPTV (Beta)
 
-- 네트워크 메뉴의 `IPTV` 항목에서 **SK Broadband**와 **LG U+**의 일반적인 멀티캐스트 IPTV 구성을 실험 기능으로 제공합니다. 메뉴와 화면에 `Beta` 배지를 표시해 아직 설치 환경별 검증이 필요한 기능임을 명확히 안내합니다.
+- 네트워크 메뉴의 `IPTV` 항목에서 **SK Broadband**와 **LG U+**의 일반적인 멀티캐스트 IPTV 구성을 실험 기능으로 제공합니다. 메뉴와 화면에 `Beta` 배지를 표시해 아직 설치 환경별 검증이 필요한 기능임을 명확히 안내합니다. 통신사 provider 선택 구조는 유지하되 현재 두 provider에는 동일한 IGMP Proxy/IGMP Snooping 프로파일을 적용하며, KT처럼 별도 네트워크 방식이 필요한 provider는 추후 확장합니다.
+- IPTV 사용 여부 또는 통신사 provider가 저장된 값과 달라지면 Wi-Fi/LAN/설정 화면과 동일한 amber 경고 아이콘과 `저장되지 않음` 상태를 표시합니다. 저장 전 런타임 정보는 마지막으로 적용된 설정 기준임을 별도 안내해 사용자가 화면의 상태를 새 설정으로 오해하지 않도록 합니다.
 - 활성화하면 OpenWrt `igmpproxy`를 `wan` upstream / `lan` downstream으로 구성하고 `quickleave=1`, upstream `altnet=0.0.0.0/0`을 적용합니다. 동시에 LAN bridge의 `igmp_snooping=1`을 활성화해 IPTV 멀티캐스트가 필요하지 않은 LAN 포트와 Wi-Fi로 불필요하게 flooding되는 것을 줄입니다.
 - 현재 OpenWrt의 `igmpproxy` 서비스가 시작 시 필요한 multicast firewall 연동을 처리하므로 SmartSafeHub는 별도의 firewall UCI 규칙을 중복 생성하지 않습니다.
 - 비활성화하면 `igmpproxy`를 stop/disable하고 IPTV를 켜기 전 LAN bridge의 IGMP snooping 값을 복원합니다. 설정 commit 또는 runtime 적용이 실패하면 `/etc/config/smartsafehub`, `/etc/config/network`, `/etc/config/igmpproxy` 스냅샷과 이전 서비스 상태로 rollback합니다.
