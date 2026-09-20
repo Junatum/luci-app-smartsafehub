@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 
+import { CustomSelect } from './CustomSelect';
 import type { SoftwareUpdateAction } from '../hooks/useSoftwareUpdates';
 import type {
   SoftwareUpdateChannel,
@@ -645,27 +646,28 @@ export function SoftwareUpdatesCard({
                   />
                 </div>
 
-                <label class="mt-4 block">
+                <div class="mt-4 block">
                   <span class="text-xs font-extrabold text-slate-700">확인 주기</span>
-                  <select
-                    class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  <CustomSelect
+                    ariaLabel="업데이트 확인 주기"
+                    className="mt-2"
                     disabled={!checkEnabled}
-                    onChange={(event) => {
-                      const nextIntervalSeconds = Number(event.currentTarget.value);
+                    id="software-update-check-interval"
+                    onChange={(nextValue) => {
+                      const nextIntervalSeconds = Number(nextValue);
                       setCheckIntervalSeconds(nextIntervalSeconds);
                       setSettingsDirty(
                         hasSettingsChanges({ checkIntervalSeconds: nextIntervalSeconds }),
                       );
                     }}
-                    value={checkIntervalSeconds}
-                  >
-                    {INTERVAL_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={INTERVAL_OPTIONS.map((option) => ({
+                      value: String(option.value),
+                      label: option.label,
+                    }))}
+                    value={String(checkIntervalSeconds)}
+                    variant="emphasized"
+                  />
+                </div>
               </div>
 
               <div class="rounded-xl border border-slate-200 p-4 sm:p-5">

@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
+import { CustomSelect } from '../components/CustomSelect';
 import type { LanFeedback } from '../hooks/useLan';
 import type { LanSettings, LanSettingsInput } from '../types/lan';
 import {
@@ -583,40 +584,43 @@ export function LanPage({
             고급 DHCP 설정
           </summary>
           <div class="mt-5 grid gap-5 lg:grid-cols-2">
-            <label class="block">
+            <div class="block">
               <span class="text-sm font-extrabold text-slate-800">서브넷 마스크</span>
-              <select
-                class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <CustomSelect
+                ariaLabel="서브넷 마스크"
+                className="mt-2"
                 disabled={busy}
-                onChange={(event) => updatePrefixLength(Number(event.currentTarget.value))}
-                value={prefixLength}
-              >
-                {prefixOptions.map((prefix) => (
-                  <option key={prefix} value={prefix}>
-                    /{prefix} · {prefix === data.lan.prefixLength ? data.lan.netmask : `CIDR /${prefix}`}
-                  </option>
-                ))}
-              </select>
+                id="lan-prefix-length"
+                onChange={(nextValue) => updatePrefixLength(Number(nextValue))}
+                options={prefixOptions.map((prefix) => ({
+                  value: String(prefix),
+                  label: `/${prefix} · ${
+                    prefix === data.lan.prefixLength
+                      ? data.lan.netmask
+                      : `CIDR /${prefix}`
+                  }`,
+                }))}
+                value={String(prefixLength)}
+                variant="emphasized"
+              />
               <span class="mt-2 block text-xs text-slate-500">
                 일반 가정용 네트워크는 /24 사용을 권장합니다.
               </span>
-            </label>
+            </div>
 
-            <label class="block">
+            <div class="block">
               <span class="text-sm font-extrabold text-slate-800">DHCP 임대 시간</span>
-              <select
-                class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <CustomSelect
+                ariaLabel="DHCP 임대 시간"
+                className="mt-2"
                 disabled={busy}
-                onChange={(event) => updateLeaseTime(event.currentTarget.value)}
+                id="lan-dhcp-lease-time"
+                onChange={updateLeaseTime}
+                options={leaseOptions.map(([value, label]) => ({ value, label }))}
                 value={leaseTime}
-              >
-                {leaseOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                variant="emphasized"
+              />
+            </div>
 
             <label class="inline-flex min-h-11 items-center gap-3 text-sm font-extrabold text-slate-800 lg:col-span-2">
               <input

@@ -9,6 +9,7 @@ import {
   formatUptime,
   getMemoryUsage,
 } from '../app/format';
+import { CustomSelect } from '../components/CustomSelect';
 import {
   AlertIcon,
   CalendarIcon,
@@ -294,23 +295,18 @@ function TimeSettingsCard(props: {
             >
               시간대
             </label>
-            <select
-              aria-label="시간대"
-              class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-60"
+            <CustomSelect
+              ariaLabel="시간대"
               disabled={props.loading || props.saving || props.syncing || !props.data}
               id="smartsafehub-timezone"
-              onChange={(event) =>
-                setSelectedTimezone(event.currentTarget.value)
+              onChange={setSelectedTimezone}
+              options={
+                props.data
+                  ? zones.map((zone) => ({ value: zone, label: zone }))
+                  : [{ value: '', label: '시간대 불러오는 중' }]
               }
               value={selectedTimezone}
-            >
-              {!props.data && <option value="">시간대 불러오는 중</option>}
-              {zones.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone}
-                </option>
-              ))}
-            </select>
+            />
             <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
               시간대를 변경하면 시스템에 즉시 적용되며 자동 설치와 예약 재부팅 일정도 새 기준 시간으로 다시 계산합니다.
             </p>
@@ -1192,41 +1188,38 @@ function ScheduledRebootSection(props: {
               <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-frequency">
                 주기
               </label>
-              <select
-                aria-label="예약 재부팅 주기"
-                class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+              <CustomSelect
+                ariaLabel="예약 재부팅 주기"
                 disabled={!enabled || props.saving || !props.data}
                 id="scheduled-reboot-frequency"
-                onChange={(event) =>
-                  setFrequency(event.currentTarget.value as ScheduledRebootFrequency)
+                onChange={(nextValue) =>
+                  setFrequency(nextValue as ScheduledRebootFrequency)
                 }
+                options={[
+                  { value: 'weekly', label: '매주' },
+                  { value: 'daily', label: '매일' },
+                ]}
                 value={frequency}
-              >
-                <option value="weekly">매주</option>
-                <option value="daily">매일</option>
-              </select>
+              />
             </div>
 
             <div>
               <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-day">
                 요일
               </label>
-              <select
-                aria-label="예약 재부팅 요일"
-                class="min-h-11 w-full cursor-pointer rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+              <CustomSelect
+                ariaLabel="예약 재부팅 요일"
                 disabled={!enabled || frequency !== 'weekly' || props.saving || !props.data}
                 id="scheduled-reboot-day"
-                onChange={(event) =>
-                  setDayOfWeek(event.currentTarget.value as ScheduledRebootDayOfWeek)
+                onChange={(nextValue) =>
+                  setDayOfWeek(nextValue as ScheduledRebootDayOfWeek)
                 }
+                options={scheduledRebootDays.map((day) => ({
+                  value: day.value,
+                  label: day.label,
+                }))}
                 value={dayOfWeek}
-              >
-                {scheduledRebootDays.map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.label}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>

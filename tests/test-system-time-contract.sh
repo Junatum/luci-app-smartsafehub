@@ -89,8 +89,8 @@ grep -Fq 'const result = await fetchSystemTimeSettings();' "$HOOK" || \
 
 grep -Fq 'title="시간 및 시간대"' "$SETTINGS_PAGE" || \
 	fail 'settings UI must expose a dedicated time and timezone card'
-grep -Fq 'aria-label="시간대"' "$SETTINGS_PAGE" || \
-	fail 'timezone selector must have an accessible label'
+grep -Fq 'ariaLabel="시간대"' "$SETTINGS_PAGE" || \
+	fail 'timezone custom dropdown must have an accessible label'
 grep -Fq '브라우저 시간대 사용' "$SETTINGS_PAGE" || \
 	fail 'settings UI must offer the matching browser timezone as a convenience'
 grep -Fq '자동 설치와 예약 재부팅 일정도 새 기준 시간으로 다시 계산합니다.' "$SETTINGS_PAGE" || \
@@ -102,13 +102,11 @@ grep -Fq "{props.syncing ? '동기화 요청 중' : '지금 동기화'}" "$SETTI
 grep -Fq 'disabled={!props.data?.ntpEnabled || props.saving || props.syncing}' "$SETTINGS_PAGE" || \
 	fail 'immediate synchronization must be unavailable when NTP is disabled or another time mutation is active'
 
-grep -Fq '.ssh-app select {' "$APP_STYLE" || \
-	fail 'all SmartSafeHub select controls must share a normalized disclosure arrow style'
-grep -Fq 'appearance: none;' "$APP_STYLE" || \
-	fail 'shared select styling must replace inconsistent browser-native arrows'
-grep -Fq 'background-position: right 1rem center;' "$APP_STYLE" || \
-	fail 'shared select arrow must be inset from the right edge'
-grep -Fq 'padding-right: 3rem;' "$APP_STYLE" || \
-	fail 'shared select controls must reserve room for the inset arrow'
+grep -Fq '<CustomSelect' "$SETTINGS_PAGE" || \
+	fail 'timezone settings must use the shared SmartSafeHub custom dropdown'
+grep -Fq 'id="smartsafehub-timezone"' "$SETTINGS_PAGE" || \
+	fail 'timezone custom dropdown must preserve its stable control id'
+grep -Fq "zones.map((zone) => ({ value: zone, label: zone }))" "$SETTINGS_PAGE" || \
+	fail 'timezone custom dropdown must expose every supported timezone option'
 
-echo 'PASS: timezone selection, immediate NTP sync, inset select arrows and scheduled-update recalculation contracts are consistent'
+echo 'PASS: timezone selection, immediate NTP sync, custom dropdown and scheduled-update recalculation contracts are consistent'

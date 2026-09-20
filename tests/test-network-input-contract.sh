@@ -23,12 +23,13 @@ grep -Fq 'shadow-inner' "$WIFI_PAGE" || \
 grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$WIFI_PAGE" || \
 	fail 'Wi-Fi text inputs must use the shared teal focus treatment'
 
-# Wi-Fi security select should use the same visual surface as text inputs.
-grep -Fq 'cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold' "$WIFI_PAGE" || \
-	fail 'Wi-Fi security select must use the emphasized form-control surface'
-
-grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$WIFI_PAGE" || \
-	fail 'Wi-Fi security select must use the shared teal focus treatment'
+# Wi-Fi security uses the shared SmartSafeHub custom dropdown rather than a native popup.
+grep -Fq '<CustomSelect' "$WIFI_PAGE" || \
+	fail 'Wi-Fi security must use the shared custom dropdown'
+grep -Fq 'variant="emphasized"' "$WIFI_PAGE" || \
+	fail 'Wi-Fi security custom dropdown must retain the emphasized form-control surface'
+grep -Fq 'ariaLabel={`${network.bandLabel} Wi-Fi 보안 방식`}' "$WIFI_PAGE" || \
+	fail 'Wi-Fi security custom dropdown must retain an accessible per-radio label'
 
 # Wi-Fi cards use the same explicit unsaved-state contract as other editable settings.
 grep -Fq 'const settingsDirty =' "$WIFI_PAGE" || \
@@ -60,13 +61,6 @@ grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-amber-50']" "$APP_STYLE" || \
 grep -Fq "[class~='text-amber-800']" "$APP_STYLE" || \
 	fail 'Wi-Fi unsaved marker text must retain dark-theme contrast mapping'
 
-grep -Fq '.ssh-app select {' "$APP_STYLE" || \
-	fail 'all product select controls must share one normalized native-arrow override'
-grep -Fq 'background-position: right 1rem center;' "$APP_STYLE" || \
-	fail 'select disclosure arrow must sit farther inside the right edge'
-grep -Fq 'padding-right: 3rem;' "$APP_STYLE" || \
-	fail 'select controls must reserve text space for the inset disclosure arrow'
-
 # Connected-device search follows the same search-input and icon alignment contract as custom rules.
 grep -Fq 'absolute inset-y-0 left-0 flex w-11 items-center justify-center' "$DEVICES_PAGE" || \
 	fail 'connected-device search icon must use a vertically centered flex wrapper'
@@ -81,4 +75,4 @@ if grep -Fq 'absolute top-1/2 left-3.5 size-5 -translate-y-1/2' "$DEVICES_PAGE";
 	fail 'connected-device search icon must not use transform-based vertical positioning'
 fi
 
-echo 'PASS: Wi-Fi, shared select-arrow and connected-device input contracts are present'
+echo 'PASS: Wi-Fi custom dropdown and connected-device input contracts are present'

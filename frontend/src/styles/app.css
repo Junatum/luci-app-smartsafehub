@@ -186,25 +186,25 @@
 .ssh-app a,
 .ssh-app button,
 .ssh-app input,
-.ssh-app select,
 .ssh-app textarea {
   touch-action: manipulation;
 }
 
-/* Normalize native select arrows so every SmartSafeHub form keeps the
- * disclosure glyph comfortably inset from the right edge. */
-.ssh-app select {
-  -webkit-appearance: none;
-  appearance: none;
-  padding-right: 3rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2364758b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1rem center;
-  background-size: 1rem 1rem;
+/* SmartSafeHub select menus are rendered inside the product root instead of
+ * using the OS-native popup. Keep disabled/focus states legible in dark mode
+ * even when the menu itself is portaled to the application root. */
+.ssh-app[data-theme='dark'] .ssh-custom-select-trigger:disabled {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #64748b;
 }
 
-.ssh-app[data-theme='dark'] select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+.ssh-app[data-theme='dark'] .ssh-custom-select-trigger:focus-visible {
+  --tw-ring-color: rgb(19 78 74 / 0.65);
+}
+
+.ssh-app[data-theme='dark'] .ssh-custom-select-menu {
+  box-shadow: 0 18px 45px rgb(0 0 0 / 0.35);
 }
 
 .ssh-mobile-navigation {
@@ -248,7 +248,6 @@
   }
 
   .ssh-app input,
-  .ssh-app select,
   .ssh-app textarea {
     font-size: 16px;
   }

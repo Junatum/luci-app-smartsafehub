@@ -170,9 +170,13 @@ grep -Fq 'ReloadIcon class="size-5"' "$UPDATES_CARD" || \
 grep -Fq '지금 확인' "$UPDATES_CARD" || \
 	fail 'unchecked update state must offer an explicit check action'
 
-# Scheduled update controls use the same emphasized form-control surface as Wi-Fi/rules.
-grep -Fq 'cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold' "$UPDATES_CARD" || \
-	fail 'update interval select must use the emphasized form-control surface'
+# Scheduled update controls use the shared emphasized SmartSafeHub form surface.
+grep -Fq '<CustomSelect' "$UPDATES_CARD" || \
+	fail 'update interval must use the shared custom dropdown'
+grep -Fq 'id="software-update-check-interval"' "$UPDATES_CARD" || \
+	fail 'update interval custom dropdown must expose a stable control id'
+grep -Fq 'variant="emphasized"' "$UPDATES_CARD" || \
+	fail 'update interval custom dropdown must use the emphasized form-control surface'
 grep -Fq 'rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold' "$UPDATES_CARD" || \
 	fail 'auto-install time input must use the emphasized form-control surface'
 grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$UPDATES_CARD" || \

@@ -263,8 +263,8 @@ grep -Fq 'const changed =' "$SETTINGS_PAGE" || fail 'scheduled reboot UI must de
 grep -Fq '{changed && (' "$SETTINGS_PAGE" || fail 'scheduled reboot UI must show the unsaved marker only while local settings differ'
 grep -Fq '저장되지 않음' "$SETTINGS_PAGE" || fail 'scheduled reboot UI must warn when changes have not been saved'
 grep -Fq '<AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />' "$SETTINGS_PAGE" || fail 'scheduled reboot unsaved state must include a warning icon'
-grep -Fq '<option value="weekly">매주</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support weekly cadence'
-grep -Fq '<option value="daily">매일</option>' "$SETTINGS_PAGE" || fail 'scheduled reboot must support daily cadence'
+grep -Fq "{ value: 'weekly', label: '매주' }" "$SETTINGS_PAGE" || fail 'scheduled reboot must support weekly cadence'
+grep -Fq "{ value: 'daily', label: '매일' }" "$SETTINGS_PAGE" || fail 'scheduled reboot must support daily cadence'
 grep -Fq '업데이트 작업 중이면 15분 단위로 최대 2시간 연기합니다.' "$SETTINGS_PAGE" || fail 'UI must explain update-conflict deferral behavior'
 if ! sed -n '/^function TimeSettingsCard/,/^function healthTone/p' "$SETTINGS_PAGE" | grep -F '<ScheduledRebootSection' >/dev/null; then
 	fail 'scheduled reboot section must be rendered inside the time and timezone card'

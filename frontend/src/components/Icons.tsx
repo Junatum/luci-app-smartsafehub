@@ -277,6 +277,14 @@ export function MenuIcon(props: IconProps) {
   );
 }
 
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </IconBase>
+  );
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <IconBase {...props}>

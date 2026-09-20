@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
+import { CustomSelect } from '../components/CustomSelect';
 import { AlertIcon, CheckCircleIcon, RouterIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { WifiFeedback } from '../hooks/useWifi';
@@ -92,6 +93,17 @@ function WifiNetworkCard({
     enabled !== network.enabled ||
     security !== savedSecurity ||
     password.length > 0;
+  const securityOptions = [
+    ...(network.security === 'custom'
+      ? [
+          {
+            value: 'keep',
+            label: `현재 고급 설정 유지 (${network.securityRaw})`,
+          },
+        ]
+      : []),
+    ...SECURITY_OPTIONS,
+  ];
 
   const submit = async (
     event: JSX.TargetedSubmitEvent<HTMLFormElement>,
@@ -202,33 +214,28 @@ function WifiNetworkCard({
           />
         </label>
 
-        <label class="block">
+        <div class="block">
           <span class="text-sm font-extrabold text-slate-800">보안 방식</span>
-          <select
-            class="mt-2 min-h-11 w-full cursor-pointer rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+          <CustomSelect
+            ariaLabel={`${network.bandLabel} Wi-Fi 보안 방식`}
+            className="mt-2"
             disabled={busy}
-            onChange={(event) => {
-              const next = event.currentTarget.value as WifiSecurityChoice;
+            id={`wifi-security-${network.section}`}
+            onChange={(nextValue) => {
+              const next = nextValue as WifiSecurityChoice;
               setSecurity(next);
               if (next === 'none' || next === 'keep') {
                 setPassword('');
               }
             }}
+            options={securityOptions}
             value={security}
-          >
-            {network.security === 'custom' ? (
-              <option value="keep">현재 고급 설정 유지 ({network.securityRaw})</option>
-            ) : null}
-            {SECURITY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            variant="emphasized"
+          />
           <span class="mt-2 block text-xs text-slate-500">
             현재: {securityLabel(network)}
           </span>
-        </label>
+        </div>
 
         <label class="block lg:col-span-2">
           <span class="text-sm font-extrabold text-slate-800">새 비밀번호</span>
