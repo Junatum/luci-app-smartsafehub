@@ -116,6 +116,15 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 - 각 무선 네트워크 카드에서 SSID, 사용 여부, 보안 방식 또는 새 비밀번호가 저장 상태와 달라지면 amber 경고 아이콘과 `저장되지 않음` 상태를 표시하고, 값을 원래 상태로 되돌리거나 저장 성공 후 서버 상태가 반영되면 자동으로 해제. `설정 저장`은 실제 변경사항이 있을 때만 활성화
 - 게스트, VLAN, mesh, 추가 BSS와 고급 무선 옵션은 기존 LuCI에서 관리
 
+### IPTV (Beta)
+
+- 네트워크 메뉴의 `IPTV` 항목에서 **SK Broadband**와 **LG U+**의 일반적인 멀티캐스트 IPTV 구성을 실험 기능으로 제공합니다. 메뉴와 화면에 `Beta` 배지를 표시해 아직 설치 환경별 검증이 필요한 기능임을 명확히 안내합니다.
+- 활성화하면 OpenWrt `igmpproxy`를 `wan` upstream / `lan` downstream으로 구성하고 `quickleave=1`, upstream `altnet=0.0.0.0/0`을 적용합니다. 동시에 LAN bridge의 `igmp_snooping=1`을 활성화해 IPTV 멀티캐스트가 필요하지 않은 LAN 포트와 Wi-Fi로 불필요하게 flooding되는 것을 줄입니다.
+- 현재 OpenWrt의 `igmpproxy` 서비스가 시작 시 필요한 multicast firewall 연동을 처리하므로 SmartSafeHub는 별도의 firewall UCI 규칙을 중복 생성하지 않습니다.
+- 비활성화하면 `igmpproxy`를 stop/disable하고 IPTV를 켜기 전 LAN bridge의 IGMP snooping 값을 복원합니다. 설정 commit 또는 runtime 적용이 실패하면 `/etc/config/smartsafehub`, `/etc/config/network`, `/etc/config/igmpproxy` 스냅샷과 이전 서비스 상태로 rollback합니다.
+- 기존 `igmpproxy`가 WAN 이외의 upstream을 사용하거나 upstream이 여러 개인 커스텀 구성인 경우에는 해당 설정을 덮어쓰지 않고 충돌 오류를 반환합니다.
+- **KT IPTV와 통신사별 VLAN 구성은 이번 Beta 범위에 포함하지 않습니다.** 설치 환경이나 셋톱박스 세대에 따라 SKB/LG U+도 별도 VLAN이 필요할 수 있으므로 실제 회선 검증이 필요합니다.
+
 ### 연결된 기기
 
 - DHCP 임대, ARP, `network.wireless`와 hostapd 클라이언트 정보 통합
@@ -268,10 +277,11 @@ ucode-mod-uci
 procd
 uclient-fetch
 jsonfilter
+igmpproxy
 safeshield (>= 0.3.24)
 ```
 
-`LUCI_DEPENDS`의 `+safeshield`는 빌드 시 패키지 선택 관계를 유지하고, `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.24)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
+`LUCI_DEPENDS`의 `+igmpproxy`는 IPTV Beta의 멀티캐스트 proxy runtime을 함께 설치하고, `+safeshield`는 빌드 시 SafeShield 패키지 선택 관계를 유지합니다. `LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.24)`는 설치·업데이트 시 필요한 최소 SafeShield 버전을 강제합니다.
 
 프런트엔드 빌드에는 **Node.js 24 이상**이 필요합니다.
 
@@ -298,7 +308,7 @@ luci-app-smartsafehub/
 │   │   ├── components/
 │   │   ├── hooks/
 │   │   ├── login/
-│   │   ├── pages/
+│   │   ├── pages/            # IPTV Beta 포함
 │   │   ├── styles/
 │   │   ├── types/
 │   │   └── utils/

@@ -17,6 +17,7 @@ import {
   SettingsIcon,
   ShieldIcon,
   SunIcon,
+  TvIcon,
   UpdateIcon,
   UserIcon,
   WifiIcon,
@@ -40,7 +41,7 @@ const NAVIGATION_GROUPS: readonly {
   routes: readonly AppRoute[];
 }[] = [
   { label: 'Overview', routes: ['home'] },
-  { label: 'Network', routes: ['lan', 'wifi', 'devices'] },
+  { label: 'Network', routes: ['lan', 'wifi', 'iptv', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
   { label: 'System', routes: ['system', 'settings'] },
 ];
@@ -53,6 +54,8 @@ function NavigationIcon({ route }: { route: AppRoute }) {
       return <CableIcon class="size-5" />;
     case 'wifi':
       return <WifiIcon class="size-5" />;
+    case 'iptv':
+      return <TvIcon class="size-5" />;
     case 'devices':
       return <DevicesIcon class="size-5" />;
     case 'safeshield':
@@ -128,7 +131,24 @@ function NavigationItems({
                   >
                     <NavigationIcon route={routeName} />
                   </span>
-                  {collapsed ? null : <span class="min-w-0 flex-1 truncate">{item.label}</span>}
+                  {collapsed ? null : (
+                    <span class="flex min-w-0 flex-1 items-center gap-2">
+                      <span class="truncate">{item.label}</span>
+                      {routeName === 'iptv' ? (
+                        <span class="rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800">
+                          Beta
+                        </span>
+                      ) : null}
+                    </span>
+                  )}
+                  {collapsed && routeName === 'iptv' ? (
+                    <span
+                      aria-label="Beta 기능"
+                      class="absolute right-1 top-1 rounded-full bg-amber-400 px-1 text-[8px] font-black leading-4 text-amber-950 ring-2 ring-white"
+                    >
+                      β
+                    </span>
+                  ) : null}
                   {routeName === 'system' && updateCount > 0 ? (
                     collapsed ? (
                       <span

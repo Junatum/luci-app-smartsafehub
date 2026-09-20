@@ -159,6 +159,8 @@ grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+uclient-fetch([[:space:]]|$)' "$MAKE
 	fail 'LUCI_DEPENDS must include +uclient-fetch for release note downloads'
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+jsonfilter([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +jsonfilter for firmware metadata validation'
+grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+igmpproxy([[:space:]]|$)' "$MAKEFILE" || \
+	fail 'LUCI_DEPENDS must include +igmpproxy for IPTV multicast support'
 grep -Eq '^LUCI_EXTRA_DEPENDS:=safeshield \(>=[0-9]+\.[0-9]+\.[0-9]+([._~+-][A-Za-z0-9._~+-]+)?\)$' "$MAKEFILE" || \
 	fail 'LUCI_EXTRA_DEPENDS must require a minimum safeshield version'
 
@@ -201,6 +203,12 @@ printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-license ena
 	fail 'package postinst must force-enable smartsafehub-license'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-license restart' ||
 	fail 'package postinst must start or restart smartsafehub-license immediately after installation'
+printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.iptv.enabled' ||
+	fail 'package postinst must reconcile igmpproxy enable state from SmartSafeHub IPTV config'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/igmpproxy stop' ||
+	fail 'package postinst must stop igmpproxy while IPTV is disabled'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/igmpproxy disable' ||
+	fail 'package postinst must disable igmpproxy while IPTV is disabled'
 printf '%s\n' "$postinst_block" | grep -Fq 'rm -f /tmp/luci-indexcache' ||
 	fail 'package postinst must clear the LuCI index cache after installing RPC/menu changes'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd reload' ||

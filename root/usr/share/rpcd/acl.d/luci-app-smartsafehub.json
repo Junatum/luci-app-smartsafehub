@@ -22,7 +22,8 @@
           "rules_list"
         ],
         "smartsafehub_network": [
-          "lan_settings"
+          "lan_settings",
+          "iptv_settings"
         ]
       },
       "cgi-io": [
@@ -64,7 +65,8 @@
         ],
         "smartsafehub_network": [
           "lan_update",
-          "lan_auto_subnet"
+          "lan_auto_subnet",
+          "iptv_update"
         ]
       },
       "cgi-io": [

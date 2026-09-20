@@ -6,6 +6,7 @@ import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useHealth } from '../hooks/useHealth';
+import { useIptv } from '../hooks/useIptv';
 import { useLan } from '../hooks/useLan';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
@@ -19,6 +20,7 @@ import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useWifi } from '../hooks/useWifi';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
+import { IptvPage } from '../pages/IptvPage';
 import { LanPage } from '../pages/LanPage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
@@ -35,6 +37,7 @@ export function App() {
     route === 'system' || route === 'home' || route === 'settings',
   );
   const lan = useLan(route === 'home' || route === 'lan');
+  const iptv = useIptv(route === 'iptv');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
@@ -57,6 +60,8 @@ export function App() {
       ? lan
       : route === 'wifi'
         ? wifi
+        : route === 'iptv'
+          ? iptv
       : route === 'devices'
         ? devices
         : route === 'safeshield'
@@ -97,6 +102,21 @@ export function App() {
           onRetry={() => void wifi.refresh()}
           onUpdate={wifi.update}
           updatingSection={wifi.updatingSection}
+        />
+      );
+      break;
+
+    case 'iptv':
+      content = (
+        <IptvPage
+          data={iptv.data}
+          error={iptv.error}
+          feedback={iptv.feedback}
+          loading={iptv.loading}
+          onDismissFeedback={iptv.dismissFeedback}
+          onRetry={() => void iptv.refresh()}
+          onSave={iptv.save}
+          saving={iptv.saving}
         />
       );
       break;

@@ -25,3 +25,7 @@ config health 'health'
 	option reporter_enabled '0'
 	option report_interval_s '1800'
 	option api_base_url 'https://www.smartsafehub.com/api/v1'
+
+config iptv 'iptv'
+	option enabled '0'
+	option provider 'skb'

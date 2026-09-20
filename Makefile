@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.19
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -16,7 +16,7 @@ PKG_LICENSE_FILES:=LICENSE
 LUCI_TITLE:=SmartSafeHub
 LUCI_URL:=https://github.com/Junatum/luci-app-smartsafehub
 LUCI_DESCRIPTION:=A modern, user-friendly OpenWrt management platform with Wi-Fi control, device management, system monitoring, and SafeShield DNS protection.
-LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +uclient-fetch +jsonfilter +safeshield
+LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +uclient-fetch +jsonfilter +igmpproxy +safeshield
 LUCI_EXTRA_DEPENDS:=safeshield (>=0.3.24)
 LUCI_PKGARCH:=all
 
@@ -46,6 +46,14 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 	if [ -x /etc/init.d/smartsafehub-license ]; then
 		/etc/init.d/smartsafehub-license enable
 		/etc/init.d/smartsafehub-license restart >/dev/null 2>&1 || true
+	fi
+	if [ -x /etc/init.d/igmpproxy ]; then
+		if [ "$$(uci -q get smartsafehub.iptv.enabled 2>/dev/null)" = "1" ]; then
+			/etc/init.d/igmpproxy enable >/dev/null 2>&1 || true
+		else
+			/etc/init.d/igmpproxy stop >/dev/null 2>&1 || true
+			/etc/init.d/igmpproxy disable >/dev/null 2>&1 || true
+		fi
 	fi
 	if [ -f /usr/libexec/smartsafehub-root-entry ]; then
 		/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile

@@ -8,6 +8,10 @@ import {
 	read_lan_settings,
 	update_lan_settings
 } from './smartsafehub/network-management.uc';
+import {
+	read_iptv_settings,
+	update_iptv_settings
+} from './smartsafehub/iptv-management.uc';
 
 function require_root_password(handler) {
 	return function(request) {
@@ -56,6 +60,21 @@ const methods = {
 		},
 		call: require_root_password(function(request) {
 			return apply_recommended_lan(request);
+		}),
+	},
+	iptv_settings: {
+		call: require_root_password(function(request) {
+			return read_iptv_settings();
+		}),
+	},
+	iptv_update: {
+		args: {
+			enabled: false,
+			provider: 'skb',
+			confirm: '',
+		},
+		call: require_root_password(function(request) {
+			return update_iptv_settings(request);
 		}),
 	},
 };

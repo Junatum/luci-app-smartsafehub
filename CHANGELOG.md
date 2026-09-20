@@ -1,5 +1,25 @@
 # 변경 기록
 
+## [0.2.19-r2] - 2026-09-20
+
+### 기능
+
+- 네트워크 메뉴에 `IPTV` Beta 화면을 추가하고 SK Broadband/LG U+의 일반적인 멀티캐스트 IPTV 구성을 지원합니다.
+- IPTV 활성화 시 `igmpproxy`를 WAN upstream/LAN downstream으로 구성하고 upstream `altnet`을 `0.0.0.0/0`으로 설정하며, LAN bridge의 IGMP snooping을 함께 활성화합니다.
+- IPTV 비활성화 시 IGMP Proxy 서비스를 중지·비활성화하고, IPTV 활성화 전에 사용하던 LAN bridge의 IGMP snooping 값을 복원합니다.
+
+### 안정성
+
+- IPTV 설정 적용 전에 SmartSafeHub/network/igmpproxy UCI 파일과 IGMP Proxy 서비스 상태를 스냅샷하고, commit 또는 runtime 적용에 실패하면 이전 설정과 서비스 상태로 복구합니다.
+- rollback 파일 복원은 ucode `fs.writefile()`의 기록 바이트 수를 검증해 복구 성공 여부를 정확히 판정합니다.
+- 기존 `igmpproxy`에 WAN 이외 upstream 또는 복수 upstream이 있으면 사용자의 커스텀 구성을 덮어쓰지 않고 충돌 오류를 반환합니다.
+- 현재 OpenWrt igmpproxy의 runtime firewall 연동을 사용하므로 SmartSafeHub가 별도 firewall 규칙을 중복 생성하지 않습니다.
+
+### 테스트 및 문서
+
+- IPTV RPC/ACL, IGMP Proxy·IGMP snooping 구성, rollback, 서비스 lifecycle, Beta UI, SKB/LG U+ 선택 제한을 검증하는 회귀 테스트를 추가했습니다.
+- README에 IPTV Beta 기능, 의존성, 적용 방식과 현재 지원 범위를 문서화했습니다. 프런트엔드 빌드 산출물은 생성하지 않습니다.
+
 ## [0.2.19-r1] - 2026-09-20
 
 ### 개선

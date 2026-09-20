@@ -27,7 +27,7 @@ assert_not_contains() {
 	fi
 }
 
-assert_contains "$MAKEFILE" 'LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +uclient-fetch +jsonfilter +safeshield'
+assert_contains "$MAKEFILE" 'LUCI_DEPENDS:=+luci-base +rpcd-mod-ucode +ucode +ucode-mod-ubus +ucode-mod-fs +ucode-mod-uci +procd +uclient-fetch +jsonfilter +igmpproxy +safeshield'
 SAFESHIELD_MIN_VERSION="$(sed -n 's/^LUCI_EXTRA_DEPENDS:=safeshield (>=\([^)]*\))$/\1/p' "$MAKEFILE")"
 [ -n "$SAFESHIELD_MIN_VERSION" ] || fail 'unable to read safeshield minimum version from LUCI_EXTRA_DEPENDS'
 PKG_VERSION="$(awk -F ':=' '$1 == "PKG_VERSION" { print $2; exit }' "$MAKEFILE")"

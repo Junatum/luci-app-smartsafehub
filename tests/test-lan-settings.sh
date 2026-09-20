@@ -165,7 +165,7 @@ grep -Fq 'newAddress: result.newAddress ?? result.settings.lan.address' "$HOOK" 
 grep -Fq "route: 'lan'" "$ROUTES" || fail 'LAN route가 등록되어야 합니다.'
 grep -Fq "hash: '#lan'" "$ROUTES" || fail 'LAN route는 #lan hash를 사용해야 합니다.'
 grep -Fq "'#lan': 'lan'" "$HASH_ROUTE" || fail '#lan hash router 연결이 필요합니다.'
-grep -Fq "{ label: 'Network', routes: ['lan', 'wifi', 'devices'] }" "$NAVIGATION" || \
+grep -Fq "{ label: 'Network', routes: ['lan', 'wifi', 'iptv', 'devices'] }" "$NAVIGATION" || \
 	fail 'Network 메뉴에서 LAN이 Wi-Fi와 연결된 기기보다 먼저 표시되어야 합니다.'
 grep -Fq "case 'lan':" "$APP" || fail 'App이 LAN 페이지를 렌더링해야 합니다.'
 grep -Fq "const lan = useLan(route === 'home' || route === 'lan');" "$APP" || \

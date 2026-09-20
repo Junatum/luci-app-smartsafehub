@@ -115,6 +115,15 @@ export function GlobeIcon(props: IconProps) {
   );
 }
 
+export function TvIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect height="13" rx="2" width="18" x="3" y="6" />
+      <path d="m8 2 4 4 4-4M8 22h8" />
+    </IconBase>
+  );
+}
+
 export function ClockIcon(props: IconProps) {
   return (
     <IconBase {...props}>

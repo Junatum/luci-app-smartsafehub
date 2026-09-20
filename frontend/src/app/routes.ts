@@ -2,6 +2,7 @@ export type AppRoute =
   | 'home'
   | 'lan'
   | 'wifi'
+  | 'iptv'
   | 'devices'
   | 'safeshield'
   | 'rules'
@@ -37,6 +38,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: 'Wi-Fi',
     title: 'Wi-Fi',
     description: '기본 무선 네트워크의 이름, 보안과 사용 상태를 관리합니다.',
+  },
+  {
+    route: 'iptv',
+    hash: '#iptv',
+    label: 'IPTV',
+    title: 'IPTV',
+    description: 'SK Broadband와 LG U+ 멀티캐스트 IPTV를 설정합니다.',
   },
   {
     route: 'devices',

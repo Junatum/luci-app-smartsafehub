@@ -5,6 +5,7 @@ import type {
 } from '../types/backup';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type { HealthAccepted, HealthStatus } from '../types/health';
+import type { IptvSettings, IptvSettingsInput, IptvUpdateResult } from '../types/iptv';
 import type { LanSettings, LanSettingsInput, LanUpdateResult } from '../types/lan';
 import type {
   SmartSafeHubLicenseActivationAccepted,
@@ -203,6 +204,25 @@ export function applyRecommendedLanSubnet(): Promise<LanUpdateResult> {
     'lan_auto_subnet',
     { confirm: 'apply' },
     { timeoutMs: 10_000 },
+  );
+}
+
+export function fetchIptvSettings(): Promise<IptvSettings> {
+  return callApi(LAN_API_OBJECT, 'iptv_settings');
+}
+
+export function updateIptvSettings(
+  input: IptvSettingsInput,
+): Promise<IptvUpdateResult> {
+  return callApi(
+    LAN_API_OBJECT,
+    'iptv_update',
+    {
+      enabled: input.enabled,
+      provider: input.provider,
+      confirm: 'apply',
+    },
+    { timeoutMs: 20_000 },
   );
 }
 

@@ -6,6 +6,7 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
   '#home': 'home',
   '#lan': 'lan',
   '#wifi': 'wifi',
+  '#iptv': 'iptv',
   '#devices': 'devices',
   '#safeshield': 'safeshield',
   '#rules': 'rules',

@@ -56,6 +56,7 @@ for script in \
 	tests/test-network-input-contract.sh \
 	tests/test-lan-settings.sh \
 	tests/test-lan-uci-runtime.sh \
+	tests/test-iptv.sh \
 	tests/test-update-ui-contract.sh \
 	tests/test-reload-safety.sh \
 	tests/test-settings-ui-contract.sh \
