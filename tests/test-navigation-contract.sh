@@ -62,6 +62,17 @@ grep -Fq 'class="ssh-sidebar-toggle absolute right-0 top-[4.5rem] z-20 inline-fl
 	fail 'sidebar toggle must stay centered on the shared 72px brand/header boundary'
 grep -Fq 'title={collapsed ? item.label : undefined}' "$NAVIGATION" || \
 	fail 'collapsed navigation items must retain hover labels'
+grep -Fq 'aria-label="Beta 기능"' "$NAVIGATION" || \
+	fail 'collapsed IPTV navigation item must expose an accessible Beta badge'
+grep -Fq 'class="absolute right-0.5 top-0.5 inline-flex size-5' "$NAVIGATION" || \
+	fail 'collapsed IPTV navigation badge must keep a compact readable 20px circle'
+grep -Fq 'text-[13px] font-extrabold' "$NAVIGATION" || \
+	fail 'collapsed IPTV beta glyph must keep a readable 13px weight'
+grep -Fq '                      β' "$NAVIGATION" || \
+	fail 'collapsed IPTV navigation badge must use the single beta glyph'
+if grep -Fq 'text-[8px]' "$NAVIGATION"; then
+	fail 'collapsed IPTV navigation badge must not regress to the unreadable 8px beta style'
+fi
 grep -Fq 'data-collapsed={collapsed ? '\''true'\'' : '\''false'\''}' "$NAVIGATION" || \
 	fail 'desktop sidebar must expose its collapsed state'
 [ "$(grep -Fc 'onClick={onToggleTheme}' "$NAVIGATION")" -eq 1 ] || \

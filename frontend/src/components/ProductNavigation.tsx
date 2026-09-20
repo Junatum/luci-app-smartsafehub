@@ -144,7 +144,7 @@ function NavigationItems({
                   {collapsed && routeName === 'iptv' ? (
                     <span
                       aria-label="Beta 기능"
-                      class="absolute right-1 top-1 rounded-full bg-amber-400 px-1 text-[8px] font-black leading-4 text-amber-950 ring-2 ring-white"
+                      class="absolute right-0.5 top-0.5 inline-flex size-5 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-[13px] font-extrabold leading-none text-amber-900 shadow-sm ring-2 ring-white"
                     >
                       β
                     </span>

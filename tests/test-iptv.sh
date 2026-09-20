@@ -98,6 +98,15 @@ grep -Fq "{ label: 'Network', routes: ['lan', 'wifi', 'iptv', 'devices'] }" "$NA
   fail 'IPTV 메뉴는 Network 그룹에서 Wi-Fi 다음에 표시되어야 합니다.'
 grep -Fq "routeName === 'iptv'" "$NAVIGATION" || fail 'IPTV 메뉴에 Beta badge 조건이 필요합니다.'
 grep -Fq 'Beta' "$NAVIGATION" || fail 'IPTV 메뉴에 Beta 표시가 필요합니다.'
+grep -Fq 'class="absolute right-0.5 top-0.5 inline-flex size-5' "$NAVIGATION" || \
+  fail '접힌 사이드바의 IPTV Beta badge는 20x20px 원형 크기를 유지해야 합니다.'
+grep -Fq 'text-[13px] font-extrabold' "$NAVIGATION" || \
+  fail '접힌 사이드바의 IPTV β 문자는 충분한 글꼴 크기와 굵기를 유지해야 합니다.'
+grep -Fq '                      β' "$NAVIGATION" || \
+  fail '접힌 사이드바의 IPTV Beta badge는 단일 β 문자를 사용해야 합니다.'
+if grep -Fq 'text-[8px]' "$NAVIGATION"; then
+  fail '접힌 사이드바의 IPTV Beta badge는 다시 너무 작은 8px 문자 스타일로 돌아가면 안 됩니다.'
+fi
 grep -Fq 'export function TvIcon' "$ICONS" || fail 'IPTV 전용 TV 아이콘이 필요합니다.'
 grep -Fq "const iptv = useIptv(route === 'iptv');" "$APP" || fail 'IPTV route에서 전용 hook을 활성화해야 합니다.'
 grep -Fq "case 'iptv':" "$APP" || fail 'App이 IPTV 페이지를 렌더링해야 합니다.'
