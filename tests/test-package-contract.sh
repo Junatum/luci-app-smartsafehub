@@ -83,6 +83,8 @@ require_executable "$ROOT_DIR/tests/test-ucode-imports.sh"
 require_executable "$ROOT_DIR/tests/test-runtime-path-contract.sh"
 require_executable "$ROOT_DIR/tests/test-lan-settings.sh"
 require_executable "$ROOT_DIR/tests/test-root-url-rewrite.sh"
+require_executable "$ROOT_DIR/tests/test-rpcd-reconcile.sh"
+require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-rpcd-reconcile"
 
 pkg_version="$(make_value PKG_VERSION)"
 pkg_release="$(make_value PKG_RELEASE)"
@@ -211,11 +213,18 @@ printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/igmpproxy disable' ||
 	fail 'package postinst must disable igmpproxy while IPTV is disabled'
 printf '%s\n' "$postinst_block" | grep -Fq 'rm -f /tmp/luci-indexcache' ||
 	fail 'package postinst must clear the LuCI index cache after installing RPC/menu changes'
-printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd reload' ||
-	fail 'package postinst must reload rpcd so newly installed ucode methods and ACL files are active'
-if printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/rpcd restart'; then
-	fail 'package postinst must reload rpcd instead of restarting it and discarding active sessions'
+printf '%s\n' "$postinst_block" | grep -Fq '/bin/sh /usr/libexec/smartsafehub-rpcd-reconcile' ||
+	fail 'package postinst must reconcile rpcd and verify the SmartSafeHub core ubus object after upgrade'
+if printf '%s\n' "$postinst_block" | grep -Eq '/etc/init.d/rpcd (reload|restart)'; then
+	fail 'package postinst must centralize rpcd reload/restart fallback in the tested reconcile helper'
 fi
+rpcd_reconcile="$ROOT_DIR/root/usr/libexec/smartsafehub-rpcd-reconcile"
+grep -Fq '"$RPCD_INIT" reload' "$rpcd_reconcile" ||
+	fail 'rpcd reconcile helper must try graceful reload first'
+grep -Fq 'list "$RPC_OBJECT"' "$rpcd_reconcile" ||
+	fail 'rpcd reconcile helper must verify the smartsafehub ubus object after reload'
+grep -Fq '"$RPCD_INIT" restart' "$rpcd_reconcile" ||
+	fail 'rpcd reconcile helper must restart rpcd when reload leaves the core object unavailable'
 printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.check_enabled' ||
 	fail 'package postinst must remove the obsolete firmware check_enabled option on existing installs'
 if printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.updates.check_enabled'; then

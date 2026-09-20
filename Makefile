@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.19
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -59,8 +59,8 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 		/bin/sh /usr/libexec/smartsafehub-root-entry --install --reconcile
 	fi
 	rm -f /tmp/luci-indexcache
-	if [ -x /etc/init.d/rpcd ]; then
-		/etc/init.d/rpcd reload >/dev/null 2>&1 || true
+	if [ -f /usr/libexec/smartsafehub-rpcd-reconcile ]; then
+		/bin/sh /usr/libexec/smartsafehub-rpcd-reconcile >/dev/null 2>&1 || true
 	fi
 fi
 exit 0

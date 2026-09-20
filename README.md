@@ -423,11 +423,13 @@ apk add --allow-untrusted /tmp/luci-app-smartsafehub-*.apk
 
 정확한 현재 버전은 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`, 또는 설치된 장치의 `apk info luci-app-smartsafehub`로 확인합니다.
 
-패키지의 postinst는 설치/업그레이드 후 updater, firmware, maintenance 등 항상 동작해야 하는 SmartSafeHub 서비스를 명시적으로 enable하고, LuCI 메뉴 캐시를 지운 뒤 `rpcd reload`를 실행해 새 ucode RPC와 ACL을 즉시 다시 읽습니다. 이 과정은 기존 장치에서 새 서비스가 추가된 업그레이드 후에도 다음 부팅 시 서비스가 빠지지 않도록 합니다. OpenWrt의 rpcd plugin 패키지와 같은 방식으로 `restart` 대신 `reload`를 사용해 기존 세션을 가능한 한 유지합니다. 수동 설치 환경에서 확인이 필요하면 아래 명령을 직접 실행할 수 있습니다.
+패키지의 postinst는 설치/업그레이드 후 updater, firmware, maintenance 등 항상 동작해야 하는 SmartSafeHub 서비스를 명시적으로 enable하고 LuCI 메뉴 캐시를 지운 뒤 `/usr/libexec/smartsafehub-rpcd-reconcile`을 실행합니다. helper는 먼저 `rpcd reload`로 기존 세션 영향을 최소화하고, reload가 끝난 뒤 핵심 `smartsafehub` ubus 객체가 실제로 다시 등록됐는지 최대 5회 확인하고 연속 2회 확인될 때만 정상으로 판정합니다. 실기기에서 확인된 것처럼 reload 명령 자체는 성공했는데 핵심 객체가 사라진 경우에만 `rpcd restart`로 자동 복구하며, restart 후에도 객체가 돌아오지 않으면 실패 상태를 남깁니다. 수동 설치 환경에서 같은 검증·복구를 실행하려면 아래 명령을 사용할 수 있습니다.
 
 ```bash
 rm -f /tmp/luci-indexcache
-/etc/init.d/rpcd reload
+/bin/sh /usr/libexec/smartsafehub-rpcd-reconcile
+ubus list | grep smartsafehub
+ubus call smartsafehub system_root_password_status '{}'
 ```
 
 ## 설치 후 확인

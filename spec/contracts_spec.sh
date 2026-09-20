@@ -29,6 +29,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '패키지 업그레이드 후 rpcd 핵심 객체 자동 복구 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-rpcd-reconcile.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '내비게이션 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-navigation-contract.sh"
     The status should be success

@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.19-r3] - 2026-09-20
+
+### 수정
+
+- 패키지 업그레이드 직후 `rpcd reload`가 성공으로 끝났지만 핵심 `smartsafehub` ubus 객체가 등록되지 않아 로그인 화면에서 `system_root_password_status`가 `Not found`가 되던 실기기 장애를 수정했습니다.
+- postinst가 직접 `rpcd reload`만 호출하지 않고 `/usr/libexec/smartsafehub-rpcd-reconcile`을 실행하도록 변경했습니다. helper는 reload 후 핵심 ubus 객체가 실제 등록됐는지 확인하고, 등록되지 않은 경우에만 `rpcd restart`로 자동 복구합니다. 정상 reload에서는 restart하지 않아 기존 세션 영향을 최소화합니다.
+
+### 테스트 및 문서
+
+- 실기기에서 확인된 `reload 성공 + smartsafehub 객체 누락` 상태를 mock으로 재현하고 restart fallback으로 복구되는지 실행형 회귀 테스트를 추가했습니다. 정상 reload, reload 자체 실패, restart 후에도 미복구되는 오류 경로도 함께 검증합니다.
+- 패키지 계약 테스트에 rpcd reconcile helper 사용을 고정하고 ShellSpec 전체 계약에 새 회귀 테스트를 연결했습니다.
+- README에 패키지 업그레이드 시 rpcd self-heal 정책을 문서화했습니다. 프런트엔드 빌드 산출물은 생성하지 않습니다.
+
 ## [0.2.19-r2] - 2026-09-20
 
 ### 기능
