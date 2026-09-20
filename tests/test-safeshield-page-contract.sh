@@ -8,6 +8,7 @@ PANEL="$ROOT_DIR/frontend/src/components/SafeShieldStatisticsPanel.tsx"
 NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
 ASSET_JS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.js"
 ASSET_CSS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.css"
+SOURCE_CSS="$ROOT_DIR/frontend/src/styles/app.css"
 ACTIONS="$ROOT_DIR/frontend/src/hooks/useSafeShieldActions.ts"
 
 fail() {
@@ -15,7 +16,7 @@ fail() {
 	exit 1
 }
 
-for file in "$PAGE" "$PANEL" "$NAVIGATION" "$ACTIONS" "$ASSET_JS" "$ASSET_CSS"; do
+for file in "$PAGE" "$PANEL" "$NAVIGATION" "$ACTIONS" "$ASSET_JS" "$ASSET_CSS" "$SOURCE_CSS"; do
 	[ -f "$file" ] || fail "missing SafeShield product UI source: ${file#$ROOT_DIR/}"
 done
 
@@ -173,12 +174,28 @@ grep -Fq 'ssh-safeshield-plan-badge' "$ASSET_JS" || \
 	fail 'checked-in app.js must include SafeShield membership badges'
 grep -Fq 'https://www.smartsafehub.com/pricing/' "$ASSET_JS" || \
 	fail 'checked-in app.js must include the FREE plan pricing CTA'
-grep -Fq '.ssh-safeshield-plan-badge[data-tier=ultimate]' "$ASSET_CSS" || \
-	fail 'checked-in app.css must include the ULTIMATE premium badge treatment'
-grep -Fq 'linear-gradient(122deg,#1c1917 0%,#451a03 22%,#92400e 48%,#f59e0b 76%,#fde68a 100%)' "$ASSET_CSS" || \
-	fail 'light-theme ULTIMATE badge must keep the high-contrast dark-gold premium gradient'
-grep -Fq '@keyframes ssh-safeshield-premium-shine' "$ASSET_CSS" || \
-	fail 'checked-in app.css must include the restrained ULTIMATE shine animation'
+grep -Fq ".ssh-safeshield-plan-badge[data-tier='ultimate']" "$SOURCE_CSS" || \
+	fail 'source styles must include the ULTIMATE membership badge treatment'
+grep -Fq 'background: linear-gradient(135deg, #78350f 0%, #92400e 58%, #b45309 100%);' "$SOURCE_CSS" || \
+	fail 'light-theme ULTIMATE badge must use the restrained bronze surface'
+grep -Fq '0 1px 2px rgb(120 53 15 / 0.18)' "$SOURCE_CSS" || \
+	fail 'light-theme ULTIMATE badge must keep only a shallow neutral depth shadow'
+grep -Fq "background: linear-gradient(135deg, #115e59 0%, #0f766e 62%, #0d9488 100%);" "$SOURCE_CSS" || \
+	fail 'PRO badge must use the restrained teal membership surface'
+grep -Fq "background: linear-gradient(135deg, #0c4a6e 0%, #075985 58%, #0369a1 100%);" "$SOURCE_CSS" || \
+	fail 'other paid tiers such as PLUS must use the restrained blue membership surface'
+if grep -Fq '@keyframes ssh-safeshield-premium-shine' "$SOURCE_CSS" || \
+	grep -Fq 'ssh-safeshield-premium-shine' "$SOURCE_CSS"; then
+	fail 'membership badges must not use promotional shine animation'
+fi
+if grep -Fq '0 9px 24px rgb(217 119 6 / 0.36)' "$SOURCE_CSS" || \
+	grep -Fq '0 0 18px rgb(251 191 36 / 0.22)' "$SOURCE_CSS"; then
+	fail 'ULTIMATE badge must not keep the light-theme amber glow below the chip'
+fi
+[ "$(grep -Fc ".ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='ultimate'] {" "$SOURCE_CSS")" -eq 1 ] || \
+	fail 'dark-theme ULTIMATE treatment must be defined exactly once'
+grep -Fq 'background: linear-gradient(135deg, #451a03 0%, #78350f 100%);' "$SOURCE_CSS" || \
+	fail 'dark-theme ULTIMATE badge must use a static deep-bronze surface'
 if grep -Fq '.ssh-safeshield-plan-caption[data-tier=' "$ASSET_CSS"; then
 	fail 'checked-in app.css must not retain paid membership status-caption styling'
 fi

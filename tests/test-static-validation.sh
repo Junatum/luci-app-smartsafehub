@@ -11,6 +11,26 @@ fail() {
 
 command -v jq >/dev/null 2>&1 || fail 'jq is required to validate JSON files'
 
+APP_STYLE="$ROOT_DIR/frontend/src/styles/app.css"
+[ -f "$APP_STYLE" ] || fail 'missing frontend application stylesheet'
+
+[ "$(grep -Fc ':host {' "$APP_STYLE")" -eq 1 ] || \
+	fail 'app.css must keep host-level defaults in one rule'
+if grep -Fq '.ssh-app > header,' "$APP_STYLE"; then
+	fail 'app.css must not keep the obsolete direct-child header/main rule'
+fi
+if grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-white']," "$APP_STYLE"; then
+	fail 'dark bg-white/95 must not inherit a value that is immediately overridden'
+fi
+if grep -Fq ".ssh-app[data-theme='dark'] [class~='bg-slate-50']," "$APP_STYLE"; then
+	fail 'dark bg-slate-50/70 must not inherit a value that is immediately overridden'
+fi
+[ "$(grep -Fc '  .ssh-safeshield-upgrade-action {' "$APP_STYLE")" -eq 1 ] || \
+	fail 'mobile SafeShield upgrade action styling must be defined once'
+if grep -Fq '  .ssh-safeshield-license-summary,' "$APP_STYLE"; then
+	fail 'mobile license styles must not duplicate SafeShield upgrade-card alignment'
+fi
+
 for script in \
 	root/etc/init.d/smartsafehub-updater \
 	root/etc/init.d/smartsafehub-firmware \

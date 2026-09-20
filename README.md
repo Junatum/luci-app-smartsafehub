@@ -130,7 +130,7 @@ SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1
 - 수동 갱신 요청의 성공 안내 배너는 유지하지 않고 실제 진행 상태를 보호 카드의 단계 UI로 표시하며, 실패한 경우에만 오류 피드백을 유지
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
 - 라이선스, 플랜, 아티팩트와 차단 목록 상태 표시
-- 유료 플랜은 PRO/ULTIMATE 등급별 고대비 premium badge의 아이콘과 색상만으로 간결하게 강조하고, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시
+- 유료 플랜은 PRO(teal), ULTIMATE(bronze), PLUS 등 기타 유료 플랜(blue)의 정적인 premium chip으로 구분합니다. 외부 glow와 shine 애니메이션은 사용하지 않고 얕은 그림자와 1px 테두리만 유지하며, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시
 - 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
 - DHCP 식별 정보를 이용한 기기별 DNS 요청·차단 수·차단율과 IP/MAC 표시. 차단 수 기준 상위 3개 기기를 기본 미리보기로 보여주며 `차단 TOP 3` 배지와 `전체 N개 기기 중 차단 수 기준 상위 3개` 안내로 현재 표시 범위를 명확히 표현. 필요할 때 전체 목록을 펼쳐 10개 단위 페이지네이션으로 확인
 - 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지

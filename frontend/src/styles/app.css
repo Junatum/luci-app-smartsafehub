@@ -21,6 +21,7 @@
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
 }
 
@@ -54,13 +55,6 @@
   min-width: 0;
 }
 
-
-.ssh-app > header,
-.ssh-app > main {
-  width: 100%;
-  min-width: 0;
-}
-
 .ssh-product-hero {
   border-radius: 0;
 }
@@ -73,11 +67,6 @@
 
 .ssh-product-header-action:hover {
   border-color: #5eead4 !important;
-}
-
-
-:host {
-  -webkit-tap-highlight-color: transparent;
 }
 
 .ssh-app a,
@@ -258,8 +247,7 @@
   color-scheme: dark;
 }
 
-.ssh-app[data-theme='dark'] [class~='bg-white'],
-.ssh-app[data-theme='dark'] [class~='bg-white/95'] {
+.ssh-app[data-theme='dark'] [class~='bg-white'] {
   background-color: #0f172a;
 }
 
@@ -271,8 +259,7 @@
   background-color: rgb(15 23 42 / 0.78);
 }
 
-.ssh-app[data-theme='dark'] [class~='bg-slate-50'],
-.ssh-app[data-theme='dark'] [class~='bg-slate-50/70'] {
+.ssh-app[data-theme='dark'] [class~='bg-slate-50'] {
   background-color: #020617;
 }
 
@@ -1405,8 +1392,9 @@
 
 /* SafeShield refresh progress keeps internal stage names out of the product UI
  * and presents the six user-facing refresh phases as a compact donut. */
-/* SafeShield membership presentation. Paid plans use high-contrast jewel tones,
- * metallic highlights and restrained motion so membership feels premium in both themes. */
+/* SafeShield membership presentation. Paid plans use restrained, static
+ * tier colors so membership reads like a product entitlement rather than a
+ * promotional badge. Keep shadows shallow and avoid glow/motion in both themes. */
 .ssh-safeshield-plan-badge {
   position: relative;
   isolation: isolate;
@@ -1463,73 +1451,51 @@
 }
 
 .ssh-safeshield-plan-badge[data-tier='pro'] {
-  border-color: #2dd4bf;
-  background: linear-gradient(125deg, #064e3b 0%, #0f766e 42%, #14b8a6 72%, #5eead4 100%);
+  border-color: #0f766e;
+  background: linear-gradient(135deg, #115e59 0%, #0f766e 62%, #0d9488 100%);
   color: #f0fdfa;
-  text-shadow: 0 1px 1px rgb(6 78 59 / 0.5);
   box-shadow:
-    0 8px 20px rgb(13 148 136 / 0.32),
-    inset 0 1px 0 rgb(255 255 255 / 0.24),
-    inset 0 -1px 0 rgb(6 78 59 / 0.38);
+    0 1px 2px rgb(15 118 110 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.14);
 }
 
 .ssh-safeshield-plan-badge[data-tier='pro'] .ssh-safeshield-plan-badge-mark {
-  border: 1px solid rgb(204 251 241 / 0.55);
-  background: rgb(240 253 250 / 0.94);
-  color: #0f766e;
-  box-shadow: 0 0 12px rgb(94 234 212 / 0.38);
+  border: 1px solid rgb(153 246 228 / 0.46);
+  background: rgb(240 253 250 / 0.12);
+  color: #ccfbf1;
+  box-shadow: none;
 }
 
 .ssh-safeshield-plan-badge[data-tier='ultimate'] {
-  border-color: #fbbf24;
-  background:
-    radial-gradient(circle at 18% 20%, rgb(255 255 255 / 0.24), transparent 28%),
-    linear-gradient(122deg, #1c1917 0%, #451a03 22%, #92400e 48%, #f59e0b 76%, #fde68a 100%);
-  color: #fff7ed;
-  text-shadow: 0 1px 2px rgb(69 26 3 / 0.72);
+  border-color: #b45309;
+  background: linear-gradient(135deg, #78350f 0%, #92400e 58%, #b45309 100%);
+  color: #fffbeb;
   box-shadow:
-    0 0 0 1px rgb(245 158 11 / 0.18),
-    0 9px 24px rgb(217 119 6 / 0.36),
-    0 0 18px rgb(251 191 36 / 0.22),
-    inset 0 1px 0 rgb(255 255 255 / 0.34),
-    inset 0 -1px 0 rgb(69 26 3 / 0.55);
-}
-
-.ssh-safeshield-plan-badge[data-tier='ultimate']::after {
-  position: absolute;
-  inset: -70% auto -70% -36%;
-  z-index: 1;
-  width: 30%;
-  content: '';
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.82), transparent);
-  transform: rotate(16deg);
-  animation: ssh-safeshield-premium-shine 4.8s ease-in-out infinite;
+    0 1px 2px rgb(120 53 15 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
 }
 
 .ssh-safeshield-plan-badge[data-tier='ultimate'] .ssh-safeshield-plan-badge-mark {
-  border: 1px solid rgb(255 247 237 / 0.72);
-  background: linear-gradient(145deg, #fff7ed 0%, #fde68a 48%, #f59e0b 100%);
-  color: #9a3412;
-  box-shadow:
-    0 0 0 1px rgb(251 191 36 / 0.22),
-    0 0 14px rgb(253 230 138 / 0.48);
+  border: 1px solid rgb(253 230 138 / 0.46);
+  background: rgb(255 251 235 / 0.12);
+  color: #fde68a;
+  box-shadow: none;
 }
 
 .ssh-safeshield-plan-badge[data-tier='paid'] {
-  border-color: #93c5fd;
-  background: linear-gradient(125deg, #312e81 0%, #4338ca 42%, #2563eb 72%, #38bdf8 100%);
-  color: #eff6ff;
-  text-shadow: 0 1px 1px rgb(30 64 175 / 0.52);
+  border-color: #0369a1;
+  background: linear-gradient(135deg, #0c4a6e 0%, #075985 58%, #0369a1 100%);
+  color: #f0f9ff;
   box-shadow:
-    0 8px 20px rgb(37 99 235 / 0.28),
-    inset 0 1px 0 rgb(255 255 255 / 0.2);
+    0 1px 2px rgb(3 105 161 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
 }
 
 .ssh-safeshield-plan-badge[data-tier='paid'] .ssh-safeshield-plan-badge-mark {
-  border: 1px solid rgb(219 234 254 / 0.55);
-  background: rgb(239 246 255 / 0.94);
-  color: #1d4ed8;
-  box-shadow: 0 0 12px rgb(147 197 253 / 0.34);
+  border: 1px solid rgb(186 230 253 / 0.46);
+  background: rgb(240 249 255 / 0.12);
+  color: #bae6fd;
+  box-shadow: none;
 }
 
 .ssh-safeshield-plan-caption {
@@ -1542,27 +1508,9 @@
   white-space: nowrap;
 }
 
-@keyframes ssh-safeshield-premium-shine {
-  0%,
-  72% {
-    left: -36%;
-    opacity: 0;
-  }
-
-  78% {
-    opacity: 0.92;
-  }
-
-  90%,
-  100% {
-    left: 118%;
-    opacity: 0;
-  }
-}
-
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='free'] {
   border-color: #475569;
-  background: linear-gradient(135deg, #1e293b, #0f172a);
+  background: #1e293b;
   color: #cbd5e1;
 }
 
@@ -1574,47 +1522,52 @@
 }
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='pro'] {
-  border-color: #5eead4;
-  background: linear-gradient(125deg, #022c22 0%, #065f46 34%, #0d9488 70%, #2dd4bf 100%);
-  color: #ecfeff;
-  box-shadow:
-    0 0 0 1px rgb(45 212 191 / 0.14),
-    0 0 26px rgb(20 184 166 / 0.3),
-    inset 0 1px 0 rgb(255 255 255 / 0.18);
+  border-color: #0f766e;
+  background: linear-gradient(135deg, #042f2e 0%, #134e4a 100%);
+  color: #99f6e4;
+  box-shadow: inset 0 1px 0 rgb(153 246 228 / 0.08);
+}
+
+.ssh-app[data-theme='dark']
+  .ssh-safeshield-plan-badge[data-tier='pro']
+  .ssh-safeshield-plan-badge-mark {
+  border-color: rgb(45 212 191 / 0.38);
+  background: rgb(13 148 136 / 0.12);
+  color: #99f6e4;
 }
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='ultimate'] {
-  border-color: #fcd34d;
-  background:
-    radial-gradient(circle at 18% 20%, rgb(255 255 255 / 0.2), transparent 28%),
-    linear-gradient(122deg, #0c0a09 0%, #451a03 24%, #b45309 56%, #f59e0b 80%, #fde68a 100%);
-  color: #fff7ed;
-  box-shadow:
-    0 0 0 1px rgb(251 191 36 / 0.2),
-    0 0 30px rgb(245 158 11 / 0.4),
-    0 10px 28px rgb(0 0 0 / 0.36),
-    inset 0 1px 0 rgb(255 255 255 / 0.22);
+  border-color: #b45309;
+  background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
+  color: #fde68a;
+  box-shadow: inset 0 1px 0 rgb(253 230 138 / 0.08);
+}
+
+.ssh-app[data-theme='dark']
+  .ssh-safeshield-plan-badge[data-tier='ultimate']
+  .ssh-safeshield-plan-badge-mark {
+  border-color: rgb(217 119 6 / 0.46);
+  background: rgb(146 64 14 / 0.16);
+  color: #fde68a;
 }
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='paid'] {
-  border-color: #7dd3fc;
-  background: linear-gradient(125deg, #172554 0%, #312e81 36%, #1d4ed8 72%, #0ea5e9 100%);
-  color: #eff6ff;
-  box-shadow:
-    0 0 0 1px rgb(125 211 252 / 0.14),
-    0 0 24px rgb(59 130 246 / 0.3),
-    inset 0 1px 0 rgb(255 255 255 / 0.16);
+  border-color: #0369a1;
+  background: linear-gradient(135deg, #082f49 0%, #0c4a6e 100%);
+  color: #bae6fd;
+  box-shadow: inset 0 1px 0 rgb(186 230 253 / 0.08);
+}
+
+.ssh-app[data-theme='dark']
+  .ssh-safeshield-plan-badge[data-tier='paid']
+  .ssh-safeshield-plan-badge-mark {
+  border-color: rgb(14 165 233 / 0.36);
+  background: rgb(3 105 161 / 0.14);
+  color: #bae6fd;
 }
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption {
   color: #94a3b8;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ssh-safeshield-plan-badge[data-tier='ultimate']::after {
-    animation: none;
-    opacity: 0;
-  }
 }
 
 .ssh-safeshield-upgrade-card {
@@ -1713,44 +1666,6 @@
   outline-offset: 2px;
 }
 
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='free'] {
-  border-color: #475569;
-  background: #1e293b;
-  color: #cbd5e1;
-}
-
-.ssh-app[data-theme='dark']
-  .ssh-safeshield-plan-badge[data-tier='free']
-  .ssh-safeshield-plan-badge-mark {
-  background: #475569;
-  color: #e2e8f0;
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='pro'] {
-  border-color: #0f766e;
-  background: linear-gradient(135deg, rgb(13 148 136 / 0.2), rgb(6 78 59 / 0.32));
-  color: #99f6e4;
-  box-shadow: 0 0 20px rgb(45 212 191 / 0.08);
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='ultimate'] {
-  border-color: #d97706;
-  background: linear-gradient(135deg, rgb(146 64 14 / 0.3), rgb(120 53 15 / 0.22));
-  color: #fde68a;
-  box-shadow:
-    0 0 22px rgb(245 158 11 / 0.1),
-    inset 0 1px 0 rgb(253 230 138 / 0.12);
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-badge[data-tier='paid'] {
-  border-color: #0e7490;
-  background: linear-gradient(135deg, rgb(14 116 144 / 0.24), rgb(22 78 99 / 0.28));
-  color: #a5f3fc;
-}
-
-.ssh-app[data-theme='dark'] .ssh-safeshield-plan-caption {
-  color: #94a3b8;
-}
 
 .ssh-app[data-theme='dark'] .ssh-safeshield-upgrade-card {
   border-color: #134e4a;
@@ -1803,6 +1718,7 @@
 
   .ssh-safeshield-upgrade-action {
     width: 100%;
+    justify-content: center;
   }
 }
 
@@ -2209,13 +2125,9 @@
 }
 
 @media (max-width: 640px) {
-  .ssh-safeshield-license-summary,
-  .ssh-safeshield-upgrade-card {
-    align-items: flex-start;
-  }
-
   .ssh-safeshield-license-summary {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .ssh-safeshield-license-key-mask {
@@ -2223,10 +2135,6 @@
     overflow-wrap: anywhere;
   }
 
-  .ssh-safeshield-upgrade-action {
-    width: 100%;
-    justify-content: center;
-  }
 }
 
 @media (min-width: 640px) {

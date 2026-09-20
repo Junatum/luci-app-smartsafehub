@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.17-r9] - 2026-09-20
+
+### 개선
+
+- SafeShield의 유료 멤버십 배지를 지속적으로 빛나는 프로모션 배지 대신 정적인 premium chip 형태로 정리했습니다. ULTIMATE의 하단 amber glow와 shine 애니메이션을 제거하고, 얕은 그림자·1px 테두리·절제된 bronze surface만 사용해 라이트 모드에서도 주변 카드와 자연스럽게 어울리도록 했습니다.
+- PRO는 teal, ULTIMATE는 bronze, PLUS를 포함한 기타 유료 플랜은 blue 계열을 유지하되 모든 등급에서 외부 glow와 아이콘 glow를 제거했습니다. 다크 모드도 같은 색상 체계를 더 어두운 surface로 표현해 등급 구분은 유지하면서 과한 광택 효과를 없앴습니다.
+- 중복으로 존재하던 다크 모드 멤버십 badge override를 한 군데로 통합해 이후 스타일 수정 시 실제 적용 규칙을 추적하기 쉽게 했습니다.
+
+### 테스트 및 문서
+
+- `tests/test-safeshield-page-contract.sh`에 정적 ULTIMATE/PRO/기타 유료 플랜 surface, glow·shine 제거, 다크 모드 ULTIMATE 규칙 단일 정의를 검증하는 소스 스타일 계약을 추가했습니다. 프런트엔드 빌드 산출물은 패치에서 생성하지 않습니다.
+- README의 유료 플랜 표시 설명을 정적인 premium chip 디자인에 맞게 갱신했습니다.
+
 ## [0.2.17-r8] - 2026-09-20
 
 ### 개선
