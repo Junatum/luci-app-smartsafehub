@@ -7,6 +7,7 @@ import type {
   SoftwareUpdateSettingsInput,
   SoftwareUpdateStatus,
 } from '../types/updates';
+import { isSoftwareUpdateCheckStale } from '../utils/softwareUpdates';
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -94,7 +95,7 @@ function updateErrorSummary(error: SoftwareUpdateError): { title: string; descri
   };
 }
 
-function phaseLabel(data: SoftwareUpdateStatus): string {
+function phaseLabel(data: SoftwareUpdateStatus, stale: boolean): string {
   if (data.phase === 'checking') {
     return '업데이트 확인 중';
   }
@@ -107,17 +108,20 @@ function phaseLabel(data: SoftwareUpdateStatus): string {
   if (data.updateCount > 0) {
     return '업데이트 가능';
   }
+  if (stale) {
+    return '업데이트 확인 지연';
+  }
   return data.lastCheckAt ? '최신 상태' : '확인 전';
 }
 
-function phaseClass(data: SoftwareUpdateStatus): string {
+function phaseClass(data: SoftwareUpdateStatus, stale: boolean): string {
   if (data.phase === 'error') {
     return 'bg-rose-50 text-rose-700 ring-rose-200';
   }
   if (data.phase === 'checking' || data.phase === 'installing') {
     return 'bg-sky-50 text-sky-700 ring-sky-200';
   }
-  if (data.updateCount > 0) {
+  if (data.updateCount > 0 || stale) {
     return 'bg-amber-50 text-amber-800 ring-amber-200';
   }
   if (!data.lastCheckAt) {
@@ -126,7 +130,7 @@ function phaseClass(data: SoftwareUpdateStatus): string {
   return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
 }
 
-function updatePhaseIcon(data: SoftwareUpdateStatus) {
+function updatePhaseIcon(data: SoftwareUpdateStatus, stale: boolean) {
   if (data.phase === 'checking' || data.phase === 'installing') {
     return <ReloadIcon class="size-3.5 shrink-0 animate-spin" />;
   }
@@ -135,6 +139,9 @@ function updatePhaseIcon(data: SoftwareUpdateStatus) {
   }
   if (data.updateCount > 0) {
     return <DownloadIcon class="size-3.5 shrink-0" />;
+  }
+  if (stale) {
+    return <AlertIcon class="size-3.5 shrink-0" />;
   }
   if (!data.lastCheckAt) {
     return <ClockIcon class="size-3.5 shrink-0" />;
@@ -209,6 +216,7 @@ export function SoftwareUpdatesCard({
   const checking = action === 'check' || data?.phase === 'checking';
   const installing = action === 'install' || data?.phase === 'installing';
   const busy = checking || installing;
+  const updateCheckStale = isSoftwareUpdateCheckStale(data);
   const repositoryCheckFailed =
     data?.phase === 'error' && data.lastError?.code === 'UPDATES_INDEX_REFRESH_FAILED';
   const lastErrorSummary = data?.lastError ? updateErrorSummary(data.lastError) : null;
@@ -262,10 +270,10 @@ export function SoftwareUpdatesCard({
                   </p>
                   {data ? (
                     <span
-                      class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset ${phaseClass(data)}`}
+                      class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset ${phaseClass(data, updateCheckStale)}`}
                     >
-                      <span aria-hidden="true" class="flex items-center justify-center">{updatePhaseIcon(data)}</span>
-                      {phaseLabel(data)}
+                      <span aria-hidden="true" class="flex items-center justify-center">{updatePhaseIcon(data, updateCheckStale)}</span>
+                      {phaseLabel(data, updateCheckStale)}
                     </span>
                   ) : null}
                 </div>
@@ -467,13 +475,17 @@ export function SoftwareUpdatesCard({
                   Available
                 </dt>
                 <dd class={`mt-2 mb-0 ml-0 break-all text-sm font-black ${
-                  currentPackage?.updateAvailable ? 'text-amber-700' : 'text-slate-950'
+                  currentPackage?.updateAvailable || updateCheckStale
+                    ? 'text-amber-700'
+                    : 'text-slate-950'
                 }`}>
                   {!data.lastCheckAt || (repositoryCheckFailed && !currentPackage?.updateAvailable)
                     ? '미확인'
                     : currentPackage?.updateAvailable && currentPackage.availableVersion
                       ? currentPackage.availableVersion
-                      : '최신 버전'}
+                      : updateCheckStale
+                        ? '확인 필요'
+                        : '최신 버전'}
                 </dd>
               </div>
               <div class="bg-white p-4">
@@ -496,22 +508,41 @@ export function SoftwareUpdatesCard({
           </div>
         ) : null}
         {data && data.updateCount === 0 && data.lastCheckAt ? (
-          <section
-            class="mx-5 mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mx-6 sm:mb-6 sm:p-5"
-            data-section="software-update-result"
-          >
-            <div class="flex gap-3">
-              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700">
-                <CheckCircleIcon class="size-5" />
-              </span>
-              <div>
-                <h3 class="m-0 text-base font-black text-emerald-950">최신 버전을 사용 중입니다.</h3>
-                <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
-                  마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
-                </p>
+          updateCheckStale ? (
+            <section
+              class="mx-5 mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:mx-6 sm:mb-6 sm:p-5"
+              data-section="software-update-result"
+            >
+              <div class="flex gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-amber-700 ring-1 ring-inset ring-amber-200">
+                  <AlertIcon class="size-5" />
+                </span>
+                <div>
+                  <h3 class="m-0 text-base font-black text-amber-950">업데이트 확인이 지연되고 있습니다.</h3>
+                  <p class="mt-1 mb-0 text-sm leading-6 text-amber-800">
+                    마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다. 자동 확인 상태를 점검하거나 업데이트 확인을 실행해 주세요.
+                  </p>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          ) : (
+            <section
+              class="mx-5 mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:mx-6 sm:mb-6 sm:p-5"
+              data-section="software-update-result"
+            >
+              <div class="flex gap-3">
+                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700">
+                  <CheckCircleIcon class="size-5" />
+                </span>
+                <div>
+                  <h3 class="m-0 text-base font-black text-emerald-950">최신 버전을 사용 중입니다.</h3>
+                  <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
+                    마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
+                  </p>
+                </div>
+              </div>
+            </section>
+          )
         ) : null}
 
         {data && data.updateCount === 0 && !data.lastCheckAt ? (

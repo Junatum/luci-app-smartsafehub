@@ -140,6 +140,11 @@ printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package postinst must limit service enable to runtime installation'
 printf '%s\n' "$postinst_block" | grep -Fq 'mkdir -p /tmp/smartsafehub' ||
 	fail 'package postinst must create the SmartSafeHub runtime directory'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-updater enable' ||
+	fail 'package postinst must force-enable smartsafehub-updater so scheduled checks survive upgrades'
+if printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-updater restart'; then
+	fail 'package postinst must not restart smartsafehub-updater while it may be upgrading itself'
+fi
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-firmware enable' ||
 	fail 'package postinst must force-enable smartsafehub-firmware'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-health enable' ||
@@ -161,6 +166,9 @@ printf '%s\n' "$postinst_block" | grep -Fq 'uci -q delete smartsafehub.firmware.
 	fail 'package postinst must remove the obsolete firmware check_enabled option on existing installs'
 if printf '%s\n' "$postinst_block" | grep -Fq 'smartsafehub.updates.check_enabled'; then
 	fail 'package postinst must not remove the management software check_enabled option'
+fi
+if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-updater enabled'; then
+	fail 'updater service enable must not depend on upgrade or previous enabled state'
 fi
 if printf '%s\n' "$postinst_block" | grep -Eq 'PKG_UPGRADE|smartsafehub-firmware enabled'; then
 	fail 'firmware service enable must not depend on upgrade or previous enabled state'

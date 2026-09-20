@@ -15,13 +15,14 @@ SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
 ASYNC_RESOURCE="$ROOT_DIR/frontend/src/hooks/useAsyncResource.ts"
 APP_CSS="$ROOT_DIR/frontend/src/styles/app.css"
+UPDATE_FRESHNESS="$ROOT_DIR/frontend/src/utils/softwareUpdates.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$UPDATE_FRESHNESS"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -105,8 +106,8 @@ grep -Fq 'data-section="software-update-result"' "$UPDATES_CARD" || \
 # Busy update work should have persistent visual feedback rather than relying on hover text.
 grep -Fq "const installing = action === 'install' || data?.phase === 'installing';" "$UPDATES_CARD" || \
 	fail 'update card must track installing state explicitly'
-grep -Fq 'function updatePhaseIcon(data: SoftwareUpdateStatus)' "$UPDATES_CARD" || \
-	fail 'update card must provide an explicit status icon for each update phase'
+grep -Fq 'function updatePhaseIcon(data: SoftwareUpdateStatus, stale: boolean)' "$UPDATES_CARD" || \
+	fail 'update card must provide an explicit status icon for each update phase and stale state'
 grep -Fq 'ReloadIcon class="size-3.5 shrink-0 animate-spin"' "$UPDATES_CARD" || \
 	fail 'checking/installing status badge must spin the shared reload icon'
 grep -Fq "{installing ? '설치 중...' : '업데이트 설치'}" "$UPDATES_CARD" || \
@@ -138,6 +139,20 @@ grep -Fq '{data.lastError.message}' "$UPDATES_CARD" || \
 # An unchecked repository state must stay neutral and must not be presented as current.
 grep -Fq "return data.lastCheckAt ? '최신 상태' : '확인 전';" "$UPDATES_CARD" || \
 	fail 'update badge must distinguish unchecked state from current state'
+grep -Fq "if (stale)" "$UPDATES_CARD" || \
+	fail 'stale management-software checks must override the green current-state badge'
+grep -Fq "return '업데이트 확인 지연';" "$UPDATES_CARD" || \
+	fail 'stale management-software checks must be labeled as delayed'
+grep -Fq 'isSoftwareUpdateCheckStale(data)' "$UPDATES_CARD" || \
+	fail 'update page must use the shared software-update freshness rule'
+grep -Fq 'data.settings.checkIntervalSeconds * 2' "$UPDATE_FRESHNESS" || \
+	fail 'software-update freshness helper must use twice the configured check interval'
+grep -Fq 'MINIMUM_STALE_THRESHOLD_SECONDS = 7_200' "$UPDATE_FRESHNESS" || \
+	fail 'software-update freshness helper must preserve the two-hour minimum stale threshold'
+grep -Fq '업데이트 확인이 지연되고 있습니다.' "$UPDATES_CARD" || \
+	fail 'stale update page must explain that automatic checking is delayed'
+grep -Fq "? '확인 필요'" "$UPDATES_CARD" || \
+	fail 'stale available-version summary must not claim the repository is current'
 grep -Fq "if (!data.lastCheckAt)" "$UPDATES_CARD" || \
 	fail 'unchecked update badge must use a dedicated neutral style'
 grep -Fq "? '미확인'" "$UPDATES_CARD" || \

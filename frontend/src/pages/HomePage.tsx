@@ -21,6 +21,7 @@ import type { LanSettings } from '../types/lan';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
+import { isSoftwareUpdateCheckStale } from '../utils/softwareUpdates';
 import {
   formatBootTime,
   formatBytes,
@@ -617,17 +618,7 @@ export function HomePage({
       safeShieldStaleThreshold !== null &&
       safeShieldRefreshAge > safeShieldStaleThreshold,
   );
-  const updateAge = elapsedSeconds(updates?.lastCheckAt, relativeNow);
-  const updateStaleThreshold = updates
-    ? Math.max(updates.settings.checkIntervalSeconds * 2, 7_200)
-    : null;
-  const updatesStale = Boolean(
-    updates?.settings.checkEnabled &&
-      updates.phase !== 'checking' &&
-      updateAge !== null &&
-      updateStaleThreshold !== null &&
-      updateAge > updateStaleThreshold,
-  );
+  const updatesStale = isSoftwareUpdateCheckStale(updates, relativeNow);
   const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);
   const deviceFirmware =
     firmwareLoading && !firmware

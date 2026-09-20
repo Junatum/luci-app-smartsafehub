@@ -11,13 +11,14 @@ STATISTICS_HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldStatistics.ts"
 FORMAT="$ROOT_DIR/frontend/src/app/format.ts"
 HEALTH_HOOK="$ROOT_DIR/frontend/src/hooks/useHealth.ts"
 APP_STYLE="$ROOT_DIR/frontend/src/styles/app.css"
+UPDATE_FRESHNESS="$ROOT_DIR/frontend/src/utils/softwareUpdates.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT" "$HEALTH_HOOK" "$APP_STYLE"; do
+for file in "$APP" "$HOME" "$ACTIVITY" "$DEVICES_HOOK" "$STATISTICS_HOOK" "$FORMAT" "$HEALTH_HOOK" "$APP_STYLE" "$UPDATE_FRESHNESS"; do
 	[ -f "$file" ] || fail "대시보드 소스 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
@@ -194,6 +195,10 @@ grep -Fq "state={devices ? 'healthy' : devicesError ? 'warning' : 'neutral'}" "$
 	fail '연결 기기 데이터가 있으면 목록 확인 시각과 관계없이 정상 상태를 유지해야 합니다'
 grep -Fq "updatesStale ? '업데이트 확인 지연' : '마지막 확인'" "$HOME" || \
 	fail '소프트웨어 업데이트 개요 카드가 최근 확인 정보와 지연 경고를 직접 표시해야 합니다'
+grep -Fq 'const updatesStale = isSoftwareUpdateCheckStale(updates, relativeNow);' "$HOME" || \
+	fail '대시보드와 업데이트 페이지는 같은 관리 소프트웨어 지연 기준을 사용해야 합니다'
+grep -Fq "import { isSoftwareUpdateCheckStale } from '../utils/softwareUpdates';" "$HOME" || \
+	fail '대시보드는 공통 관리 소프트웨어 freshness helper를 사용해야 합니다'
 grep -Fq '{label}: {formatRelativeTime(timestamp, nowTimestamp)}' "$HOME" || \
 	fail '대시보드 최근 확인 문구는 항목과 상대 시간을 콜론으로 구분해야 합니다'
 grep -Fq "updates && !updates.settings.checkEnabled" "$HOME" || \
