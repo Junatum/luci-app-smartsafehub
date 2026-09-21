@@ -5,6 +5,7 @@ set -eu
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 SYNC_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-activity-sync"
 EVENTS_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-events"
+LICENSE_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-license"
 SAFE_ADAPTER="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/safeshield-management.uc"
 HEALTH_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-health"
 TMP_DIR="$(mktemp -d)"
@@ -15,7 +16,7 @@ fail() {
   exit 1
 }
 
-for file in "$SYNC_BIN" "$EVENTS_BIN" "$SAFE_ADAPTER"; do
+for file in "$SYNC_BIN" "$EVENTS_BIN" "$LICENSE_BIN" "$SAFE_ADAPTER"; do
   [ -f "$file" ] || fail "missing activity producer/sync component: $file"
 done
 
@@ -40,11 +41,13 @@ grep -Fq 'mv "$WAKE_FILE" "$consumed"' "$SYNC_BIN" || fail 'wake marker consumpt
 grep -Fq 'RETRY_INITIAL_S=900' "$SYNC_BIN" || fail 'Cloud activity status failures must start with a 15-minute retry backoff'
 grep -Fq 'RETRY_MAX_S=3600' "$SYNC_BIN" || fail 'Cloud activity retry backoff must be capped at one hour'
 grep -Fq 'retry_backoff_active' "$SYNC_BIN" || fail 'new event wake markers must respect an active Cloud failure backoff'
-grep -Fq '$base/licenses/status' "$SYNC_BIN" || fail 'Cloud activity credentials must use the lightweight license status endpoint'
-if grep -Fq '$base/licenses/resolve' "$SYNC_BIN"; then
-  fail 'Cloud activity sync must not resolve artifacts just to obtain an activity credential'
+if grep -Fq '$base/licenses/status' "$SYNC_BIN" || grep -Fq '$base/licenses/resolve' "$SYNC_BIN" || grep -Fq 'post_json()' "$SYNC_BIN"; then
+  fail 'activity sync must not duplicate license API calls; smartsafehub-license owns license status and activity credential acquisition'
 fi
-grep -Fq 'build_status_body' "$SYNC_BIN" || fail 'activity sync must build the minimal license status request payload'
+grep -Fq 'SMARTSAFEHUB_ACTIVITY_LICENSE_BIN' "$SYNC_BIN" || fail 'activity sync must consume the dedicated license helper boundary'
+grep -Fq '"$LICENSE_BIN" status-sync' "$SYNC_BIN" || fail 'missing/expired activity credentials must be refreshed through smartsafehub-license status-sync'
+grep -Fq 'store_activity_credential_from_status' "$LICENSE_BIN" || fail 'license helper must cache activity_history credentials from its authoritative status response'
+grep -Fq '$base/licenses/status' "$LICENSE_BIN" || fail 'license helper must remain the single owner of /licenses/status'
 grep -Fq '[ -e "$WAKE_FILE" ] && ! retry_backoff_active' "$SYNC_BIN" || fail 'event wake must not bypass Cloud failure backoff'
 
 for contract in \
@@ -66,11 +69,13 @@ OUTBOX="$TMP_DIR/outbox.jsonl"
 ACK_LOG="$TMP_DIR/ack.log"
 CLEAR_LOG="$TMP_DIR/clear.log"
 FETCH_LOG="$TMP_DIR/fetch.log"
-STATUS_BODY_LOG="$TMP_DIR/status-body.json"
+LICENSE_CALL_LOG="$TMP_DIR/license-calls.log"
+LICENSE_STATUS_FILE="$TMP_DIR/license-status.json"
 mkdir -p "$MOCK_BIN" "$RUNTIME"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 : > "$FETCH_LOG"
+: > "$LICENSE_CALL_LOG"
 
 cat > "$MOCK_BIN/events" <<'EOF_EVENTS'
 #!/bin/sh
@@ -114,22 +119,6 @@ case "$*" in
 esac
 EOF_UCI
 chmod +x "$MOCK_BIN/uci"
-
-cat > "$MOCK_BIN/ubus" <<'EOF_UBUS'
-#!/bin/sh
-if [ "$1" = call ] && [ "$2" = safeshield ] && [ "$3" = license_get ]; then
-  printf '%s\n' '{"license":{"configured":true,"key":"SSH-PAID-TEST"}}'
-  exit 0
-fi
-if [ "$1" = call ] && [ "$2" = safeshield ] && [ "$3" = status ]; then
-  cat <<'EOF_STATUS'
-{"version":"0.3.24-r1","device":{"physical_fingerprint":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","fingerprint_version":1,"identity_provider":"physical","identity_source":"factory","identity_strength":"strong","identity_profile":"router","installation_id":"install-test","configured":{"vendor":"SmartSafeHub","model":"AX3000SM","arch":"aarch64_cortex-a53","memory_mb":256,"device_code":"iptime-ax3000sm","device_code_source":"smartsafehub_firmware"}}}
-EOF_STATUS
-  exit 0
-fi
-exit 1
-EOF_UBUS
-chmod +x "$MOCK_BIN/ubus"
 
 cat > "$MOCK_BIN/jsonfilter" <<'EOF_JSONFILTER'
 #!/bin/sh
@@ -176,49 +165,75 @@ while [ "$#" -gt 0 ]; do
     *) url="$1"; shift ;;
   esac
 done
-printf '%s\n' "$url" >> "$MOCK_FETCH_LOG"
 case "$url" in
-  */licenses/status)
-    cp "$body" "$MOCK_STATUS_BODY_LOG"
-    case "${MOCK_STATUS_MODE:-paid}" in
-      paid)
-        cat > "$output" <<'EOF_PAID'
-{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none","activity_history":{"upload_url":"https://www.smartsafehub.com/api/v1/activity/events","token":"activity-token","token_expires_in_s":172800,"retention_days":90}}
-EOF_PAID
-        ;;
-      paid-missing)
-        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none"}' > "$output"
-        ;;
-      paid-null)
-        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none","activity_history":null}' > "$output"
-        ;;
-      revoked)
-        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":false},"activation":{"status":"revoked"},"device_action":"clear_license","activity_history":null}' > "$output"
-        ;;
-      unknown)
-        printf '%s\n' '{"license":{"plan":"pro"}}' > "$output"
-        ;;
-      free)
-        printf '%s\n' '{"license":{"plan":"free","status":"unlicensed","is_licensed":false},"activation":{"status":"not_found"},"device_action":"clear_license","activity_history":null}' > "$output"
-        ;;
-      unavailable)
-        exit 1
-        ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  */licenses/resolve)
-    echo 'unexpected artifact resolve from activity sync' >&2
-    exit 99
-    ;;
   */activity/events)
+    printf '%s
+' "$url" >> "$MOCK_FETCH_LOG"
     count="$(jq '.events | length' "$body")"
-    printf '{"status":"accepted","received":%s,"accepted":%s,"duplicates":0,"expired":0}\n' "$count" "$count" > "$output"
+    printf '{"status":"accepted","received":%s,"accepted":%s,"duplicates":0,"expired":0}
+' "$count" "$count" > "$output"
+    ;;
+  */licenses/status|*/licenses/resolve)
+    echo 'activity sync must not call license APIs directly' >&2
+    exit 99
     ;;
   *) exit 1 ;;
 esac
 EOF_FETCH
 chmod +x "$MOCK_BIN/uclient-fetch"
+
+cat > "$MOCK_BIN/license" <<'EOF_LICENSE'
+#!/bin/sh
+set -eu
+command="${1:-}"
+printf '%s
+' "$command" >> "$MOCK_LICENSE_CALL_LOG"
+case "$command" in
+  status-sync)
+    case "${MOCK_STATUS_MODE:-paid}" in
+      paid)
+        cat > "$MOCK_ACTIVITY_CREDENTIAL_FILE" <<EOF_CREDENTIAL
+{"schema":1,"token":"activity-token","upload_url":"https://www.smartsafehub.com/api/v1/activity/events","expires_at":1800172800,"retention_days":90,"plan":"pro"}
+EOF_CREDENTIAL
+        printf '%s
+' '{"schema":1,"component":"license","phase":"active","plan":"pro","licenseStatus":"active","activationStatus":"active","deviceAction":"none"}' > "$MOCK_LICENSE_STATUS_FILE"
+        exit 0
+        ;;
+      paid-missing|paid-null)
+        rm -f "$MOCK_ACTIVITY_CREDENTIAL_FILE"
+        printf '%s
+' '{"schema":1,"component":"license","phase":"active","plan":"pro","licenseStatus":"active","activationStatus":"active","deviceAction":"none"}' > "$MOCK_LICENSE_STATUS_FILE"
+        exit 0
+        ;;
+      revoked)
+        rm -f "$MOCK_ACTIVITY_CREDENTIAL_FILE"
+        printf '%s
+' '{"schema":1,"component":"license","phase":"cleared","plan":"pro","licenseStatus":"active","activationStatus":"revoked","deviceAction":"clear_license"}' > "$MOCK_LICENSE_STATUS_FILE"
+        exit 0
+        ;;
+      free)
+        rm -f "$MOCK_ACTIVITY_CREDENTIAL_FILE"
+        printf '%s
+' '{"schema":1,"component":"license","phase":"unconfigured","plan":null,"licenseStatus":"unlicensed","activationStatus":"not_found","deviceAction":"none"}' > "$MOCK_LICENSE_STATUS_FILE"
+        exit 0
+        ;;
+      unknown)
+        rm -f "$MOCK_ACTIVITY_CREDENTIAL_FILE"
+        printf '%s
+' '{"schema":1,"component":"license","phase":"error","plan":"pro","licenseStatus":"active","activationStatus":"active","deviceAction":"none"}' > "$MOCK_LICENSE_STATUS_FILE"
+        exit 0
+        ;;
+      unavailable) exit 1 ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  status)
+    cat "$MOCK_LICENSE_STATUS_FILE"
+    ;;
+  *) exit 2 ;;
+esac
+EOF_LICENSE
+chmod +x "$MOCK_BIN/license"
 
 cat > "$MOCK_BIN/sleep" <<'EOF_SLEEP'
 #!/bin/sh
@@ -239,14 +254,15 @@ run_sync() {
     SMARTSAFEHUB_ACTIVITY_RUNTIME_DIR="$RUNTIME" \
     SMARTSAFEHUB_ACTIVITY_EVENTS_BIN="$MOCK_BIN/events" \
     SMARTSAFEHUB_ACTIVITY_UCI_BIN="$MOCK_BIN/uci" \
-    SMARTSAFEHUB_ACTIVITY_UBUS_BIN="$MOCK_BIN/ubus" \
-    SMARTSAFEHUB_ACTIVITY_JSONFILTER_BIN="$MOCK_BIN/jsonfilter" \
+        SMARTSAFEHUB_ACTIVITY_JSONFILTER_BIN="$MOCK_BIN/jsonfilter" \
     SMARTSAFEHUB_ACTIVITY_UCLIENT_FETCH_BIN="$MOCK_BIN/uclient-fetch" \
+    SMARTSAFEHUB_ACTIVITY_LICENSE_BIN="$MOCK_BIN/license" \
     SMARTSAFEHUB_ACTIVITY_DATE_BIN="$MOCK_BIN/date" \
     SMARTSAFEHUB_ACTIVITY_SLEEP_BIN="$MOCK_BIN/sleep" \
     SMARTSAFEHUB_ACTIVITY_LOGGER_BIN="$MOCK_BIN/logger" \
     MOCK_OUTBOX="$OUTBOX" MOCK_ACK_LOG="$ACK_LOG" MOCK_CLEAR_LOG="$CLEAR_LOG" \
-    MOCK_FETCH_LOG="$FETCH_LOG" MOCK_STATUS_BODY_LOG="$STATUS_BODY_LOG" \
+    MOCK_FETCH_LOG="$FETCH_LOG" MOCK_LICENSE_CALL_LOG="$LICENSE_CALL_LOG" \
+    MOCK_LICENSE_STATUS_FILE="$LICENSE_STATUS_FILE" MOCK_ACTIVITY_CREDENTIAL_FILE="$RUNTIME/activity-sync-credential.json" \
     MOCK_STATUS_MODE="$1" \
     "$SYNC_BIN" sync-once
 }
@@ -257,10 +273,9 @@ run_sync paid || fail 'paid activity batch must synchronize successfully'
 [ "$(wc -l < "$ACK_LOG" | tr -d ' ')" -eq 2 ] || fail 'successful two-event upload must ack both event IDs'
 jq -e '.eligible == true and .plan == "pro" and .retentionDays == 90 and .pendingEvents == 0 and .lastUploadedCount == 2 and .lastSuccessAt == 1800000000' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'paid synchronization state must expose entitlement, retention, pending count and success metadata'
-jq -e '.license_key == "SSH-PAID-TEST" and .device.physical_fingerprint == "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" and (.device | keys | length) == 1 and (keys | sort) == ["device","license_key"]' "$STATUS_BODY_LOG" >/dev/null || \
-  fail 'activity sync must send only license_key and physical_fingerprint to /licenses/status'
-if grep -Fq '/licenses/resolve' "$FETCH_LOG"; then
-  fail 'activity sync must never call /licenses/resolve after the status endpoint migration'
+grep -Fxq 'status-sync' "$LICENSE_CALL_LOG" || fail 'missing credential must be refreshed through smartsafehub-license status-sync'
+if grep -Eq '/licenses/(status|resolve)' "$FETCH_LOG"; then
+  fail 'activity sync must never call license APIs directly'
 fi
 
 # Credentials issued by the previous /licenses/resolve implementation use the
@@ -268,29 +283,32 @@ fi
 # usable after upgrading the router and must not force an immediate status call.
 : > "$FETCH_LOG"
 : > "$ACK_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 run_sync unavailable || fail 'a still-valid cached activity credential must survive the status-endpoint migration'
 [ ! -s "$OUTBOX" ] || fail 'cached credential upload must ack the snapshotted events'
-if grep -Fq '/licenses/status' "$FETCH_LOG"; then
-  fail 'valid cached activity credential must not trigger an unnecessary license status request'
+if [ -s "$LICENSE_CALL_LOG" ]; then
+  fail 'valid cached activity credential must not trigger an unnecessary license status refresh'
 fi
 grep -Fq '/activity/events' "$FETCH_LOG" || fail 'valid cached credential must continue uploading activity events'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 if run_sync paid-missing >/dev/null 2>&1; then
   fail 'paid status without an activity credential must be retried as an error'
 fi
 [ -s "$OUTBOX" ] || fail 'paid events must never be discarded when the backend omits the activity credential'
 [ ! -s "$CLEAR_LOG" ] || fail 'paid missing-credential response must not clear the Cloud outbox'
-jq -e '.phase == "error" and .lastErrorCode == "ACTIVITY_STATUS_UNSUPPORTED"' "$RUNTIME/activity-sync.json" >/dev/null || \
+jq -e '.phase == "error" and .lastErrorCode == "ACTIVITY_CREDENTIAL_UNAVAILABLE"' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'paid missing-credential response must surface a rollout-safe status error'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 if run_sync paid-null >/dev/null 2>&1; then
   fail 'older paid status without activity credentials must remain retryable until the Hub activity API is deployed'
@@ -301,6 +319,7 @@ fi
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 if run_sync unknown >/dev/null 2>&1; then
   fail 'status responses with unknown entitlement must be retryable rather than treated as Free'
@@ -311,13 +330,14 @@ fi
 rm -f "$RUNTIME/activity-sync-credential.json" "$RUNTIME/activity-sync.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 if run_sync unavailable >/dev/null 2>&1; then
   fail 'unreachable Hub license status API must surface a retryable synchronization error'
 fi
 [ -s "$OUTBOX" ] || fail 'Hub status API communication failure must preserve Cloud events for a later retry'
 [ ! -s "$CLEAR_LOG" ] || fail 'Hub status API communication failure must not clear the Cloud outbox'
-jq -e '.lastErrorCode == "ACTIVITY_STATUS_FAILED" and .nextSyncAt == 1800000900' "$RUNTIME/activity-sync.json" >/dev/null || \
+jq -e '.lastErrorCode == "ACTIVITY_LICENSE_STATUS_FAILED" and .nextSyncAt == 1800000900' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'first Cloud status failure must back off for 15 minutes instead of retrying after five minutes'
 if run_sync unavailable >/dev/null 2>&1; then
   fail 'repeated unavailable Hub status must remain retryable'
@@ -338,6 +358,7 @@ jq -e '.nextSyncAt == 1800003600' "$RUNTIME/activity-sync.json" >/dev/null || \
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 run_sync revoked || fail 'revoked paid activation must settle as ineligible without a daemon failure'
 [ ! -s "$OUTBOX" ] || fail 'revoked paid activation must not retain a Cloud-only outbox indefinitely'
@@ -346,6 +367,7 @@ grep -Fq 'clear' "$CLEAR_LOG" || fail 'revoked paid activation must explicitly c
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$LICENSE_CALL_LOG"
 write_outbox
 run_sync free || fail 'ineligible activity sync must settle without a daemon failure'
 [ ! -s "$OUTBOX" ] || fail 'Free/ineligible device must not retain a Cloud-only outbox indefinitely'

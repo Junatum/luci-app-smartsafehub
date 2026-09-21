@@ -9,6 +9,7 @@ COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/commo
 
 RUNTIME_DIR="${SMARTSAFEHUB_LICENSE_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_LICENSE_STATE_FILE:-$RUNTIME_DIR/license.json}"
+ACTIVITY_CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-sync-credential.json}"
 ACTIVATION_LOCK="${SMARTSAFEHUB_LICENSE_ACTIVATION_LOCK:-$RUNTIME_DIR/license-activate.lock}"
 ACTIVATION_REQUEST_PATH="${SMARTSAFEHUB_LICENSE_ACTIVATION_REQUEST_FILE:-$RUNTIME_DIR/license-activate.request.json}"
 UCI_BIN="${SMARTSAFEHUB_LICENSE_UCI_BIN:-uci}"
@@ -122,6 +123,39 @@ json_value() {
 
 sanitize_code() {
 	printf '%s' "$1" | tr -cd 'A-Za-z0-9_.:-' | cut -c 1-120
+}
+
+number_value() {
+	case "$1" in
+		''|*[!0-9]*) printf '0' ;;
+		*) printf '%s' "$1" ;;
+	esac
+}
+
+store_activity_credential_from_status() {
+	local response="$1" token url ttl retention plan now expires tmp
+	token="$(json_value "$response" '@.activity_history.token')"
+	url="$(json_value "$response" '@.activity_history.upload_url')"
+	ttl="$(number_value "$(json_value "$response" '@.activity_history.token_expires_in_s')")"
+	retention="$(number_value "$(json_value "$response" '@.activity_history.retention_days')")"
+	plan="$(json_value "$response" '@.license.plan')"
+
+	[ -n "$token" ] || return 2
+	case "$url" in https://*) ;; *) return 3 ;; esac
+	[ "$ttl" -gt 600 ] 2>/dev/null || return 4
+	[ "$retention" -gt 0 ] 2>/dev/null || retention=90
+
+	now="$(now_epoch)"
+	expires=$((now + ttl))
+	tmp="${ACTIVITY_CREDENTIAL_FILE}.tmp.$$"
+	cat > "$tmp" <<EOF_ACTIVITY_CREDENTIAL
+{"schema":1,"token":"$(json_escape "$token")","upload_url":"$(json_escape "$url")","expires_at":$expires,"retention_days":$retention,"plan":"$(json_escape "$plan")"}
+EOF_ACTIVITY_CREDENTIAL
+	if ! mv "$tmp" "$ACTIVITY_CREDENTIAL_FILE"; then
+		rm -f "$tmp"
+		return 5
+	fi
+	return 0
 }
 
 write_state_fields() {
@@ -389,6 +423,11 @@ activate_license() {
 		return 1
 	fi
 
+	# A credential belongs to the previously resolved license state. Invalidate
+	# it only after the new license key was successfully applied locally; the
+	# next status-sync will issue a credential for the new entitlement.
+	rm -f "$ACTIVITY_CREDENTIAL_FILE"
+
 	now="$(now_epoch)"
 	interval="$(check_interval_s)"
 	write_state_fields active activated '' "$now" "$now" "$now" $((now + interval)) "$plan" "$license_status" "$activation_status" none 200 active null
@@ -399,7 +438,7 @@ activate_license() {
 }
 
 status_sync() {
-	local now previous_activated previous_plan previous_license_status interval next_check key fingerprint base action licensed plan license_status activation_status
+	local now previous_activated previous_plan previous_license_status interval next_check key fingerprint base action licensed plan license_status activation_status activity_credential_rc
 
 	# Activation and periodic reconciliation share one state file. Do not let a
 	# scheduled status check overwrite an in-flight explicit activation result.
@@ -418,6 +457,7 @@ status_sync() {
 		return 1
 	fi
 	if [ -z "$key" ]; then
+		rm -f "$ACTIVITY_CREDENTIAL_FILE"
 		write_state unconfigured unconfigured '' "$now" "$now" "$previous_activated" "$next_check" '' unlicensed not_found none
 		return 0
 	fi
@@ -450,6 +490,20 @@ EOF_REQUEST
 	activation_status="$(json_value "$STATUS_RESPONSE_FILE" '@.activation.status')"
 
 	if [ "$action" = 'none' ] && { [ "$licensed" = 'true' ] || [ "$licensed" = '1' ]; }; then
+		activity_credential_rc=0
+		store_activity_credential_from_status "$STATUS_RESPONSE_FILE" || activity_credential_rc=$?
+		if [ "$activity_credential_rc" -ne 0 ]; then
+			# License status remains authoritative even when an optional Cloud
+			# feature credential is unavailable. Keep any still-valid cached
+			# credential and surface the exact non-secret failure class in logread.
+			case "$activity_credential_rc" in
+				2) log_message 'LICENSE_ACTIVITY_CREDENTIAL_TOKEN_MISSING: activity_history token이 없습니다.' ;;
+				3) log_message 'LICENSE_ACTIVITY_CREDENTIAL_URL_INVALID: upload URL이 HTTPS가 아닙니다.' ;;
+				4) log_message 'LICENSE_ACTIVITY_CREDENTIAL_TTL_INVALID: upload token TTL이 너무 짧거나 잘못되었습니다.' ;;
+				5) log_message 'LICENSE_ACTIVITY_CREDENTIAL_WRITE_FAILED: runtime credential cache를 저장하지 못했습니다.' ;;
+				*) log_message 'LICENSE_ACTIVITY_CREDENTIAL_INVALID: activity_history credential을 사용할 수 없습니다.' ;;
+			esac
+		fi
 		write_state_fields active active '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" none 200 keep keep
 		if { [ -n "$previous_plan" ] && [ "$previous_plan" != "$plan" ]; } || \
 			{ [ -n "$previous_license_status" ] && [ "$previous_license_status" != "$license_status" ]; }; then
@@ -459,6 +513,7 @@ EOF_REQUEST
 	fi
 
 	if [ "$action" = 'clear_license' ]; then
+		rm -f "$ACTIVITY_CREDENTIAL_FILE"
 		if ! update_local_license ''; then
 			write_state_fields error failed LICENSE_LOCAL_CLEAR_FAILED "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license 200 keep keep
 			log_message 'LICENSE_LOCAL_CLEAR_FAILED: 서버 해제 지시를 로컬에 적용하지 못했습니다.'

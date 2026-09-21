@@ -39,6 +39,7 @@ grep -Fq 'kill "$WAIT_PID"' "$HELPER" || fail '라이선스 daemon 종료 시 �
 grep -Fq '"lastHttpStatus"' "$HELPER" || fail '라이선스 상태 파일에 마지막 Hub HTTP 상태를 기록해야 합니다.'
 grep -Fq '"lastActivationResult"' "$HELPER" || fail '라이선스 상태 파일에 마지막 activation 결과를 기록해야 합니다.'
 grep -Fq '"lastActivationErrorCode"' "$HELPER" || fail '라이선스 상태 파일에 마지막 activation 오류를 기록해야 합니다.'
+grep -Fq 'store_activity_credential_from_status' "$HELPER" || fail '라이선스 status-sync가 Cloud activity credential의 단일 발급/저장 경로여야 합니다.'
 
 grep -Fq "activate --request-file" "$HELPER" || fail '향후 agent license 모듈로 옮길 수 있는 activate subcommand가 필요합니다.'
 grep -Fq 'status-sync' "$HELPER" || fail '향후 agent license 모듈로 옮길 수 있는 status-sync subcommand가 필요합니다.'
@@ -178,7 +179,7 @@ EOF_ACTIVATE
 			exit "${MOCK_STATUS_FETCH_EXIT}"
 		fi
 		cat > "$output" <<EOF_STATUS
-{"license":{"plan":"${MOCK_STATUS_PLAN:-ultimate}","status":"${MOCK_STATUS_LICENSE_STATUS:-active}","is_licensed":${MOCK_STATUS_LICENSED:-true}},"activation":{"status":"${MOCK_STATUS_ACTIVATION:-active}"},"device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"device_action":"${MOCK_STATUS_ACTION:-none}"}
+{"license":{"plan":"${MOCK_STATUS_PLAN:-ultimate}","status":"${MOCK_STATUS_LICENSE_STATUS:-active}","is_licensed":${MOCK_STATUS_LICENSED:-true}},"activation":{"status":"${MOCK_STATUS_ACTIVATION:-active}"},"device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"device_action":"${MOCK_STATUS_ACTION:-none}","activity_history":{"upload_url":"https://www.smartsafehub.com/api/v1/activity/events","token":"activity-test-token","token_expires_in_s":172800,"retention_days":90}}
 EOF_STATUS
 		;;
 	*) exit 3 ;;
@@ -210,6 +211,7 @@ LOCK_DIR="$TMP/runtime/license-activate.lock"
 UPDATE_LOG="$TMP/license-update.log"
 FETCH_URL_LOG="$TMP/fetch-url.log"
 FETCH_BODY_LOG="$TMP/fetch-body.log"
+ACTIVITY_CREDENTIAL_FILE="$TMP/runtime/activity-sync-credential.json"
 : > "$UPDATE_LOG"
 : > "$FETCH_URL_LOG"
 : > "$FETCH_BODY_LOG"
@@ -251,6 +253,7 @@ run_license() {
 	MOCK_EPOCH="${MOCK_EPOCH:-1800000000}" \
 	SMARTSAFEHUB_LICENSE_RUNTIME_DIR="$TMP/runtime" \
 	SMARTSAFEHUB_LICENSE_STATE_FILE="$STATE_FILE" \
+	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$ACTIVITY_CREDENTIAL_FILE" \
 	SMARTSAFEHUB_LICENSE_ACTIVATION_LOCK="$LOCK_DIR" \
 	SMARTSAFEHUB_LICENSE_UCI_BIN="$TMP/bin/uci" \
 	SMARTSAFEHUB_LICENSE_UBUS_BIN="$TMP/bin/ubus" \
@@ -270,6 +273,7 @@ ACTIVATION_REQUEST="$TMP/runtime/license-activate.request.json"
 cat > "$ACTIVATION_REQUEST" <<'EOF_REQUEST'
 {"license_key":"LIC-ACTIVATE-001"}
 EOF_REQUEST
+printf '%s\n' '{"schema":1,"token":"stale-token"}' > "$ACTIVITY_CREDENTIAL_FILE"
 mkdir "$LOCK_DIR"
 run_license activate --request-file "$ACTIVATION_REQUEST" || fail '유효한 라이선스 activate 요청이 성공해야 합니다.'
 grep -Fq '/api/v1/licenses/activate' "$FETCH_URL_LOG" || fail 'activate endpoint가 호출되어야 합니다.'
@@ -280,6 +284,7 @@ grep -Fq '"safeshield_version":"0.3.23-r1"' "$FETCH_BODY_LOG" || fail 'activate 
 grep -Fq 'LIC-ACTIVATE-001' "$UPDATE_LOG" || fail 'Hub activation 성공 뒤에만 SafeShield license_update가 호출되어야 합니다.'
 [ ! -e "$ACTIVATION_REQUEST" ] || fail 'activate 요청 임시 파일은 완료 후 삭제되어야 합니다.'
 [ ! -d "$LOCK_DIR" ] || fail 'activate single-flight lock은 완료 후 해제되어야 합니다.'
+[ ! -e "$ACTIVITY_CREDENTIAL_FILE" ] || fail '새 라이선스가 적용되면 이전 entitlement의 activity credential을 폐기해야 합니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'active' ] || fail 'activate 성공 상태는 active여야 합니다.'
 [ "$(jq -r '.lastResult' "$STATE_FILE")" = 'activated' ] || fail 'activate 성공 결과는 activated여야 합니다.'
 [ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = '200' ] || fail 'activate 성공 시 마지막 Hub HTTP 상태를 200으로 기록해야 합니다.'
@@ -301,6 +306,10 @@ grep -Fq '"license_key":"LIC-LOCAL-001"' "$FETCH_BODY_LOG" || fail 'status paylo
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'active' ] || fail 'active status 응답은 active 상태로 기록해야 합니다.'
 [ "$(jq -r '.lastHttpStatus' "$STATE_FILE")" = '200' ] || fail 'status 성공 시 마지막 Hub HTTP 상태를 갱신해야 합니다.'
 [ "$(jq -r '.lastActivationResult' "$STATE_FILE")" = 'active' ] || fail '주기 status-sync가 마지막 activation 결과를 덮어쓰면 안 됩니다.'
+[ -s "$ACTIVITY_CREDENTIAL_FILE" ] || fail 'active paid status-sync는 activity upload credential을 private runtime cache에 저장해야 합니다.'
+[ "$(jq -r '.token' "$ACTIVITY_CREDENTIAL_FILE")" = 'activity-test-token' ] || fail 'activity credential cache에 Hub가 발급한 token이 저장되어야 합니다.'
+[ "$(jq -r '.plan' "$ACTIVITY_CREDENTIAL_FILE")" = 'ultimate' ] || fail 'activity credential cache에 현재 plan을 저장해야 합니다.'
+[ "$(jq -r '.retention_days' "$ACTIVITY_CREDENTIAL_FILE")" = '90' ] || fail 'activity credential cache에 retention 정책을 저장해야 합니다.'
 
 # Explicit server revocation is authoritative and clears the local key through
 # SafeShield, never by writing SafeShield UCI directly.
@@ -314,6 +323,7 @@ run_license status-sync || fail 'revoked status-sync가 로컬 정리를 완료�
 grep -Fq '"license_key":""' "$UPDATE_LOG" || fail 'clear_license는 SafeShield license_update에 빈 키를 전달해야 합니다.'
 [ "$(jq -r '.phase' "$STATE_FILE")" = 'cleared' ] || fail '해제 완료 상태는 cleared여야 합니다.'
 [ "$(jq -r '.activationStatus' "$STATE_FILE")" = 'revoked' ] || fail '서버 activation 상태를 진단용 상태에 남겨야 합니다.'
+[ ! -e "$ACTIVITY_CREDENTIAL_FILE" ] || fail '서버가 라이선스를 해제하면 activity credential cache도 제거해야 합니다.'
 
 # Network/server failures are fail-open locally: never clear a key unless a
 # successful response explicitly asks for clear_license.
@@ -432,6 +442,7 @@ MOCK_CHECK_INTERVAL=300 \
 MOCK_STARTUP_DELAY=0 \
 SMARTSAFEHUB_LICENSE_RUNTIME_DIR="$TMP/runtime" \
 SMARTSAFEHUB_LICENSE_STATE_FILE="$STATE_FILE" \
+	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$ACTIVITY_CREDENTIAL_FILE" \
 SMARTSAFEHUB_LICENSE_ACTIVATION_LOCK="$LOCK_DIR" \
 SMARTSAFEHUB_LICENSE_UCI_BIN="$TMP/bin/uci" \
 SMARTSAFEHUB_LICENSE_UBUS_BIN="$TMP/bin/ubus" \

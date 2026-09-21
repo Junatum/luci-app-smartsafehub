@@ -1,5 +1,20 @@
 # 변경 기록
 
+## [0.2.19-r17] - 2026-09-21
+
+### 수정
+
+- Cloud 활동 기록 upload credential의 발급 책임을 `smartsafehub-license`로 통합했습니다. 기존에는 `smartsafehub-license`와 `smartsafehub-activity-sync`가 각각 `/api/v1/licenses/status` 요청/응답 해석을 별도로 구현해 동일한 라이선스 상태 API 계약이 두 곳에 중복되어 있었고, 실기기에서는 license status-sync가 정상인데 activity-sync의 중복 credential 획득 경로만 `ACTIVITY_STATUS_FAILED`로 실패하는 문제가 있었습니다.
+- `smartsafehub-license status-sync`가 이미 정상 처리한 Hub `/licenses/status` 응답의 `activity_history` credential을 `/tmp/smartsafehub/activity-sync-credential.json`에 원자적으로 저장합니다. 토큰은 기존과 동일하게 `/tmp`에만 보관되며 재부팅 시 사라집니다.
+- `smartsafehub-activity-sync`는 더 이상 `/licenses/status` 또는 `/licenses/resolve`를 직접 호출하거나 license key/device fingerprint를 다시 읽어 같은 entitlement 응답을 중복 파싱하지 않습니다. credential이 없거나 만료 임박하면 `smartsafehub-license status-sync`를 실행해 canonical license 경로를 갱신한 뒤 캐시된 upload credential만 소비합니다.
+- 서버가 명시적으로 라이선스를 해제하거나 로컬 라이선스가 미설정 상태가 되면 license component가 activity credential을 함께 제거하고, activity sync는 Cloud-only outbox만 정리합니다. 반대로 Pro/Ultimate 상태는 정상인데 activity credential만 발급되지 않은 경우에는 `ACTIVITY_CREDENTIAL_UNAVAILABLE`로 outbox를 보존합니다. license status 자체를 확인하지 못한 경우는 `ACTIVITY_LICENSE_STATUS_FAILED`로 구분합니다.
+- 기존에 발급된 유효한 activity credential은 r17 업그레이드 뒤에도 그대로 재사용하므로 즉시 추가 status 호출을 만들지 않습니다. Cloud event upload/ack, 15분 → 30분 → 60분 backoff, 로컬 최근 활동 history는 그대로 유지됩니다.
+
+### 테스트 및 문서
+
+- license status-sync가 paid 응답의 activity credential을 실제 runtime cache에 저장하고 revoke/clear 시 제거하는 계약을 추가했습니다. Activity Sync는 license API를 직접 호출하지 않고 `smartsafehub-license status-sync` 경계만 사용하며, cached credential 재사용·paid credential 누락·Free/revoked 처리·Cloud upload/ack·backoff가 유지되는지 회귀 테스트로 고정했습니다.
+- README의 Cloud 활동 기록 구조를 `license = entitlement/credential owner`, `activity-sync = upload/ack consumer` 책임 분리와 향후 agent module 경계에 맞게 갱신했습니다.
+
 ## [0.2.19-r16] - 2026-09-21
 
 ### 수정

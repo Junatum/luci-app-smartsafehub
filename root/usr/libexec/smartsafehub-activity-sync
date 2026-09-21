@@ -13,14 +13,13 @@ CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-
 WAKE_FILE="${SMARTSAFEHUB_ACTIVITY_WAKE_FILE:-$RUNTIME_DIR/activity-sync.wake}"
 LOCK_DIR="${SMARTSAFEHUB_ACTIVITY_LOCK_DIR:-$RUNTIME_DIR/activity-sync.lock}"
 EVENTS_BIN="${SMARTSAFEHUB_ACTIVITY_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
+LICENSE_BIN="${SMARTSAFEHUB_ACTIVITY_LICENSE_BIN:-/usr/libexec/smartsafehub-license}"
 UCI_BIN="${SMARTSAFEHUB_ACTIVITY_UCI_BIN:-uci}"
-UBUS_BIN="${SMARTSAFEHUB_ACTIVITY_UBUS_BIN:-ubus}"
 JSONFILTER_BIN="${SMARTSAFEHUB_ACTIVITY_JSONFILTER_BIN:-jsonfilter}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_ACTIVITY_UCLIENT_FETCH_BIN:-uclient-fetch}"
 DATE_BIN="${SMARTSAFEHUB_ACTIVITY_DATE_BIN:-date}"
 SLEEP_BIN="${SMARTSAFEHUB_ACTIVITY_SLEEP_BIN:-sleep}"
 LOGGER_BIN="${SMARTSAFEHUB_ACTIVITY_LOGGER_BIN:-logger}"
-DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 DEFAULT_SYNC_INTERVAL_S=300
 DEFAULT_STARTUP_DELAY_S=45
 DAEMON_TICK_S=15
@@ -29,22 +28,16 @@ CREDENTIAL_REFRESH_MARGIN_S=600
 RETRY_INITIAL_S=900
 RETRY_MAX_S=3600
 
-STATUS_BODY_FILE=''
-STATUS_RESPONSE_FILE=''
 UPLOAD_BODY_FILE=''
 UPLOAD_RESPONSE_FILE=''
-SAFESHIELD_STATUS_FILE=''
-LICENSE_FILE=''
+LICENSE_STATUS_FILE=''
 STOP_REQUESTED=0
 WAIT_PID=''
 
 cleanup_files() {
-	[ -n "$STATUS_BODY_FILE" ] && rm -f "$STATUS_BODY_FILE"
-	[ -n "$STATUS_RESPONSE_FILE" ] && rm -f "$STATUS_RESPONSE_FILE"
 	[ -n "$UPLOAD_BODY_FILE" ] && rm -f "$UPLOAD_BODY_FILE"
 	[ -n "$UPLOAD_RESPONSE_FILE" ] && rm -f "$UPLOAD_RESPONSE_FILE"
-	[ -n "$SAFESHIELD_STATUS_FILE" ] && rm -f "$SAFESHIELD_STATUS_FILE"
-	[ -n "$LICENSE_FILE" ] && rm -f "$LICENSE_FILE"
+	[ -n "$LICENSE_STATUS_FILE" ] && rm -f "$LICENSE_STATUS_FILE"
 }
 
 request_stop() {
@@ -66,11 +59,6 @@ normalized_integer() {
 
 sync_interval_s() { normalized_integer "$(uci_get sync_interval_s)" "$DEFAULT_SYNC_INTERVAL_S" 60 86400; }
 startup_delay_s() { normalized_integer "$(uci_get startup_delay_s)" "$DEFAULT_STARTUP_DELAY_S" 0 600; }
-api_base_url() {
-	local value
-	value="$(uci_get api_base_url)"
-	case "$value" in https://*) printf '%s' "${value%/}" ;; *) printf '%s' "$DEFAULT_API_BASE_URL" ;; esac
-}
 now_epoch() {
 	local value
 	value="$("$DATE_BIN" +%s 2>/dev/null || true)"
@@ -154,39 +142,6 @@ EOF_STATE
 	mv "$tmp" "$STATE_FILE"
 }
 
-read_license_key() {
-	local configured key
-	LICENSE_FILE="$RUNTIME_DIR/activity-license.$$.json"
-	if ! "$UBUS_BIN" call safeshield license_get > "$LICENSE_FILE" 2>/dev/null; then return 1; fi
-	configured="$(json_value "$LICENSE_FILE" '@.license.configured')"
-	key="$(json_value "$LICENSE_FILE" '@.license.key')"
-	[ -n "$key" ] || key="$(json_value "$LICENSE_FILE" '@.key')"
-	case "$configured" in true|1) ;; *) printf '%s' ''; return 0 ;; esac
-	printf '%s' "$key"
-}
-
-build_status_body() {
-	local key="$1" fingerprint
-	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/activity-safeshield.$$.json"
-	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then return 1; fi
-
-	fingerprint="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.physical_fingerprint')"
-	case "$fingerprint" in
-		????????????????????????????????????????????????????????????????) case "$fingerprint" in *[!0-9a-fA-F]*) return 1 ;; esac ;;
-		*) return 1 ;;
-	esac
-
-	STATUS_BODY_FILE="$RUNTIME_DIR/activity-status-body.$$.json"
-	cat > "$STATUS_BODY_FILE" <<EOF_STATUS
-{"license_key":"$(json_escape "$key")","device":{"physical_fingerprint":"$(json_escape "$fingerprint")"}}
-EOF_STATUS
-}
-
-post_json() {
-	local body_file="$1" output_file="$2" url="$3"
-	"$UCLIENT_FETCH_BIN" -q -T "$REQUEST_TIMEOUT_S" --method=POST --body-file="$body_file" \
-		--header='Content-Type: application/json' -O "$output_file" "$url"
-}
 post_authorized_json() {
 	local body_file="$1" output_file="$2" url="$3" token="$4"
 	"$UCLIENT_FETCH_BIN" -q -T "$REQUEST_TIMEOUT_S" --method=POST --body-file="$body_file" \
@@ -206,75 +161,39 @@ credential_valid() {
 	[ "$expires" -gt $((now + CREDENTIAL_REFRESH_MARGIN_S)) ] 2>/dev/null
 }
 
-store_credential() {
-	local response="$1" now token url ttl retention plan expires tmp
-	token="$(json_value "$response" '@.activity_history.token')"
-	url="$(json_value "$response" '@.activity_history.upload_url')"
-	ttl="$(number_value "$(json_value "$response" '@.activity_history.token_expires_in_s')")"
-	retention="$(number_value "$(json_value "$response" '@.activity_history.retention_days')")"
-	plan="$(json_value "$response" '@.license.plan')"
-	[ -n "$token" ] || return 2
-	case "$url" in https://*) ;; *) return 1 ;; esac
-	[ "$ttl" -gt "$CREDENTIAL_REFRESH_MARGIN_S" ] 2>/dev/null || return 1
-	[ "$retention" -gt 0 ] 2>/dev/null || retention=90
-	now="$(now_epoch)"
-	expires=$((now + ttl))
-	tmp="${CREDENTIAL_FILE}.tmp.$$"
-	cat > "$tmp" <<EOF_CREDENTIAL
-{"schema":1,"token":"$(json_escape "$token")","upload_url":"$(json_escape "$url")","expires_at":$expires,"retention_days":$retention,"plan":"$(json_escape "$plan")"}
-EOF_CREDENTIAL
-	mv "$tmp" "$CREDENTIAL_FILE"
-}
+refresh_credential_from_license() {
+	local phase plan action
+	[ -x "$LICENSE_BIN" ] || return 1
 
-status_credential() {
-	local key base activity_token plan is_licensed device_action
-	key="$(read_license_key 2>/dev/null || true)"
-	if [ -z "$key" ]; then
-		rm -f "$CREDENTIAL_FILE"
-		"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
-		return 2
-	fi
-	build_status_body "$key" || return 1
-	STATUS_RESPONSE_FILE="$RUNTIME_DIR/activity-status-response.$$.json"
-	base="$(api_base_url)"
-	post_json "$STATUS_BODY_FILE" "$STATUS_RESPONSE_FILE" "$base/licenses/status" || return 1
+	# /licenses/status is owned by the license component. It already has the
+	# authoritative device identity, reconciliation rules and proven request
+	# path. Refresh it once, then consume the activity credential it cached.
+	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$CREDENTIAL_FILE" "$LICENSE_BIN" status-sync >/dev/null 2>&1 || return 1
+	credential_valid && return 0
 
-	activity_token="$(json_value "$STATUS_RESPONSE_FILE" '@.activity_history.token')"
-	plan="$(json_value "$STATUS_RESPONSE_FILE" '@.license.plan' | tr '[:upper:]' '[:lower:]')"
-	is_licensed="$(json_value "$STATUS_RESPONSE_FILE" '@.license.is_licensed' | tr '[:upper:]' '[:lower:]')"
-	device_action="$(json_value "$STATUS_RESPONSE_FILE" '@.device_action' | tr '[:upper:]' '[:lower:]')"
+	LICENSE_STATUS_FILE="$RUNTIME_DIR/activity-license-status.$$.json"
+	"$LICENSE_BIN" status > "$LICENSE_STATUS_FILE" 2>/dev/null || return 1
+	phase="$(json_value "$LICENSE_STATUS_FILE" '@.phase' | tr '[:upper:]' '[:lower:]')"
+	plan="$(json_value "$LICENSE_STATUS_FILE" '@.plan' | tr '[:upper:]' '[:lower:]')"
+	action="$(json_value "$LICENSE_STATUS_FILE" '@.deviceAction' | tr '[:upper:]' '[:lower:]')"
 
-	# /licenses/status is authoritative for current eligibility. Explicitly
-	# ineligible devices must not retain a Cloud-only outbox, regardless of any
-	# stale or inconsistent credential field in the response.
-	case "$is_licensed:$device_action:$plan" in
-		false:*:*|0:*:*|*:clear_license:*|*:*:free)
-		rm -f "$CREDENTIAL_FILE"
+	case "$phase:$action:$plan" in
+		unconfigured:*:*|cleared:*:*|*:clear_license:*|*:*:free)
+			rm -f "$CREDENTIAL_FILE"
 			"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
 			return 2
 			;;
-	esac
-
-	if [ -z "$activity_token" ]; then
-		rm -f "$CREDENTIAL_FILE"
-		# An active paid status without activity_history is the expected shape of
-		# an older Hub during a staged rollout. Preserve the bounded outbox rather
-		# than falling back to /licenses/resolve and resolving an artifact.
-		case "$is_licensed:$plan" in
-			true:pro|true:ultimate|1:pro|1:ultimate) return 3 ;;
-			*) return 1 ;;
-		esac
-	fi
-
-	case "$is_licensed:$device_action:$plan" in
-		true:none:pro|true:none:ultimate|1:none:pro|1:none:ultimate) ;;
+		active:none:pro|active:none:ultimate)
+			# The license API succeeded and the account is paid, but no usable
+			# activity credential was published. Preserve the bounded outbox.
+			return 3
+			;;
 		*) return 1 ;;
 	esac
-	store_credential "$STATUS_RESPONSE_FILE"
 }
 
 sync_once() {
-	local now previous_success interval next_sync retry_delay pending batch_count plan retention token url received accepted duplicates expired processed event_id status_rc
+	local now previous_success interval next_sync retry_delay pending batch_count plan retention token url received accepted duplicates expired processed event_id credential_rc
 	mkdir -p "$RUNTIME_DIR" || return 1
 	acquire_lock || return 75
 	trap 'release_lock; cleanup_files' EXIT INT TERM
@@ -287,9 +206,9 @@ sync_once() {
 	write_state syncing null '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
 
 	if ! credential_valid; then
-		status_rc=0
-		status_credential || status_rc=$?
-		case "$status_rc" in
+		credential_rc=0
+		refresh_credential_from_license || credential_rc=$?
+		case "$credential_rc" in
 			2)
 				pending="$(pending_count)"
 				write_state ineligible false '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
@@ -298,12 +217,12 @@ sync_once() {
 			0) ;;
 			3)
 				next_sync=$((now + retry_delay))
-				write_state error true '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_STATUS_UNSUPPORTED "$next_sync"
+				write_state error true '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_CREDENTIAL_UNAVAILABLE "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 1
 				;;
 			*)
 				next_sync=$((now + retry_delay))
-				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_STATUS_FAILED "$next_sync"
+				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_LICENSE_STATUS_FAILED "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 1
 				;;
 		esac
