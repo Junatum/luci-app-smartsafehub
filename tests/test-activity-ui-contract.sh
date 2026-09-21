@@ -123,6 +123,46 @@ for event_type in \
 	grep -Fq "case '$event_type':" "$TIMELINE" || fail "UI renderer missing event type: $event_type"
 done
 
+# 사용자에게 원인이나 정확도를 과도하게 단정하지 않는 최근 활동 문구를 유지합니다.
+grep -Fq "title: '공유기 부팅 감지'" "$TIMELINE" || \
+	fail 'boot activity must distinguish a detected boot from a generic router start'
+grep -Fq "description: '공유기가 켜지거나 재시작된 것을 확인했습니다.'" "$TIMELINE" || \
+	fail 'boot activity must explain both power-on and restart without exposing boot-session jargon'
+grep -Fq "title: '인터넷 연결 끊김 감지'" "$TIMELINE" || \
+	fail 'internet disconnect activity must be framed as an observation'
+grep -Fq "description: '공유기에서 인터넷 연결을 확인할 수 없었습니다.'" "$TIMELINE" || \
+	fail 'internet disconnect activity must not claim a specific upstream failure cause'
+grep -Fq '약 ${formatDuration(downtime)} 동안 인터넷 연결이 확인되지 않았습니다.' "$TIMELINE" || \
+	fail 'observed internet downtime must be qualified as approximate and observation-based'
+grep -Fq "title: 'SafeShield 보호 활성화'" "$TIMELINE" || \
+	fail 'SafeShield enabled activity must use explicit activation wording'
+grep -Fq "title: 'SafeShield 보호 비활성화'" "$TIMELINE" || \
+	fail 'SafeShield disabled activity must use explicit deactivation wording'
+grep -Fq "title: '라이선스 연결 해제'" "$TIMELINE" || \
+	fail 'license clear activity must describe the router-license link instead of implying license deletion'
+grep -Fq "title: '확인이 필요한 장치 상태 발견'" "$TIMELINE" || \
+	fail 'health issue activity must use user-facing device-state wording'
+grep -Fq "title: '확인이 필요한 장치 상태 변경'" "$TIMELINE" || \
+	fail 'health change activity must avoid diagnostic jargon'
+grep -Fq "title: '장치 상태 정상으로 복구'" "$TIMELINE" || \
+	fail 'health resolved activity must clearly describe recovery'
+grep -Fq "function failureDescription(event: ActivityEvent, message: string): string" "$TIMELINE" || \
+	fail 'failed activities must share a user-facing description before diagnostic error codes'
+grep -Fq 'return errorCode ? `${message} (오류 코드: ${errorCode})` : message;' "$TIMELINE" || \
+	fail 'failed activities must keep error codes as secondary diagnostic information'
+
+for ambiguous_copy in \
+	"title: '공유기 시작'" \
+	"상위 네트워크 연결이 끊어졌습니다." \
+	'동안 연결이 중단되었습니다.' \
+	"title: 'SafeShield 보호 꺼짐'" \
+	"title: '라이선스 해제'" \
+	"title: '장치 진단 정상화'"; do
+	if grep -Fq "$ambiguous_copy" "$TIMELINE"; then
+		fail "ambiguous recent-activity copy must not return: $ambiguous_copy"
+	fi
+done
+
 grep -Fq "title: 'SmartSafeHub 활동'" "$TIMELINE" || \
 	fail 'unknown future event types must keep a safe UI fallback'
 grep -Fq 'formatNumber(domainCount)' "$TIMELINE" || \

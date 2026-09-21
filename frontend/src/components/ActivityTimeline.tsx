@@ -24,6 +24,11 @@ function metadataNumber(event: ActivityEvent, key: string): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function failureDescription(event: ActivityEvent, message: string): string {
+  const errorCode = metadataString(event, 'error_code');
+  return errorCode ? `${message} (오류 코드: ${errorCode})` : message;
+}
+
 function formatDuration(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));
   if (seconds < 60) {
@@ -66,14 +71,14 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
   switch (event.eventType) {
     case 'system.booted':
       return {
-        title: '공유기 시작',
-        description: 'SmartSafeHub가 새 부팅 세션을 시작했습니다.',
+        title: '공유기 부팅 감지',
+        description: '공유기가 켜지거나 재시작된 것을 확인했습니다.',
       };
 
     case 'network.internet.disconnected':
       return {
-        title: '인터넷 연결 끊김',
-        description: '상위 네트워크 연결이 끊어졌습니다.',
+        title: '인터넷 연결 끊김 감지',
+        description: '공유기에서 인터넷 연결을 확인할 수 없었습니다.',
       };
 
     case 'network.internet.recovered': {
@@ -82,20 +87,20 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
         title: '인터넷 연결 복구',
         description:
           downtime !== null && downtime > 0
-            ? `${formatDuration(downtime)} 동안 연결이 중단되었습니다.`
-            : '인터넷 연결이 다시 정상 상태로 돌아왔습니다.',
+            ? `약 ${formatDuration(downtime)} 동안 인터넷 연결이 확인되지 않았습니다.`
+            : '공유기에서 인터넷 연결을 다시 확인했습니다.',
       };
     }
 
     case 'safeshield.protection.enabled':
       return {
-        title: 'SafeShield 보호 켜짐',
+        title: 'SafeShield 보호 활성화',
         description: 'DNS 보호 기능이 활성화되었습니다.',
       };
 
     case 'safeshield.protection.disabled':
       return {
-        title: 'SafeShield 보호 꺼짐',
+        title: 'SafeShield 보호 비활성화',
         description: 'DNS 보호 기능이 비활성화되었습니다.',
       };
 
@@ -118,9 +123,7 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
     case 'safeshield.blocklist.update_failed':
       return {
         title: 'SafeShield 차단 목록 업데이트 실패',
-        description: metadataString(event, 'error_code')
-          ? `오류 코드: ${metadataString(event, 'error_code')}`
-          : '차단 목록을 업데이트하지 못했습니다.',
+        description: failureDescription(event, '차단 목록을 업데이트하지 못했습니다.'),
       };
 
     case 'software.update.completed':
@@ -132,9 +135,7 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
     case 'software.update.failed':
       return {
         title: '관리 소프트웨어 업데이트 실패',
-        description: metadataString(event, 'error_code')
-          ? `오류 코드: ${metadataString(event, 'error_code')}`
-          : '업데이트 작업을 완료하지 못했습니다.',
+        description: failureDescription(event, '관리 소프트웨어를 업데이트하지 못했습니다.'),
       };
 
     case 'firmware.update.started':
@@ -146,9 +147,7 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
     case 'firmware.update.failed':
       return {
         title: '펌웨어 업데이트 실패',
-        description: metadataString(event, 'error_code')
-          ? `오류 코드: ${metadataString(event, 'error_code')}`
-          : '펌웨어 설치 준비 또는 검증에 실패했습니다.',
+        description: failureDescription(event, '펌웨어 설치 준비 또는 검증에 실패했습니다.'),
       };
 
     case 'license.activated': {
@@ -175,8 +174,8 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
 
     case 'license.cleared':
       return {
-        title: '라이선스 해제',
-        description: '서버의 라이선스 상태와 동기화되어 로컬 라이선스가 해제되었습니다.',
+        title: '라이선스 연결 해제',
+        description: '서버의 라이선스 상태가 반영되어 이 공유기의 라이선스 연결이 해제되었습니다.',
       };
 
     case 'health.issue.started': {
@@ -190,8 +189,8 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
         details.push(`주의 ${formatNumber(warningCount)}건`);
       }
       return {
-        title: '장치 진단에서 확인 항목 발견',
-        description: details.length > 0 ? details.join(' · ') : '확인이 필요한 진단 항목이 발견되었습니다.',
+        title: '확인이 필요한 장치 상태 발견',
+        description: details.length > 0 ? details.join(' · ') : '장치 상태에서 확인이 필요한 항목이 발견되었습니다.',
       };
     }
 
@@ -206,15 +205,15 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
         details.push(`주의 ${formatNumber(warningCount)}건`);
       }
       return {
-        title: '장치 진단 상태 변경',
-        description: details.length > 0 ? details.join(' · ') : '진단에서 확인 중인 항목이 변경되었습니다.',
+        title: '확인이 필요한 장치 상태 변경',
+        description: details.length > 0 ? details.join(' · ') : '확인이 필요한 장치 상태 항목이 변경되었습니다.',
       };
     }
 
     case 'health.issue.resolved':
       return {
-        title: '장치 진단 정상화',
-        description: '이전에 확인된 진단 항목이 해소되었습니다.',
+        title: '장치 상태 정상으로 복구',
+        description: '이전에 확인이 필요했던 장치 상태가 정상으로 돌아왔습니다.',
       };
 
     default:
