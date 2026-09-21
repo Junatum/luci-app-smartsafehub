@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.19-r18] - 2026-09-21
+
+### 수정
+
+- SafeShield 수동 갱신 단계의 원형 progress ring이 `track 4px / active arc 7px`와 비교적 강한 drop-shadow 조합으로 렌더링되어 라이트/다크 모드에서 진행 표시가 필요 이상으로 두껍게 보이던 문제를 수정했습니다. 확인 결과 이 두께는 Tailwind `border` utility가 아니라 SVG에 직접 지정된 `strokeWidth`와 glow에서 발생했습니다.
+- 진행 ring의 track을 3px, active arc를 4px로 줄이고 light/dark theme의 glow도 함께 완화했습니다. 진행 단계 숫자와 6단계 구조, 회전 animation, 오류 상태 및 접근성 progressbar semantics는 그대로 유지합니다.
+- 이 progress ring은 SVG `strokeWidth`를 명시적으로 사용하므로 Tailwind border utility 값과 독립적으로 동일한 두께를 유지합니다.
+
+### 테스트 및 문서
+
+- SafeShield UI contract에 track/arc stroke 폭과 라이트/다크 모드 shadow 강도를 고정하는 회귀 검증을 추가해 이후 Tailwind border/shadow 변경이 진행 ring의 시각 두께를 다시 키우지 않도록 했습니다.
+- README의 SafeShield 갱신 단계 설명에 얇은 progress ring 시각 규칙을 추가했습니다.
+
 ## [0.2.19-r17] - 2026-09-21
 
 ### 수정

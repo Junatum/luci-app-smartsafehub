@@ -246,6 +246,8 @@ function RefreshDonut({
   total: number;
 }) {
   const loaderRadius = 18;
+  const loaderTrackWidth = 3;
+  const loaderArcWidth = 4;
   const loaderCircumference = 2 * Math.PI * loaderRadius;
   const loaderArcLength = loaderCircumference * 0.22;
   const loaderGapLength = loaderCircumference - loaderArcLength;
@@ -276,7 +278,7 @@ function RefreshDonut({
           fill="none"
           r={loaderRadius}
           stroke="currentColor"
-          strokeWidth="4"
+          strokeWidth={loaderTrackWidth}
         />
         {!failed ? (
           <circle
@@ -288,7 +290,7 @@ function RefreshDonut({
             stroke="currentColor"
             strokeDasharray={`${loaderArcLength} ${loaderGapLength}`}
             strokeLinecap="round"
-            strokeWidth="7"
+            strokeWidth={loaderArcWidth}
           />
         ) : null}
       </svg>
