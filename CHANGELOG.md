@@ -1,5 +1,25 @@
 # 변경 기록
 
+## [0.2.19-r9] - 2026-09-21
+
+### 기능
+
+- 공유기 웹사이트에 `최근 활동` 화면을 추가했습니다. 인터넷 연결, SafeShield 보호/차단 목록, 관리 소프트웨어, 펌웨어, 라이선스와 Health 진단의 정규화 이벤트를 시간순으로 표시하며 `오늘`/`어제`/날짜 단위로 묶어 확인할 수 있습니다.
+- 대시보드에도 최근 활동 3건을 요약해서 표시하고 `전체 보기`로 전용 화면에 이동할 수 있도록 연결했습니다. 이벤트 원본에는 UI 문구를 저장하지 않고 프론트엔드가 `event_type + metadata`를 사용자 문구로 렌더링하므로 이후 문구 변경과 다국어 확장을 그대로 유지합니다.
+- 인증된 read-only `smartsafehub.activity_history` RPC를 추가했습니다. 최대 128건만 반환하고 손상된 개별 레코드는 건너뛰며, `0.2.19-r8`에서 이미 수집된 `events.jsonl`도 전용 history가 생기기 전까지 호환 fallback으로 읽습니다. 첫 r9 이벤트에서는 기존 r8 outbox를 bounded local history에 먼저 승계해 업그레이드 직후의 최근 활동이 history 생성 시 사라지지 않도록 했습니다.
+
+### 안정성 및 저장 정책
+
+- 향후 Cloud Console 업로드가 outbox의 event를 `ack`해도 공유기 웹사이트의 최근 활동이 사라지지 않도록 `/tmp/smartsafehub/events.jsonl` Cloud outbox와 `/tmp/smartsafehub/activity-history.jsonl` 로컬 표시 history를 분리했습니다. 두 저장소 모두 최대 128건의 휘발성 기록만 유지하며 flash에는 주기적으로 쓰지 않습니다.
+- 로컬 최근 활동은 현재 부팅 세션 범위이며 재부팅하면 초기화됩니다. 주기적인 상태 조회 자체는 표시하지 않고 기존과 동일하게 실제 상태 전이가 발생한 경우에만 기록합니다.
+- 라이트/다크 모드에서 info/success/warning/error 이벤트의 배경, 테두리, 아이콘과 텍스트 대비가 기존 SmartSafeHub 공통 theme token을 따르도록 구성했습니다.
+
+### 테스트 및 문서
+
+- `tests/test-activity-ui-contract.sh`를 추가해 activity RPC/ACL, r8 fallback, outbox/history 분리, ack 후 local history 보존, 대시보드 3건 요약, 전체 페이지, 모든 현재 event type renderer와 라이트/다크 모드 tone 계약을 검증합니다.
+- 기존 event queue 테스트를 확장해 outbox와 local history가 함께 bounded retention을 적용하고, Cloud ack가 로컬 표시 history를 제거하지 않는지 검증합니다.
+- README의 활동 이벤트 문서를 공유기 `최근 활동` UI와 Cloud outbox/local history 분리 구조에 맞게 갱신했습니다.
+
 ## [0.2.19-r8] - 2026-09-21
 
 ### 기능

@@ -86,6 +86,10 @@ const methods = {
 		},
 	},
 	status: {
+		args: {
+			include_activity_history: false,
+			activity_limit: 128,
+		},
 		call: require_root_password(function(request) {
 			return read_status(request);
 		}),

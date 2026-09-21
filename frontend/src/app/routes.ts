@@ -1,5 +1,6 @@
 export type AppRoute =
   | 'home'
+  | 'activity'
   | 'lan'
   | 'wifi'
   | 'iptv'
@@ -24,6 +25,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: '대시보드',
     title: '대시보드',
     description: '네트워크, 장치와 시스템 상태를 한눈에 확인합니다.',
+  },
+  {
+    route: 'activity',
+    hash: '#activity',
+    label: '최근 활동',
+    title: '최근 활동',
+    description: '현재 부팅 이후 인터넷, 보호, 업데이트와 진단 상태 변화를 확인합니다.',
   },
   {
     route: 'lan',

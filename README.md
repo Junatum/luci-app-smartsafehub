@@ -88,6 +88,7 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 - SafeShield 차단 목록, 연결 기기 목록, 관리 소프트웨어 업데이트의 최근 확인 시각은 별도 하단 섹션 대신 각 개요 카드에서 `차단 목록 갱신: 41분 전`처럼 `항목: 상대 시간` 형식으로 표시하며, 마우스를 올리면 정확한 시각을 확인할 수 있음
 - 연결 기기의 `목록 확인` 시각은 정보성 메타데이터로만 표시하며 오래되었다는 이유만으로 카드 상태를 주의(노란색)로 변경하지 않음. 연결 기기 조회 자체가 실패한 경우에만 확인 필요 상태를 표시함
 - SafeShield/관리 소프트웨어가 각 설정 주기의 2배 이상 확인되지 않으면 해당 개요 카드에서 지연 상태를 경고하고, 정상 상태에서는 별도 freshness 영역을 표시하지 않음
+- 대시보드에 현재 부팅 이후의 정규화 이벤트 중 최신 3건을 `최근 활동`으로 표시하고, `전체 보기`에서 인터넷·보호·업데이트·라이선스·진단 상태 변화의 전체 로컬 이력을 확인할 수 있음
 - `시스템 상태 > 리소스 사용량` 카드 아래에서 최신 로컬 장치 진단을 함께 요약해 표시. 정상일 때는 전체 상태와 마지막 진단 시각/검사 항목 수를 간결하게 보여주고, 주의·이상 항목이 있으면 최대 2건을 바로 노출하며 상세 진단은 설정 페이지에서 확인
 - 장치 진단 요약의 정상/주의/이상 배경과 세부 항목은 라이트/다크 테마에 각각 맞는 대비를 사용하며, 다크 모드에서 반투명 밝은 배경이 남지 않도록 전용 테마 매핑을 적용
 
@@ -263,7 +264,12 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 }
 ```
 
-로컬 큐는 `/tmp/smartsafehub/events.jsonl`에 최대 128개를 보관하며 오래된 항목부터 제거합니다. 기록은 `mkdir` lock과 atomic rename으로 직렬화하고, `metadata`는 JSON object만 허용하며 크기를 제한합니다. `/tmp` 기반이므로 이벤트 수집 때문에 flash에 주기적으로 쓰지 않습니다. 향후 Cloud 업로더는 `list`로 batch를 읽고 서버가 수락한 `event_id`를 `ack`하여 제거할 수 있습니다. `device_uuid`는 공유기에서 임의로 신뢰하지 않고 현재는 `null`로 두며, Cloud 수집 단계에서 인증된 장치 identity 기준으로 서버가 연결하는 것을 전제로 합니다.
+이벤트는 서로 다른 수명 주기를 갖는 두 개의 `/tmp` 저장소에 최대 128건씩 보관합니다.
+
+- `/tmp/smartsafehub/activity-history.jsonl`: 공유기 웹사이트의 **최근 활동** 표시용 로컬 history. Cloud 전송 여부와 관계없이 현재 부팅 세션의 최근 활동을 유지합니다.
+- `/tmp/smartsafehub/events.jsonl`: 향후 Cloud Console 전송용 outbox. Cloud 업로더는 `list`로 batch를 읽고 서버가 수락한 `event_id`만 `ack`하여 제거할 수 있으며, 이 ack는 로컬 history를 삭제하지 않습니다.
+
+두 저장소 모두 오래된 항목부터 제거하고 `mkdir` lock과 atomic rename으로 직렬화하며, `metadata`는 JSON object만 허용하고 크기를 제한합니다. `/tmp` 기반이므로 이벤트 수집 때문에 flash에 주기적으로 쓰지 않고 재부팅 시 초기화됩니다. `0.2.19-r8`에서 이미 수집된 `/tmp/smartsafehub/events.jsonl`은 전용 history가 생기기 전까지 RPC가 호환 fallback으로 읽으며, 첫 r9 이벤트가 기록될 때 기존 r8 outbox를 bounded local history로 먼저 승계한 뒤 새 이벤트를 추가합니다. 따라서 같은 부팅 세션에서 업그레이드 직후 수집돼 있던 최근 활동이 history 생성 시 갑자기 사라지지 않습니다. `device_uuid`는 공유기에서 임의로 신뢰하지 않고 현재는 `null`로 두며, Cloud 수집 단계에서 인증된 장치 identity 기준으로 서버가 연결하는 것을 전제로 합니다.
 
 현재 생산 경로에서 기록하는 event type은 다음 범위입니다.
 
@@ -278,7 +284,7 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 
 Health observer의 첫 주기는 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며, 상태 전이가 있을 때만 기록됩니다. `smartsafehub-events` init script도 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
 
-이 단계는 **공유기 내부 정규화와 로컬 큐까지만** 포함합니다. Cloud 전송 API, Pro/Ultimate entitlement, 서버 장기 보관, 웹사이트의 활동 기록 UI는 아직 이 패치에서 활성화하지 않습니다.
+공유기 웹사이트는 기존 로그인 세션이 이미 허용하는 read-only `smartsafehub.status` RPC에 `include_activity_history`를 선택적으로 요청해 최신 이벤트를 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 현재 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**만 제공합니다. Cloud 전송 API, Pro/Ultimate entitlement와 서버 장기 보관은 이후 Cloud Console 활동 기록 단계에서 별도로 연결합니다.
 
 진단 파일은 설정 화면에 이미 로드된 시스템/Health 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다. Health Reporter는 이 다운로드 JSON을 전송하지 않으며 `/usr/libexec/smartsafehub-health`가 개인정보가 배제된 별도 최소 payload를 생성합니다.
 

@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 
 import { AppShell } from '../components/AppShell';
+import { useActivityHistory } from '../hooks/useActivityHistory';
 import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
@@ -18,6 +19,7 @@ import { useScheduledRebootSettings } from '../hooks/useScheduledRebootSettings'
 import { useSystemActions } from '../hooks/useSystemActions';
 import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useWifi } from '../hooks/useWifi';
+import { ActivityPage } from '../pages/ActivityPage';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
 import { IptvPage } from '../pages/IptvPage';
@@ -31,6 +33,7 @@ import { WifiPage } from '../pages/WifiPage';
 export function App() {
   const route = useHashRoute();
   const configurationBackup = useConfigurationBackup();
+  const activity = useActivityHistory(route === 'home' || route === 'activity');
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
   const firmware = useFirmwareUpdates(
@@ -56,25 +59,38 @@ export function App() {
   );
 
   const current =
-    route === 'lan'
-      ? lan
-      : route === 'wifi'
-        ? wifi
-        : route === 'iptv'
-          ? iptv
-      : route === 'devices'
-        ? devices
-        : route === 'safeshield'
-          ? safeshield
-          : route === 'rules'
-            ? rules
-            : route === 'system'
-              ? updates
-              : status;
+    route === 'activity'
+      ? activity
+      : route === 'lan'
+        ? lan
+        : route === 'wifi'
+          ? wifi
+          : route === 'iptv'
+            ? iptv
+            : route === 'devices'
+              ? devices
+              : route === 'safeshield'
+                ? safeshield
+                : route === 'rules'
+                  ? rules
+                  : route === 'system'
+                    ? updates
+                    : status;
 
   let content: ComponentChildren;
 
   switch (route) {
+    case 'activity':
+      content = (
+        <ActivityPage
+          data={activity.data}
+          error={activity.error}
+          loading={activity.loading}
+          onRetry={() => void activity.refresh()}
+        />
+      );
+      break;
+
     case 'lan':
       content = (
         <LanPage
@@ -267,6 +283,9 @@ export function App() {
     default:
       content = (
         <HomePage
+          activity={activity.data}
+          activityError={activity.error}
+          activityLoading={activity.loading}
           data={status.data}
           devices={dashboardDevices.data}
           devicesError={dashboardDevices.error}
@@ -284,6 +303,7 @@ export function App() {
           loading={status.loading}
           onRetry={() =>
             void Promise.all([
+              activity.refresh(),
               status.refresh(),
               dashboardDevices.refresh(),
               dashboardSafeShield.refresh(),
@@ -311,6 +331,7 @@ export function App() {
   const refreshCurrent = () => {
     if (route === 'home') {
       void Promise.all([
+        activity.refresh(),
         status.refresh(),
         dashboardDevices.refresh(),
         dashboardSafeShield.refresh(),
@@ -354,7 +375,8 @@ export function App() {
       refreshing={
         current.refreshing ||
         (route === 'home' &&
-          (dashboardDevices.refreshing ||
+          (activity.refreshing ||
+            dashboardDevices.refreshing ||
             dashboardSafeShield.refreshing ||
             dashboardSafeShieldStatistics.refreshing ||
             updates.refreshing ||

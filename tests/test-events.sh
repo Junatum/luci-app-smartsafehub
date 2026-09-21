@@ -52,6 +52,7 @@ chmod +x "$TMP/bin/logger"
 run_events() {
 	SMARTSAFEHUB_EVENTS_RUNTIME_DIR="$TMP/runtime" \
 	SMARTSAFEHUB_EVENTS_FILE="$TMP/runtime/events.jsonl" \
+	SMARTSAFEHUB_EVENTS_HISTORY_FILE="$TMP/runtime/activity-history.jsonl" \
 	SMARTSAFEHUB_EVENTS_LOCK_DIR="$TMP/runtime/events.lock" \
 	SMARTSAFEHUB_EVENTS_SEQ_FILE="$TMP/runtime/events.seq" \
 	SMARTSAFEHUB_EVENTS_BOOT_MARKER_FILE="$TMP/runtime/events.boot-id" \
@@ -69,6 +70,21 @@ first_id="$(MOCK_EVENT_EPOCH=1800000001 run_events emit safeshield safeshield.bl
 run_events list > "$TMP/list.json"
 jq -e --arg id "$first_id" '.schema == 1 and (.events | length) == 1 and .events[0].event_id == $id and .events[0].event_type == "safeshield.blocklist.updated" and .events[0].severity == "success" and .events[0].occurred_at == 1800000001 and .events[0].device_uuid == null and .events[0].source == "safeshield" and .events[0].metadata.domain_count == 33818' "$TMP/list.json" >/dev/null || \
 	fail 'event queue는 schema v1 정규화 레코드를 보존해야 합니다.'
+
+run_events history > "$TMP/history.json"
+jq -e --arg id "$first_id" '.schema == 1 and (.events | length) == 1 and .events[0].event_id == $id' "$TMP/history.json" >/dev/null || \
+	fail 'local activity history는 outbox와 별도로 동일한 정규화 이벤트를 보존해야 합니다.'
+
+# r8 -> r9 migration: before the dedicated history exists, reads fall back to the
+# old outbox; the first new r9 event must seed history with those r8 records.
+rm -f "$TMP/runtime/activity-history.jsonl"
+run_events history > "$TMP/history-r8-fallback.json"
+jq -e --arg id "$first_id" '(.events | length) == 1 and .events[0].event_id == $id' "$TMP/history-r8-fallback.json" >/dev/null || \
+	fail '전용 history가 없으면 r8 outbox를 최근 활동 fallback으로 읽어야 합니다.'
+second_id="$(MOCK_EVENT_EPOCH=1800000002 run_events emit network network.internet.recovered success '{"downtime_seconds":48}' 1800000002)"
+run_events history > "$TMP/history-r9-seeded.json"
+jq -e --arg first "$first_id" --arg second "$second_id" '(.events | length) == 2 and .events[0].event_id == $first and .events[1].event_id == $second' "$TMP/history-r9-seeded.json" >/dev/null || \
+	fail '첫 r9 이벤트는 기존 r8 outbox를 local history에 승계한 뒤 새 이벤트를 추가해야 합니다.'
 
 if run_events emit safeshield bad.event notice '{}' >/dev/null 2>&1; then
 	fail 'severity는 info/success/warning/error 외 값을 허용하면 안 됩니다.'
@@ -89,15 +105,21 @@ done
 run_events list > "$TMP/list.json"
 [ "$(jq '.events | length' "$TMP/list.json")" -eq 8 ] || fail 'event queue는 설정된 최대 개수를 초과하면 안 됩니다.'
 [ "$(jq -r '.events[0].metadata.index' "$TMP/list.json")" = '3' ] || fail 'queue 초과 시 가장 오래된 event부터 제거해야 합니다.'
+run_events history > "$TMP/history.json"
+[ "$(jq '.events | length' "$TMP/history.json")" -eq 8 ] || fail 'local activity history도 설정된 최대 개수를 초과하면 안 됩니다.'
+[ "$(jq -r '.events[0].metadata.index' "$TMP/history.json")" = '3' ] || fail 'history 초과 시 가장 오래된 event부터 제거해야 합니다.'
 
 ack_id="$(jq -r '.events[3].event_id' "$TMP/list.json")"
 run_events ack "$ack_id"
 run_events list > "$TMP/list-after-ack.json"
 jq -e --arg id "$ack_id" 'all(.events[]; .event_id != $id)' "$TMP/list-after-ack.json" >/dev/null || \
 	fail 'ack된 event는 local queue에서 제거되어야 합니다.'
+run_events history > "$TMP/history-after-ack.json"
+jq -e --arg id "$ack_id" 'any(.events[]; .event_id == $id)' "$TMP/history-after-ack.json" >/dev/null || \
+	fail 'Cloud outbox ack가 공유기 웹사이트용 local history를 삭제하면 안 됩니다.'
 
 # Boot event is one-per-kernel-boot even if the init service is restarted.
-rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/events.seq" "$TMP/runtime/events.boot-id"
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq" "$TMP/runtime/events.boot-id"
 MOCK_EVENT_EPOCH=1800001000 run_events boot
 MOCK_EVENT_EPOCH=1800001001 run_events boot
 run_events list > "$TMP/boot-list.json"
@@ -131,4 +153,4 @@ for contract in \
 	grep -Fq "$event_type" "$ROOT_DIR/$file" || fail "production event source가 누락되었습니다: $event_type"
 done
 
-printf 'PASS: SmartSafeHub normalized event queue, boot deduplication, bounded retention and production event source contracts are valid\n'
+printf 'PASS: SmartSafeHub normalized event outbox/history, boot deduplication, bounded retention and production event source contracts are valid\n'

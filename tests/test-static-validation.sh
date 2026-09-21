@@ -51,6 +51,7 @@ for script in \
 	tests/test-shell-pipeline-safety.sh \
 	tests/test-package-contract.sh \
 	tests/test-events.sh \
+	tests/test-activity-ui-contract.sh \
 	tests/test-common-shell.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-tailwind-shadow-dom.sh \

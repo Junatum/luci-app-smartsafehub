@@ -61,6 +61,7 @@ jq -e \
 	"$ACL" >/dev/null || fail 'safeshield statistics is missing from read ACL'
 
 assert_acl_method read system_root_password_status
+assert_acl_method read status
 assert_acl_method write system_root_password_set
 [ -f "$LAN_RPC_ENTRY" ] || fail 'isolated LAN rpc entry is missing'
 [ -f "$LAN_MODULE" ] || fail 'LAN implementation module is missing'

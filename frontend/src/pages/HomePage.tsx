@@ -12,8 +12,10 @@ import {
   ShieldIcon,
   UpdateIcon,
 } from '../components/Icons';
+import { ActivityLoadState, ActivityTimeline } from '../components/ActivityTimeline';
 import { DashboardSafeShieldActivity } from '../components/DashboardSafeShieldActivity';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
+import type { ActivityHistory } from '../types/activity';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type { FirmwareStatus } from '../types/firmware';
 import type { HealthSeverity, HealthStatus } from '../types/health';
@@ -34,6 +36,9 @@ import {
 } from '../app/format';
 
 interface HomePageProps {
+  activity: ActivityHistory | null;
+  activityError: string | null;
+  activityLoading: boolean;
   data: SmartSafeHubStatus | null;
   devices: ConnectedDevicesSummary | null;
   devicesError: string | null;
@@ -475,6 +480,9 @@ function safeShieldOverview(
 }
 
 export function HomePage({
+  activity,
+  activityError,
+  activityLoading,
   data,
   devices,
   devicesError,
@@ -819,6 +827,30 @@ export function HomePage({
             </a>
           </article>
         </div>
+      </section>
+
+      <section aria-labelledby="dashboard-recent-activity-title">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <SectionHeading
+            description="인터넷, 보호, 업데이트와 진단에서 실제 상태가 바뀐 시점을 확인합니다."
+            eyebrow="History"
+            id="dashboard-recent-activity-title"
+            title="최근 활동"
+          />
+          <a
+            class="mb-4 inline-flex text-xs font-extrabold text-teal-700 no-underline hover:text-teal-900"
+            href="#activity"
+          >
+            전체 보기 →
+          </a>
+        </div>
+        <article class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+          {activityLoading || (activityError && !activity) ? (
+            <ActivityLoadState error={activityError} loading={activityLoading} />
+          ) : (
+            <ActivityTimeline compact events={(activity?.events ?? []).slice(0, 3)} />
+          )}
+        </article>
       </section>
 
       <section aria-labelledby="dashboard-system-title">

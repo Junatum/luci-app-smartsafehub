@@ -1,3 +1,4 @@
+import type { ActivityHistory } from '../types/activity';
 import type {
   ConfigurationBackupDiscardResult,
   ConfigurationBackupRestoreResult,
@@ -41,6 +42,19 @@ const LAN_API_OBJECT = 'smartsafehub_network';
 
 export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
   return callApi(API_OBJECT, 'connected_devices');
+}
+
+interface SmartSafeHubStatusWithActivity extends SmartSafeHubStatus {
+  activityHistory: ActivityHistory;
+}
+
+export async function fetchActivityHistory(limit = 128): Promise<ActivityHistory> {
+  const status = await callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status', {
+    include_activity_history: true,
+    activity_limit: limit,
+  });
+
+  return status.activityHistory;
 }
 
 export function fetchStatus(): Promise<SmartSafeHubStatus> {

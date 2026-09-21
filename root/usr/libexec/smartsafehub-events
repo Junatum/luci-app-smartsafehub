@@ -9,6 +9,7 @@ COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/commo
 
 RUNTIME_DIR="${SMARTSAFEHUB_EVENTS_RUNTIME_DIR:-/tmp/smartsafehub}"
 EVENTS_FILE="${SMARTSAFEHUB_EVENTS_FILE:-$RUNTIME_DIR/events.jsonl}"
+HISTORY_FILE="${SMARTSAFEHUB_EVENTS_HISTORY_FILE:-$RUNTIME_DIR/activity-history.jsonl}"
 LOCK_DIR="${SMARTSAFEHUB_EVENTS_LOCK_DIR:-$RUNTIME_DIR/events.lock}"
 SEQ_FILE="${SMARTSAFEHUB_EVENTS_SEQ_FILE:-$RUNTIME_DIR/events.seq}"
 BOOT_MARKER_FILE="${SMARTSAFEHUB_EVENTS_BOOT_MARKER_FILE:-$RUNTIME_DIR/events.boot-id}"
@@ -115,8 +116,42 @@ boot_id() {
 	printf '%s' "$value"
 }
 
+append_bounded_event() {
+	local file="$1" event_json="$2" keep_count="$3" tmp
+	tmp="${file}.tmp.$$"
+
+	if [ -s "$file" ] && [ "$keep_count" -gt 0 ]; then
+		tail -n "$keep_count" "$file" > "$tmp" 2>/dev/null || : > "$tmp"
+	else
+		: > "$tmp"
+	fi
+	printf '%s\n' "$event_json" >> "$tmp" || {
+		rm -f "$tmp"
+		return 1
+	}
+	mv "$tmp" "$file"
+}
+
+seed_history_from_outbox() {
+	local keep_count="$1" tmp
+
+	# r8 only had the Cloud outbox. On the first r9 event, preserve those
+	# already-collected records in the dedicated local history before the new
+	# event is appended. A history file that already exists is authoritative.
+	[ ! -e "$HISTORY_FILE" ] || return 0
+	[ -s "$EVENTS_FILE" ] || return 0
+
+	tmp="${HISTORY_FILE}.tmp.$$"
+	if [ "$keep_count" -gt 0 ]; then
+		tail -n "$keep_count" "$EVENTS_FILE" > "$tmp" 2>/dev/null || : > "$tmp"
+	else
+		: > "$tmp"
+	fi
+	mv "$tmp" "$HISTORY_FILE"
+}
+
 emit_event() {
-	local source event_type severity metadata occurred_at sequence current_boot event_id tmp keep_count
+	local source event_type severity metadata occurred_at sequence current_boot event_id event_json keep_count
 	source="$(sanitize_token "${1:-}")"
 	event_type="$(sanitize_token "${2:-}")"
 	severity="${3:-}"
@@ -144,32 +179,28 @@ emit_event() {
 	sequence="$(next_sequence)"
 	current_boot="$(boot_id)"
 	event_id="${current_boot}-${occurred_at}-${sequence}"
-	tmp="${EVENTS_FILE}.tmp.$$"
 	keep_count=$((MAX_EVENTS - 1))
-
-	if [ -s "$EVENTS_FILE" ] && [ "$keep_count" -gt 0 ]; then
-		tail -n "$keep_count" "$EVENTS_FILE" > "$tmp" 2>/dev/null || : > "$tmp"
-	else
-		: > "$tmp"
-	fi
-	printf '{"schema":1,"event_id":"%s","event_type":"%s","severity":"%s","occurred_at":%s,"device_uuid":null,"source":"%s","metadata":%s}\n' \
+	event_json="$(printf '{"schema":1,"event_id":"%s","event_type":"%s","severity":"%s","occurred_at":%s,"device_uuid":null,"source":"%s","metadata":%s}' \
 		"$(json_escape "$event_id")" \
 		"$(json_escape "$event_type")" \
 		"$severity" \
 		"$occurred_at" \
 		"$(json_escape "$source")" \
-		"$metadata" >> "$tmp"
-	mv "$tmp" "$EVENTS_FILE"
+		"$metadata")"
+
+	seed_history_from_outbox "$keep_count" || return 1
+	append_bounded_event "$HISTORY_FILE" "$event_json" "$keep_count" || return 1
+	append_bounded_event "$EVENTS_FILE" "$event_json" "$keep_count" || return 1
 
 	release_lock
 	trap - EXIT INT TERM
 	printf '%s\n' "$event_id"
 }
 
-list_events() {
-	local first=1 line
+list_event_file() {
+	local file="$1" first=1 line
 	printf '{"schema":1,"events":['
-	if [ -s "$EVENTS_FILE" ]; then
+	if [ -s "$file" ]; then
 		while IFS= read -r line || [ -n "$line" ]; do
 			[ -n "$line" ] || continue
 			if [ "$first" -eq 0 ]; then
@@ -177,9 +208,23 @@ list_events() {
 			fi
 			printf '%s' "$line"
 			first=0
-		done < "$EVENTS_FILE"
+		done < "$file"
 	fi
 	printf ']}\n'
+}
+
+list_events() {
+	list_event_file "$EVENTS_FILE"
+}
+
+list_history() {
+	if [ -s "$HISTORY_FILE" ]; then
+		list_event_file "$HISTORY_FILE"
+	else
+		# Preserve locally collected r8 events across the r8 -> r9 upgrade until
+		# the first new event creates the dedicated history file.
+		list_event_file "$EVENTS_FILE"
+	fi
 }
 
 ack_event() {
@@ -219,6 +264,7 @@ Usage: smartsafehub-events <command>
 Commands:
   emit SOURCE EVENT_TYPE SEVERITY [METADATA_JSON] [OCCURRED_AT]
   list
+  history
   ack EVENT_ID
   boot
 EOF_USAGE
@@ -233,6 +279,9 @@ case "${1:-}" in
 		;;
 	list)
 		list_events
+		;;
+	history)
+		list_history
 		;;
 	ack)
 		shift
