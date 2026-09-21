@@ -29,8 +29,8 @@ CREDENTIAL_REFRESH_MARGIN_S=600
 RETRY_INITIAL_S=900
 RETRY_MAX_S=3600
 
-RESOLVE_BODY_FILE=''
-RESOLVE_RESPONSE_FILE=''
+STATUS_BODY_FILE=''
+STATUS_RESPONSE_FILE=''
 UPLOAD_BODY_FILE=''
 UPLOAD_RESPONSE_FILE=''
 SAFESHIELD_STATUS_FILE=''
@@ -39,8 +39,8 @@ STOP_REQUESTED=0
 WAIT_PID=''
 
 cleanup_files() {
-	[ -n "$RESOLVE_BODY_FILE" ] && rm -f "$RESOLVE_BODY_FILE"
-	[ -n "$RESOLVE_RESPONSE_FILE" ] && rm -f "$RESOLVE_RESPONSE_FILE"
+	[ -n "$STATUS_BODY_FILE" ] && rm -f "$STATUS_BODY_FILE"
+	[ -n "$STATUS_RESPONSE_FILE" ] && rm -f "$STATUS_RESPONSE_FILE"
 	[ -n "$UPLOAD_BODY_FILE" ] && rm -f "$UPLOAD_BODY_FILE"
 	[ -n "$UPLOAD_RESPONSE_FILE" ] && rm -f "$UPLOAD_RESPONSE_FILE"
 	[ -n "$SAFESHIELD_STATUS_FILE" ] && rm -f "$SAFESHIELD_STATUS_FILE"
@@ -165,9 +165,8 @@ read_license_key() {
 	printf '%s' "$key"
 }
 
-build_resolve_body() {
-	local key="$1" fingerprint fingerprint_version identity_provider identity_source identity_strength identity_profile
-	local installation_id vendor model arch memory_mb version memory_json device_code device_code_source
+build_status_body() {
+	local key="$1" fingerprint
 	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/activity-safeshield.$$.json"
 	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then return 1; fi
 
@@ -176,27 +175,11 @@ build_resolve_body() {
 		????????????????????????????????????????????????????????????????) case "$fingerprint" in *[!0-9a-fA-F]*) return 1 ;; esac ;;
 		*) return 1 ;;
 	esac
-	fingerprint_version="$(number_value "$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.fingerprint_version')")"
-	[ "$fingerprint_version" -ge 1 ] 2>/dev/null || fingerprint_version=1
-	identity_provider="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_provider')"
-	identity_source="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_source')"
-	identity_strength="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_strength')"
-	identity_profile="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_profile')"
-	installation_id="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.installation_id')"
-	vendor="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.vendor')"
-	model="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.model')"
-	arch="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.arch')"
-	memory_mb="$(number_value "$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.memory_mb')")"
-	version="$(json_value "$SAFESHIELD_STATUS_FILE" '@.version')"
-	device_code="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.device_code')"
-	device_code_source="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.device_code_source')"
-	[ -n "$vendor" ] && [ -n "$model" ] && [ -n "$arch" ] && [ -n "$version" ] || return 1
-	if [ "$memory_mb" -gt 0 ] 2>/dev/null; then memory_json="$memory_mb"; else memory_json='null'; fi
 
-	RESOLVE_BODY_FILE="$RUNTIME_DIR/activity-resolve-body.$$.json"
-	cat > "$RESOLVE_BODY_FILE" <<EOF_RESOLVE
-{"license_key":"$(json_escape "$key")","device":{"physical_fingerprint":"$(json_escape "$fingerprint")","fingerprint_version":$fingerprint_version,"identity_provider":"$(json_escape "$identity_provider")","identity_source":"$(json_escape "$identity_source")","identity_strength":"$(json_escape "$identity_strength")","identity_profile":"$(json_escape "$identity_profile")","installation_id":$(json_string_or_null "$installation_id"),"vendor":"$(json_escape "$vendor")","model":"$(json_escape "$model")","arch":"$(json_escape "$arch")","memory_mb":$memory_json,"safeshield_version":"$(json_escape "$version")","device_code":"$(json_escape "$device_code")","device_code_source":"$(json_escape "$device_code_source")"}}
-EOF_RESOLVE
+	STATUS_BODY_FILE="$RUNTIME_DIR/activity-status-body.$$.json"
+	cat > "$STATUS_BODY_FILE" <<EOF_STATUS
+{"license_key":"$(json_escape "$key")","device":{"physical_fingerprint":"$(json_escape "$fingerprint")"}}
+EOF_STATUS
 }
 
 post_json() {
@@ -243,46 +226,55 @@ EOF_CREDENTIAL
 	mv "$tmp" "$CREDENTIAL_FILE"
 }
 
-resolve_credential() {
-	local key base activity_token plan
+status_credential() {
+	local key base activity_token plan is_licensed device_action
 	key="$(read_license_key 2>/dev/null || true)"
 	if [ -z "$key" ]; then
 		rm -f "$CREDENTIAL_FILE"
 		"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
 		return 2
 	fi
-	build_resolve_body "$key" || return 1
-	RESOLVE_RESPONSE_FILE="$RUNTIME_DIR/activity-resolve-response.$$.json"
+	build_status_body "$key" || return 1
+	STATUS_RESPONSE_FILE="$RUNTIME_DIR/activity-status-response.$$.json"
 	base="$(api_base_url)"
-	post_json "$RESOLVE_BODY_FILE" "$RESOLVE_RESPONSE_FILE" "$base/licenses/resolve" || return 1
-	activity_token="$(json_value "$RESOLVE_RESPONSE_FILE" '@.activity_history.token')"
-	plan="$(json_value "$RESOLVE_RESPONSE_FILE" '@.license.plan' | tr '[:upper:]' '[:lower:]')"
-	# Before the Cloud activity API rollout, /licenses/resolve used the legacy
-	# top-level plan field. Accept it so an older backend cannot be mistaken for
-	# an explicit Free response and cause the bounded outbox to be discarded.
-	[ -n "$plan" ] || plan="$(json_value "$RESOLVE_RESPONSE_FILE" '@.plan' | tr '[:upper:]' '[:lower:]')"
+	post_json "$STATUS_BODY_FILE" "$STATUS_RESPONSE_FILE" "$base/licenses/status" || return 1
+
+	activity_token="$(json_value "$STATUS_RESPONSE_FILE" '@.activity_history.token')"
+	plan="$(json_value "$STATUS_RESPONSE_FILE" '@.license.plan' | tr '[:upper:]' '[:lower:]')"
+	is_licensed="$(json_value "$STATUS_RESPONSE_FILE" '@.license.is_licensed' | tr '[:upper:]' '[:lower:]')"
+	device_action="$(json_value "$STATUS_RESPONSE_FILE" '@.device_action' | tr '[:upper:]' '[:lower:]')"
+
+	# /licenses/status is authoritative for current eligibility. Explicitly
+	# ineligible devices must not retain a Cloud-only outbox, regardless of any
+	# stale or inconsistent credential field in the response.
+	case "$is_licensed:$device_action:$plan" in
+		false:*:*|0:*:*|*:clear_license:*|*:*:free)
+		rm -f "$CREDENTIAL_FILE"
+			"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
+			return 2
+			;;
+	esac
+
 	if [ -z "$activity_token" ]; then
 		rm -f "$CREDENTIAL_FILE"
-		case "$plan" in
-			free)
-				# Only an explicit Free response is allowed to discard the Cloud-only
-				# outbox. Missing/unknown plan data may be an older or partial backend.
-				"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
-				return 2
-				;;
-			*)
-				# Paid, legacy, unknown or incomplete responses are retryable. Local
-				# history is independent, and the bounded Cloud outbox must survive
-				# until the activity API is actually available.
-				return 1
-				;;
+		# An active paid status without activity_history is the expected shape of
+		# an older Hub during a staged rollout. Preserve the bounded outbox rather
+		# than falling back to /licenses/resolve and resolving an artifact.
+		case "$is_licensed:$plan" in
+			true:pro|true:ultimate|1:pro|1:ultimate) return 3 ;;
+			*) return 1 ;;
 		esac
 	fi
-	store_credential "$RESOLVE_RESPONSE_FILE"
+
+	case "$is_licensed:$device_action:$plan" in
+		true:none:pro|true:none:ultimate|1:none:pro|1:none:ultimate) ;;
+		*) return 1 ;;
+	esac
+	store_credential "$STATUS_RESPONSE_FILE"
 }
 
 sync_once() {
-	local now previous_success interval next_sync retry_delay pending batch_count plan retention token url received accepted duplicates expired processed event_id resolve_rc
+	local now previous_success interval next_sync retry_delay pending batch_count plan retention token url received accepted duplicates expired processed event_id status_rc
 	mkdir -p "$RUNTIME_DIR" || return 1
 	acquire_lock || return 75
 	trap 'release_lock; cleanup_files' EXIT INT TERM
@@ -295,18 +287,23 @@ sync_once() {
 	write_state syncing null '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
 
 	if ! credential_valid; then
-		resolve_rc=0
-		resolve_credential || resolve_rc=$?
-		case "$resolve_rc" in
+		status_rc=0
+		status_credential || status_rc=$?
+		case "$status_rc" in
 			2)
 				pending="$(pending_count)"
 				write_state ineligible false '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 0
 				;;
 			0) ;;
+			3)
+				next_sync=$((now + retry_delay))
+				write_state error true '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_STATUS_UNSUPPORTED "$next_sync"
+				release_lock; trap cleanup_files EXIT; return 1
+				;;
 			*)
 				next_sync=$((now + retry_delay))
-				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_RESOLVE_FAILED "$next_sync"
+				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_STATUS_FAILED "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 1
 				;;
 		esac

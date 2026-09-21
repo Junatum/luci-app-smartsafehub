@@ -1,5 +1,20 @@
 # 변경 기록
 
+## [0.2.19-r16] - 2026-09-21
+
+### 수정
+
+- Cloud 활동 기록 동기화가 upload credential을 얻기 위해 무거운 `/api/v1/licenses/resolve`를 호출하던 경로를 기존 조회 전용 `/api/v1/licenses/status`로 전환했습니다. Activity Sync는 더 이상 artifact resolve/download token 발급 경로를 건드리지 않으며, Hub의 다운로드 감사 로그와 Cloud 활동 credential 조회가 분리됩니다.
+- `/licenses/status` 요청은 `license_key`와 `device.physical_fingerprint`만 전송합니다. Activity Sync 때문에 vendor/model/arch/SafeShield version 등 artifact resolve용 전체 device profile을 다시 조립하거나 전송하지 않습니다.
+- Hub 1.4.86 이전처럼 유효한 Pro/Ultimate 상태이지만 `activity_history` 필드가 아직 없는 `/licenses/status` 응답은 `ACTIVITY_STATUS_UNSUPPORTED`로 처리하고 bounded Cloud outbox를 보존합니다. `/licenses/resolve`로 fallback하지 않으므로 단계적 배포 중에도 불필요한 artifact resolve가 다시 발생하지 않습니다.
+- `license.is_licensed=false`, `device_action=clear_license` 또는 명시적인 Free 상태는 현재 Cloud 활동 기록 entitlement가 없는 것으로 처리해 Cloud-only outbox를 정리합니다. revoked/expired Pro 라이선스를 서버 오류로 오인해 무한 보존하지 않습니다.
+- status API 통신 실패는 기존 15분 → 30분 → 60분 bounded backoff를 그대로 사용하며 `ACTIVITY_STATUS_FAILED`로 상태를 노출합니다. 기존 resolve 단계에서 발급된 유효한 activity credential도 만료 전까지 그대로 사용할 수 있어 업그레이드 시 전송이 끊기지 않습니다.
+
+### 테스트 및 문서
+
+- Activity Sync가 `/licenses/status`만 호출하고 `/licenses/resolve`를 호출하지 않는 계약, status body가 최소 identity만 포함하는 계약, 구 Hub paid 응답의 outbox 보존, revoked/Free outbox 정리, status 장애 backoff를 회귀 테스트로 고정했습니다.
+- README의 Cloud 활동 기록 동기화 설명을 Hub 1.4.86의 조회 전용 status credential 구조와 단계적 배포 호환 정책에 맞게 갱신했습니다.
+
 ## [0.2.19-r15] - 2026-09-21
 
 ### 수정

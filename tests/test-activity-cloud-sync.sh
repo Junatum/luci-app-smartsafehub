@@ -37,9 +37,14 @@ grep -Fq 'network.internet.disconnected' "$HEALTH_BIN" || fail 'Health observer 
 grep -Fq 'health.issue.started' "$HEALTH_BIN" || fail 'Health observer must keep diagnostic transition events'
 grep -Fq 'consume_wake_marker' "$SYNC_BIN" || fail 'activity sync daemon must consume wake markers so backend failures do not retry every daemon tick'
 grep -Fq 'mv "$WAKE_FILE" "$consumed"' "$SYNC_BIN" || fail 'wake marker consumption must use atomic rename so events emitted during sync create a fresh marker'
-grep -Fq 'RETRY_INITIAL_S=900' "$SYNC_BIN" || fail 'Cloud activity resolve failures must start with a 15-minute retry backoff'
+grep -Fq 'RETRY_INITIAL_S=900' "$SYNC_BIN" || fail 'Cloud activity status failures must start with a 15-minute retry backoff'
 grep -Fq 'RETRY_MAX_S=3600' "$SYNC_BIN" || fail 'Cloud activity retry backoff must be capped at one hour'
 grep -Fq 'retry_backoff_active' "$SYNC_BIN" || fail 'new event wake markers must respect an active Cloud failure backoff'
+grep -Fq '$base/licenses/status' "$SYNC_BIN" || fail 'Cloud activity credentials must use the lightweight license status endpoint'
+if grep -Fq '$base/licenses/resolve' "$SYNC_BIN"; then
+  fail 'Cloud activity sync must not resolve artifacts just to obtain an activity credential'
+fi
+grep -Fq 'build_status_body' "$SYNC_BIN" || fail 'activity sync must build the minimal license status request payload'
 grep -Fq '[ -e "$WAKE_FILE" ] && ! retry_backoff_active' "$SYNC_BIN" || fail 'event wake must not bypass Cloud failure backoff'
 
 for contract in \
@@ -60,9 +65,12 @@ RUNTIME="$TMP_DIR/runtime"
 OUTBOX="$TMP_DIR/outbox.jsonl"
 ACK_LOG="$TMP_DIR/ack.log"
 CLEAR_LOG="$TMP_DIR/clear.log"
+FETCH_LOG="$TMP_DIR/fetch.log"
+STATUS_BODY_LOG="$TMP_DIR/status-body.json"
 mkdir -p "$MOCK_BIN" "$RUNTIME"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
+: > "$FETCH_LOG"
 
 cat > "$MOCK_BIN/events" <<'EOF_EVENTS'
 #!/bin/sh
@@ -168,31 +176,40 @@ while [ "$#" -gt 0 ]; do
     *) url="$1"; shift ;;
   esac
 done
+printf '%s\n' "$url" >> "$MOCK_FETCH_LOG"
 case "$url" in
-  */licenses/resolve)
-    case "${MOCK_RESOLVE_MODE:-paid}" in
+  */licenses/status)
+    cp "$body" "$MOCK_STATUS_BODY_LOG"
+    case "${MOCK_STATUS_MODE:-paid}" in
       paid)
         cat > "$output" <<'EOF_PAID'
-{"license":{"plan":"pro"},"activity_history":{"upload_url":"https://www.smartsafehub.com/api/v1/activity/events","token":"activity-token","token_expires_in_s":172800,"retention_days":90}}
+{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none","activity_history":{"upload_url":"https://www.smartsafehub.com/api/v1/activity/events","token":"activity-token","token_expires_in_s":172800,"retention_days":90}}
 EOF_PAID
         ;;
       paid-missing)
-        printf '%s\n' '{"license":{"plan":"pro"},"activity_history":null}' > "$output"
+        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none"}' > "$output"
         ;;
-      legacy-paid)
-        printf '%s\n' '{"plan":"pro","artifact_id":"legacy-artifact"}' > "$output"
+      paid-null)
+        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":true},"activation":{"status":"active"},"device_action":"none","activity_history":null}' > "$output"
+        ;;
+      revoked)
+        printf '%s\n' '{"license":{"plan":"pro","status":"active","is_licensed":false},"activation":{"status":"revoked"},"device_action":"clear_license","activity_history":null}' > "$output"
         ;;
       unknown)
-        printf '%s\n' '{"artifact_id":"legacy-artifact"}' > "$output"
+        printf '%s\n' '{"license":{"plan":"pro"}}' > "$output"
         ;;
       free)
-        printf '%s\n' '{"license":{"plan":"free"},"activity_history":null}' > "$output"
+        printf '%s\n' '{"license":{"plan":"free","status":"unlicensed","is_licensed":false},"activation":{"status":"not_found"},"device_action":"clear_license","activity_history":null}' > "$output"
         ;;
       unavailable)
         exit 1
         ;;
       *) exit 1 ;;
     esac
+    ;;
+  */licenses/resolve)
+    echo 'unexpected artifact resolve from activity sync' >&2
+    exit 99
     ;;
   */activity/events)
     count="$(jq '.events | length' "$body")"
@@ -229,7 +246,8 @@ run_sync() {
     SMARTSAFEHUB_ACTIVITY_SLEEP_BIN="$MOCK_BIN/sleep" \
     SMARTSAFEHUB_ACTIVITY_LOGGER_BIN="$MOCK_BIN/logger" \
     MOCK_OUTBOX="$OUTBOX" MOCK_ACK_LOG="$ACK_LOG" MOCK_CLEAR_LOG="$CLEAR_LOG" \
-    MOCK_RESOLVE_MODE="$1" \
+    MOCK_FETCH_LOG="$FETCH_LOG" MOCK_STATUS_BODY_LOG="$STATUS_BODY_LOG" \
+    MOCK_STATUS_MODE="$1" \
     "$SYNC_BIN" sync-once
 }
 
@@ -239,65 +257,91 @@ run_sync paid || fail 'paid activity batch must synchronize successfully'
 [ "$(wc -l < "$ACK_LOG" | tr -d ' ')" -eq 2 ] || fail 'successful two-event upload must ack both event IDs'
 jq -e '.eligible == true and .plan == "pro" and .retentionDays == 90 and .pendingEvents == 0 and .lastUploadedCount == 2 and .lastSuccessAt == 1800000000' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'paid synchronization state must expose entitlement, retention, pending count and success metadata'
+jq -e '.license_key == "SSH-PAID-TEST" and .device.physical_fingerprint == "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" and (.device | keys | length) == 1 and (keys | sort) == ["device","license_key"]' "$STATUS_BODY_LOG" >/dev/null || \
+  fail 'activity sync must send only license_key and physical_fingerprint to /licenses/status'
+if grep -Fq '/licenses/resolve' "$FETCH_LOG"; then
+  fail 'activity sync must never call /licenses/resolve after the status endpoint migration'
+fi
+
+# Credentials issued by the previous /licenses/resolve implementation use the
+# same activity upload token format. A still-valid cached credential must remain
+# usable after upgrading the router and must not force an immediate status call.
+: > "$FETCH_LOG"
+: > "$ACK_LOG"
+write_outbox
+run_sync unavailable || fail 'a still-valid cached activity credential must survive the status-endpoint migration'
+[ ! -s "$OUTBOX" ] || fail 'cached credential upload must ack the snapshotted events'
+if grep -Fq '/licenses/status' "$FETCH_LOG"; then
+  fail 'valid cached activity credential must not trigger an unnecessary license status request'
+fi
+grep -Fq '/activity/events' "$FETCH_LOG" || fail 'valid cached credential must continue uploading activity events'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
 if run_sync paid-missing >/dev/null 2>&1; then
-  fail 'paid resolve without an activity credential must be retried as an error'
+  fail 'paid status without an activity credential must be retried as an error'
 fi
 [ -s "$OUTBOX" ] || fail 'paid events must never be discarded when the backend omits the activity credential'
 [ ! -s "$CLEAR_LOG" ] || fail 'paid missing-credential response must not clear the Cloud outbox'
-jq -e '.phase == "error" and .lastErrorCode == "ACTIVITY_RESOLVE_FAILED"' "$RUNTIME/activity-sync.json" >/dev/null || \
-  fail 'paid missing-credential response must surface a retryable resolve error'
+jq -e '.phase == "error" and .lastErrorCode == "ACTIVITY_STATUS_UNSUPPORTED"' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'paid missing-credential response must surface a rollout-safe status error'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
-if run_sync legacy-paid >/dev/null 2>&1; then
-  fail 'legacy paid resolve without activity credentials must remain retryable until the Hub activity API is deployed'
+if run_sync paid-null >/dev/null 2>&1; then
+  fail 'older paid status without activity credentials must remain retryable until the Hub activity API is deployed'
 fi
-[ -s "$OUTBOX" ] || fail 'legacy paid resolve must preserve the bounded Cloud outbox'
-[ ! -s "$CLEAR_LOG" ] || fail 'legacy paid resolve must never clear Cloud events before the activity API rollout'
+[ -s "$OUTBOX" ] || fail 'older paid status must preserve the bounded Cloud outbox'
+[ ! -s "$CLEAR_LOG" ] || fail 'older paid status must never clear Cloud events before the activity API rollout'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
 if run_sync unknown >/dev/null 2>&1; then
-  fail 'resolve responses with unknown entitlement must be retryable rather than treated as Free'
+  fail 'status responses with unknown entitlement must be retryable rather than treated as Free'
 fi
-[ -s "$OUTBOX" ] || fail 'unknown/partial resolve response must preserve Cloud events'
-[ ! -s "$CLEAR_LOG" ] || fail 'unknown/partial resolve response must not clear the Cloud outbox'
+[ -s "$OUTBOX" ] || fail 'unknown/partial status response must preserve Cloud events'
+[ ! -s "$CLEAR_LOG" ] || fail 'unknown/partial status response must not clear the Cloud outbox'
 
 rm -f "$RUNTIME/activity-sync-credential.json" "$RUNTIME/activity-sync.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
 if run_sync unavailable >/dev/null 2>&1; then
-  fail 'unreachable Hub activity API must surface a retryable synchronization error'
+  fail 'unreachable Hub license status API must surface a retryable synchronization error'
 fi
-[ -s "$OUTBOX" ] || fail 'Hub API communication failure must preserve Cloud events for a later retry'
-[ ! -s "$CLEAR_LOG" ] || fail 'Hub API communication failure must not clear the Cloud outbox'
-jq -e '.lastErrorCode == "ACTIVITY_RESOLVE_FAILED" and .nextSyncAt == 1800000900' "$RUNTIME/activity-sync.json" >/dev/null || \
-  fail 'first Cloud resolve failure must back off for 15 minutes instead of retrying after five minutes'
+[ -s "$OUTBOX" ] || fail 'Hub status API communication failure must preserve Cloud events for a later retry'
+[ ! -s "$CLEAR_LOG" ] || fail 'Hub status API communication failure must not clear the Cloud outbox'
+jq -e '.lastErrorCode == "ACTIVITY_STATUS_FAILED" and .nextSyncAt == 1800000900' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'first Cloud status failure must back off for 15 minutes instead of retrying after five minutes'
 if run_sync unavailable >/dev/null 2>&1; then
-  fail 'repeated unavailable Hub resolve must remain retryable'
+  fail 'repeated unavailable Hub status must remain retryable'
 fi
 jq -e '.nextSyncAt == 1800001800' "$RUNTIME/activity-sync.json" >/dev/null || \
-  fail 'second consecutive Cloud resolve failure must back off for 30 minutes'
+  fail 'second consecutive Cloud status failure must back off for 30 minutes'
 if run_sync unavailable >/dev/null 2>&1; then
-  fail 'third unavailable Hub resolve must remain retryable'
+  fail 'third unavailable Hub status must remain retryable'
 fi
 jq -e '.nextSyncAt == 1800003600' "$RUNTIME/activity-sync.json" >/dev/null || \
-  fail 'Cloud resolve retry backoff must grow to the one-hour cap'
+  fail 'Cloud status retry backoff must grow to the one-hour cap'
 if run_sync unavailable >/dev/null 2>&1; then
-  fail 'capped unavailable Hub resolve must remain retryable'
+  fail 'capped unavailable Hub status must remain retryable'
 fi
 jq -e '.nextSyncAt == 1800003600' "$RUNTIME/activity-sync.json" >/dev/null || \
-  fail 'Cloud resolve retry backoff must remain capped at one hour'
+  fail 'Cloud status retry backoff must remain capped at one hour'
+
+rm -f "$RUNTIME/activity-sync-credential.json"
+: > "$ACK_LOG"
+: > "$CLEAR_LOG"
+write_outbox
+run_sync revoked || fail 'revoked paid activation must settle as ineligible without a daemon failure'
+[ ! -s "$OUTBOX" ] || fail 'revoked paid activation must not retain a Cloud-only outbox indefinitely'
+grep -Fq 'clear' "$CLEAR_LOG" || fail 'revoked paid activation must explicitly clear only the Cloud outbox'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
@@ -305,8 +349,8 @@ rm -f "$RUNTIME/activity-sync-credential.json"
 write_outbox
 run_sync free || fail 'ineligible activity sync must settle without a daemon failure'
 [ ! -s "$OUTBOX" ] || fail 'Free/ineligible device must not retain a Cloud-only outbox indefinitely'
-grep -Fq 'clear' "$CLEAR_LOG" || fail 'ineligible resolve must explicitly clear only the Cloud outbox'
+grep -Fq 'clear' "$CLEAR_LOG" || fail 'ineligible status must explicitly clear only the Cloud outbox'
 jq -e '.phase == "ineligible" and .eligible == false and .pendingEvents == 0' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'Free/ineligible synchronization state must be exposed to the router UI'
 
-printf '%s\n' 'PASS: paid Cloud activity batching/ack, rollout-safe retries, entitlement handling and direct-vs-observer event ownership are valid'
+printf '%s\n' 'PASS: paid Cloud activity batching/ack, lightweight status credentials, rollout-safe retries, entitlement handling and direct-vs-observer event ownership are valid'
