@@ -5,6 +5,7 @@ set -eu
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 HELPER="$ROOT_DIR/root/usr/libexec/smartsafehub-events"
 INIT_SCRIPT="$ROOT_DIR/root/etc/init.d/smartsafehub-events"
+CORE_RPC="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/core.uc"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
@@ -15,6 +16,7 @@ fail() {
 
 [ -x "$HELPER" ] || fail 'event helper가 실행 가능해야 합니다.'
 [ -x "$INIT_SCRIPT" ] || fail 'event boot init script가 실행 가능해야 합니다.'
+[ -f "$CORE_RPC" ] || fail 'core RPC module이 존재해야 합니다.'
 sh -n "$HELPER" || fail 'event helper가 POSIX shell 문법 검사를 통과해야 합니다.'
 sh -n "$INIT_SCRIPT" || fail 'event init script가 POSIX shell 문법 검사를 통과해야 합니다.'
 
@@ -156,6 +158,28 @@ run_events history > "$TMP/contended-history.json"
 jq -e --arg id "$contended_id" '(.events | length) == 1 and .events[0].event_id == $id and .events[0].event_type == "settings.test.contended"' "$TMP/contended-history.json" >/dev/null || \
 	fail 'event emitted during short lock contention must remain in local history'
 
+# A freshly created mkdir lock may exist briefly before its owner pid file is
+# written. That window is not a stale lock. The previous implementation removed
+# such a directory immediately, allowing multiple writers into the read-modify-
+# replace critical section and silently collapsing history to only a few events.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq"
+rm -rf "$TMP/runtime/events.lock" "$TMP/runtime/events.lock.reclaim"
+mkdir "$TMP/runtime/events.lock"
+(
+	SMARTSAFEHUB_EVENTS_LOCK_RETRY_COUNT=100 SMARTSAFEHUB_EVENTS_LOCK_RETRY_DELAY_S=0.02 \
+		run_events emit system settings.test.initializing_lock info '{"origin":"direct"}' 1800000901 > "$TMP/initializing-lock-id"
+) & initializing_writer=$!
+sleep 0.10
+[ -d "$TMP/runtime/events.lock" ] || \
+	fail 'a contender must not remove a pid-less lock that may still be initializing'
+[ ! -e "$TMP/runtime/events.lock/pid" ] || \
+	fail 'a contender must not take ownership of a pid-less lock that may still be initializing'
+rm -rf "$TMP/runtime/events.lock"
+wait "$initializing_writer" || fail 'writer must continue after the initializing lock is released'
+run_events history > "$TMP/initializing-lock-history.json"
+jq -e '(.events | length) == 1 and .events[0].event_type == "settings.test.initializing_lock"' "$TMP/initializing-lock-history.json" >/dev/null || \
+	fail 'an event waiting behind an initializing lock must be retained'
+
 # Concurrent direct producers must serialize through the same bounded writer
 # lock instead of returning 75 and silently losing all but one record.
 rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq"
@@ -214,6 +238,11 @@ jq -e '(.events | length) == 1 and .events[0].event_type == "safeshield.blocklis
 
 grep -Fq 'procd_set_param command "$PROG" daemon' "$INIT_SCRIPT" || \
 	fail 'smartsafehub-events init must keep the unified observer alive as a procd daemon'
+
+grep -Fq 'activity event emit failed: source=%s event_type=%s' "$CORE_RPC" || \
+	fail 'direct event producer failures must be visible in rpcd logs instead of remaining silent'
+grep -Fq '], 5000);' "$CORE_RPC" || \
+	fail 'direct event producer timeout must cover the bounded writer-lock wait'
 
 # Production sources must emit normalized raw events rather than localized title/description strings.
 for contract in \

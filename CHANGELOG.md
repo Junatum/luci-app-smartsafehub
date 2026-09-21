@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.19-r14] - 2026-09-21
+
+### 수정
+
+- `smartsafehub-events`의 `mkdir` lock에서 lock 디렉터리 생성 직후 owner PID 파일이 기록되기 전의 짧은 구간을 stale lock으로 오인해 다른 writer가 lock을 삭제할 수 있던 race condition을 수정했습니다. 이 경쟁 상태에서는 둘 이상의 writer가 동시에 JSONL read-modify-replace 구간에 들어가 먼저 기록한 이벤트를 덮어쓸 수 있어 최근 활동에 마지막 일부 이벤트만 남을 수 있었습니다.
+- lock 디렉터리는 생성 자체를 소유권 획득으로 취급하고, PID가 아직 없는 lock은 초기화 중인 busy 상태로 기다립니다. dead owner만 별도 reclaim lock 아래에서 회수하며, unlock도 현재 PID가 실제 owner일 때만 수행하도록 변경했습니다. 같은 안전한 lock 구현을 SafeShield 비동기 refresh observer state에도 적용했습니다.
+- rpcd의 직접 이벤트 producer가 event helper 기록 실패를 더 이상 완전히 숨기지 않고 `logread`에서 확인할 수 있도록 `source`와 `event_type`을 포함한 경고를 남기며, bounded lock wait를 고려해 helper 호출 timeout을 늘렸습니다.
+
+### 테스트 및 문서
+
+- PID 파일이 아직 없는 초기화 중 lock을 경쟁 writer가 탈취하지 않는지 검증하는 회귀 테스트를 추가했습니다. 기존 동시 writer 및 local history/outbox 분리 테스트와 함께 여러 producer가 겹쳐도 이벤트가 덮어써지지 않는 계약을 검증합니다.
+- README에 lock owner 게시 전 구간을 stale로 간주하지 않는 소유권 규칙과 event emit 실패 로그 정책을 문서화했습니다.
+
 ## [0.2.19-r13] - 2026-09-21
 
 ### 수정

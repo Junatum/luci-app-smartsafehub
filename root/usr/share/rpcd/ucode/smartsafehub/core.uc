@@ -91,12 +91,22 @@ export function emit_activity_event(source, event_type, severity, metadata) {
 	}
 
 	const document = type(metadata) == 'object' && type(metadata) != 'array' ? metadata : {};
-	return run_command([
+	const emitted = run_command([
 		ACTIVITY_EVENTS_HELPER,
 		'emit-quiet',
 		source,
 		event_type,
 		severity,
 		sprintf('%J', document),
-	], 3000);
+	], 5000);
+
+	if (!emitted) {
+		warn(sprintf(
+			'smartsafehub: activity event emit failed: source=%s event_type=%s\n',
+			source,
+			event_type
+		));
+	}
+
+	return emitted;
 };
