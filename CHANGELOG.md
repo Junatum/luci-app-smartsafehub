@@ -1,5 +1,19 @@
 # 변경 기록
 
+## [0.2.19-r13] - 2026-09-21
+
+### 수정
+
+- 여러 직접/관찰 이벤트가 가까운 시점에 발생할 때 `smartsafehub-events`의 local history/outbox lock이 사용 중이면 새 이벤트를 즉시 실패시키던 문제를 수정했습니다. event writer는 짧은 bounded retry로 lock을 기다린 뒤 직렬화해 저장하므로 설정 변경이나 observer 이벤트가 lock 경합 때문에 조용히 유실되지 않습니다.
+- Cloud Activity API가 아직 배포되지 않았거나 `/api/v1/licenses/resolve`가 구 응답 형식을 반환하는 동안에도 Cloud outbox를 보존하도록 호환성을 강화했습니다. legacy top-level `plan`을 인식하고, 명시적인 `Free` 응답에서만 Cloud-only outbox를 정리하며, 누락/미지원/불완전 응답은 재시도 가능한 오류로 취급합니다.
+- Cloud API 통신 실패 상태에서 wake marker가 남아 15초 daemon tick마다 resolve/upload를 반복하던 동작을 수정했습니다. wake marker를 원자적으로 소비해 이벤트 burst당 빠른 시도는 한 번만 수행하고, 실패 후에는 기본 5분 주기로 재시도합니다. 동기화 중 새 이벤트가 생기면 새 wake marker가 남아 다음 tick에서 다시 처리됩니다.
+
+### 테스트 및 문서
+
+- 살아 있는 lock owner가 잠깐 event store를 점유한 경우와 여러 event emit이 동시에 발생한 경우에도 모든 이벤트가 local history에 보존되는 회귀 테스트를 추가했습니다.
+- Hub API 미배포/통신 실패, legacy paid resolve, plan 미확인 응답에서 outbox가 삭제되지 않고, 명시적인 Free 응답에서만 정리되는 계약을 추가했습니다.
+- README에 로컬 history와 Cloud 전송 실패의 독립성, bounded lock wait, Cloud API rollout 이전의 retry 정책을 문서화했습니다.
+
 ## [0.2.19-r12] - 2026-09-21
 
 ### 기능

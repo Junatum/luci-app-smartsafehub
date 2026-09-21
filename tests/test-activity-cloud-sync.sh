@@ -35,6 +35,8 @@ if grep -Fq 'safeshield.protection.enabled' "$HEALTH_BIN" || grep -Fq 'safeshiel
 fi
 grep -Fq 'network.internet.disconnected' "$HEALTH_BIN" || fail 'Health observer must keep WAN transition events'
 grep -Fq 'health.issue.started' "$HEALTH_BIN" || fail 'Health observer must keep diagnostic transition events'
+grep -Fq 'consume_wake_marker' "$SYNC_BIN" || fail 'activity sync daemon must consume wake markers so backend failures do not retry every daemon tick'
+grep -Fq 'mv "$WAKE_FILE" "$consumed"' "$SYNC_BIN" || fail 'wake marker consumption must use atomic rename so events emitted during sync create a fresh marker'
 
 for contract in \
   'root/usr/share/rpcd/ucode/smartsafehub/system.uc:settings.scheduled_reboot.updated' \
@@ -173,8 +175,17 @@ EOF_PAID
       paid-missing)
         printf '%s\n' '{"license":{"plan":"pro"},"activity_history":null}' > "$output"
         ;;
+      legacy-paid)
+        printf '%s\n' '{"plan":"pro","artifact_id":"legacy-artifact"}' > "$output"
+        ;;
+      unknown)
+        printf '%s\n' '{"artifact_id":"legacy-artifact"}' > "$output"
+        ;;
       free)
         printf '%s\n' '{"license":{"plan":"free"},"activity_history":null}' > "$output"
+        ;;
+      unavailable)
+        exit 1
         ;;
       *) exit 1 ;;
     esac
@@ -241,10 +252,40 @@ rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
+if run_sync legacy-paid >/dev/null 2>&1; then
+  fail 'legacy paid resolve without activity credentials must remain retryable until the Hub activity API is deployed'
+fi
+[ -s "$OUTBOX" ] || fail 'legacy paid resolve must preserve the bounded Cloud outbox'
+[ ! -s "$CLEAR_LOG" ] || fail 'legacy paid resolve must never clear Cloud events before the activity API rollout'
+
+rm -f "$RUNTIME/activity-sync-credential.json"
+: > "$ACK_LOG"
+: > "$CLEAR_LOG"
+write_outbox
+if run_sync unknown >/dev/null 2>&1; then
+  fail 'resolve responses with unknown entitlement must be retryable rather than treated as Free'
+fi
+[ -s "$OUTBOX" ] || fail 'unknown/partial resolve response must preserve Cloud events'
+[ ! -s "$CLEAR_LOG" ] || fail 'unknown/partial resolve response must not clear the Cloud outbox'
+
+rm -f "$RUNTIME/activity-sync-credential.json"
+: > "$ACK_LOG"
+: > "$CLEAR_LOG"
+write_outbox
+if run_sync unavailable >/dev/null 2>&1; then
+  fail 'unreachable Hub activity API must surface a retryable synchronization error'
+fi
+[ -s "$OUTBOX" ] || fail 'Hub API communication failure must preserve Cloud events for a later retry'
+[ ! -s "$CLEAR_LOG" ] || fail 'Hub API communication failure must not clear the Cloud outbox'
+
+rm -f "$RUNTIME/activity-sync-credential.json"
+: > "$ACK_LOG"
+: > "$CLEAR_LOG"
+write_outbox
 run_sync free || fail 'ineligible activity sync must settle without a daemon failure'
 [ ! -s "$OUTBOX" ] || fail 'Free/ineligible device must not retain a Cloud-only outbox indefinitely'
 grep -Fq 'clear' "$CLEAR_LOG" || fail 'ineligible resolve must explicitly clear only the Cloud outbox'
 jq -e '.phase == "ineligible" and .eligible == false and .pendingEvents == 0' "$RUNTIME/activity-sync.json" >/dev/null || \
   fail 'Free/ineligible synchronization state must be exposed to the router UI'
 
-printf '%s\n' 'PASS: paid Cloud activity batching/ack, entitlement handling, retry safety and direct-vs-observer event ownership are valid'
+printf '%s\n' 'PASS: paid Cloud activity batching/ack, rollout-safe retries, entitlement handling and direct-vs-observer event ownership are valid'

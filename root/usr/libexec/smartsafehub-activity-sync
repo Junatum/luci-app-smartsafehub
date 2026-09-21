@@ -229,19 +229,24 @@ resolve_credential() {
 	post_json "$RESOLVE_BODY_FILE" "$RESOLVE_RESPONSE_FILE" "$base/licenses/resolve" || return 1
 	activity_token="$(json_value "$RESOLVE_RESPONSE_FILE" '@.activity_history.token')"
 	plan="$(json_value "$RESOLVE_RESPONSE_FILE" '@.license.plan' | tr '[:upper:]' '[:lower:]')"
+	# Before the Cloud activity API rollout, /licenses/resolve used the legacy
+	# top-level plan field. Accept it so an older backend cannot be mistaken for
+	# an explicit Free response and cause the bounded outbox to be discarded.
+	[ -n "$plan" ] || plan="$(json_value "$RESOLVE_RESPONSE_FILE" '@.plan' | tr '[:upper:]' '[:lower:]')"
 	if [ -z "$activity_token" ]; then
 		rm -f "$CREDENTIAL_FILE"
 		case "$plan" in
-			pro|ultimate)
-				# A paid resolve response without an activity credential usually means
-				# the backend has not rolled out the activity API yet or returned an
-				# incomplete payload. Keep the outbox for a later retry instead of
-				# silently discarding paid-user events.
-				return 1
-				;;
-			*)
+			free)
+				# Only an explicit Free response is allowed to discard the Cloud-only
+				# outbox. Missing/unknown plan data may be an older or partial backend.
 				"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
 				return 2
+				;;
+			*)
+				# Paid, legacy, unknown or incomplete responses are retryable. Local
+				# history is independent, and the bounded Cloud outbox must survive
+				# until the activity API is actually available.
+				return 1
 				;;
 		esac
 	fi
@@ -267,7 +272,7 @@ sync_once() {
 			2)
 				pending="$(pending_count)"
 				write_state ineligible false '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
-				release_lock; trap cleanup_files EXIT; rm -f "$WAKE_FILE" 2>/dev/null || true; return 0
+				release_lock; trap cleanup_files EXIT; return 0
 				;;
 			0) ;;
 			*)
@@ -284,7 +289,6 @@ sync_once() {
 	pending="$(pending_count)"
 	if [ "$pending" -eq 0 ] 2>/dev/null; then
 		write_state idle true "$plan" "$retention" 0 "$now" "$previous_success" 0 '' "$next_sync"
-		rm -f "$WAKE_FILE" 2>/dev/null || true
 		release_lock; trap cleanup_files EXIT; return 0
 	fi
 
@@ -298,7 +302,6 @@ sync_once() {
 	case "$batch_count" in ''|*[!0-9]*) batch_count=0 ;; esac
 	if [ "$batch_count" -eq 0 ] 2>/dev/null; then
 		write_state idle true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 '' "$next_sync"
-		rm -f "$WAKE_FILE" 2>/dev/null || true
 		release_lock; trap cleanup_files EXIT; return 0
 	fi
 	if ! post_authorized_json "$UPLOAD_BODY_FILE" "$UPLOAD_RESPONSE_FILE" "$url" "$token"; then
@@ -323,7 +326,6 @@ sync_once() {
 	now="$(now_epoch)"
 	pending="$(pending_count)"
 	write_state idle true "$plan" "$retention" "$pending" "$now" "$now" "$received" '' $((now + interval))
-	rm -f "$WAKE_FILE" 2>/dev/null || true
 	release_lock
 	trap cleanup_files EXIT
 	return 0
@@ -342,18 +344,38 @@ interruptible_sleep() {
 	[ "$STOP_REQUESTED" -eq 0 ]
 }
 
+consume_wake_marker() {
+	local consumed
+	[ -e "$WAKE_FILE" ] || return 1
+	consumed="${WAKE_FILE}.consumed.$$"
+	# Rename instead of unlinking so an event emitted while sync is running can
+	# create a fresh marker that remains visible for the next daemon tick.
+	if mv "$WAKE_FILE" "$consumed" 2>/dev/null; then
+		rm -f "$consumed"
+		return 0
+	fi
+	return 1
+}
+
 daemon_loop() {
 	local delay tick last_periodic now
 	STOP_REQUESTED=0
 	delay="$(startup_delay_s)"
 	interruptible_sleep "$delay" || return 0
+	consume_wake_marker || true
 	sync_once || true
 	last_periodic="$(now_epoch)"
 	tick="$(normalized_integer "$DAEMON_TICK_S" 15 5 60)"
 	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		interruptible_sleep "$tick" || break
 		now="$(now_epoch)"
-		if [ -e "$WAKE_FILE" ] || [ $((now - last_periodic)) -ge "$(sync_interval_s)" ] 2>/dev/null; then
+		if consume_wake_marker; then
+			# One event burst gets one immediate attempt. If the backend is down,
+			# do not retry every daemon tick; the periodic schedule will retry. A
+			# new event emitted during this attempt creates a fresh wake marker.
+			sync_once || true
+			last_periodic="$now"
+		elif [ $((now - last_periodic)) -ge "$(sync_interval_s)" ] 2>/dev/null; then
 			sync_once || true
 			last_periodic="$now"
 		fi

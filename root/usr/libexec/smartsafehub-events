@@ -17,6 +17,9 @@ BOOT_ID_FILE="${SMARTSAFEHUB_EVENTS_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_i
 JSONFILTER_BIN="${SMARTSAFEHUB_EVENTS_JSONFILTER_BIN:-jsonfilter}"
 DATE_BIN="${SMARTSAFEHUB_EVENTS_DATE_BIN:-date}"
 LOGGER_BIN="${SMARTSAFEHUB_EVENTS_LOGGER_BIN:-logger}"
+LOCK_SLEEP_BIN="${SMARTSAFEHUB_EVENTS_LOCK_SLEEP_BIN:-sleep}"
+LOCK_RETRY_COUNT="${SMARTSAFEHUB_EVENTS_LOCK_RETRY_COUNT:-40}"
+LOCK_RETRY_DELAY_S="${SMARTSAFEHUB_EVENTS_LOCK_RETRY_DELAY_S:-0.05}"
 MAX_EVENTS="${SMARTSAFEHUB_EVENTS_MAX_EVENTS:-128}"
 MAX_METADATA_BYTES="${SMARTSAFEHUB_EVENTS_MAX_METADATA_BYTES:-4096}"
 ACTIVITY_SYNC_WAKE_FILE="${SMARTSAFEHUB_ACTIVITY_SYNC_WAKE_FILE:-$RUNTIME_DIR/activity-sync.wake}"
@@ -70,7 +73,7 @@ normalized_limit() {
 	fi
 }
 
-acquire_lock() {
+try_acquire_lock() {
 	local owner
 	if mkdir "$LOCK_DIR" 2>/dev/null; then
 		printf '%s\n' "$$" > "$LOCK_DIR/pid"
@@ -85,6 +88,27 @@ acquire_lock() {
 	rm -rf "$LOCK_DIR" 2>/dev/null || return 1
 	mkdir "$LOCK_DIR" 2>/dev/null || return 1
 	printf '%s\n' "$$" > "$LOCK_DIR/pid"
+}
+
+acquire_lock() {
+	local attempts=0 max_attempts delay
+	max_attempts="$LOCK_RETRY_COUNT"
+	case "$max_attempts" in ''|*[!0-9]*) max_attempts=40 ;; esac
+	if [ "$max_attempts" -lt 1 ] 2>/dev/null || [ "$max_attempts" -gt 200 ] 2>/dev/null; then
+		max_attempts=40
+	fi
+	delay="$LOCK_RETRY_DELAY_S"
+	[ -n "$delay" ] || delay='0.05'
+
+	while [ "$attempts" -lt "$max_attempts" ]; do
+		try_acquire_lock && return 0
+		attempts=$((attempts + 1))
+		[ "$attempts" -lt "$max_attempts" ] || break
+		"$LOCK_SLEEP_BIN" "$delay" 2>/dev/null || true
+	done
+
+	log_message "event store lock remained busy after ${attempts} attempts"
+	return 1
 }
 
 release_lock() {

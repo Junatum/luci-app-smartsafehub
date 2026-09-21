@@ -135,6 +135,49 @@ run_events history > "$TMP/history-after-ack.json"
 jq -e --arg id "$ack_id" 'any(.events[]; .event_id == $id)' "$TMP/history-after-ack.json" >/dev/null || \
 	fail 'Cloud outbox ack가 공유기 웹사이트용 local history를 삭제하면 안 됩니다.'
 
+# Event writes are best-effort callers in production, so the helper itself must
+# absorb short lock contention instead of dropping activity records. Simulate a
+# live owner that releases the lock shortly after a new event arrives.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq"
+rm -rf "$TMP/runtime/events.lock"
+sleep 2 & lock_owner=$!
+mkdir "$TMP/runtime/events.lock"
+printf '%s\n' "$lock_owner" > "$TMP/runtime/events.lock/pid"
+(
+	sleep 0.15
+	rm -rf "$TMP/runtime/events.lock"
+) & lock_releaser=$!
+contended_id="$(SMARTSAFEHUB_EVENTS_LOCK_RETRY_COUNT=80 SMARTSAFEHUB_EVENTS_LOCK_RETRY_DELAY_S=0.02 run_events emit system settings.test.contended info '{"origin":"direct"}' 1800000900)" || \
+	fail 'short-lived event store lock contention must not drop a new event'
+wait "$lock_releaser" 2>/dev/null || true
+kill "$lock_owner" 2>/dev/null || true
+wait "$lock_owner" 2>/dev/null || true
+run_events history > "$TMP/contended-history.json"
+jq -e --arg id "$contended_id" '(.events | length) == 1 and .events[0].event_id == $id and .events[0].event_type == "settings.test.contended"' "$TMP/contended-history.json" >/dev/null || \
+	fail 'event emitted during short lock contention must remain in local history'
+
+# Concurrent direct producers must serialize through the same bounded writer
+# lock instead of returning 75 and silently losing all but one record.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq"
+rm -rf "$TMP/runtime/events.lock"
+pids=''
+i=0
+while [ "$i" -lt 8 ]; do
+	i=$((i + 1))
+	(
+		SMARTSAFEHUB_EVENTS_LOCK_RETRY_COUNT=100 SMARTSAFEHUB_EVENTS_LOCK_RETRY_DELAY_S=0.02 \
+			run_events emit system "settings.test.parallel.$i" info "{\"index\":$i}" "$((1800000900 + i))" > "$TMP/parallel-id.$i"
+	) &
+	pids="$pids $!"
+done
+for pid in $pids; do
+	wait "$pid" || fail 'parallel event producer lost an event while waiting for the writer lock'
+done
+run_events history > "$TMP/parallel-history.json"
+[ "$(jq '.events | length' "$TMP/parallel-history.json")" -eq 8 ] || fail 'all concurrent events must be retained when the bounded history has capacity'
+jq -e '[.events[].metadata.index] | sort == [1,2,3,4,5,6,7,8]' "$TMP/parallel-history.json" >/dev/null || \
+	fail 'parallel event producers must not lose any record to writer lock contention'
+
 # Boot event is one-per-kernel-boot even if the init service is restarted.
 rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq" "$TMP/runtime/events.boot-id"
 MOCK_EVENT_EPOCH=1800001000 run_events boot
