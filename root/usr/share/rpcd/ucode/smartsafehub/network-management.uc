@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import {
+	emit_activity_event,
 	failure,
 	new_uci_cursor,
 	run_command,
@@ -702,6 +703,13 @@ function apply_validated_settings(validated) {
 			? failure('LAN_RUNTIME_RELOAD_FAILED', '네트워크 재적용을 시작하지 못해 이전 설정으로 되돌렸습니다.')
 			: failure('LAN_ROLLBACK_FAILED', '네트워크 설정 적용과 복구에 실패했습니다. 기존 LuCI에서 LAN 설정을 확인해 주세요.');
 	}
+
+	emit_activity_event('network', 'settings.lan.updated', 'info', {
+		origin: 'direct',
+		address_changed: address_changed,
+		prefix_length: validated.prefixLength,
+		dhcp_enabled: validated.dhcpEnabled,
+	});
 
 	return success({
 		changed: true,

@@ -24,6 +24,11 @@ function metadataNumber(event: ActivityEvent, key: string): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function metadataBoolean(event: ActivityEvent, key: string): boolean | null {
+  const value = event.metadata[key];
+  return typeof value === 'boolean' ? value : null;
+}
+
 function failureDescription(event: ActivityEvent, message: string): string {
   const errorCode = metadataString(event, 'error_code');
   return errorCode ? `${message} (오류 코드: ${errorCode})` : message;
@@ -126,6 +131,106 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
         description: failureDescription(event, '차단 목록을 업데이트하지 못했습니다.'),
       };
 
+
+    case 'safeshield.statistics.enabled':
+      return {
+        title: 'SafeShield 차단 통계 수집 활성화',
+        description: '기기별 차단 통계 수집을 활성화했습니다.',
+      };
+
+    case 'safeshield.statistics.disabled':
+      return {
+        title: 'SafeShield 차단 통계 수집 비활성화',
+        description: '기기별 차단 통계 수집을 비활성화했습니다.',
+      };
+
+    case 'safeshield.rule.added': {
+      const action = metadataString(event, 'rule_action');
+      return {
+        title: action === 'allow' ? '사용자 허용 규칙 추가' : '사용자 차단 규칙 추가',
+        description: 'SafeShield 사용자 규칙이 변경되었습니다.',
+      };
+    }
+
+    case 'safeshield.rule.removed': {
+      const action = metadataString(event, 'rule_action');
+      return {
+        title: action === 'allow' ? '사용자 허용 규칙 삭제' : '사용자 차단 규칙 삭제',
+        description: 'SafeShield 사용자 규칙이 변경되었습니다.',
+      };
+    }
+
+    case 'settings.scheduled_reboot.updated': {
+      const enabled = metadataBoolean(event, 'enabled');
+      return {
+        title: '예약 재부팅 설정 변경',
+        description:
+          enabled === true
+            ? '예약 재부팅 설정을 저장하고 새 일정에 적용했습니다.'
+            : enabled === false
+              ? '예약 재부팅을 비활성화했습니다.'
+              : '예약 재부팅 설정을 변경했습니다.',
+      };
+    }
+
+    case 'settings.software_updates.updated': {
+      const autoInstall = metadataBoolean(event, 'auto_install');
+      return {
+        title: '관리 소프트웨어 업데이트 설정 변경',
+        description:
+          autoInstall === true
+            ? '자동 설치를 포함한 업데이트 설정을 저장했습니다.'
+            : '관리 소프트웨어 업데이트 설정을 저장했습니다.',
+      };
+    }
+
+    case 'settings.health_reporter.enabled':
+      return {
+        title: '원격 상태 보고 활성화',
+        description: '장치 상태를 SmartSafeHub Cloud에 보고하도록 설정했습니다.',
+      };
+
+    case 'settings.health_reporter.disabled':
+      return {
+        title: '원격 상태 보고 비활성화',
+        description: 'SmartSafeHub Cloud로의 장치 상태 보고를 중지했습니다.',
+      };
+
+    case 'settings.timezone.updated': {
+      const zonename = metadataString(event, 'zonename');
+      return {
+        title: '시간대 설정 변경',
+        description: zonename ? `공유기 시간대를 ${zonename}(으)로 변경했습니다.` : '공유기 시간대를 변경했습니다.',
+      };
+    }
+
+    case 'settings.wifi.updated':
+      return {
+        title: 'Wi-Fi 설정 변경',
+        description: 'Wi-Fi 설정을 저장하고 무선 네트워크에 적용했습니다.',
+      };
+
+    case 'settings.lan.updated':
+      return {
+        title: 'LAN 설정 변경',
+        description: '내부 네트워크 및 DHCP 설정을 변경했습니다.',
+      };
+
+    case 'settings.iptv.updated': {
+      const enabled = metadataBoolean(event, 'enabled');
+      const provider = metadataString(event, 'provider');
+      const providerLabel = provider === 'skb' ? 'SK Broadband' : provider === 'lgu' ? 'LG U+' : null;
+      return {
+        title: 'IPTV 설정 변경',
+        description:
+          enabled === false
+            ? 'IPTV 기능을 비활성화했습니다.'
+            : providerLabel
+              ? `${providerLabel} IPTV 설정을 적용했습니다.`
+              : 'IPTV 설정을 적용했습니다.',
+      };
+    }
+
     case 'software.update.completed':
       return {
         title: '관리 소프트웨어 업데이트 완료',
@@ -172,11 +277,16 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
       };
     }
 
-    case 'license.cleared':
+    case 'license.cleared': {
+      const reason = metadataString(event, 'reason');
       return {
         title: '라이선스 연결 해제',
-        description: '서버의 라이선스 상태가 반영되어 이 공유기의 라이선스 연결이 해제되었습니다.',
+        description:
+          reason === 'manual'
+            ? '이 공유기에서 라이선스 연결을 해제했습니다.'
+            : '서버의 라이선스 상태가 반영되어 이 공유기의 라이선스 연결이 해제되었습니다.',
       };
+    }
 
     case 'health.issue.started': {
       const warningCount = metadataNumber(event, 'warning_count') ?? 0;

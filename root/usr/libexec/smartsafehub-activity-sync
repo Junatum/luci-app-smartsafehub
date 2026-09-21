@@ -1,0 +1,380 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -u
+umask 077
+
+COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
+[ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
+. "$COMMON_LIB"
+
+RUNTIME_DIR="${SMARTSAFEHUB_ACTIVITY_RUNTIME_DIR:-/tmp/smartsafehub}"
+STATE_FILE="${SMARTSAFEHUB_ACTIVITY_STATE_FILE:-$RUNTIME_DIR/activity-sync.json}"
+CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-sync-credential.json}"
+WAKE_FILE="${SMARTSAFEHUB_ACTIVITY_WAKE_FILE:-$RUNTIME_DIR/activity-sync.wake}"
+LOCK_DIR="${SMARTSAFEHUB_ACTIVITY_LOCK_DIR:-$RUNTIME_DIR/activity-sync.lock}"
+EVENTS_BIN="${SMARTSAFEHUB_ACTIVITY_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
+UCI_BIN="${SMARTSAFEHUB_ACTIVITY_UCI_BIN:-uci}"
+UBUS_BIN="${SMARTSAFEHUB_ACTIVITY_UBUS_BIN:-ubus}"
+JSONFILTER_BIN="${SMARTSAFEHUB_ACTIVITY_JSONFILTER_BIN:-jsonfilter}"
+UCLIENT_FETCH_BIN="${SMARTSAFEHUB_ACTIVITY_UCLIENT_FETCH_BIN:-uclient-fetch}"
+DATE_BIN="${SMARTSAFEHUB_ACTIVITY_DATE_BIN:-date}"
+SLEEP_BIN="${SMARTSAFEHUB_ACTIVITY_SLEEP_BIN:-sleep}"
+LOGGER_BIN="${SMARTSAFEHUB_ACTIVITY_LOGGER_BIN:-logger}"
+DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
+DEFAULT_SYNC_INTERVAL_S=300
+DEFAULT_STARTUP_DELAY_S=45
+DAEMON_TICK_S=15
+REQUEST_TIMEOUT_S=15
+CREDENTIAL_REFRESH_MARGIN_S=600
+
+RESOLVE_BODY_FILE=''
+RESOLVE_RESPONSE_FILE=''
+UPLOAD_BODY_FILE=''
+UPLOAD_RESPONSE_FILE=''
+SAFESHIELD_STATUS_FILE=''
+LICENSE_FILE=''
+STOP_REQUESTED=0
+WAIT_PID=''
+
+cleanup_files() {
+	[ -n "$RESOLVE_BODY_FILE" ] && rm -f "$RESOLVE_BODY_FILE"
+	[ -n "$RESOLVE_RESPONSE_FILE" ] && rm -f "$RESOLVE_RESPONSE_FILE"
+	[ -n "$UPLOAD_BODY_FILE" ] && rm -f "$UPLOAD_BODY_FILE"
+	[ -n "$UPLOAD_RESPONSE_FILE" ] && rm -f "$UPLOAD_RESPONSE_FILE"
+	[ -n "$SAFESHIELD_STATUS_FILE" ] && rm -f "$SAFESHIELD_STATUS_FILE"
+	[ -n "$LICENSE_FILE" ] && rm -f "$LICENSE_FILE"
+}
+
+request_stop() {
+	STOP_REQUESTED=1
+	[ -z "$WAIT_PID" ] || kill "$WAIT_PID" 2>/dev/null || true
+}
+trap cleanup_files EXIT
+trap request_stop INT TERM
+
+log_message() { "$LOGGER_BIN" -t smartsafehub-activity-sync -- "$*" 2>/dev/null || true; }
+uci_get() { "$UCI_BIN" -q get "smartsafehub.activity.$1" 2>/dev/null || true; }
+
+normalized_integer() {
+	local value="$1" fallback="$2" minimum="$3" maximum="$4"
+	case "$value" in ''|*[!0-9]*) value="$fallback" ;; esac
+	if [ "$value" -lt "$minimum" ] 2>/dev/null || [ "$value" -gt "$maximum" ] 2>/dev/null; then value="$fallback"; fi
+	printf '%s' "$value"
+}
+
+sync_interval_s() { normalized_integer "$(uci_get sync_interval_s)" "$DEFAULT_SYNC_INTERVAL_S" 60 86400; }
+startup_delay_s() { normalized_integer "$(uci_get startup_delay_s)" "$DEFAULT_STARTUP_DELAY_S" 0 600; }
+api_base_url() {
+	local value
+	value="$(uci_get api_base_url)"
+	case "$value" in https://*) printf '%s' "${value%/}" ;; *) printf '%s' "$DEFAULT_API_BASE_URL" ;; esac
+}
+now_epoch() {
+	local value
+	value="$("$DATE_BIN" +%s 2>/dev/null || true)"
+	case "$value" in ''|*[!0-9]*) value=0 ;; esac
+	printf '%s' "$value"
+}
+json_value() {
+	local file="$1" expression="$2"
+	[ -s "$file" ] || return 0
+	"$JSONFILTER_BIN" -i "$file" -e "$expression" 2>/dev/null || true
+}
+json_string_or_null() {
+	if [ -n "$1" ]; then printf '"%s"' "$(json_escape "$1")"; else printf 'null'; fi
+}
+sanitize_code() { printf '%s' "$1" | tr -cd 'A-Za-z0-9_.:-' | cut -c 1-120; }
+number_value() { case "$1" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$1" ;; esac; }
+
+acquire_lock() {
+	local owner
+	if mkdir "$LOCK_DIR" 2>/dev/null; then printf '%s\n' "$$" > "$LOCK_DIR/pid"; return 0; fi
+	owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+	if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then return 1; fi
+	rm -rf "$LOCK_DIR" 2>/dev/null || return 1
+	mkdir "$LOCK_DIR" 2>/dev/null || return 1
+	printf '%s\n' "$$" > "$LOCK_DIR/pid"
+}
+release_lock() { rm -rf "$LOCK_DIR" 2>/dev/null || true; }
+
+pending_count() {
+	local file count
+	file="$RUNTIME_DIR/activity-pending.$$.json"
+	if ! "$EVENTS_BIN" list > "$file" 2>/dev/null; then rm -f "$file"; printf '0'; return; fi
+	count="$("$JSONFILTER_BIN" -i "$file" -e '@.events[*].event_id' 2>/dev/null | wc -l | tr -d '[:space:]')"
+	rm -f "$file"
+	case "$count" in ''|*[!0-9]*) count=0 ;; esac
+	printf '%s' "$count"
+}
+
+previous_state_number() {
+	local expression="$1" value
+	value="$(json_value "$STATE_FILE" "$expression")"
+	number_value "$value"
+}
+
+write_state() {
+	local phase="$1" eligible="$2" plan="$3" retention_days="$4" pending="$5"
+	local last_attempt="$6" last_success="$7" uploaded="$8" error_code="$9"
+	shift 9
+	local next_sync="$1" tmp eligible_json
+	case "$eligible" in true|false) eligible_json="$eligible" ;; *) eligible_json='null' ;; esac
+	tmp="${STATE_FILE}.tmp.$$"
+	cat > "$tmp" <<EOF_STATE
+{"schema":1,"component":"activity_sync","phase":"$(json_escape "$phase")","eligible":$eligible_json,"plan":$(json_string_or_null "$(sanitize_code "$plan")"),"retentionDays":$retention_days,"pendingEvents":$pending,"lastAttemptAt":$last_attempt,"lastSuccessAt":$last_success,"lastUploadedCount":$uploaded,"lastErrorCode":$(json_string_or_null "$(sanitize_code "$error_code")"),"nextSyncAt":$next_sync}
+EOF_STATE
+	mv "$tmp" "$STATE_FILE"
+}
+
+read_license_key() {
+	local configured key
+	LICENSE_FILE="$RUNTIME_DIR/activity-license.$$.json"
+	if ! "$UBUS_BIN" call safeshield license_get > "$LICENSE_FILE" 2>/dev/null; then return 1; fi
+	configured="$(json_value "$LICENSE_FILE" '@.license.configured')"
+	key="$(json_value "$LICENSE_FILE" '@.license.key')"
+	[ -n "$key" ] || key="$(json_value "$LICENSE_FILE" '@.key')"
+	case "$configured" in true|1) ;; *) printf '%s' ''; return 0 ;; esac
+	printf '%s' "$key"
+}
+
+build_resolve_body() {
+	local key="$1" fingerprint fingerprint_version identity_provider identity_source identity_strength identity_profile
+	local installation_id vendor model arch memory_mb version memory_json device_code device_code_source
+	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/activity-safeshield.$$.json"
+	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then return 1; fi
+
+	fingerprint="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.physical_fingerprint')"
+	case "$fingerprint" in
+		????????????????????????????????????????????????????????????????) case "$fingerprint" in *[!0-9a-fA-F]*) return 1 ;; esac ;;
+		*) return 1 ;;
+	esac
+	fingerprint_version="$(number_value "$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.fingerprint_version')")"
+	[ "$fingerprint_version" -ge 1 ] 2>/dev/null || fingerprint_version=1
+	identity_provider="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_provider')"
+	identity_source="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_source')"
+	identity_strength="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_strength')"
+	identity_profile="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.identity_profile')"
+	installation_id="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.installation_id')"
+	vendor="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.vendor')"
+	model="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.model')"
+	arch="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.arch')"
+	memory_mb="$(number_value "$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.memory_mb')")"
+	version="$(json_value "$SAFESHIELD_STATUS_FILE" '@.version')"
+	device_code="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.device_code')"
+	device_code_source="$(json_value "$SAFESHIELD_STATUS_FILE" '@.device.configured.device_code_source')"
+	[ -n "$vendor" ] && [ -n "$model" ] && [ -n "$arch" ] && [ -n "$version" ] || return 1
+	if [ "$memory_mb" -gt 0 ] 2>/dev/null; then memory_json="$memory_mb"; else memory_json='null'; fi
+
+	RESOLVE_BODY_FILE="$RUNTIME_DIR/activity-resolve-body.$$.json"
+	cat > "$RESOLVE_BODY_FILE" <<EOF_RESOLVE
+{"license_key":"$(json_escape "$key")","device":{"physical_fingerprint":"$(json_escape "$fingerprint")","fingerprint_version":$fingerprint_version,"identity_provider":"$(json_escape "$identity_provider")","identity_source":"$(json_escape "$identity_source")","identity_strength":"$(json_escape "$identity_strength")","identity_profile":"$(json_escape "$identity_profile")","installation_id":$(json_string_or_null "$installation_id"),"vendor":"$(json_escape "$vendor")","model":"$(json_escape "$model")","arch":"$(json_escape "$arch")","memory_mb":$memory_json,"safeshield_version":"$(json_escape "$version")","device_code":"$(json_escape "$device_code")","device_code_source":"$(json_escape "$device_code_source")"}}
+EOF_RESOLVE
+}
+
+post_json() {
+	local body_file="$1" output_file="$2" url="$3"
+	"$UCLIENT_FETCH_BIN" -q -T "$REQUEST_TIMEOUT_S" --method=POST --body-file="$body_file" \
+		--header='Content-Type: application/json' -O "$output_file" "$url"
+}
+post_authorized_json() {
+	local body_file="$1" output_file="$2" url="$3" token="$4"
+	"$UCLIENT_FETCH_BIN" -q -T "$REQUEST_TIMEOUT_S" --method=POST --body-file="$body_file" \
+		--header='Content-Type: application/json' --header="Authorization: Bearer $token" \
+		-O "$output_file" "$url"
+}
+
+credential_valid() {
+	local now expires token url
+	[ -s "$CREDENTIAL_FILE" ] || return 1
+	now="$(now_epoch)"
+	expires="$(number_value "$(json_value "$CREDENTIAL_FILE" '@.expires_at')")"
+	token="$(json_value "$CREDENTIAL_FILE" '@.token')"
+	url="$(json_value "$CREDENTIAL_FILE" '@.upload_url')"
+	[ -n "$token" ] || return 1
+	case "$url" in https://*) ;; *) return 1 ;; esac
+	[ "$expires" -gt $((now + CREDENTIAL_REFRESH_MARGIN_S)) ] 2>/dev/null
+}
+
+store_credential() {
+	local response="$1" now token url ttl retention plan expires tmp
+	token="$(json_value "$response" '@.activity_history.token')"
+	url="$(json_value "$response" '@.activity_history.upload_url')"
+	ttl="$(number_value "$(json_value "$response" '@.activity_history.token_expires_in_s')")"
+	retention="$(number_value "$(json_value "$response" '@.activity_history.retention_days')")"
+	plan="$(json_value "$response" '@.license.plan')"
+	[ -n "$token" ] || return 2
+	case "$url" in https://*) ;; *) return 1 ;; esac
+	[ "$ttl" -gt "$CREDENTIAL_REFRESH_MARGIN_S" ] 2>/dev/null || return 1
+	[ "$retention" -gt 0 ] 2>/dev/null || retention=90
+	now="$(now_epoch)"
+	expires=$((now + ttl))
+	tmp="${CREDENTIAL_FILE}.tmp.$$"
+	cat > "$tmp" <<EOF_CREDENTIAL
+{"schema":1,"token":"$(json_escape "$token")","upload_url":"$(json_escape "$url")","expires_at":$expires,"retention_days":$retention,"plan":"$(json_escape "$plan")"}
+EOF_CREDENTIAL
+	mv "$tmp" "$CREDENTIAL_FILE"
+}
+
+resolve_credential() {
+	local key base activity_token plan
+	key="$(read_license_key 2>/dev/null || true)"
+	if [ -z "$key" ]; then
+		rm -f "$CREDENTIAL_FILE"
+		"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
+		return 2
+	fi
+	build_resolve_body "$key" || return 1
+	RESOLVE_RESPONSE_FILE="$RUNTIME_DIR/activity-resolve-response.$$.json"
+	base="$(api_base_url)"
+	post_json "$RESOLVE_BODY_FILE" "$RESOLVE_RESPONSE_FILE" "$base/licenses/resolve" || return 1
+	activity_token="$(json_value "$RESOLVE_RESPONSE_FILE" '@.activity_history.token')"
+	plan="$(json_value "$RESOLVE_RESPONSE_FILE" '@.license.plan' | tr '[:upper:]' '[:lower:]')"
+	if [ -z "$activity_token" ]; then
+		rm -f "$CREDENTIAL_FILE"
+		case "$plan" in
+			pro|ultimate)
+				# A paid resolve response without an activity credential usually means
+				# the backend has not rolled out the activity API yet or returned an
+				# incomplete payload. Keep the outbox for a later retry instead of
+				# silently discarding paid-user events.
+				return 1
+				;;
+			*)
+				"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
+				return 2
+				;;
+		esac
+	fi
+	store_credential "$RESOLVE_RESPONSE_FILE"
+}
+
+sync_once() {
+	local now previous_success interval next_sync pending batch_count plan retention token url received accepted duplicates expired processed event_id resolve_rc
+	mkdir -p "$RUNTIME_DIR" || return 1
+	acquire_lock || return 75
+	trap 'release_lock; cleanup_files' EXIT INT TERM
+	now="$(now_epoch)"
+	previous_success="$(previous_state_number '@.lastSuccessAt')"
+	interval="$(sync_interval_s)"
+	next_sync=$((now + interval))
+	pending="$(pending_count)"
+	write_state syncing null '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
+
+	if ! credential_valid; then
+		resolve_rc=0
+		resolve_credential || resolve_rc=$?
+		case "$resolve_rc" in
+			2)
+				pending="$(pending_count)"
+				write_state ineligible false '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
+				release_lock; trap cleanup_files EXIT; rm -f "$WAKE_FILE" 2>/dev/null || true; return 0
+				;;
+			0) ;;
+			*)
+				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_RESOLVE_FAILED "$next_sync"
+				release_lock; trap cleanup_files EXIT; return 1
+				;;
+		esac
+	fi
+
+	plan="$(json_value "$CREDENTIAL_FILE" '@.plan')"
+	retention="$(number_value "$(json_value "$CREDENTIAL_FILE" '@.retention_days')")"
+	token="$(json_value "$CREDENTIAL_FILE" '@.token')"
+	url="$(json_value "$CREDENTIAL_FILE" '@.upload_url')"
+	pending="$(pending_count)"
+	if [ "$pending" -eq 0 ] 2>/dev/null; then
+		write_state idle true "$plan" "$retention" 0 "$now" "$previous_success" 0 '' "$next_sync"
+		rm -f "$WAKE_FILE" 2>/dev/null || true
+		release_lock; trap cleanup_files EXIT; return 0
+	fi
+
+	UPLOAD_BODY_FILE="$RUNTIME_DIR/activity-upload-body.$$.json"
+	UPLOAD_RESPONSE_FILE="$RUNTIME_DIR/activity-upload-response.$$.json"
+	if ! "$EVENTS_BIN" list > "$UPLOAD_BODY_FILE" 2>/dev/null; then
+		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_OUTBOX_READ_FAILED "$next_sync"
+		release_lock; trap cleanup_files EXIT; return 1
+	fi
+	batch_count="$("$JSONFILTER_BIN" -i "$UPLOAD_BODY_FILE" -e '@.events[*].event_id' 2>/dev/null | awk 'NF { count++ } END { print count + 0 }')"
+	case "$batch_count" in ''|*[!0-9]*) batch_count=0 ;; esac
+	if [ "$batch_count" -eq 0 ] 2>/dev/null; then
+		write_state idle true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 '' "$next_sync"
+		rm -f "$WAKE_FILE" 2>/dev/null || true
+		release_lock; trap cleanup_files EXIT; return 0
+	fi
+	if ! post_authorized_json "$UPLOAD_BODY_FILE" "$UPLOAD_RESPONSE_FILE" "$url" "$token"; then
+		rm -f "$CREDENTIAL_FILE"
+		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_UPLOAD_FAILED "$next_sync"
+		release_lock; trap cleanup_files EXIT; return 1
+	fi
+	received="$(number_value "$(json_value "$UPLOAD_RESPONSE_FILE" '@.received')")"
+	accepted="$(number_value "$(json_value "$UPLOAD_RESPONSE_FILE" '@.accepted')")"
+	duplicates="$(number_value "$(json_value "$UPLOAD_RESPONSE_FILE" '@.duplicates')")"
+	expired="$(number_value "$(json_value "$UPLOAD_RESPONSE_FILE" '@.expired')")"
+	processed=$((accepted + duplicates + expired))
+	if [ "$received" -ne "$batch_count" ] 2>/dev/null || [ "$processed" -ne "$received" ] 2>/dev/null; then
+		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_UPLOAD_RESPONSE_INVALID "$next_sync"
+		release_lock; trap cleanup_files EXIT; return 1
+	fi
+
+	"$JSONFILTER_BIN" -i "$UPLOAD_BODY_FILE" -e '@.events[*].event_id' 2>/dev/null | while IFS= read -r event_id; do
+		[ -n "$event_id" ] || continue
+		"$EVENTS_BIN" ack "$event_id" >/dev/null 2>&1 || true
+	done
+	now="$(now_epoch)"
+	pending="$(pending_count)"
+	write_state idle true "$plan" "$retention" "$pending" "$now" "$now" "$received" '' $((now + interval))
+	rm -f "$WAKE_FILE" 2>/dev/null || true
+	release_lock
+	trap cleanup_files EXIT
+	return 0
+}
+
+show_status() {
+	if [ -s "$STATE_FILE" ]; then cat "$STATE_FILE"; else
+		printf '%s\n' '{"schema":1,"component":"activity_sync","phase":"preparing","eligible":null,"plan":null,"retentionDays":0,"pendingEvents":0,"lastAttemptAt":0,"lastSuccessAt":0,"lastUploadedCount":0,"lastErrorCode":null,"nextSyncAt":0}'
+	fi
+}
+
+interruptible_sleep() {
+	local duration="$1"
+	[ "$duration" -gt 0 ] 2>/dev/null || return 0
+	"$SLEEP_BIN" "$duration" & WAIT_PID=$!; wait "$WAIT_PID" 2>/dev/null || true; WAIT_PID=''
+	[ "$STOP_REQUESTED" -eq 0 ]
+}
+
+daemon_loop() {
+	local delay tick last_periodic now
+	STOP_REQUESTED=0
+	delay="$(startup_delay_s)"
+	interruptible_sleep "$delay" || return 0
+	sync_once || true
+	last_periodic="$(now_epoch)"
+	tick="$(normalized_integer "$DAEMON_TICK_S" 15 5 60)"
+	while [ "$STOP_REQUESTED" -eq 0 ]; do
+		interruptible_sleep "$tick" || break
+		now="$(now_epoch)"
+		if [ -e "$WAKE_FILE" ] || [ $((now - last_periodic)) -ge "$(sync_interval_s)" ] 2>/dev/null; then
+			sync_once || true
+			last_periodic="$now"
+		fi
+	done
+}
+
+usage() {
+	cat <<'EOF_USAGE'
+Usage: smartsafehub-activity-sync <command>
+
+Commands:
+  daemon
+  sync-once
+  status
+EOF_USAGE
+}
+
+mkdir -p "$RUNTIME_DIR" || exit 1
+case "${1:-}" in
+	daemon) daemon_loop ;;
+	sync-once) sync_once ;;
+	status) show_status ;;
+	*) usage >&2; exit 2 ;;
+esac

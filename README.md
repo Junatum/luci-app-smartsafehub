@@ -271,20 +271,20 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 
 두 저장소 모두 오래된 항목부터 제거하고 `mkdir` lock과 atomic rename으로 직렬화하며, `metadata`는 JSON object만 허용하고 크기를 제한합니다. `/tmp` 기반이므로 이벤트 수집 때문에 flash에 주기적으로 쓰지 않고 재부팅 시 초기화됩니다. `0.2.19-r8`에서 이미 수집된 `/tmp/smartsafehub/events.jsonl`은 전용 history가 생기기 전까지 RPC가 호환 fallback으로 읽으며, 첫 r9 이벤트가 기록될 때 기존 r8 outbox를 bounded local history로 먼저 승계한 뒤 새 이벤트를 추가합니다. 따라서 같은 부팅 세션에서 업그레이드 직후 수집돼 있던 최근 활동이 history 생성 시 갑자기 사라지지 않습니다. `device_uuid`는 공유기에서 임의로 신뢰하지 않고 현재는 `null`로 두며, Cloud 수집 단계에서 인증된 장치 identity 기준으로 서버가 연결하는 것을 전제로 합니다.
 
+이벤트 producer는 **직접 이벤트(direct)** 와 **관찰 이벤트(observer)** 로 책임을 나눕니다. 사용자가 저장/변경을 완료한 사실을 mutation call site에서 확정할 수 있는 항목은 성공 직후 즉시 기록하고, 외부 네트워크 상태나 비동기 작업 결과처럼 즉시 확정할 수 없는 항목만 observer가 상태 전이를 감지합니다. 주기적인 상태 조회 자체는 이벤트가 아닙니다.
+
 현재 생산 경로에서 기록하는 event type은 다음 범위입니다.
 
-- `system.booted`: 커널 `boot_id` 기준으로 부팅당 한 번만 기록
-- `software.update.completed`, `software.update.failed`: 실제 관리 소프트웨어 설치 결과만 기록하고 정기 업데이트 조회는 기록하지 않음
-- `firmware.update.started`, `firmware.update.failed`: 사용자가 실제 설치를 시작한 시점과 설치 직전 검증 실패를 기록. sysupgrade 이후 성공 완료 판정은 재부팅 후 펌웨어 identity 검증과 함께 후속 단계에서 연결
-- `license.activated`, `license.changed`, `license.cleared`: 활성화와 서버 status reconcile에서 실제 라이선스 상태가 변경될 때만 기록하며 라이선스 키는 metadata에 넣지 않음
-- `network.internet.disconnected`, `network.internet.recovered`: Health observer가 WAN의 실제 `up/down` 전이를 관찰할 때만 기록하며 복구 시 관찰된 중단 시간을 함께 기록
-- `safeshield.protection.enabled`, `safeshield.protection.disabled`: SafeShield enabled 상태가 이전 관측값과 달라질 때만 기록
-- `safeshield.blocklist.updated`, `safeshield.blocklist.update_failed`: SafeShield의 `timestamps.last_success`/`last_failure`가 증가했을 때만 기록하고 실제 SafeShield timestamp를 `occurred_at`으로 사용
-- `health.issue.started`, `health.issue.changed`, `health.issue.resolved`: 메모리, 시스템 부하, 저장 공간, dnsmasq, 시스템 시간처럼 Health 고유 진단 항목의 fingerprint가 실제로 바뀔 때만 기록. WAN/SafeShield/updater/firmware 이상은 전용 event와 중복되지 않도록 제외
+- 직접 이벤트: `safeshield.protection.enabled/disabled`, `safeshield.statistics.enabled/disabled`, `safeshield.rule.added/removed`, `settings.scheduled_reboot.updated`, `settings.software_updates.updated`, `settings.health_reporter.enabled/disabled`, `settings.timezone.updated`, `settings.wifi.updated`, `settings.lan.updated`, `settings.iptv.updated`
+- 기존 직접 결과 이벤트: `software.update.completed/failed`, `firmware.update.started/failed`, `license.activated/changed/cleared`, `system.booted`
+- 관찰 이벤트: `network.internet.disconnected/recovered`, `health.issue.started/changed/resolved`
+- SafeShield 비동기 완료 관찰: `safeshield.blocklist.updated/update_failed`. 수동 refresh가 SafeShield에서 `accepted`되면 `/usr/libexec/smartsafehub-events`의 watcher가 해당 요청 직전의 success/failure timestamp를 기준으로 완료를 기다리고, 같은 `smartsafehub-events daemon`이 자동 refresh 결과도 보완합니다. 별도 SafeShield 이벤트 daemon은 두지 않으며 Health observer도 SafeShield 보호 및 blocklist event를 만들지 않습니다.
 
-Health observer의 첫 주기는 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며, 상태 전이가 있을 때만 기록됩니다. `smartsafehub-events` init script도 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
+Health observer의 첫 주기는 WAN/Health 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며 상태 전이가 있을 때만 기록됩니다. 직접 producer는 성공한 mutation마다 별도로 기록하므로 Health 주기 사이에 SafeShield를 OFF→ON으로 변경해도 두 이벤트가 모두 남습니다. `smartsafehub-events`는 boot event 기록과 SafeShield 비동기 refresh observer를 한 procd daemon에 통합하며, 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
 
-공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 현재 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**만 제공합니다. Cloud 전송 API, Pro/Ultimate entitlement와 서버 장기 보관은 이후 Cloud Console 활동 기록 단계에서 별도로 연결합니다.
+공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**을 제공합니다.
+
+Pro/Ultimate 장치에서는 `/usr/libexec/smartsafehub-activity-sync`가 같은 이벤트의 Cloud outbox를 `/api/v1/activity/events`로 batch 전송합니다. `/api/v1/licenses/resolve`가 발급한 `activity_history` upload token/URL을 `/tmp`에만 보관하고, 전송 성공 응답의 `received == accepted + duplicates + expired`가 snapshot batch와 일치할 때 그 snapshot의 `event_id`만 ack합니다. 업로드 실패나 불완전 응답에서는 ack하지 않습니다. 유료 플랜인데 credential이 누락되면 배포 지연/서버 오류로 보고 outbox를 보존해 재시도하며, Free/비대상 상태에서는 Cloud 전송용 outbox만 비워 무한 적재를 막습니다. Cloud ack는 로컬 `activity-history.jsonl`을 삭제하지 않습니다. 기본 주기 검사는 5분이지만 새 이벤트가 생기면 wake marker로 빠르게 동기화를 시도합니다. 공유기 `최근 활동` 화면에서는 entitlement, 전송 대기 건수, 마지막 성공 시각과 서버 retention을 함께 확인할 수 있습니다.
 
 최근 활동 문구는 관측 데이터가 실제로 보장하는 범위만 표현합니다. 부팅 이벤트는 전원 인가와 재시작을 구분할 수 없으므로 `공유기 부팅 감지`로 표시하고, WAN 장애 시간은 Health observer가 연결을 확인하지 못한 관측 구간이므로 `약 N초 동안 인터넷 연결이 확인되지 않았습니다.`처럼 안내합니다. 실패 이벤트는 오류 코드만 단독 노출하지 않고 사용자용 실패 설명을 먼저 표시하며, 오류 코드는 진단용 보조 정보로 함께 제공합니다.
 

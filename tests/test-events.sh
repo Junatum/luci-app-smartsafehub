@@ -25,14 +25,20 @@ cat > "$TMP/bin/jsonfilter" <<'EOF_JSONFILTER'
 #!/bin/sh
 set -eu
 file=''
+expr='@'
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-i) file="$2"; shift 2 ;;
-		-e) shift 2 ;;
+		-e) expr="$2"; shift 2 ;;
 		*) shift ;;
 	esac
 done
-jq -e . "$file" >/dev/null
+if [ "$expr" = '@' ]; then
+	jq -e . "$file" >/dev/null
+else
+	jq_expr="${expr#@}"
+	jq -r "$jq_expr // empty" "$file"
+fi
 EOF_JSONFILTER
 chmod +x "$TMP/bin/jsonfilter"
 
@@ -49,6 +55,14 @@ exit 0
 EOF_LOGGER
 chmod +x "$TMP/bin/logger"
 
+cat > "$TMP/bin/ubus" <<'EOF_UBUS'
+#!/bin/sh
+set -eu
+[ "${1:-}" = call ] && [ "${2:-}" = safeshield ] && [ "${3:-}" = status ] || exit 1
+cat "$MOCK_SAFESHIELD_STATUS"
+EOF_UBUS
+chmod +x "$TMP/bin/ubus"
+
 run_events() {
 	SMARTSAFEHUB_EVENTS_RUNTIME_DIR="$TMP/runtime" \
 	SMARTSAFEHUB_EVENTS_FILE="$TMP/runtime/events.jsonl" \
@@ -61,6 +75,9 @@ run_events() {
 	SMARTSAFEHUB_EVENTS_DATE_BIN="$TMP/bin/date" \
 	SMARTSAFEHUB_EVENTS_LOGGER_BIN="$TMP/bin/logger" \
 	SMARTSAFEHUB_EVENTS_MAX_EVENTS=8 \
+	SMARTSAFEHUB_EVENTS_SAFESHIELD_UBUS_BIN="$TMP/bin/ubus" \
+	SMARTSAFEHUB_EVENTS_SAFESHIELD_JSONFILTER_BIN="$TMP/bin/jsonfilter" \
+	MOCK_SAFESHIELD_STATUS="$TMP/safeshield-status.json" \
 	PATH="$TMP/bin:$PATH" \
 	"$HELPER" "$@"
 }
@@ -131,6 +148,30 @@ MOCK_EVENT_EPOCH=1800002000 run_events boot
 run_events list > "$TMP/boot-list.json"
 [ "$(jq '.events | length' "$TMP/boot-list.json")" -eq 2 ] || fail '새 boot_id에서는 새 system.booted 이벤트를 기록해야 합니다.'
 
+# The unified daemon owns SafeShield async refresh observation. The first
+# successful observation is baseline-only; a later terminal timestamp emits one
+# observer event and persists the timestamp so the same result is not replayed.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq" \
+	"$TMP/runtime/safeshield-events.state"
+cat > "$TMP/safeshield-status.json" <<'EOF_SAFE_BASELINE'
+{"timestamps":{"last_success":1800003000,"last_failure":0},"artifact":{"version":"2026.09.21","unique_domains":33818},"runtime":{"last_error_code":""}}
+EOF_SAFE_BASELINE
+run_events observe-once || fail 'unified event daemon must baseline the current SafeShield refresh timestamps'
+run_events list > "$TMP/safeshield-baseline-list.json"
+[ "$(jq '.events | length' "$TMP/safeshield-baseline-list.json")" -eq 0 ] || \
+	fail 'first SafeShield observer cycle must establish a baseline without fabricating history'
+cat > "$TMP/safeshield-status.json" <<'EOF_SAFE_UPDATED'
+{"timestamps":{"last_success":1800003060,"last_failure":0},"artifact":{"version":"2026.09.21.1","unique_domains":33901},"runtime":{"last_error_code":""}}
+EOF_SAFE_UPDATED
+run_events observe-once || fail 'unified event daemon must observe a later SafeShield refresh result'
+run_events observe-once || fail 're-observing the same SafeShield timestamp must remain idempotent'
+run_events list > "$TMP/safeshield-updated-list.json"
+jq -e '(.events | length) == 1 and .events[0].event_type == "safeshield.blocklist.updated" and .events[0].occurred_at == 1800003060 and .events[0].metadata.origin == "observer" and .events[0].metadata.artifact_version == "2026.09.21.1" and .events[0].metadata.domain_count == 33901' "$TMP/safeshield-updated-list.json" >/dev/null || \
+	fail 'unified SafeShield observer must emit exactly one normalized completion event'
+
+grep -Fq 'procd_set_param command "$PROG" daemon' "$INIT_SCRIPT" || \
+	fail 'smartsafehub-events init must keep the unified observer alive as a procd daemon'
+
 # Production sources must emit normalized raw events rather than localized title/description strings.
 for contract in \
 	'root/usr/libexec/smartsafehub-updater:software.update.completed' \
@@ -142,10 +183,10 @@ for contract in \
 	'root/usr/libexec/smartsafehub-license:license.cleared' \
 	'root/usr/libexec/smartsafehub-health:network.internet.disconnected' \
 	'root/usr/libexec/smartsafehub-health:network.internet.recovered' \
-	'root/usr/libexec/smartsafehub-health:safeshield.blocklist.updated' \
-	'root/usr/libexec/smartsafehub-health:safeshield.blocklist.update_failed' \
-	'root/usr/libexec/smartsafehub-health:safeshield.protection.enabled' \
-	'root/usr/libexec/smartsafehub-health:safeshield.protection.disabled' \
+	'root/usr/libexec/smartsafehub-events:safeshield.blocklist.updated' \
+	'root/usr/libexec/smartsafehub-events:safeshield.blocklist.update_failed' \
+	'root/usr/share/rpcd/ucode/smartsafehub/safeshield-management.uc:safeshield.protection.enabled' \
+	'root/usr/share/rpcd/ucode/smartsafehub/safeshield-management.uc:safeshield.protection.disabled' \
 	'root/usr/libexec/smartsafehub-health:health.issue.started' \
 	'root/usr/libexec/smartsafehub-health:health.issue.resolved'; do
 	file="${contract%%:*}"

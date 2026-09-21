@@ -97,8 +97,10 @@ grep -Fq '현재 부팅 이후의 최근 활동' "$PAGE" || \
 	fail 'full page must clearly describe current-boot scope'
 grep -Fq '재부팅하면 초기화됩니다' "$PAGE" || \
 	fail 'full page must explain volatile local retention'
-grep -Fq '상태가 실제로 변경된 경우에만 새 활동을 추가합니다' "$PAGE" || \
-	fail 'full page must explain transition-only event recording'
+grep -Fq '직접 설정을 변경한 작업은 성공 시점에 즉시 기록하고' "$PAGE" || \
+	fail 'full page must explain direct mutation event recording'
+grep -Fq '외부 상태를 확인해야 하는 항목은 실제 상태 변화가 관찰된 경우에만 추가합니다' "$PAGE" || \
+	fail 'full page must explain observer-owned transition recording'
 grep -Fq '<ActivityTimeline events={data?.events ?? []} />' "$PAGE" || \
 	fail 'full page must render the complete local activity response'
 
@@ -192,4 +194,17 @@ grep -Fq 'const ACTIVITY_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
 grep -Fq 'refreshOnFocus: true' "$HOOK" || \
 	fail 'recent activity must refresh when the user returns to the page'
 
-printf '%s\n' 'PASS: local recent activity via argument-free status RPC, r8 event migration, outbox/history separation and UI contracts are valid'
+grep -Fq 'Cloud 활동 기록 동기화' "$PAGE" || \
+	fail 'activity page must expose Cloud activity synchronization status'
+grep -Fq 'Pro / Ultimate 전용' "$PAGE" || \
+	fail 'Cloud activity UI must clearly identify the paid entitlement boundary'
+grep -Fq '전송 대기' "$PAGE" || \
+	fail 'Cloud activity UI must show the pending outbox count'
+grep -Fq '마지막 동기화' "$PAGE" || \
+	fail 'Cloud activity UI must show the last successful synchronization time'
+grep -Fq 'Cloud 보관' "$PAGE" || \
+	fail 'Cloud activity UI must show server retention when eligible'
+grep -Fq 'cloud: read_cloud_sync()' "$ACTIVITY_RPC" || \
+	fail 'local activity RPC must expose activity Cloud sync state without a new RPC method'
+
+printf '%s\n' 'PASS: local recent activity, direct/observed copy, paid Cloud sync status and argument-free status RPC contracts are valid'

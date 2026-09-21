@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import {
+	emit_activity_event,
 	failure,
 	new_uci_cursor,
 	run_command,
@@ -434,6 +435,14 @@ export function update_iptv_settings(request) {
 	const settings = status_payload();
 	const changed = current.enabled != requested_enabled || current.provider != requested_provider;
 	release_iptv_update_lock();
+
+	if (changed && settings != null) {
+		emit_activity_event('network', 'settings.iptv.updated', 'info', {
+			origin: 'direct',
+			enabled: requested_enabled,
+			provider: requested_provider,
+		});
+	}
 
 	return settings != null
 		? success({ changed: changed, settings: settings })

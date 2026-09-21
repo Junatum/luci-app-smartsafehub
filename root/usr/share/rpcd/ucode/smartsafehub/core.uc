@@ -7,6 +7,7 @@ import { cursor } from 'uci';
 // The ucode module loader caches this module, so all feature modules share one
 // ubus connection for the lifetime of the rpcd plugin.
 const ubus = connect();
+const ACTIVITY_EVENTS_HELPER = '/usr/libexec/smartsafehub-events';
 
 function call_result(object, method, args) {
 	try {
@@ -82,4 +83,20 @@ export function run_command(argv, timeout) {
 	catch (e) {
 		return false;
 	}
+};
+
+export function emit_activity_event(source, event_type, severity, metadata) {
+	if (type(source) != 'string' || type(event_type) != 'string' || type(severity) != 'string') {
+		return false;
+	}
+
+	const document = type(metadata) == 'object' && type(metadata) != 'array' ? metadata : {};
+	return run_command([
+		ACTIVITY_EVENTS_HELPER,
+		'emit-quiet',
+		source,
+		event_type,
+		severity,
+		sprintf('%J', document),
+	], 3000);
 };

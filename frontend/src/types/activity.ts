@@ -11,10 +11,24 @@ export interface ActivityEvent {
   metadata: Record<string, unknown>;
 }
 
+export interface ActivityCloudSync {
+  phase: string;
+  eligible: boolean | null;
+  plan: string | null;
+  retentionDays: number;
+  pendingEvents: number;
+  lastAttemptAt: number;
+  lastSuccessAt: number;
+  lastUploadedCount: number;
+  lastErrorCode: string | null;
+  nextSyncAt: number;
+}
+
 export interface ActivityHistory {
   schema: 1;
   scope: 'current_boot';
   volatile: boolean;
   maxEvents: number;
+  cloud: ActivityCloudSync;
   events: ActivityEvent[];
 }

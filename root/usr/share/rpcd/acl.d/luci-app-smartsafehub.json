@@ -52,7 +52,13 @@
           "system_backup_discard",
           "license_activate",
           "health_run",
-          "health_reporter_update"
+          "health_reporter_update",
+          "safeshield_set_enabled",
+          "safeshield_refresh",
+          "safeshield_statistics_update",
+          "safeshield_rule_add",
+          "safeshield_rule_delete",
+          "safeshield_license_update"
         ],
         "safeshield": [
           "set_enabled",

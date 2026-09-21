@@ -7,6 +7,7 @@ import { failure, success } from './core.uc';
 
 const ACTIVITY_HISTORY_FILE = '/tmp/smartsafehub/activity-history.jsonl';
 const LEGACY_EVENTS_FILE = '/tmp/smartsafehub/events.jsonl';
+const ACTIVITY_SYNC_STATE_FILE = '/tmp/smartsafehub/activity-sync.json';
 const MAX_ACTIVITY_EVENTS = 128;
 const MAX_ACTIVITY_FILE_BYTES = 1048576;
 
@@ -60,6 +61,61 @@ function normalize_event(document) {
 		source: document.source,
 		metadata: document.metadata,
 	};
+}
+
+
+function read_cloud_sync() {
+	const raw = fs.readfile(ACTIVITY_SYNC_STATE_FILE);
+	if (type(raw) != 'string' || !length(raw)) {
+		return {
+			phase: 'preparing',
+			eligible: null,
+			plan: null,
+			retentionDays: 0,
+			pendingEvents: 0,
+			lastAttemptAt: 0,
+			lastSuccessAt: 0,
+			lastUploadedCount: 0,
+			lastErrorCode: null,
+			nextSyncAt: 0,
+		};
+	}
+
+	try {
+		const document = json(raw);
+		if (type(document) != 'object' || document?.schema != 1) {
+			throw 'invalid';
+		}
+		const eligible = type(document?.eligible) == 'bool' ? document.eligible : null;
+		return {
+			phase: type(document?.phase) == 'string' ? document.phase : 'unknown',
+			eligible: eligible,
+			plan: type(document?.plan) == 'string' && length(document.plan) ? document.plan : null,
+			retentionDays: integer_value(document?.retentionDays, 0),
+			pendingEvents: integer_value(document?.pendingEvents, 0),
+			lastAttemptAt: integer_value(document?.lastAttemptAt, 0),
+			lastSuccessAt: integer_value(document?.lastSuccessAt, 0),
+			lastUploadedCount: integer_value(document?.lastUploadedCount, 0),
+			lastErrorCode: type(document?.lastErrorCode) == 'string' && length(document.lastErrorCode)
+				? document.lastErrorCode
+				: null,
+			nextSyncAt: integer_value(document?.nextSyncAt, 0),
+		};
+	}
+	catch (e) {
+		return {
+			phase: 'unknown',
+			eligible: null,
+			plan: null,
+			retentionDays: 0,
+			pendingEvents: 0,
+			lastAttemptAt: 0,
+			lastSuccessAt: 0,
+			lastUploadedCount: 0,
+			lastErrorCode: 'ACTIVITY_SYNC_STATE_INVALID',
+			nextSyncAt: 0,
+		};
+	}
 }
 
 function read_history_file() {
@@ -126,6 +182,7 @@ export function read_activity_history(limit_value) {
 		scope: 'current_boot',
 		volatile: true,
 		maxEvents: MAX_ACTIVITY_EVENTS,
+		cloud: read_cloud_sync(),
 		events: events,
 	});
 };

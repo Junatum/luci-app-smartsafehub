@@ -19,6 +19,24 @@ DATE_BIN="${SMARTSAFEHUB_EVENTS_DATE_BIN:-date}"
 LOGGER_BIN="${SMARTSAFEHUB_EVENTS_LOGGER_BIN:-logger}"
 MAX_EVENTS="${SMARTSAFEHUB_EVENTS_MAX_EVENTS:-128}"
 MAX_METADATA_BYTES="${SMARTSAFEHUB_EVENTS_MAX_METADATA_BYTES:-4096}"
+ACTIVITY_SYNC_WAKE_FILE="${SMARTSAFEHUB_ACTIVITY_SYNC_WAKE_FILE:-$RUNTIME_DIR/activity-sync.wake}"
+
+# SafeShield blocklist refresh is asynchronous, so the event subsystem keeps a
+# narrow observer for terminal refresh timestamps. Keep the existing state file
+# name so r12 upgrades do not replay a result already observed by the former
+# standalone smartsafehub-safeshield-events daemon.
+SAFESHIELD_STATE_FILE="${SMARTSAFEHUB_EVENTS_SAFESHIELD_STATE_FILE:-$RUNTIME_DIR/safeshield-events.state}"
+SAFESHIELD_LOCK_DIR="${SMARTSAFEHUB_EVENTS_SAFESHIELD_LOCK_DIR:-$RUNTIME_DIR/safeshield-events.lock}"
+SAFESHIELD_UBUS_BIN="${SMARTSAFEHUB_EVENTS_SAFESHIELD_UBUS_BIN:-ubus}"
+SAFESHIELD_JSONFILTER_BIN="${SMARTSAFEHUB_EVENTS_SAFESHIELD_JSONFILTER_BIN:-$JSONFILTER_BIN}"
+SAFESHIELD_DATE_BIN="${SMARTSAFEHUB_EVENTS_SAFESHIELD_DATE_BIN:-$DATE_BIN}"
+SAFESHIELD_SLEEP_BIN="${SMARTSAFEHUB_EVENTS_SAFESHIELD_SLEEP_BIN:-sleep}"
+SAFESHIELD_POLL_INTERVAL_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_POLL_INTERVAL_S:-60}"
+SAFESHIELD_WATCH_INTERVAL_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_WATCH_INTERVAL_S:-1}"
+SAFESHIELD_WATCH_TIMEOUT_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_WATCH_TIMEOUT_S:-180}"
+
+STOP_REQUESTED=0
+WAIT_PID=''
 
 log_message() {
 	"$LOGGER_BIN" -t smartsafehub-events -- "$*" 2>/dev/null || true
@@ -191,6 +209,7 @@ emit_event() {
 	seed_history_from_outbox "$keep_count" || return 1
 	append_bounded_event "$HISTORY_FILE" "$event_json" "$keep_count" || return 1
 	append_bounded_event "$EVENTS_FILE" "$event_json" "$keep_count" || return 1
+	: > "$ACTIVITY_SYNC_WAKE_FILE" 2>/dev/null || true
 
 	release_lock
 	trap - EXIT INT TERM
@@ -244,6 +263,17 @@ ack_event() {
 	trap - EXIT INT TERM
 }
 
+clear_outbox() {
+	mkdir -p "$RUNTIME_DIR" || return 1
+	acquire_lock || return 75
+	trap release_lock EXIT INT TERM
+	: > "${EVENTS_FILE}.tmp.$$" || return 1
+	mv "${EVENTS_FILE}.tmp.$$" "$EVENTS_FILE" || return 1
+	rm -f "$ACTIVITY_SYNC_WAKE_FILE" 2>/dev/null || true
+	release_lock
+	trap - EXIT INT TERM
+}
+
 record_boot() {
 	local current previous metadata
 	mkdir -p "$RUNTIME_DIR" || return 1
@@ -257,16 +287,231 @@ record_boot() {
 	log_message "recorded boot event for $current"
 }
 
+normalized_integer() {
+	local value="$1" fallback="$2" minimum="$3" maximum="$4"
+	case "$value" in ''|*[!0-9]*) value="$fallback" ;; esac
+	if [ "$value" -lt "$minimum" ] 2>/dev/null || [ "$value" -gt "$maximum" ] 2>/dev/null; then
+		value="$fallback"
+	fi
+	printf '%s' "$value"
+}
+
+safeshield_json_value() {
+	local file="$1" expression="$2"
+	[ -s "$file" ] || return 0
+	"$SAFESHIELD_JSONFILTER_BIN" -i "$file" -e "$expression" 2>/dev/null || true
+}
+
+safeshield_number_value() {
+	case "$1" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$1" ;; esac
+}
+
+safeshield_json_string_or_null() {
+	if [ -n "$1" ]; then printf '"%s"' "$(json_escape "$1")"; else printf 'null'; fi
+}
+
+safeshield_state_value() {
+	local key="$1"
+	[ -f "$SAFESHIELD_STATE_FILE" ] || return 0
+	awk -F '\t' -v key="$key" '$1 == key { print $2; exit }' "$SAFESHIELD_STATE_FILE" 2>/dev/null || true
+}
+
+safeshield_acquire_lock() {
+	local owner
+	if mkdir "$SAFESHIELD_LOCK_DIR" 2>/dev/null; then
+		printf '%s\n' "$$" > "$SAFESHIELD_LOCK_DIR/pid"
+		return 0
+	fi
+	owner="$(cat "$SAFESHIELD_LOCK_DIR/pid" 2>/dev/null || true)"
+	if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+		return 1
+	fi
+	rm -rf "$SAFESHIELD_LOCK_DIR" 2>/dev/null || return 1
+	mkdir "$SAFESHIELD_LOCK_DIR" 2>/dev/null || return 1
+	printf '%s\n' "$$" > "$SAFESHIELD_LOCK_DIR/pid"
+}
+
+safeshield_release_lock() {
+	rm -rf "$SAFESHIELD_LOCK_DIR" 2>/dev/null || true
+}
+
+safeshield_write_state() {
+	local last_success="$1" last_failure="$2" tmp
+	tmp="${SAFESHIELD_STATE_FILE}.tmp.$$"
+	{
+		printf 'version\t1\n'
+		printf 'last_success\t%s\n' "$last_success"
+		printf 'last_failure\t%s\n' "$last_failure"
+	} > "$tmp"
+	mv "$tmp" "$SAFESHIELD_STATE_FILE"
+}
+
+safeshield_status_snapshot() {
+	local status_file success failure version count error
+	status_file="$RUNTIME_DIR/safeshield-event-status.$$.json"
+	rm -f "$status_file"
+	if ! "$SAFESHIELD_UBUS_BIN" call safeshield status > "$status_file" 2>/dev/null; then
+		rm -f "$status_file"
+		return 1
+	fi
+
+	success="$(safeshield_number_value "$(safeshield_json_value "$status_file" '@.timestamps.last_success')")"
+	failure="$(safeshield_number_value "$(safeshield_json_value "$status_file" '@.timestamps.last_failure')")"
+	version="$(safeshield_json_value "$status_file" '@.artifact.version')"
+	count="$(safeshield_number_value "$(safeshield_json_value "$status_file" '@.artifact.unique_domains')")"
+	[ "$count" -gt 0 ] 2>/dev/null || count="$(safeshield_number_value "$(safeshield_json_value "$status_file" '@.blocklist.valid_line_count')")"
+	error="$(safeshield_json_value "$status_file" '@.runtime.last_error_code')"
+	rm -f "$status_file"
+	printf '%s\t%s\t%s\t%s\t%s\n' "$success" "$failure" "$version" "$count" "$error"
+}
+
+safeshield_record_result() {
+	local kind="$1" occurred_at="$2" artifact_version="$3" domain_count="$4" error_code="$5"
+	local previous_success previous_failure current_success current_failure metadata
+	[ "$occurred_at" -gt 0 ] 2>/dev/null || return 0
+	safeshield_acquire_lock || return 75
+	previous_success="$(safeshield_number_value "$(safeshield_state_value last_success)")"
+	previous_failure="$(safeshield_number_value "$(safeshield_state_value last_failure)")"
+	current_success="$previous_success"
+	current_failure="$previous_failure"
+
+	case "$kind" in
+		success)
+			if [ "$occurred_at" -le "$previous_success" ] 2>/dev/null; then
+				safeshield_release_lock
+				return 0
+			fi
+			metadata="{\"artifact_version\":$(safeshield_json_string_or_null "$artifact_version"),\"domain_count\":$domain_count,\"origin\":\"observer\"}"
+			if ! "$0" emit-quiet safeshield safeshield.blocklist.updated success "$metadata" "$occurred_at" >/dev/null 2>&1; then
+				safeshield_release_lock
+				return 1
+			fi
+			current_success="$occurred_at"
+			;;
+		failure)
+			if [ "$occurred_at" -le "$previous_failure" ] 2>/dev/null; then
+				safeshield_release_lock
+				return 0
+			fi
+			metadata="{\"error_code\":$(safeshield_json_string_or_null "$error_code"),\"origin\":\"observer\"}"
+			if ! "$0" emit-quiet safeshield safeshield.blocklist.update_failed error "$metadata" "$occurred_at" >/dev/null 2>&1; then
+				safeshield_release_lock
+				return 1
+			fi
+			current_failure="$occurred_at"
+			;;
+		*)
+			safeshield_release_lock
+			return 2
+			;;
+	esac
+	safeshield_write_state "$current_success" "$current_failure"
+	safeshield_release_lock
+}
+
+safeshield_observe_once() {
+	local snapshot success failure version count error previous_success previous_failure
+	snapshot="$(safeshield_status_snapshot 2>/dev/null || true)"
+	[ -n "$snapshot" ] || return 1
+	IFS="$(printf '\t')" read -r success failure version count error <<EOF_SNAPSHOT
+$snapshot
+EOF_SNAPSHOT
+	previous_success="$(safeshield_number_value "$(safeshield_state_value last_success)")"
+	previous_failure="$(safeshield_number_value "$(safeshield_state_value last_failure)")"
+
+	if [ ! -f "$SAFESHIELD_STATE_FILE" ]; then
+		safeshield_acquire_lock || return 0
+		safeshield_write_state "$success" "$failure"
+		safeshield_release_lock
+		return 0
+	fi
+	[ "$success" -le "$previous_success" ] 2>/dev/null || safeshield_record_result success "$success" "$version" "$count" "$error"
+	[ "$failure" -le "$previous_failure" ] 2>/dev/null || safeshield_record_result failure "$failure" "$version" "$count" "$error"
+}
+
+safeshield_watch_refresh() {
+	local baseline_success baseline_failure requested_at deadline now snapshot success failure version count error
+	baseline_success="$(safeshield_number_value "${1:-0}")"
+	baseline_failure="$(safeshield_number_value "${2:-0}")"
+	requested_at="$(safeshield_number_value "${3:-0}")"
+	now="$(safeshield_number_value "$("$SAFESHIELD_DATE_BIN" +%s 2>/dev/null || true)")"
+	[ "$requested_at" -gt 0 ] 2>/dev/null || requested_at="$now"
+	deadline=$((now + $(normalized_integer "$SAFESHIELD_WATCH_TIMEOUT_S" 180 30 600)))
+
+	while [ "$STOP_REQUESTED" -eq 0 ]; do
+		snapshot="$(safeshield_status_snapshot 2>/dev/null || true)"
+		if [ -n "$snapshot" ]; then
+			IFS="$(printf '\t')" read -r success failure version count error <<EOF_SNAPSHOT
+$snapshot
+EOF_SNAPSHOT
+			if [ "$success" -gt "$baseline_success" ] 2>/dev/null && [ "$success" -ge "$requested_at" ] 2>/dev/null; then
+				safeshield_record_result success "$success" "$version" "$count" "$error"
+				return 0
+			fi
+			if [ "$failure" -gt "$baseline_failure" ] 2>/dev/null && [ "$failure" -ge "$requested_at" ] 2>/dev/null; then
+				safeshield_record_result failure "$failure" "$version" "$count" "$error"
+				return 0
+			fi
+		fi
+		now="$(safeshield_number_value "$("$SAFESHIELD_DATE_BIN" +%s 2>/dev/null || true)")"
+		[ "$now" -lt "$deadline" ] 2>/dev/null || break
+		"$SAFESHIELD_SLEEP_BIN" "$(normalized_integer "$SAFESHIELD_WATCH_INTERVAL_S" 1 1 10)"
+	done
+	log_message 'SafeShield refresh result watch timed out without a terminal timestamp change.'
+	return 0
+}
+
+safeshield_watch_refresh_detached() {
+	local success="$1" failure="$2" requested="$3"
+	(
+		trap - INT TERM
+		"$0" watch-refresh "$success" "$failure" "$requested" >/dev/null 2>&1
+	) </dev/null >/dev/null 2>&1 &
+}
+
+request_stop() {
+	STOP_REQUESTED=1
+	[ -z "$WAIT_PID" ] || kill "$WAIT_PID" 2>/dev/null || true
+}
+
+interruptible_sleep() {
+	local duration="$1"
+	"$SAFESHIELD_SLEEP_BIN" "$duration" &
+	WAIT_PID=$!
+	wait "$WAIT_PID" 2>/dev/null || true
+	WAIT_PID=''
+	[ "$STOP_REQUESTED" -eq 0 ]
+}
+
+events_daemon_loop() {
+	local interval
+	STOP_REQUESTED=0
+	trap request_stop INT TERM
+	safeshield_observe_once || true
+	interval="$(normalized_integer "$SAFESHIELD_POLL_INTERVAL_S" 60 15 3600)"
+	while [ "$STOP_REQUESTED" -eq 0 ]; do
+		interruptible_sleep "$interval" || break
+		safeshield_observe_once || true
+	done
+	trap - INT TERM
+}
+
 usage() {
 	cat <<'EOF_USAGE'
 Usage: smartsafehub-events <command>
 
 Commands:
   emit SOURCE EVENT_TYPE SEVERITY [METADATA_JSON] [OCCURRED_AT]
+  emit-quiet SOURCE EVENT_TYPE SEVERITY [METADATA_JSON] [OCCURRED_AT]
   list
   history
   ack EVENT_ID
+  clear-outbox
   boot
+  daemon
+  observe-once
+  watch-refresh BASE_SUCCESS BASE_FAILURE REQUESTED_AT
+  watch-refresh-detached BASE_SUCCESS BASE_FAILURE REQUESTED_AT
 EOF_USAGE
 }
 
@@ -276,6 +521,10 @@ case "${1:-}" in
 	emit)
 		shift
 		emit_event "$@"
+		;;
+	emit-quiet)
+		shift
+		emit_event "$@" >/dev/null
 		;;
 	list)
 		list_events
@@ -287,8 +536,25 @@ case "${1:-}" in
 		shift
 		ack_event "$@"
 		;;
+	clear-outbox)
+		clear_outbox
+		;;
 	boot)
 		record_boot
+		;;
+	daemon)
+		events_daemon_loop
+		;;
+	observe-once)
+		safeshield_observe_once
+		;;
+	watch-refresh)
+		shift
+		safeshield_watch_refresh "$@"
+		;;
+	watch-refresh-detached)
+		shift
+		safeshield_watch_refresh_detached "$@"
 		;;
 	*)
 		usage >&2

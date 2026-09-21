@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 
 import {
+	emit_activity_event,
 	failure,
 	new_uci_cursor,
 	run_command,
@@ -144,6 +145,7 @@ export function run_health_diagnostic(request) {
 
 export function update_health_reporter(request) {
 	const enabled = request.args.enabled;
+	const previous_enabled = read_reporter_enabled();
 	if (type(enabled) != 'bool') {
 		return failure(
 			'HEALTH_REPORTER_ARGUMENT_INVALID',
@@ -180,6 +182,15 @@ export function update_health_reporter(request) {
 	// Enabling performs the first report in a detached cycle. Disabling only
 	// refreshes the local state and never performs a remote report.
 	start_health_action(enabled ? 'run-cycle' : 'run-once');
+
+	if (previous_enabled != enabled) {
+		emit_activity_event(
+			'health',
+			enabled ? 'settings.health_reporter.enabled' : 'settings.health_reporter.disabled',
+			'info',
+			{ origin: 'direct' }
+		);
+	}
 
 	return health_payload();
 };

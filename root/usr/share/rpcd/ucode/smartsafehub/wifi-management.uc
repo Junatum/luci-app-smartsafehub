@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import {
+	emit_activity_event,
 	failure,
 	new_uci_cursor,
 	number_value,
@@ -268,5 +269,13 @@ export function update_wifi(request) {
 	}
 
 	release_wifi_update_lock();
+	if (result?.ok == true && result?.data?.changed == true) {
+		emit_activity_event('network', 'settings.wifi.updated', 'info', {
+			origin: 'direct',
+			enabled: request.args.enabled,
+			security: request.args.security,
+			section: request.args.section,
+		});
+	}
 	return result;
 };

@@ -54,6 +54,18 @@ function emptyActivityHistory(): ActivityHistory {
     scope: 'current_boot',
     volatile: true,
     maxEvents: 128,
+    cloud: {
+      phase: 'preparing',
+      eligible: null,
+      plan: null,
+      retentionDays: 0,
+      pendingEvents: 0,
+      lastAttemptAt: 0,
+      lastSuccessAt: 0,
+      lastUploadedCount: 0,
+      lastErrorCode: null,
+      nextSyncAt: 0,
+    },
     events: [],
   };
 }

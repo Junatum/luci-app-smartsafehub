@@ -436,17 +436,13 @@ emit_activity_event() {
 }
 
 write_activity_state() {
-	local initialized="$1" wan_state="$2" wan_down_since="$3" safeshield_enabled="$4"
-	local last_success="$5" last_failure="$6" health_fingerprint="$7" tmp
+	local initialized="$1" wan_state="$2" wan_down_since="$3" health_fingerprint="$4" tmp
 	tmp="${EVENT_OBSERVER_STATE_FILE}.tmp.$$"
 	{
-		printf 'version\t1\n'
+		printf 'version\t2\n'
 		printf 'initialized\t%s\n' "$initialized"
 		printf 'wan_state\t%s\n' "$(sanitize_code "$wan_state")"
 		printf 'wan_down_since\t%s\n' "$wan_down_since"
-		printf 'safeshield_enabled\t%s\n' "$(sanitize_code "$safeshield_enabled")"
-		printf 'safeshield_last_success\t%s\n' "$last_success"
-		printf 'safeshield_last_failure\t%s\n' "$last_failure"
 		printf 'health_fingerprint\t%s\n' "$(sanitize_code "$health_fingerprint")"
 	} > "$tmp"
 	mv "$tmp" "$EVENT_OBSERVER_STATE_FILE"
@@ -454,38 +450,33 @@ write_activity_state() {
 
 record_activity_transitions() {
 	local now initialized previous_wan previous_down_since next_wan next_down_since
-	local previous_enabled next_enabled previous_success previous_failure next_success next_failure
 	local previous_health severity metadata downtime
 	now="$("$DATE_BIN" +%s 2>/dev/null || printf '0')"
 	case "$now" in ''|*[!0-9]*) now=0 ;; esac
 	initialized="$(activity_state_value initialized)"
 	previous_wan="$(activity_state_value wan_state)"
 	previous_down_since="$(activity_state_value wan_down_since)"
-	previous_enabled="$(activity_state_value safeshield_enabled)"
-	previous_success="$(activity_state_value safeshield_last_success)"
-	previous_failure="$(activity_state_value safeshield_last_failure)"
 	previous_health="$(activity_state_value health_fingerprint)"
 	case "$previous_down_since" in ''|*[!0-9]*) previous_down_since=0 ;; esac
-	case "$previous_success" in ''|*[!0-9]*) previous_success=0 ;; esac
-	case "$previous_failure" in ''|*[!0-9]*) previous_failure=0 ;; esac
 
 	next_wan="$WAN_STATE"
 	next_down_since="$previous_down_since"
-	next_enabled="$SAFESHIELD_ENABLED_STATE"
-	next_success="$SAFESHIELD_LAST_SUCCESS"
-	next_failure="$SAFESHIELD_LAST_FAILURE"
 
 	if [ "$initialized" != '1' ]; then
 		[ "$next_wan" != 'unknown' ] || next_wan='unknown'
 		if [ "$next_wan" = 'down' ]; then next_down_since="$now"; else next_down_since=0; fi
-		write_activity_state 1 "$next_wan" "$next_down_since" "$next_enabled" "$next_success" "$next_failure" "$HEALTH_EVENT_FINGERPRINT"
+		write_activity_state 1 "$next_wan" "$next_down_since" "$HEALTH_EVENT_FINGERPRINT"
 		return 0
 	fi
 
+	# Observer-owned events are limited to state changes that do not have a
+	# reliable mutation call site. SafeShield mutations are emitted directly by
+	# the SmartSafeHub SafeShield adapter, while refresh completion is observed by
+	# the dedicated SafeShield event bridge.
 	if [ "$WAN_STATE" = 'down' ]; then
 		if [ "$previous_wan" = 'up' ]; then
 			next_down_since="$now"
-			emit_activity_event network network.internet.disconnected error '{"previous_state":"up","current_state":"down"}'
+			emit_activity_event network network.internet.disconnected error '{"previous_state":"up","current_state":"down","origin":"observer"}'
 		elif [ "$previous_wan" != 'down' ]; then
 			next_down_since="$now"
 		fi
@@ -495,7 +486,7 @@ record_activity_transitions() {
 			if [ "$previous_down_since" -gt 0 ] 2>/dev/null && [ "$now" -ge "$previous_down_since" ] 2>/dev/null; then
 				downtime=$((now - previous_down_since))
 			fi
-			metadata="{\"previous_state\":\"down\",\"current_state\":\"up\",\"downtime_seconds\":$downtime}"
+			metadata="{\"previous_state\":\"down\",\"current_state\":\"up\",\"downtime_seconds\":$downtime,\"origin\":\"observer\"}"
 			emit_activity_event network network.internet.recovered success "$metadata"
 		fi
 		next_down_since=0
@@ -503,45 +494,22 @@ record_activity_transitions() {
 		next_wan="$previous_wan"
 	fi
 
-	if [ "$SAFESHIELD_ENABLED_STATE" = '0' ] || [ "$SAFESHIELD_ENABLED_STATE" = '1' ]; then
-		if [ "$previous_enabled" = '0' ] || [ "$previous_enabled" = '1' ]; then
-			if [ "$previous_enabled" != "$SAFESHIELD_ENABLED_STATE" ]; then
-				if [ "$SAFESHIELD_ENABLED_STATE" = '1' ]; then
-					emit_activity_event safeshield safeshield.protection.enabled success '{}'
-				else
-					emit_activity_event safeshield safeshield.protection.disabled warning '{}'
-				fi
-			fi
-		fi
-	else
-		next_enabled="$previous_enabled"
-	fi
-
-	if [ "$SAFESHIELD_LAST_SUCCESS" -gt "$previous_success" ] 2>/dev/null; then
-		metadata="{\"artifact_version\":$(json_string_or_null "$SAFESHIELD_ARTIFACT_VERSION"),\"domain_count\":$SAFESHIELD_DOMAIN_COUNT}"
-		emit_activity_event safeshield safeshield.blocklist.updated success "$metadata" "$SAFESHIELD_LAST_SUCCESS"
-	fi
-	if [ "$SAFESHIELD_LAST_FAILURE" -gt "$previous_failure" ] 2>/dev/null; then
-		metadata="{\"error_code\":$(json_string_or_null "$SAFESHIELD_LAST_ERROR_CODE")}"
-		emit_activity_event safeshield safeshield.blocklist.update_failed error "$metadata" "$SAFESHIELD_LAST_FAILURE"
-	fi
-
 	if [ -z "$previous_health" ] && [ -n "$HEALTH_EVENT_FINGERPRINT" ]; then
 		severity='warning'
 		[ "$HEALTH_EVENT_CRITICAL_COUNT" -eq 0 ] || severity='error'
-		metadata="{\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT}"
+		metadata="{\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT,\"origin\":\"observer\"}"
 		emit_activity_event health health.issue.started "$severity" "$metadata"
 	elif [ -n "$previous_health" ] && [ -z "$HEALTH_EVENT_FINGERPRINT" ]; then
-		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\"}"
+		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\",\"origin\":\"observer\"}"
 		emit_activity_event health health.issue.resolved success "$metadata"
 	elif [ -n "$previous_health" ] && [ -n "$HEALTH_EVENT_FINGERPRINT" ] && [ "$previous_health" != "$HEALTH_EVENT_FINGERPRINT" ]; then
 		severity='warning'
 		[ "$HEALTH_EVENT_CRITICAL_COUNT" -eq 0 ] || severity='error'
-		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\",\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT}"
+		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\",\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT,\"origin\":\"observer\"}"
 		emit_activity_event health health.issue.changed "$severity" "$metadata"
 	fi
 
-	write_activity_state 1 "$next_wan" "$next_down_since" "$next_enabled" "$next_success" "$next_failure" "$HEALTH_EVENT_FINGERPRINT"
+	write_activity_state 1 "$next_wan" "$next_down_since" "$HEALTH_EVENT_FINGERPRINT"
 }
 
 health_summary_message() {

@@ -49,6 +49,13 @@ import {
 	activate_license,
 	read_license_status
 } from './smartsafehub/license.uc';
+import {
+	mutate_safeshield_rule,
+	refresh_safeshield_blocklist,
+	update_safeshield_enabled,
+	update_safeshield_license,
+	update_safeshield_statistics
+} from './smartsafehub/safeshield-management.uc';
 
 function require_root_password(handler) {
 	return function(request) {
@@ -262,6 +269,42 @@ const methods = {
 	health_run: {
 		call: require_root_password(function(request) {
 			return run_health_diagnostic(request);
+		}),
+	},
+
+	safeshield_set_enabled: {
+		args: { enabled: true },
+		call: require_root_password(function(request) {
+			return update_safeshield_enabled(request);
+		}),
+	},
+	safeshield_refresh: {
+		call: require_root_password(function(request) {
+			return refresh_safeshield_blocklist(request);
+		}),
+	},
+	safeshield_statistics_update: {
+		args: { enabled: true },
+		call: require_root_password(function(request) {
+			return update_safeshield_statistics(request);
+		}),
+	},
+	safeshield_rule_add: {
+		args: { action: '', domain: '', refresh: true },
+		call: require_root_password(function(request) {
+			return mutate_safeshield_rule(request, 'rule_add');
+		}),
+	},
+	safeshield_rule_delete: {
+		args: { action: '', domain: '', refresh: true },
+		call: require_root_password(function(request) {
+			return mutate_safeshield_rule(request, 'rule_delete');
+		}),
+	},
+	safeshield_license_update: {
+		args: { license_key: '' },
+		call: require_root_password(function(request) {
+			return update_safeshield_license(request);
 		}),
 	},
 	health_reporter_update: {

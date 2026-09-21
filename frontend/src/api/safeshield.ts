@@ -12,9 +12,10 @@ import type {
   SafeShieldStatisticsEnabledResult,
   SafeShieldStatus,
 } from '../types/safeshield';
-import { callRpc, RpcError } from './rpc';
+import { callApi, callRpc, RpcError } from './rpc';
 
 const API_OBJECT = 'safeshield';
+const SMARTSAFEHUB_API_OBJECT = 'smartsafehub';
 
 interface RawSafeShieldStatus {
   version?: unknown;
@@ -136,6 +137,26 @@ async function callSafeShield<T>(
   }
 
   return response as T;
+}
+
+
+async function callManagedSafeShield<T>(
+  method: string,
+  params: Record<string, unknown>,
+  fallbackMethod: string,
+  fallbackParams: Record<string, unknown> = params,
+): Promise<T> {
+  try {
+    return await callApi<T>(SMARTSAFEHUB_API_OBJECT, method, params);
+  } catch (error) {
+    if (
+      error instanceof RpcError &&
+      ['RPC_PERMISSION_DENIED', 'UBUS_3', 'UBUS_6'].includes(error.code)
+    ) {
+      return callSafeShield<T>(fallbackMethod, fallbackParams);
+    }
+    throw error;
+  }
 }
 
 function unavailableStatistics(): SafeShieldStatistics {
@@ -406,11 +427,12 @@ export async function fetchSafeShieldStatistics(): Promise<SafeShieldStatistics>
 export async function setSafeShieldStatisticsEnabled(
   enabled: boolean,
 ): Promise<SafeShieldStatisticsEnabledResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>('config_update', {
-    values: {
-      statistics_enabled: enabled,
-    },
-  });
+  const response = await callManagedSafeShield<RawSafeShieldMutation>(
+    'safeshield_statistics_update',
+    { enabled },
+    'config_update',
+    { values: { statistics_enabled: enabled } },
+  );
 
   const changed = Array.isArray(response.changed)
     ? response.changed.some((name) => name === 'statistics_enabled')
@@ -448,9 +470,11 @@ async function fetchSafeShieldRuleConfig(): Promise<SafeShieldRuleConfig> {
 export async function setSafeShieldEnabled(
   enabled: boolean,
 ): Promise<SafeShieldEnabledResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>('set_enabled', {
-    enabled,
-  });
+  const response = await callManagedSafeShield<RawSafeShieldMutation>(
+    'safeshield_set_enabled',
+    { enabled },
+    'set_enabled',
+  );
 
   return {
     changed: boolValue(response.changed),
@@ -461,7 +485,11 @@ export async function setSafeShieldEnabled(
 }
 
 export async function requestSafeShieldRefresh(): Promise<SafeShieldRefreshResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>('refresh');
+  const response = await callManagedSafeShield<RawSafeShieldMutation>(
+    'safeshield_refresh',
+    {},
+    'refresh',
+  );
 
   return {
     accepted: boolValue(response.accepted),
@@ -497,11 +525,11 @@ async function mutateSafeShieldRule(
   domain: string,
   refresh = true,
 ): Promise<SafeShieldRuleMutationResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>(method, {
-    action,
-    domain,
-    refresh,
-  });
+  const response = await callManagedSafeShield<RawSafeShieldMutation>(
+    method === 'rule_add' ? 'safeshield_rule_add' : 'safeshield_rule_delete',
+    { action, domain, refresh },
+    method,
+  );
   const changed = method === 'rule_add'
     ? boolValue(response.added)
     : boolValue(response.deleted);
@@ -544,9 +572,11 @@ export async function fetchSafeShieldLicense(): Promise<SafeShieldLicenseReadRes
 export async function updateSafeShieldLicense(
   licenseKey: string,
 ): Promise<SafeShieldLicenseUpdateResult> {
-  const response = await callSafeShield<RawSafeShieldMutation>('license_update', {
-    license_key: licenseKey,
-  });
+  const response = await callManagedSafeShield<RawSafeShieldMutation>(
+    'safeshield_license_update',
+    { license_key: licenseKey },
+    'license_update',
+  );
   const license = objectValue(response.license);
 
   return {

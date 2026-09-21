@@ -301,9 +301,10 @@ after_event_lines="$(wc -l < "$EVENT_LOG" | tr -d ' ')"
 run_health_case MOCK_EPOCH=1800001200 MOCK_WAN_UP=true MOCK_SAFESHIELD_LAST_SUCCESS=1800001190 MOCK_SAFESHIELD_DOMAIN_COUNT=34001 -- run-once
 grep -Fq 'network.internet.recovered' "$EVENT_LOG" || fail 'WAN down→up 전이에서 복구 event를 기록해야 합니다.'
 grep -Fq '"downtime_seconds":100' "$EVENT_LOG" || fail '인터넷 복구 event에는 관측된 중단 시간을 metadata로 기록해야 합니다.'
-grep -Fq 'safeshield.blocklist.updated' "$EVENT_LOG" || fail 'SafeShield last_success 증가 시 차단 목록 갱신 event를 기록해야 합니다.'
-grep -Fq '"domain_count":34001' "$EVENT_LOG" || fail 'SafeShield 갱신 event에는 적용 도메인 수를 metadata로 기록해야 합니다.'
-grep -Fq '1800001190' "$EVENT_LOG" || fail 'SafeShield 갱신 event는 Health 관측 시각이 아니라 실제 last_success 시각을 사용해야 합니다.'
+grep -Fq '"origin":"observer"' "$EVENT_LOG" || fail 'Health 상태 전이 event는 observer origin을 기록해야 합니다.'
+if grep -Fq 'safeshield.blocklist.' "$EVENT_LOG" || grep -Fq 'safeshield.protection.' "$EVENT_LOG"; then
+	fail 'Health observer는 SafeShield 명시적 mutation/refresh event를 생성하면 안 됩니다.'
+fi
 
 # 이후 Health 진단 시나리오는 event observer 상태와 무관하게 독립적으로 검증한다.
 rm -f "$EVENT_STATE"

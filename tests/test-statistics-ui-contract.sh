@@ -104,10 +104,12 @@ grep -Fq 'prefers-reduced-motion: reduce' "$CHART" || \
 jq -e \
   '.["luci-app-smartsafehub"].write.ubus.safeshield | index("config_update") != null' \
   "$ACL" >/dev/null || fail 'statistics toggle requires config_update write ACL'
-grep -Fq "callSafeShield<RawSafeShieldMutation>('config_update'" "$API" || \
-  fail 'statistics toggle must update SafeShield through config_update'
+grep -Fq "'safeshield_statistics_update'" "$API" || \
+  fail 'statistics toggle must use the SmartSafeHub managed SafeShield mutation adapter'
+grep -Fq "'config_update'" "$API" || \
+  fail 'statistics toggle must retain direct SafeShield config_update as an upgrade-session fallback'
 grep -Fq 'statistics_enabled: enabled' "$API" || \
-  fail 'statistics toggle must only update statistics_enabled'
+  fail 'statistics fallback must only update statistics_enabled'
 grep -Fq 'collectorRunning: boolValue(source.collector_running)' "$API" || \
   fail 'statistics API must expose collector runtime state'
 grep -Fq 'role="switch"' "$PANEL" || \

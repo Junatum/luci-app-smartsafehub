@@ -7,6 +7,7 @@ import { read_activity_history } from './activity.uc';
 
 import {
 	defer_call,
+	emit_activity_event,
 	failure,
 	memory_value,
 	new_uci_cursor,
@@ -187,6 +188,10 @@ function apply_timezone(request, timezones) {
 	}
 
 	reset_automatic_update_schedule();
+	emit_activity_event('system', 'settings.timezone.updated', 'info', {
+		origin: 'direct',
+		zonename: requested_zonename,
+	});
 	return time_settings_payload(timezones);
 }
 
@@ -346,6 +351,14 @@ export function update_scheduled_reboot_settings(request) {
 		);
 	}
 
+	const ctx = new_uci_cursor();
+	const current = ctx?.get_all('smartsafehub', 'maintenance') ?? {};
+	const changed =
+		(string_value(current?.scheduled_reboot_enabled, '0') == '1') != enabled ||
+		scheduled_reboot_frequency(current?.scheduled_reboot_frequency) != frequency ||
+		scheduled_reboot_day(current?.scheduled_reboot_day) != day ||
+		scheduled_reboot_time(current?.scheduled_reboot_time) != reboot_time;
+
 	if (!run_command([
 		MAINTENANCE_HELPER,
 		'configure',
@@ -364,6 +377,16 @@ export function update_scheduled_reboot_settings(request) {
 	// also makes a newly saved schedule effective immediately on older rpcd/
 	// procd combinations where trigger delivery can be delayed.
 	run_command([ MAINTENANCE_INIT, 'restart' ], 5000);
+
+	if (changed) {
+		emit_activity_event('system', 'settings.scheduled_reboot.updated', 'info', {
+			origin: 'direct',
+			enabled: enabled,
+			frequency: frequency,
+			day_of_week: day,
+			time: reboot_time,
+		});
+	}
 
 	return scheduled_reboot_payload();
 };

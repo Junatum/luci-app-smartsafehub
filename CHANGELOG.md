@@ -1,5 +1,26 @@
 # 변경 기록
 
+## [0.2.19-r12] - 2026-09-21
+
+### 기능
+
+- SafeShield 보호 활성화/비활성화, 통계 수집, 사용자 allow/block 규칙처럼 사용자가 명시적으로 수행한 변경은 성공한 mutation 지점에서 즉시 이벤트로 기록하도록 전환했습니다. Health의 5분 snapshot diff에서 SafeShield 보호/차단 목록 이벤트 생성을 제거해 짧은 시간 안에 OFF→ON처럼 원상 복구된 변경도 놓치지 않습니다.
+- SafeShield 차단 목록 갱신 완료/실패는 비동기 작업의 실제 결과를 알아야 하므로 `smartsafehub-events daemon`이 `last_success`/`last_failure` timestamp 변화를 추적합니다. 수동 갱신 요청은 수락 직후 같은 event helper의 watcher를 깨워 완료 결과를 빠르게 기록하고, daemon observer가 자동 갱신 결과도 보완합니다.
+- 예약 재부팅, 관리 소프트웨어 업데이트 설정, 원격 상태 보고, 시간대, Wi-Fi, LAN/DHCP, IPTV 같은 주요 설정 저장 성공 시 `settings.*` 직접 이벤트를 추가했습니다. 주기적인 조회는 이벤트로 만들지 않습니다.
+- Pro/Ultimate 사용자를 위한 `smartsafehub-activity-sync` daemon을 추가했습니다. `/api/v1/licenses/resolve`에서 Cloud 활동 기록 upload credential을 받아 `/tmp/smartsafehub/events.jsonl`을 최대 128건 batch로 전송하고, 서버가 `accepted`/`duplicates`/`expired`로 처리한 snapshot의 `event_id`만 ack합니다. 로컬 `activity-history.jsonl`은 Cloud ack와 무관하게 유지됩니다.
+- 공유기 `최근 활동` 화면에 Cloud 동기화 상태, 멤버십, 전송 대기 건수, 마지막 성공 시각과 서버 보관 기간을 표시합니다. Free/비대상 장치는 Cloud outbox만 비우고 로컬 최근 활동은 그대로 사용할 수 있습니다.
+
+### 안정성 및 보안
+
+- 유료 플랜 resolve 응답에 activity upload credential이 누락된 경우 백엔드 배포 지연/불완전 응답으로 간주해 outbox를 삭제하지 않고 재시도하도록 했습니다. Free/비대상 응답에서만 Cloud 전송용 outbox를 정리합니다.
+- 이벤트 발생 시 wake marker를 남겨 5분 주기만 기다리지 않고 activity sync daemon이 빠르게 전송을 시도하며, 네트워크/서버 실패 시 ack하지 않아 다음 동기화에서 재전송합니다.
+- 직접 이벤트에는 `origin=direct`, WAN/Health 및 SafeShield 비동기 완료 관찰 이벤트에는 `origin=observer`를 기록해 producer 책임을 구분했습니다. SafeShield 비동기 observer는 별도 daemon을 추가하지 않고 `smartsafehub-events`에 통합해 로컬 이벤트 생성/보관 책임을 하나의 서비스로 유지합니다.
+
+### 테스트 및 문서
+
+- 유료 Cloud batch 업로드/ack, Free entitlement, 유료 credential 누락 시 outbox 보존, 직접/관찰 이벤트 소유권을 검증하는 `tests/test-activity-cloud-sync.sh`를 추가하고 ShellSpec/패키지/static validation 계약에 연결했습니다.
+- README의 이벤트 생산 경로를 direct mutation과 observer transition으로 구분하고 Cloud 활동 기록 동기화/유료 entitlement/로컬 history 보존 정책을 문서화했습니다.
+
 ## [0.2.19-r11] - 2026-09-21
 
 ### 수정

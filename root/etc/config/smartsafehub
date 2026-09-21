@@ -19,6 +19,12 @@ config license 'license'
 	option startup_delay_s '30'
 	option api_base_url 'https://www.smartsafehub.com/api/v1'
 
+
+config activity 'activity'
+	option sync_interval_s '300'
+	option startup_delay_s '45'
+	option api_base_url 'https://www.smartsafehub.com/api/v1'
+
 config health 'health'
 	option check_interval_s '300'
 	option startup_grace_s '120'

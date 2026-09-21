@@ -3,6 +3,7 @@
 
 import * as fs from 'fs';
 import {
+	emit_activity_event,
 	failure,
 	new_uci_cursor,
 	run_command,
@@ -407,6 +408,7 @@ export function update_update_settings(request) {
 		return failure('UPDATES_TIME_INVALID', '자동 설치 시간을 HH:MM 형식으로 입력해 주세요.');
 	}
 
+	const current_settings = read_update_settings();
 	const ctx = new_uci_cursor();
 	if (!ctx || ctx.get_all('smartsafehub', 'updates') == null) {
 		return failure('UPDATES_CONFIG_UNAVAILABLE', 'SmartSafeHub 업데이트 설정을 읽지 못했습니다.');
@@ -431,5 +433,20 @@ export function update_update_settings(request) {
 		'/etc/init.d/smartsafehub-updater restart >/dev/null 2>&1 </dev/null &',
 	], 2000);
 
-	return success(read_update_settings());
+	const updated_settings = read_update_settings();
+	if (
+		current_settings.checkEnabled != updated_settings.checkEnabled ||
+		current_settings.checkIntervalSeconds != updated_settings.checkIntervalSeconds ||
+		current_settings.autoInstall != updated_settings.autoInstall ||
+		current_settings.autoInstallTime != updated_settings.autoInstallTime
+	) {
+		emit_activity_event('updater', 'settings.software_updates.updated', 'info', {
+			origin: 'direct',
+			check_enabled: updated_settings.checkEnabled,
+			auto_install: updated_settings.autoInstall,
+			auto_install_time: updated_settings.autoInstallTime,
+		});
+	}
+
+	return success(updated_settings);
 };
