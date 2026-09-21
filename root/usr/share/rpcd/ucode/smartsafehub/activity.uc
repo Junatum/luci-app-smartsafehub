@@ -159,7 +159,7 @@ function read_history_file() {
 	return events;
 }
 
-export function read_activity_history(limit_value) {
+export function read_activity_history() {
 	const history = read_history_file();
 	if (history == null) {
 		return failure(
@@ -168,16 +168,11 @@ export function read_activity_history(limit_value) {
 		);
 	}
 
-	let limit = integer_value(limit_value, MAX_ACTIVITY_EVENTS);
-	if (limit < 1) {
-		limit = 1;
-	}
-	if (limit > MAX_ACTIVITY_EVENTS) {
-		limit = MAX_ACTIVITY_EVENTS;
-	}
-
+	// status RPC has no activity limit argument. Always return the bounded local
+	// history instead of coercing an omitted argument and accidentally clamping
+	// the response to a single event on the target ucode runtime.
 	const events = [];
-	for (let index = length(history) - 1; index >= 0 && length(events) < limit; index--) {
+	for (let index = length(history) - 1; index >= 0 && length(events) < MAX_ACTIVITY_EVENTS; index--) {
 		push(events, history[index]);
 	}
 

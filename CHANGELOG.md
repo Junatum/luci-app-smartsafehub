@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.19-r15] - 2026-09-21
+
+### 수정
+
+- 로컬 `activity-history.jsonl`과 `smartsafehub-events history`에는 여러 이벤트가 정상적으로 존재하지만 `smartsafehub status` 응답에서는 1건만 반환되던 문제를 수정했습니다. `read_activity_history()`가 존재하지 않는 선택적 limit 인자를 숫자로 변환한 뒤 최소값 1로 보정하는 경로를 제거하고, 상태 RPC는 항상 최신 최대 128건의 로컬 활동 기록을 반환합니다.
+- Hub Activity API가 미배포되었거나 통신할 수 없는 상태에서 `smartsafehub-activity-sync`가 5분마다 `/api/v1/licenses/resolve`를 반복 호출하던 동작을 개선했습니다. 실패 재시도는 15분 → 30분 → 60분으로 증가하고 60분에서 상한을 유지합니다.
+- Cloud 동기화가 backoff 상태일 때 새 이벤트가 발생해 wake marker가 생성되더라도 backoff를 우회해 즉시 resolve 요청을 다시 보내지 않습니다. 로컬 history와 최대 128건 Cloud outbox는 그대로 누적되며, 수동 `sync-once`는 진단/배포 직후 확인을 위해 즉시 실행할 수 있습니다.
+
+### 테스트 및 문서
+
+- status RPC가 선택적 limit 인자에 의존하지 않고 최대 128건을 반환하는 계약과 Cloud resolve 실패의 15/30/60분 bounded backoff를 검증하는 회귀 테스트를 추가했습니다.
+- README에 Cloud Activity API 장애/미배포 시 재시도 정책과 로컬 이벤트 기록이 Cloud 통신과 독립적이라는 점을 보강했습니다.
+
 ## [0.2.19-r14] - 2026-09-21
 
 ### 수정

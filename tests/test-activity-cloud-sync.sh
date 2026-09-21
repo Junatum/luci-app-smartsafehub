@@ -37,6 +37,10 @@ grep -Fq 'network.internet.disconnected' "$HEALTH_BIN" || fail 'Health observer 
 grep -Fq 'health.issue.started' "$HEALTH_BIN" || fail 'Health observer must keep diagnostic transition events'
 grep -Fq 'consume_wake_marker' "$SYNC_BIN" || fail 'activity sync daemon must consume wake markers so backend failures do not retry every daemon tick'
 grep -Fq 'mv "$WAKE_FILE" "$consumed"' "$SYNC_BIN" || fail 'wake marker consumption must use atomic rename so events emitted during sync create a fresh marker'
+grep -Fq 'RETRY_INITIAL_S=900' "$SYNC_BIN" || fail 'Cloud activity resolve failures must start with a 15-minute retry backoff'
+grep -Fq 'RETRY_MAX_S=3600' "$SYNC_BIN" || fail 'Cloud activity retry backoff must be capped at one hour'
+grep -Fq 'retry_backoff_active' "$SYNC_BIN" || fail 'new event wake markers must respect an active Cloud failure backoff'
+grep -Fq '[ -e "$WAKE_FILE" ] && ! retry_backoff_active' "$SYNC_BIN" || fail 'event wake must not bypass Cloud failure backoff'
 
 for contract in \
   'root/usr/share/rpcd/ucode/smartsafehub/system.uc:settings.scheduled_reboot.updated' \
@@ -268,7 +272,7 @@ fi
 [ -s "$OUTBOX" ] || fail 'unknown/partial resolve response must preserve Cloud events'
 [ ! -s "$CLEAR_LOG" ] || fail 'unknown/partial resolve response must not clear the Cloud outbox'
 
-rm -f "$RUNTIME/activity-sync-credential.json"
+rm -f "$RUNTIME/activity-sync-credential.json" "$RUNTIME/activity-sync.json"
 : > "$ACK_LOG"
 : > "$CLEAR_LOG"
 write_outbox
@@ -277,6 +281,23 @@ if run_sync unavailable >/dev/null 2>&1; then
 fi
 [ -s "$OUTBOX" ] || fail 'Hub API communication failure must preserve Cloud events for a later retry'
 [ ! -s "$CLEAR_LOG" ] || fail 'Hub API communication failure must not clear the Cloud outbox'
+jq -e '.lastErrorCode == "ACTIVITY_RESOLVE_FAILED" and .nextSyncAt == 1800000900' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'first Cloud resolve failure must back off for 15 minutes instead of retrying after five minutes'
+if run_sync unavailable >/dev/null 2>&1; then
+  fail 'repeated unavailable Hub resolve must remain retryable'
+fi
+jq -e '.nextSyncAt == 1800001800' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'second consecutive Cloud resolve failure must back off for 30 minutes'
+if run_sync unavailable >/dev/null 2>&1; then
+  fail 'third unavailable Hub resolve must remain retryable'
+fi
+jq -e '.nextSyncAt == 1800003600' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'Cloud resolve retry backoff must grow to the one-hour cap'
+if run_sync unavailable >/dev/null 2>&1; then
+  fail 'capped unavailable Hub resolve must remain retryable'
+fi
+jq -e '.nextSyncAt == 1800003600' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'Cloud resolve retry backoff must remain capped at one hour'
 
 rm -f "$RUNTIME/activity-sync-credential.json"
 : > "$ACK_LOG"

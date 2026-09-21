@@ -26,6 +26,8 @@ DEFAULT_STARTUP_DELAY_S=45
 DAEMON_TICK_S=15
 REQUEST_TIMEOUT_S=15
 CREDENTIAL_REFRESH_MARGIN_S=600
+RETRY_INITIAL_S=900
+RETRY_MAX_S=3600
 
 RESOLVE_BODY_FILE=''
 RESOLVE_RESPONSE_FILE=''
@@ -111,6 +113,32 @@ previous_state_number() {
 	local expression="$1" value
 	value="$(json_value "$STATE_FILE" "$expression")"
 	number_value "$value"
+}
+
+retry_delay_s() {
+	local previous_error previous_attempt previous_next previous_delay delay
+	previous_error="$(json_value "$STATE_FILE" '@.lastErrorCode')"
+	previous_attempt="$(previous_state_number '@.lastAttemptAt')"
+	previous_next="$(previous_state_number '@.nextSyncAt')"
+	delay="$RETRY_INITIAL_S"
+
+	if [ -n "$previous_error" ] && [ "$previous_next" -gt "$previous_attempt" ] 2>/dev/null; then
+		previous_delay=$((previous_next - previous_attempt))
+		if [ "$previous_delay" -ge "$RETRY_INITIAL_S" ] 2>/dev/null; then
+			delay=$((previous_delay * 2))
+		fi
+	fi
+	[ "$delay" -le "$RETRY_MAX_S" ] 2>/dev/null || delay="$RETRY_MAX_S"
+	printf '%s' "$delay"
+}
+
+retry_backoff_active() {
+	local now next error
+	error="$(json_value "$STATE_FILE" '@.lastErrorCode')"
+	[ -n "$error" ] || return 1
+	now="$(now_epoch)"
+	next="$(previous_state_number '@.nextSyncAt')"
+	[ "$next" -gt "$now" ] 2>/dev/null
 }
 
 write_state() {
@@ -254,13 +282,14 @@ resolve_credential() {
 }
 
 sync_once() {
-	local now previous_success interval next_sync pending batch_count plan retention token url received accepted duplicates expired processed event_id resolve_rc
+	local now previous_success interval next_sync retry_delay pending batch_count plan retention token url received accepted duplicates expired processed event_id resolve_rc
 	mkdir -p "$RUNTIME_DIR" || return 1
 	acquire_lock || return 75
 	trap 'release_lock; cleanup_files' EXIT INT TERM
 	now="$(now_epoch)"
 	previous_success="$(previous_state_number '@.lastSuccessAt')"
 	interval="$(sync_interval_s)"
+	retry_delay="$(retry_delay_s)"
 	next_sync=$((now + interval))
 	pending="$(pending_count)"
 	write_state syncing null '' 0 "$pending" "$now" "$previous_success" 0 '' "$next_sync"
@@ -276,6 +305,7 @@ sync_once() {
 				;;
 			0) ;;
 			*)
+				next_sync=$((now + retry_delay))
 				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_RESOLVE_FAILED "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 1
 				;;
@@ -295,6 +325,7 @@ sync_once() {
 	UPLOAD_BODY_FILE="$RUNTIME_DIR/activity-upload-body.$$.json"
 	UPLOAD_RESPONSE_FILE="$RUNTIME_DIR/activity-upload-response.$$.json"
 	if ! "$EVENTS_BIN" list > "$UPLOAD_BODY_FILE" 2>/dev/null; then
+		next_sync=$((now + retry_delay))
 		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_OUTBOX_READ_FAILED "$next_sync"
 		release_lock; trap cleanup_files EXIT; return 1
 	fi
@@ -306,6 +337,7 @@ sync_once() {
 	fi
 	if ! post_authorized_json "$UPLOAD_BODY_FILE" "$UPLOAD_RESPONSE_FILE" "$url" "$token"; then
 		rm -f "$CREDENTIAL_FILE"
+		next_sync=$((now + retry_delay))
 		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_UPLOAD_FAILED "$next_sync"
 		release_lock; trap cleanup_files EXIT; return 1
 	fi
@@ -315,6 +347,7 @@ sync_once() {
 	expired="$(number_value "$(json_value "$UPLOAD_RESPONSE_FILE" '@.expired')")"
 	processed=$((accepted + duplicates + expired))
 	if [ "$received" -ne "$batch_count" ] 2>/dev/null || [ "$processed" -ne "$received" ] 2>/dev/null; then
+		next_sync=$((now + retry_delay))
 		write_state error true "$plan" "$retention" "$pending" "$now" "$previous_success" 0 ACTIVITY_UPLOAD_RESPONSE_INVALID "$next_sync"
 		release_lock; trap cleanup_files EXIT; return 1
 	fi
@@ -358,26 +391,27 @@ consume_wake_marker() {
 }
 
 daemon_loop() {
-	local delay tick last_periodic now
+	local delay tick now next_sync
 	STOP_REQUESTED=0
 	delay="$(startup_delay_s)"
 	interruptible_sleep "$delay" || return 0
 	consume_wake_marker || true
 	sync_once || true
-	last_periodic="$(now_epoch)"
 	tick="$(normalized_integer "$DAEMON_TICK_S" 15 5 60)"
 	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		interruptible_sleep "$tick" || break
 		now="$(now_epoch)"
-		if consume_wake_marker; then
-			# One event burst gets one immediate attempt. If the backend is down,
-			# do not retry every daemon tick; the periodic schedule will retry. A
-			# new event emitted during this attempt creates a fresh wake marker.
+		next_sync="$(previous_state_number '@.nextSyncAt')"
+
+		if [ -e "$WAKE_FILE" ] && ! retry_backoff_active; then
+			# Healthy sync may react to a new event immediately. When the backend is
+			# unavailable, keep the marker and honor nextSyncAt so each new event does
+			# not bypass the retry backoff and cause another resolve request.
+			consume_wake_marker || true
 			sync_once || true
-			last_periodic="$now"
-		elif [ $((now - last_periodic)) -ge "$(sync_interval_s)" ] 2>/dev/null; then
+		elif [ "$next_sync" -le 0 ] 2>/dev/null || [ "$now" -ge "$next_sync" ] 2>/dev/null; then
+			consume_wake_marker || true
 			sync_once || true
-			last_periodic="$now"
 		fi
 	done
 }

@@ -760,3 +760,8 @@ apk info luci-app-smartsafehub
 ## 라이선스
 
 이 프로젝트는 [GPL-3.0-or-later](LICENSE) 조건으로 배포됩니다.
+
+
+### Cloud 활동 기록 재시도 정책
+
+Cloud Activity API가 아직 배포되지 않았거나 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. 백그라운드 resolve/upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신과 무관하게 최대 128건을 표시합니다.

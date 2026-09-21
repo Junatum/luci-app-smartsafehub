@@ -57,8 +57,13 @@ grep -Fq 'volatile: true' "$ACTIVITY_RPC" || \
 	fail 'RPC must tell the UI that local activity history is volatile'
 grep -Fq 'MAX_ACTIVITY_EVENTS = 128' "$ACTIVITY_RPC" || \
 	fail 'RPC must cap the local activity response to 128 events'
-grep -Fq "parsed == parsed" "$ACTIVITY_RPC" || \
-	fail 'activity limit parser must reject NaN so an omitted limit falls back to 128'
+grep -Fq 'export function read_activity_history()' "$ACTIVITY_RPC" || \
+	fail 'status activity history reader must not accept an optional limit that can coerce to one event'
+grep -Fq 'length(events) < MAX_ACTIVITY_EVENTS' "$ACTIVITY_RPC" || \
+	fail 'status activity history reader must return the bounded 128-event history by default'
+if grep -Fq 'read_activity_history(limit_value)' "$ACTIVITY_RPC"; then
+	fail 'activity history must not derive its UI limit from an omitted RPC argument'
+fi
 grep -Fq 'function invalid_cloud_sync_state()' "$ACTIVITY_RPC" || \
 	fail 'invalid Cloud sync state must use an explicit ucode-compatible fallback helper'
 if grep -Eq '^[[:space:]]*throw[[:space:]]' "$ACTIVITY_RPC"; then
