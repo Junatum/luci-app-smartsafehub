@@ -66,6 +66,12 @@ grep -Fq '최근 24시간 차단' "$PANEL" || \
 	fail 'SafeShield activity must label recent blocked totals accurately'
 grep -Fq '최근 24시간 차단율' "$PANEL" || \
 	fail 'SafeShield activity must expose the recent block rate'
+grep -Fq "emphasized ? 'text-teal-700' : 'text-slate-950'" "$PANEL" || \
+	fail 'SafeShield metric component must support the shared blocked-total emphasis'
+grep -Fq '          emphasized' "$PANEL" || \
+	fail 'SafeShield recent 24-hour blocked total must enable the shared emphasis'
+[ "$(grep -Fxc '          emphasized' "$PANEL")" -eq 1 ] || \
+	fail 'SafeShield must emphasize only the recent 24-hour blocked total metric'
 grep -Fq '수집 누적 DNS 요청' "$PANEL" || \
 	fail 'SafeShield activity must preserve collector lifetime totals as secondary metadata'
 grep -Fq "targetEnabled ? 'left-6' : 'left-1'" "$PANEL" || \

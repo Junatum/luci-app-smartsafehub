@@ -59,13 +59,25 @@ function recentBuckets(data: SafeShieldStatistics): SafeShieldStatisticsBucket[]
   });
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  emphasized = false,
+  label,
+  value,
+}: {
+  emphasized?: boolean;
+  label: string;
+  value: string;
+}) {
   return (
     <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 sm:p-5">
       <dt class="text-[0.68rem] font-black uppercase tracking-[0.12em] text-slate-400">
         {label}
       </dt>
-      <dd class="mt-2 mb-0 ml-0 text-2xl font-black tracking-tight text-slate-950">
+      <dd
+        class={`mt-2 mb-0 ml-0 text-2xl font-black tracking-tight ${
+          emphasized ? 'text-teal-700' : 'text-slate-950'
+        }`}
+      >
         {value}
       </dd>
     </div>
@@ -224,7 +236,11 @@ export function SafeShieldStatisticsPanel({
 
       <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="최근 24시간 DNS 요청" value={formatNumber(recentTotals.queries)} />
-        <Metric label="최근 24시간 차단" value={formatNumber(recentTotals.blocked)} />
+        <Metric
+          emphasized
+          label="최근 24시간 차단"
+          value={formatNumber(recentTotals.blocked)}
+        />
         <Metric
           label="최근 24시간 차단율"
           value={blockRate(recentTotals.queries, recentTotals.blocked)}

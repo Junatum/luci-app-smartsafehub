@@ -250,5 +250,9 @@ grep -Fq 'DNS 요청' "$ACTIVITY" || \
 	fail '대시보드 SafeShield 활동은 DNS 요청 합계를 표시해야 합니다'
 grep -Fq '차단율' "$ACTIVITY" || \
 	fail '대시보드 SafeShield 활동은 차단율을 표시해야 합니다'
+grep -Fq 'class="mt-1 mb-0 ml-0 text-lg font-black text-teal-700"' "$ACTIVITY" || \
+	fail '대시보드 SafeShield 활동은 최근 24시간 차단 수를 teal로 강조해야 합니다'
+[ "$(grep -Fc 'text-lg font-black text-teal-700' "$ACTIVITY")" -eq 1 ] || \
+	fail '대시보드 SafeShield 활동은 차단 수만 teal로 강조해야 합니다'
 
 echo 'PASS: 대시보드 개요, SafeShield 활동 차트, 로컬 진단 요약과 단발성 상태 조회 계약이 정상입니다'

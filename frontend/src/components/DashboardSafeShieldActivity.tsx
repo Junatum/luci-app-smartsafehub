@@ -115,7 +115,7 @@ export function DashboardSafeShieldActivity({
             <dt class="text-[0.68rem] font-black uppercase tracking-[0.12em] text-slate-400">
               차단
             </dt>
-            <dd class="mt-1 mb-0 ml-0 text-lg font-black text-slate-950">
+            <dd class="mt-1 mb-0 ml-0 text-lg font-black text-teal-700">
               {formatNumber(totals.blocked)}
             </dd>
           </div>
