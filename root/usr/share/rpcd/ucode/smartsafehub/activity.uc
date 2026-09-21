@@ -64,6 +64,21 @@ function normalize_event(document) {
 }
 
 
+function invalid_cloud_sync_state() {
+	return {
+		phase: 'unknown',
+		eligible: null,
+		plan: null,
+		retentionDays: 0,
+		pendingEvents: 0,
+		lastAttemptAt: 0,
+		lastSuccessAt: 0,
+		lastUploadedCount: 0,
+		lastErrorCode: 'ACTIVITY_SYNC_STATE_INVALID',
+		nextSyncAt: 0,
+	};
+}
+
 function read_cloud_sync() {
 	const raw = fs.readfile(ACTIVITY_SYNC_STATE_FILE);
 	if (type(raw) != 'string' || !length(raw)) {
@@ -84,7 +99,7 @@ function read_cloud_sync() {
 	try {
 		const document = json(raw);
 		if (type(document) != 'object' || document?.schema != 1) {
-			throw 'invalid';
+			return invalid_cloud_sync_state();
 		}
 		const eligible = type(document?.eligible) == 'bool' ? document.eligible : null;
 		return {
@@ -103,18 +118,7 @@ function read_cloud_sync() {
 		};
 	}
 	catch (e) {
-		return {
-			phase: 'unknown',
-			eligible: null,
-			plan: null,
-			retentionDays: 0,
-			pendingEvents: 0,
-			lastAttemptAt: 0,
-			lastSuccessAt: 0,
-			lastUploadedCount: 0,
-			lastErrorCode: 'ACTIVITY_SYNC_STATE_INVALID',
-			nextSyncAt: 0,
-		};
+		return invalid_cloud_sync_state();
 	}
 }
 

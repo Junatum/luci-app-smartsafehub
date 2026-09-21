@@ -59,6 +59,11 @@ grep -Fq 'MAX_ACTIVITY_EVENTS = 128' "$ACTIVITY_RPC" || \
 	fail 'RPC must cap the local activity response to 128 events'
 grep -Fq "parsed == parsed" "$ACTIVITY_RPC" || \
 	fail 'activity limit parser must reject NaN so an omitted limit falls back to 128'
+grep -Fq 'function invalid_cloud_sync_state()' "$ACTIVITY_RPC" || \
+	fail 'invalid Cloud sync state must use an explicit ucode-compatible fallback helper'
+if grep -Eq '^[[:space:]]*throw[[:space:]]' "$ACTIVITY_RPC"; then
+	fail 'activity RPC must not use unsupported JavaScript-style throw syntax'
+fi
 grep -Fq 'for (let index = length(history) - 1;' "$ACTIVITY_RPC" || \
 	fail 'RPC must return newest activity first'
 
