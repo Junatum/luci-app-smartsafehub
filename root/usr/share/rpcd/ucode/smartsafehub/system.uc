@@ -501,18 +501,12 @@ function collect_system_status(done) {
 }
 
 export function read_status(request) {
-	const include_activity_history = request?.args?.include_activity_history == true;
-	const activity_limit = request?.args?.activity_limit;
-
 	return collect_system_status(function(result) {
-		if (include_activity_history && result?.ok == true) {
-			const activity_result = read_activity_history(activity_limit);
-			if (activity_result?.ok != true) {
-				request.reply(activity_result);
-				return;
+		if (result?.ok == true) {
+			const activity_result = read_activity_history();
+			if (activity_result?.ok == true) {
+				result.data.activityHistory = activity_result.data;
 			}
-
-			result.data.activityHistory = activity_result.data;
 		}
 
 		request.reply(result);

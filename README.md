@@ -284,7 +284,7 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 
 Health observer의 첫 주기는 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며, 상태 전이가 있을 때만 기록됩니다. `smartsafehub-events` init script도 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
 
-공유기 웹사이트는 기존 로그인 세션이 이미 허용하는 read-only `smartsafehub.status` RPC에 `include_activity_history`를 선택적으로 요청해 최신 이벤트를 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 현재 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**만 제공합니다. Cloud 전송 API, Pro/Ultimate entitlement와 서버 장기 보관은 이후 Cloud Console 활동 기록 단계에서 별도로 연결합니다.
+공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 현재 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**만 제공합니다. Cloud 전송 API, Pro/Ultimate entitlement와 서버 장기 보관은 이후 Cloud Console 활동 기록 단계에서 별도로 연결합니다.
 
 진단 파일은 설정 화면에 이미 로드된 시스템/Health 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다. Health Reporter는 이 다운로드 JSON을 전송하지 않으며 `/usr/libexec/smartsafehub-health`가 개인정보가 배제된 별도 최소 payload를 생성합니다.
 

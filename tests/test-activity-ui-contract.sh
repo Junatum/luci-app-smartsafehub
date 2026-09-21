@@ -27,10 +27,10 @@ for file in "$RPC_ENTRY" "$SYSTEM_RPC" "$ACTIVITY_RPC" "$ACL" "$APP" "$ROUTES" "
 	[ -f "$file" ] || fail "missing activity history source: ${file#$ROOT_DIR/}"
 done
 
-grep -Fq 'include_activity_history: false' "$RPC_ENTRY" || \
-	fail 'existing status RPC must expose the optional activity-history flag'
-grep -Fq 'activity_limit: 128' "$RPC_ENTRY" || \
-	fail 'existing status RPC must expose the bounded activity-history limit'
+status_contract="$(sed -n '/^[[:space:]]*status:[[:space:]]*{/,/^[[:space:]]*},/p' "$RPC_ENTRY")"
+if printf '%s\n' "$status_contract" | grep -Fq 'args:'; then
+	fail 'status RPC must remain argument-free for upgrade/session compatibility'
+fi
 if grep -Eq '^[[:space:]]*activity_history:[[:space:]]*\{' "$RPC_ENTRY"; then
 	fail 'recent activity must not add a standalone RPC method that requires a new session ACL'
 fi
@@ -39,8 +39,13 @@ if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("activity_hist
 fi
 grep -Fq "import { read_activity_history } from './activity.uc';" "$SYSTEM_RPC" || \
 	fail 'system status module must compose the local activity history'
+grep -Fq 'const activity_result = read_activity_history();' "$SYSTEM_RPC" || \
+	fail 'status RPC must read bounded recent activity without new request arguments'
 grep -Fq 'result.data.activityHistory = activity_result.data;' "$SYSTEM_RPC" || \
-	fail 'status RPC must attach activity history only when requested'
+	fail 'status RPC must attach recent activity to successful status responses'
+if grep -Fq 'include_activity_history' "$SYSTEM_RPC" || grep -Fq 'activity_limit' "$SYSTEM_RPC"; then
+	fail 'status implementation must not depend on newly introduced ubus arguments'
+fi
 
 grep -Fq "const ACTIVITY_HISTORY_FILE = '/tmp/smartsafehub/activity-history.jsonl';" "$ACTIVITY_RPC" || \
 	fail 'RPC must read the dedicated volatile local history'
@@ -52,6 +57,8 @@ grep -Fq 'volatile: true' "$ACTIVITY_RPC" || \
 	fail 'RPC must tell the UI that local activity history is volatile'
 grep -Fq 'MAX_ACTIVITY_EVENTS = 128' "$ACTIVITY_RPC" || \
 	fail 'RPC must cap the local activity response to 128 events'
+grep -Fq "parsed == parsed" "$ACTIVITY_RPC" || \
+	fail 'activity limit parser must reject NaN so an omitted limit falls back to 128'
 grep -Fq 'for (let index = length(history) - 1;' "$ACTIVITY_RPC" || \
 	fail 'RPC must return newest activity first'
 
@@ -129,15 +136,20 @@ grep -Fq "bg-emerald-50 text-emerald-700 ring-emerald-200" "$TIMELINE" || \
 grep -Fq "bg-slate-100 text-slate-600 ring-slate-200" "$TIMELINE" || \
 	fail 'info events must use the shared neutral dark/light theme tokens'
 
-grep -Fq "export async function fetchActivityHistory(limit = 128)" "$API" || \
+grep -Fq "export async function fetchActivityHistory(): Promise<ActivityHistory>" "$API" || \
 	fail 'frontend API must expose local Recent Activity'
-grep -Fq "callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status'" "$API" || \
-	fail 'frontend activity API must reuse the long-lived status RPC authorization'
-grep -Fq 'include_activity_history: true' "$API" || \
-	fail 'frontend activity request must explicitly opt into status activity history'
+grep -Fq "callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status');" "$API" || \
+	fail 'frontend activity API must call the long-lived status RPC without new arguments'
+if grep -Fq 'include_activity_history' "$API" || grep -Fq 'activity_limit' "$API"; then
+	fail 'frontend activity request must not send upgrade-incompatible status arguments'
+fi
+grep -Fq 'activityHistory?: ActivityHistory;' "$API" || \
+	fail 'frontend must tolerate a pre-reload status response without activityHistory'
+grep -Fq 'return status.activityHistory ?? emptyActivityHistory();' "$API" || \
+	fail 'frontend must render an empty activity state while an older in-memory RPC handler is draining'
 grep -Fq 'const ACTIVITY_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
 	fail 'recent activity may refresh at a lightweight one-minute interval'
 grep -Fq 'refreshOnFocus: true' "$HOOK" || \
 	fail 'recent activity must refresh when the user returns to the page'
 
-printf '%s\n' 'PASS: local recent activity via existing status RPC, r8 event migration, outbox/history separation and UI contracts are valid'
+printf '%s\n' 'PASS: local recent activity via argument-free status RPC, r8 event migration, outbox/history separation and UI contracts are valid'

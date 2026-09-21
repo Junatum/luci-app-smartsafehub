@@ -14,7 +14,9 @@ function integer_value(value, fallback) {
 	const parsed = int(value);
 	const parsed_type = type(parsed);
 
-	return parsed_type == 'int' || parsed_type == 'double' ? parsed : fallback;
+	return (parsed_type == 'int' || parsed_type == 'double') && parsed == parsed
+		? parsed
+		: fallback;
 }
 
 function valid_severity(value) {

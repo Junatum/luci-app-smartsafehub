@@ -45,16 +45,23 @@ export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
 }
 
 interface SmartSafeHubStatusWithActivity extends SmartSafeHubStatus {
-  activityHistory: ActivityHistory;
+  activityHistory?: ActivityHistory;
 }
 
-export async function fetchActivityHistory(limit = 128): Promise<ActivityHistory> {
-  const status = await callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status', {
-    include_activity_history: true,
-    activity_limit: limit,
-  });
+function emptyActivityHistory(): ActivityHistory {
+  return {
+    schema: 1,
+    scope: 'current_boot',
+    volatile: true,
+    maxEvents: 128,
+    events: [],
+  };
+}
 
-  return status.activityHistory;
+export async function fetchActivityHistory(): Promise<ActivityHistory> {
+  const status = await callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status');
+
+  return status.activityHistory ?? emptyActivityHistory();
 }
 
 export function fetchStatus(): Promise<SmartSafeHubStatus> {
