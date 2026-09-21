@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
+COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
+[ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
+. "$COMMON_LIB"
+
 RUNTIME_DIR="${SMARTSAFEHUB_HEALTH_RUNTIME_DIR:-/tmp/smartsafehub}"
 HEALTH_FILE="${SMARTSAFEHUB_HEALTH_FILE:-$RUNTIME_DIR/health.json}"
 REPORT_STATE_FILE="${SMARTSAFEHUB_HEALTH_REPORT_STATE_FILE:-$RUNTIME_DIR/health-reporter.state}"
@@ -19,6 +23,8 @@ UCLIENT_FETCH_BIN="${SMARTSAFEHUB_HEALTH_UCLIENT_FETCH_BIN:-uclient-fetch}"
 DF_BIN="${SMARTSAFEHUB_HEALTH_DF_BIN:-df}"
 DATE_BIN="${SMARTSAFEHUB_HEALTH_DATE_BIN:-date}"
 LOGGER_BIN="${SMARTSAFEHUB_HEALTH_LOGGER_BIN:-logger}"
+EVENTS_BIN="${SMARTSAFEHUB_HEALTH_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
+EVENT_OBSERVER_STATE_FILE="${SMARTSAFEHUB_HEALTH_EVENT_STATE_FILE:-$RUNTIME_DIR/activity-observer.state}"
 DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 DEFAULT_CHECK_INTERVAL_S=300
 DEFAULT_REPORT_INTERVAL_S=1800
@@ -45,6 +51,16 @@ MEMORY_AVAILABLE_PERCENT=0
 LOAD_1M="0"
 OVERLAY_AVAILABLE_PERCENT=0
 SAFESHIELD_INITIALIZING=0
+HEALTH_EVENT_FINGERPRINT=""
+HEALTH_EVENT_WARNING_COUNT=0
+HEALTH_EVENT_CRITICAL_COUNT=0
+WAN_STATE="unknown"
+SAFESHIELD_ENABLED_STATE="unknown"
+SAFESHIELD_LAST_SUCCESS=0
+SAFESHIELD_LAST_FAILURE=0
+SAFESHIELD_DOMAIN_COUNT=0
+SAFESHIELD_ARTIFACT_VERSION=""
+SAFESHIELD_LAST_ERROR_CODE=""
 
 cleanup() {
 	[ -n "$CHECKS_FILE" ] && rm -f "$CHECKS_FILE"
@@ -129,14 +145,6 @@ api_base_url() {
 	esac
 }
 
-json_escape() {
-	printf '%s' "$1" | sed \
-		-e 's/\\/\\\\/g' \
-		-e 's/"/\\"/g' \
-		-e 's/\r/ /g' \
-		-e 's/\n/ /g'
-}
-
 json_string_or_null() {
 	if [ -n "$1" ]; then
 		printf '"%s"' "$(json_escape "$1")"
@@ -201,6 +209,21 @@ add_check() {
 			else
 				ISSUE_FINGERPRINT="$ISSUE_FINGERPRINT|$code:$status"
 			fi
+
+			case "$id" in
+				system.memory|system.load|system.storage|service.dnsmasq|system.time)
+					if [ -z "$HEALTH_EVENT_FINGERPRINT" ]; then
+						HEALTH_EVENT_FINGERPRINT="$code:$status"
+					else
+						HEALTH_EVENT_FINGERPRINT="$HEALTH_EVENT_FINGERPRINT|$code:$status"
+					fi
+					if [ "$status" = 'critical' ]; then
+						HEALTH_EVENT_CRITICAL_COUNT=$((HEALTH_EVENT_CRITICAL_COUNT + 1))
+					else
+						HEALTH_EVENT_WARNING_COUNT=$((HEALTH_EVENT_WARNING_COUNT + 1))
+					fi
+					;;
+			esac
 			;;
 	esac
 }
@@ -267,8 +290,8 @@ collect_wan() {
 	up="$(json_value "$file" '@.up')"
 	rm -f "$file"
 	case "$up" in
-		true|1) add_check network.wan '인터넷 연결' ok '' 'WAN 인터페이스가 연결되어 있습니다.' null '' ;;
-		false|0) add_check network.wan '인터넷 연결' critical 'WAN_DOWN' 'WAN 인터페이스가 연결되어 있지 않습니다.' null '' ;;
+		true|1) WAN_STATE='up'; add_check network.wan '인터넷 연결' ok '' 'WAN 인터페이스가 연결되어 있습니다.' null '' ;;
+		false|0) WAN_STATE='down'; add_check network.wan '인터넷 연결' critical 'WAN_DOWN' 'WAN 인터페이스가 연결되어 있지 않습니다.' null '' ;;
 		*) add_check network.wan '인터넷 연결' unknown '' 'WAN 인터페이스 연결 여부를 확인하지 못했습니다.' null '' ;;
 	esac
 }
@@ -282,7 +305,7 @@ collect_dnsmasq() {
 }
 
 collect_safeshield() {
-	local enabled status stage dns_ok installed last_error code
+	local enabled status stage dns_ok installed last_error code last_success last_failure domain_count artifact_version
 	SAFESHIELD_STATUS_FILE="$RUNTIME_DIR/health-safeshield.$$.json"
 	if ! "$UBUS_BIN" call safeshield status > "$SAFESHIELD_STATUS_FILE" 2>/dev/null; then
 		if in_startup_grace; then
@@ -300,6 +323,23 @@ collect_safeshield() {
 	dns_ok="$(json_value "$SAFESHIELD_STATUS_FILE" '@.runtime.dns_runtime_ok')"
 	installed="$(json_value "$SAFESHIELD_STATUS_FILE" '@.blocklist.installed')"
 	last_error="$(sanitize_code "$(json_value "$SAFESHIELD_STATUS_FILE" '@.runtime.last_error_code')")"
+	last_success="$(json_value "$SAFESHIELD_STATUS_FILE" '@.timestamps.last_success')"
+	last_failure="$(json_value "$SAFESHIELD_STATUS_FILE" '@.timestamps.last_failure')"
+	domain_count="$(json_value "$SAFESHIELD_STATUS_FILE" '@.artifact.unique_domains')"
+	artifact_version="$(json_value "$SAFESHIELD_STATUS_FILE" '@.artifact.version')"
+	case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac
+	case "$last_failure" in ''|*[!0-9]*) last_failure=0 ;; esac
+	case "$domain_count" in ''|*[!0-9]*) domain_count=0 ;; esac
+	SAFESHIELD_LAST_SUCCESS="$last_success"
+	SAFESHIELD_LAST_FAILURE="$last_failure"
+	SAFESHIELD_DOMAIN_COUNT="$domain_count"
+	SAFESHIELD_ARTIFACT_VERSION="$artifact_version"
+	SAFESHIELD_LAST_ERROR_CODE="$last_error"
+	case "$enabled" in
+		true|1) SAFESHIELD_ENABLED_STATE='1' ;;
+		false|0) SAFESHIELD_ENABLED_STATE='0' ;;
+		*) SAFESHIELD_ENABLED_STATE='unknown' ;;
+	esac
 
 	case "$enabled" in
 		false|0)
@@ -379,6 +419,131 @@ collect_time() {
 	fi
 }
 
+activity_state_value() {
+	local key="$1"
+	[ -f "$EVENT_OBSERVER_STATE_FILE" ] || return 0
+	awk -F '\t' -v key="$key" '$1 == key { print $2; exit }' "$EVENT_OBSERVER_STATE_FILE" 2>/dev/null || true
+}
+
+emit_activity_event() {
+	local source="$1" event_type="$2" severity="$3" metadata="$4" occurred_at="${5:-}"
+	[ -x "$EVENTS_BIN" ] || return 0
+	if [ -n "$occurred_at" ]; then
+		"$EVENTS_BIN" emit "$source" "$event_type" "$severity" "$metadata" "$occurred_at" >/dev/null 2>&1 || true
+	else
+		"$EVENTS_BIN" emit "$source" "$event_type" "$severity" "$metadata" >/dev/null 2>&1 || true
+	fi
+}
+
+write_activity_state() {
+	local initialized="$1" wan_state="$2" wan_down_since="$3" safeshield_enabled="$4"
+	local last_success="$5" last_failure="$6" health_fingerprint="$7" tmp
+	tmp="${EVENT_OBSERVER_STATE_FILE}.tmp.$$"
+	{
+		printf 'version\t1\n'
+		printf 'initialized\t%s\n' "$initialized"
+		printf 'wan_state\t%s\n' "$(sanitize_code "$wan_state")"
+		printf 'wan_down_since\t%s\n' "$wan_down_since"
+		printf 'safeshield_enabled\t%s\n' "$(sanitize_code "$safeshield_enabled")"
+		printf 'safeshield_last_success\t%s\n' "$last_success"
+		printf 'safeshield_last_failure\t%s\n' "$last_failure"
+		printf 'health_fingerprint\t%s\n' "$(sanitize_code "$health_fingerprint")"
+	} > "$tmp"
+	mv "$tmp" "$EVENT_OBSERVER_STATE_FILE"
+}
+
+record_activity_transitions() {
+	local now initialized previous_wan previous_down_since next_wan next_down_since
+	local previous_enabled next_enabled previous_success previous_failure next_success next_failure
+	local previous_health severity metadata downtime
+	now="$("$DATE_BIN" +%s 2>/dev/null || printf '0')"
+	case "$now" in ''|*[!0-9]*) now=0 ;; esac
+	initialized="$(activity_state_value initialized)"
+	previous_wan="$(activity_state_value wan_state)"
+	previous_down_since="$(activity_state_value wan_down_since)"
+	previous_enabled="$(activity_state_value safeshield_enabled)"
+	previous_success="$(activity_state_value safeshield_last_success)"
+	previous_failure="$(activity_state_value safeshield_last_failure)"
+	previous_health="$(activity_state_value health_fingerprint)"
+	case "$previous_down_since" in ''|*[!0-9]*) previous_down_since=0 ;; esac
+	case "$previous_success" in ''|*[!0-9]*) previous_success=0 ;; esac
+	case "$previous_failure" in ''|*[!0-9]*) previous_failure=0 ;; esac
+
+	next_wan="$WAN_STATE"
+	next_down_since="$previous_down_since"
+	next_enabled="$SAFESHIELD_ENABLED_STATE"
+	next_success="$SAFESHIELD_LAST_SUCCESS"
+	next_failure="$SAFESHIELD_LAST_FAILURE"
+
+	if [ "$initialized" != '1' ]; then
+		[ "$next_wan" != 'unknown' ] || next_wan='unknown'
+		if [ "$next_wan" = 'down' ]; then next_down_since="$now"; else next_down_since=0; fi
+		write_activity_state 1 "$next_wan" "$next_down_since" "$next_enabled" "$next_success" "$next_failure" "$HEALTH_EVENT_FINGERPRINT"
+		return 0
+	fi
+
+	if [ "$WAN_STATE" = 'down' ]; then
+		if [ "$previous_wan" = 'up' ]; then
+			next_down_since="$now"
+			emit_activity_event network network.internet.disconnected error '{"previous_state":"up","current_state":"down"}'
+		elif [ "$previous_wan" != 'down' ]; then
+			next_down_since="$now"
+		fi
+	elif [ "$WAN_STATE" = 'up' ]; then
+		if [ "$previous_wan" = 'down' ]; then
+			downtime=0
+			if [ "$previous_down_since" -gt 0 ] 2>/dev/null && [ "$now" -ge "$previous_down_since" ] 2>/dev/null; then
+				downtime=$((now - previous_down_since))
+			fi
+			metadata="{\"previous_state\":\"down\",\"current_state\":\"up\",\"downtime_seconds\":$downtime}"
+			emit_activity_event network network.internet.recovered success "$metadata"
+		fi
+		next_down_since=0
+	else
+		next_wan="$previous_wan"
+	fi
+
+	if [ "$SAFESHIELD_ENABLED_STATE" = '0' ] || [ "$SAFESHIELD_ENABLED_STATE" = '1' ]; then
+		if [ "$previous_enabled" = '0' ] || [ "$previous_enabled" = '1' ]; then
+			if [ "$previous_enabled" != "$SAFESHIELD_ENABLED_STATE" ]; then
+				if [ "$SAFESHIELD_ENABLED_STATE" = '1' ]; then
+					emit_activity_event safeshield safeshield.protection.enabled success '{}'
+				else
+					emit_activity_event safeshield safeshield.protection.disabled warning '{}'
+				fi
+			fi
+		fi
+	else
+		next_enabled="$previous_enabled"
+	fi
+
+	if [ "$SAFESHIELD_LAST_SUCCESS" -gt "$previous_success" ] 2>/dev/null; then
+		metadata="{\"artifact_version\":$(json_string_or_null "$SAFESHIELD_ARTIFACT_VERSION"),\"domain_count\":$SAFESHIELD_DOMAIN_COUNT}"
+		emit_activity_event safeshield safeshield.blocklist.updated success "$metadata" "$SAFESHIELD_LAST_SUCCESS"
+	fi
+	if [ "$SAFESHIELD_LAST_FAILURE" -gt "$previous_failure" ] 2>/dev/null; then
+		metadata="{\"error_code\":$(json_string_or_null "$SAFESHIELD_LAST_ERROR_CODE")}"
+		emit_activity_event safeshield safeshield.blocklist.update_failed error "$metadata" "$SAFESHIELD_LAST_FAILURE"
+	fi
+
+	if [ -z "$previous_health" ] && [ -n "$HEALTH_EVENT_FINGERPRINT" ]; then
+		severity='warning'
+		[ "$HEALTH_EVENT_CRITICAL_COUNT" -eq 0 ] || severity='error'
+		metadata="{\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT}"
+		emit_activity_event health health.issue.started "$severity" "$metadata"
+	elif [ -n "$previous_health" ] && [ -z "$HEALTH_EVENT_FINGERPRINT" ]; then
+		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\"}"
+		emit_activity_event health health.issue.resolved success "$metadata"
+	elif [ -n "$previous_health" ] && [ -n "$HEALTH_EVENT_FINGERPRINT" ] && [ "$previous_health" != "$HEALTH_EVENT_FINGERPRINT" ]; then
+		severity='warning'
+		[ "$HEALTH_EVENT_CRITICAL_COUNT" -eq 0 ] || severity='error'
+		metadata="{\"previous_issue_fingerprint\":\"$(json_escape "$previous_health")\",\"issue_fingerprint\":\"$(json_escape "$HEALTH_EVENT_FINGERPRINT")\",\"warning_count\":$HEALTH_EVENT_WARNING_COUNT,\"critical_count\":$HEALTH_EVENT_CRITICAL_COUNT}"
+		emit_activity_event health health.issue.changed "$severity" "$metadata"
+	fi
+
+	write_activity_state 1 "$next_wan" "$next_down_since" "$next_enabled" "$next_success" "$next_failure" "$HEALTH_EVENT_FINGERPRINT"
+}
+
 health_summary_message() {
 	case "$OVERALL" in
 		critical) printf '%s' '즉시 확인이 필요한 이상 항목이 있습니다.' ;;
@@ -413,6 +578,9 @@ collect_health() {
 	: > "$ISSUES_FILE"
 	CHECK_COUNT=0; OK_COUNT=0; WARNING_COUNT=0; CRITICAL_COUNT=0; UNKNOWN_COUNT=0
 	OVERALL=ok; ISSUE_FINGERPRINT=''; MEMORY_AVAILABLE_PERCENT=0; LOAD_1M='0'; OVERLAY_AVAILABLE_PERCENT=0; SAFESHIELD_INITIALIZING=0
+	HEALTH_EVENT_FINGERPRINT=''; HEALTH_EVENT_WARNING_COUNT=0; HEALTH_EVENT_CRITICAL_COUNT=0
+	WAN_STATE='unknown'; SAFESHIELD_ENABLED_STATE='unknown'; SAFESHIELD_LAST_SUCCESS=0; SAFESHIELD_LAST_FAILURE=0
+	SAFESHIELD_DOMAIN_COUNT=0; SAFESHIELD_ARTIFACT_VERSION=''; SAFESHIELD_LAST_ERROR_CODE=''
 
 	collect_memory
 	collect_load
@@ -427,6 +595,7 @@ collect_health() {
 		OVERALL=initializing
 	fi
 	write_health_file
+	record_activity_transitions
 }
 
 license_eligible() {

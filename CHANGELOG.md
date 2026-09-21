@@ -1,5 +1,27 @@
 # 변경 기록
 
+## [0.2.19-r8] - 2026-09-21
+
+### 기능
+
+- 향후 Cloud Console 활동 기록의 공통 원본이 되는 `/usr/libexec/smartsafehub-events`를 추가했습니다. 이벤트는 `event_type`, `severity`, `occurred_at`, `source`, `metadata` 중심의 schema v1 JSONL로 정규화하며 완성된 UI 문구를 저장하지 않습니다.
+- `/tmp/smartsafehub/events.jsonl`에 최대 128개의 휘발성 이벤트를 보관하고 동시 writer lock, atomic replace, JSON object metadata 검증, `list`/`ack` 인터페이스를 제공합니다. 이벤트 수집을 위해 flash에 주기적으로 기록하지 않습니다.
+- `smartsafehub-events` 부팅 서비스를 추가해 커널 `boot_id`마다 `system.booted`를 한 번만 기록합니다. 서비스가 같은 부팅 중 재시작되어도 중복 부팅 이벤트를 만들지 않습니다.
+- 관리 소프트웨어 실제 설치 성공/실패, 펌웨어 설치 시작/설치 직전 실패, 라이선스 활성화/변경/서버 해제 결과를 정규화 이벤트로 연결했습니다.
+- Health 진단 주기를 상태 observer로 재사용해 WAN 연결 끊김/복구, SafeShield 보호 활성/비활성, 차단 목록 갱신 성공/실패, Health 고유 이상 시작/변경/해소를 **상태가 실제로 바뀔 때만** 기록합니다. SafeShield 차단 목록 이벤트는 Health 관측 시각이 아니라 SafeShield의 실제 `last_success`/`last_failure` timestamp를 사용합니다.
+
+### 안정성 및 개인정보
+
+- Health observer의 첫 관측은 baseline으로만 저장해 공유기 시작이나 daemon 재시작 직후의 기존 상태를 새 사건으로 오인하지 않습니다. WAN/SafeShield/updater/firmware 문제는 전용 event type으로 분리해 일반 Health issue 이벤트와 중복되지 않도록 했습니다.
+- 이벤트 metadata에는 라이선스 키를 기록하지 않으며 `device_uuid`는 로컬에서 임의로 채우지 않고 `null`로 유지합니다. 향후 Cloud 수집 시 인증된 장치 identity를 서버에서 연결하는 경계를 문서화했습니다.
+- 현재 패치는 로컬 정규화/큐까지만 포함하며 Cloud 업로드, 유료 entitlement, 서버 보관, 웹사이트 활동 기록 UI는 활성화하지 않습니다.
+
+### 테스트 및 문서
+
+- 정규화 schema, metadata 검증, 큐 최대 개수/oldest eviction, `ack`, boot event 중복 방지와 생산 event source 계약을 검증하는 `tests/test-events.sh`를 추가하고 ShellSpec 전체 계약에 연결했습니다.
+- Health 회귀 테스트에 첫 관측 무이벤트, WAN down 반복 polling 중복 방지, 인터넷 복구 중단 시간, SafeShield `last_success` 기반 갱신 이벤트를 검증하는 실행형 시나리오를 추가했습니다.
+- 패키지 계약에 event helper/init script 실행 권한과 postinst 강제 enable을 추가하고 README에 이벤트 schema, 현재 source 범위, 휘발성 보관 정책과 향후 Cloud 연결 경계를 문서화했습니다.
+
 ## [0.2.19-r7] - 2026-09-21
 
 ### 개선

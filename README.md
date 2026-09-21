@@ -242,6 +242,44 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 
 SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tmp/smartsafehub/` 한 디렉터리에 모읍니다. 업데이트 상태와 릴리즈 노트, 펌웨어 상태·다운로드 이미지, Health 진단/Reporter 상태, 예약 재부팅 상태, Wi-Fi 변경 lock, 설정 백업 업로드 파일이 이 경로를 공유하며 `updater/`나 `firmware/` 같은 추가 하위 분류 디렉터리는 만들지 않습니다. `/tmp` 기반이므로 재부팅 시 함께 초기화되고 flash 저장 공간에는 기록하지 않습니다. 각 helper와 init script가 필요할 때 디렉터리를 다시 생성합니다.
 
+### 활동 이벤트 정규화
+
+향후 Cloud Console의 **활동 기록(Event Timeline)** 이 여러 기능의 상태 파일을 다시 해석하지 않도록, 공유기 내부 이벤트는 `/usr/libexec/smartsafehub-events`를 통해 공통 schema로 정규화합니다. 이벤트 자체에는 완성된 한국어 `title`/`description`을 저장하지 않고 `event_type + metadata`를 원본으로 유지합니다. 따라서 이후 웹사이트 문구 변경이나 다국어 지원 시 기존 이벤트 데이터를 마이그레이션하지 않아도 됩니다.
+
+```json
+{
+  "schema": 1,
+  "event_id": "<boot-id>-<epoch>-<sequence>",
+  "event_type": "network.internet.recovered",
+  "severity": "success",
+  "occurred_at": 1800001200,
+  "device_uuid": null,
+  "source": "network",
+  "metadata": {
+    "previous_state": "down",
+    "current_state": "up",
+    "downtime_seconds": 100
+  }
+}
+```
+
+로컬 큐는 `/tmp/smartsafehub/events.jsonl`에 최대 128개를 보관하며 오래된 항목부터 제거합니다. 기록은 `mkdir` lock과 atomic rename으로 직렬화하고, `metadata`는 JSON object만 허용하며 크기를 제한합니다. `/tmp` 기반이므로 이벤트 수집 때문에 flash에 주기적으로 쓰지 않습니다. 향후 Cloud 업로더는 `list`로 batch를 읽고 서버가 수락한 `event_id`를 `ack`하여 제거할 수 있습니다. `device_uuid`는 공유기에서 임의로 신뢰하지 않고 현재는 `null`로 두며, Cloud 수집 단계에서 인증된 장치 identity 기준으로 서버가 연결하는 것을 전제로 합니다.
+
+현재 생산 경로에서 기록하는 event type은 다음 범위입니다.
+
+- `system.booted`: 커널 `boot_id` 기준으로 부팅당 한 번만 기록
+- `software.update.completed`, `software.update.failed`: 실제 관리 소프트웨어 설치 결과만 기록하고 정기 업데이트 조회는 기록하지 않음
+- `firmware.update.started`, `firmware.update.failed`: 사용자가 실제 설치를 시작한 시점과 설치 직전 검증 실패를 기록. sysupgrade 이후 성공 완료 판정은 재부팅 후 펌웨어 identity 검증과 함께 후속 단계에서 연결
+- `license.activated`, `license.changed`, `license.cleared`: 활성화와 서버 status reconcile에서 실제 라이선스 상태가 변경될 때만 기록하며 라이선스 키는 metadata에 넣지 않음
+- `network.internet.disconnected`, `network.internet.recovered`: Health observer가 WAN의 실제 `up/down` 전이를 관찰할 때만 기록하며 복구 시 관찰된 중단 시간을 함께 기록
+- `safeshield.protection.enabled`, `safeshield.protection.disabled`: SafeShield enabled 상태가 이전 관측값과 달라질 때만 기록
+- `safeshield.blocklist.updated`, `safeshield.blocklist.update_failed`: SafeShield의 `timestamps.last_success`/`last_failure`가 증가했을 때만 기록하고 실제 SafeShield timestamp를 `occurred_at`으로 사용
+- `health.issue.started`, `health.issue.changed`, `health.issue.resolved`: 메모리, 시스템 부하, 저장 공간, dnsmasq, 시스템 시간처럼 Health 고유 진단 항목의 fingerprint가 실제로 바뀔 때만 기록. WAN/SafeShield/updater/firmware 이상은 전용 event와 중복되지 않도록 제외
+
+Health observer의 첫 주기는 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며, 상태 전이가 있을 때만 기록됩니다. `smartsafehub-events` init script도 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
+
+이 단계는 **공유기 내부 정규화와 로컬 큐까지만** 포함합니다. Cloud 전송 API, Pro/Ultimate entitlement, 서버 장기 보관, 웹사이트의 활동 기록 UI는 아직 이 패치에서 활성화하지 않습니다.
+
 진단 파일은 설정 화면에 이미 로드된 시스템/Health 상태를 재사용하고 Wi-Fi와 SafeShield 상세 정보만 병렬로 조회합니다. 선택적 상세 조회 하나가 실패해도 다운로드 전체를 중단하지 않습니다. Health Reporter는 이 다운로드 JSON을 전송하지 않으며 `/usr/libexec/smartsafehub-health`가 개인정보가 배제된 별도 최소 payload를 생성합니다.
 
 ### 모바일 지원
@@ -318,11 +356,13 @@ luci-app-smartsafehub/
 │   └── vite.config.ts
 ├── root/
 │   ├── etc/config/smartsafehub
+│   ├── etc/init.d/smartsafehub-events
 │   ├── etc/init.d/smartsafehub-updater
 │   ├── etc/init.d/smartsafehub-firmware
 │   ├── etc/init.d/smartsafehub-health
 │   ├── etc/init.d/smartsafehub-license
 │   ├── etc/init.d/smartsafehub-maintenance
+│   ├── usr/libexec/smartsafehub-events
 │   ├── usr/libexec/smartsafehub-updater
 │   ├── usr/libexec/smartsafehub-firmware
 │   ├── usr/libexec/smartsafehub-health
@@ -425,7 +465,7 @@ apk add --allow-untrusted /tmp/luci-app-smartsafehub-*.apk
 
 정확한 현재 버전은 `Makefile`의 `PKG_VERSION`과 `PKG_RELEASE`, 또는 설치된 장치의 `apk info luci-app-smartsafehub`로 확인합니다.
 
-패키지의 postinst는 설치/업그레이드 후 updater, firmware, maintenance 등 항상 동작해야 하는 SmartSafeHub 서비스를 명시적으로 enable하고 LuCI 메뉴 캐시를 지운 뒤 `/usr/libexec/smartsafehub-rpcd-reconcile`을 실행합니다. helper는 먼저 `rpcd reload`로 기존 세션 영향을 최소화하고, reload가 끝난 뒤 핵심 `smartsafehub` ubus 객체가 실제로 다시 등록됐는지 최대 5회 확인하고 연속 2회 확인될 때만 정상으로 판정합니다. 실기기에서 확인된 것처럼 reload 명령 자체는 성공했는데 핵심 객체가 사라진 경우에만 `rpcd restart`로 자동 복구하며, restart 후에도 객체가 돌아오지 않으면 실패 상태를 남깁니다. 수동 설치 환경에서 같은 검증·복구를 실행하려면 아래 명령을 사용할 수 있습니다.
+패키지의 postinst는 설치/업그레이드 후 events, updater, firmware, maintenance 등 항상 동작해야 하는 SmartSafeHub 서비스를 명시적으로 enable하고 LuCI 메뉴 캐시를 지운 뒤 `/usr/libexec/smartsafehub-rpcd-reconcile`을 실행합니다. helper는 먼저 `rpcd reload`로 기존 세션 영향을 최소화하고, reload가 끝난 뒤 핵심 `smartsafehub` ubus 객체가 실제로 다시 등록됐는지 최대 5회 확인하고 연속 2회 확인될 때만 정상으로 판정합니다. 실기기에서 확인된 것처럼 reload 명령 자체는 성공했는데 핵심 객체가 사라진 경우에만 `rpcd restart`로 자동 복구하며, restart 후에도 객체가 돌아오지 않으면 실패 상태를 남깁니다. 수동 설치 환경에서 같은 검증·복구를 실행하려면 아래 명령을 사용할 수 있습니다.
 
 ```bash
 rm -f /tmp/luci-indexcache

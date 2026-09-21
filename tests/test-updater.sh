@@ -3,6 +3,7 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+export SMARTSAFEHUB_COMMON_LIB="$ROOT_DIR/root/usr/lib/smartsafehub/common.sh"
 UPDATER="$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 MAKEFILE="$ROOT_DIR/Makefile"
 TMP="$(mktemp -d)"

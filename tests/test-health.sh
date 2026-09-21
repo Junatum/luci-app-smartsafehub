@@ -32,6 +32,7 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT INT TERM
 mkdir -p "$TMP/bin" "$TMP/runtime"
+TAB="$(printf '\t')"
 
 cat > "$TMP/bin/uci" <<'EOF_UCI'
 #!/bin/sh
@@ -89,7 +90,7 @@ case "${2:-}:${3:-}" in
 	safeshield:status)
 		[ "${MOCK_SAFESHIELD_STATUS_EXIT:-0}" -eq 0 ] || exit "${MOCK_SAFESHIELD_STATUS_EXIT}"
 		cat <<EOF_STATUS
-{"enabled":${MOCK_SAFESHIELD_ENABLED:-true},"status":"${MOCK_SAFESHIELD_STATUS:-idle}","stage":"${MOCK_SAFESHIELD_STAGE:-}","runtime":{"dns_runtime_ok":${MOCK_DNS_RUNTIME_OK:-true},"last_error_code":"${MOCK_SAFESHIELD_ERROR:-}"},"blocklist":{"installed":${MOCK_BLOCKLIST_INSTALLED:-true}},"license":{"configured":${MOCK_LICENSE_CONFIGURED:-true},"plan":"${MOCK_LICENSE_PLAN:-ULTIMATE}","status":"${MOCK_LICENSE_STATUS:-active}"}}
+{"enabled":${MOCK_SAFESHIELD_ENABLED:-true},"status":"${MOCK_SAFESHIELD_STATUS:-idle}","stage":"${MOCK_SAFESHIELD_STAGE:-}","runtime":{"dns_runtime_ok":${MOCK_DNS_RUNTIME_OK:-true},"last_error_code":"${MOCK_SAFESHIELD_ERROR:-}"},"blocklist":{"installed":${MOCK_BLOCKLIST_INSTALLED:-true}},"artifact":{"version":"${MOCK_SAFESHIELD_ARTIFACT_VERSION:-2026.09.21}","unique_domains":${MOCK_SAFESHIELD_DOMAIN_COUNT:-33818}},"timestamps":{"last_success":${MOCK_SAFESHIELD_LAST_SUCCESS:-0},"last_failure":${MOCK_SAFESHIELD_LAST_FAILURE:-0}},"license":{"configured":${MOCK_LICENSE_CONFIGURED:-true},"plan":"${MOCK_LICENSE_PLAN:-ULTIMATE}","status":"${MOCK_LICENSE_STATUS:-active}"}}
 EOF_STATUS
 		;;
 	safeshield:license_get)
@@ -129,6 +130,18 @@ exit 0
 EOF_LOGGER
 chmod +x "$TMP/bin/logger"
 
+cat > "$TMP/bin/events" <<'EOF_EVENTS'
+#!/bin/sh
+set -eu
+printf '%s' "${1:-}" >> "${MOCK_EVENT_LOG:?}"
+shift || true
+for argument in "$@"; do
+	printf '\t%s' "$argument" >> "$MOCK_EVENT_LOG"
+done
+printf '\n' >> "$MOCK_EVENT_LOG"
+EOF_EVENTS
+chmod +x "$TMP/bin/events"
+
 cat > "$TMP/bin/uclient-fetch" <<'EOF_FETCH'
 #!/bin/sh
 set -eu
@@ -160,8 +173,11 @@ HEALTH_FILE="$TMP/runtime/health.json"
 REPORT_STATE="$TMP/runtime/health-reporter.state"
 UPDATER_STATE="$TMP/runtime/updates.state"
 FIRMWARE_STATE="$TMP/runtime/firmware.state"
+EVENT_LOG="$TMP/events.log"
+EVENT_STATE="$TMP/runtime/activity-observer.state"
 : > "$FETCH_ARGS"
 : > "$FETCH_BODIES"
+: > "$EVENT_LOG"
 printf 'MemTotal:       100000 kB\nMemAvailable:    50000 kB\n' > "$MEMINFO"
 printf '0.10 0.05 0.01 1/100 100\n' > "$LOADAVG"
 printf 'processor\t: 0\nprocessor\t: 1\n' > "$CPUINFO"
@@ -191,6 +207,11 @@ run_health() {
 	MOCK_DNS_RUNTIME_OK="${MOCK_DNS_RUNTIME_OK:-true}" \
 	MOCK_BLOCKLIST_INSTALLED="${MOCK_BLOCKLIST_INSTALLED:-true}" \
 	MOCK_SAFESHIELD_ERROR="${MOCK_SAFESHIELD_ERROR:-}" \
+	MOCK_SAFESHIELD_LAST_SUCCESS="${MOCK_SAFESHIELD_LAST_SUCCESS:-0}" \
+	MOCK_SAFESHIELD_LAST_FAILURE="${MOCK_SAFESHIELD_LAST_FAILURE:-0}" \
+	MOCK_SAFESHIELD_DOMAIN_COUNT="${MOCK_SAFESHIELD_DOMAIN_COUNT:-33818}" \
+	MOCK_SAFESHIELD_ARTIFACT_VERSION="${MOCK_SAFESHIELD_ARTIFACT_VERSION:-2026.09.21}" \
+	MOCK_EVENT_LOG="$EVENT_LOG" \
 	MOCK_EPOCH="${MOCK_EPOCH:-1800000000}" \
 	MOCK_FETCH_BODIES="$FETCH_BODIES" \
 	MOCK_FETCH_EXIT="${MOCK_FETCH_EXIT:-0}" \
@@ -211,6 +232,8 @@ run_health() {
 	SMARTSAFEHUB_HEALTH_DF_BIN="$TMP/bin/df" \
 	SMARTSAFEHUB_HEALTH_DATE_BIN="$TMP/bin/date" \
 	SMARTSAFEHUB_HEALTH_LOGGER_BIN="$TMP/bin/logger" \
+	SMARTSAFEHUB_HEALTH_EVENTS_BIN="$TMP/bin/events" \
+	SMARTSAFEHUB_HEALTH_EVENT_STATE_FILE="$EVENT_STATE" \
 	PATH="$TMP/bin:$PATH" \
 	"$HELPER" "$@"
 }
@@ -231,11 +254,16 @@ run_health_case() (
 	MOCK_DNS_RUNTIME_OK=true
 	MOCK_BLOCKLIST_INSTALLED=true
 	MOCK_SAFESHIELD_ERROR=''
+	MOCK_SAFESHIELD_LAST_SUCCESS=0
+	MOCK_SAFESHIELD_LAST_FAILURE=0
+	MOCK_SAFESHIELD_DOMAIN_COUNT=33818
+	MOCK_SAFESHIELD_ARTIFACT_VERSION=2026.09.21
 	MOCK_EPOCH=1800000000
 	MOCK_FETCH_EXIT=0
 	export MOCK_LICENSE_PLAN MOCK_LICENSE_STATUS MOCK_LICENSE_CONFIGURED MOCK_LICENSE_KEY
 	export MOCK_WAN_UP MOCK_SAFESHIELD_ENABLED MOCK_SAFESHIELD_STATUS MOCK_SAFESHIELD_STAGE
 	export MOCK_SAFESHIELD_STATUS_EXIT MOCK_DNS_RUNTIME_OK MOCK_BLOCKLIST_INSTALLED MOCK_SAFESHIELD_ERROR
+	export MOCK_SAFESHIELD_LAST_SUCCESS MOCK_SAFESHIELD_LAST_FAILURE MOCK_SAFESHIELD_DOMAIN_COUNT MOCK_SAFESHIELD_ARTIFACT_VERSION
 	export MOCK_EPOCH MOCK_FETCH_EXIT
 
 	while [ "$#" -gt 0 ] && [ "$1" != '--' ]; do
@@ -257,6 +285,29 @@ jq -e '.schema == 1 and .overall == "ok" and .summary.total >= 8' "$HEALTH_FILE"
 	fail '정상 장치의 로컬 진단은 schema v1과 ok 상태를 생성해야 합니다.'
 grep -Eq '^enabled[[:space:]]+0$' "$REPORT_STATE" || fail '원격 상태 보고는 opt-in 방식이며 기본값이 OFF여야 합니다.'
 [ ! -s "$FETCH_ARGS" ] || fail '로컬 전용 진단은 서버 요청을 보내면 안 됩니다.'
+
+# 활동 기록 observer는 첫 관측을 baseline으로만 저장하고 실제 상태 전이에만 event를 기록한다.
+rm -f "$EVENT_STATE"
+: > "$EVENT_LOG"
+run_health_case MOCK_EPOCH=1800001000 MOCK_WAN_UP=true MOCK_SAFESHIELD_LAST_SUCCESS=1800000900 -- run-once
+[ ! -s "$EVENT_LOG" ] || fail '첫 Health 관측은 기존 상태를 새 사건으로 오인하면 안 됩니다.'
+run_health_case MOCK_EPOCH=1800001100 MOCK_WAN_UP=false MOCK_SAFESHIELD_LAST_SUCCESS=1800000900 -- run-once
+grep -Fq "emit${TAB}network${TAB}network.internet.disconnected${TAB}error" "$EVENT_LOG" || \
+	fail 'WAN up→down 전이에서 인터넷 연결 끊김 event를 한 번 기록해야 합니다.'
+before_event_lines="$(wc -l < "$EVENT_LOG" | tr -d ' ')"
+run_health_case MOCK_EPOCH=1800001150 MOCK_WAN_UP=false MOCK_SAFESHIELD_LAST_SUCCESS=1800000900 -- run-once
+after_event_lines="$(wc -l < "$EVENT_LOG" | tr -d ' ')"
+[ "$before_event_lines" -eq "$after_event_lines" ] || fail 'WAN down 상태의 반복 polling이 중복 event를 만들면 안 됩니다.'
+run_health_case MOCK_EPOCH=1800001200 MOCK_WAN_UP=true MOCK_SAFESHIELD_LAST_SUCCESS=1800001190 MOCK_SAFESHIELD_DOMAIN_COUNT=34001 -- run-once
+grep -Fq 'network.internet.recovered' "$EVENT_LOG" || fail 'WAN down→up 전이에서 복구 event를 기록해야 합니다.'
+grep -Fq '"downtime_seconds":100' "$EVENT_LOG" || fail '인터넷 복구 event에는 관측된 중단 시간을 metadata로 기록해야 합니다.'
+grep -Fq 'safeshield.blocklist.updated' "$EVENT_LOG" || fail 'SafeShield last_success 증가 시 차단 목록 갱신 event를 기록해야 합니다.'
+grep -Fq '"domain_count":34001' "$EVENT_LOG" || fail 'SafeShield 갱신 event에는 적용 도메인 수를 metadata로 기록해야 합니다.'
+grep -Fq '1800001190' "$EVENT_LOG" || fail 'SafeShield 갱신 event는 Health 관측 시각이 아니라 실제 last_success 시각을 사용해야 합니다.'
+
+# 이후 Health 진단 시나리오는 event observer 상태와 무관하게 독립적으로 검증한다.
+rm -f "$EVENT_STATE"
+: > "$EVENT_LOG"
 
 # 부팅 직후 SafeShield 첫 갱신은 장애로 기록하지 않고 준비 중 상태로 표시한다.
 printf '30.00 10.00\n' > "$UPTIME"

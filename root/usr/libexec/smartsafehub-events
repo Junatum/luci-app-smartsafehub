@@ -1,0 +1,248 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+set -u
+umask 077
+
+COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
+[ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
+. "$COMMON_LIB"
+
+RUNTIME_DIR="${SMARTSAFEHUB_EVENTS_RUNTIME_DIR:-/tmp/smartsafehub}"
+EVENTS_FILE="${SMARTSAFEHUB_EVENTS_FILE:-$RUNTIME_DIR/events.jsonl}"
+LOCK_DIR="${SMARTSAFEHUB_EVENTS_LOCK_DIR:-$RUNTIME_DIR/events.lock}"
+SEQ_FILE="${SMARTSAFEHUB_EVENTS_SEQ_FILE:-$RUNTIME_DIR/events.seq}"
+BOOT_MARKER_FILE="${SMARTSAFEHUB_EVENTS_BOOT_MARKER_FILE:-$RUNTIME_DIR/events.boot-id}"
+BOOT_ID_FILE="${SMARTSAFEHUB_EVENTS_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}"
+JSONFILTER_BIN="${SMARTSAFEHUB_EVENTS_JSONFILTER_BIN:-jsonfilter}"
+DATE_BIN="${SMARTSAFEHUB_EVENTS_DATE_BIN:-date}"
+LOGGER_BIN="${SMARTSAFEHUB_EVENTS_LOGGER_BIN:-logger}"
+MAX_EVENTS="${SMARTSAFEHUB_EVENTS_MAX_EVENTS:-128}"
+MAX_METADATA_BYTES="${SMARTSAFEHUB_EVENTS_MAX_METADATA_BYTES:-4096}"
+
+log_message() {
+	"$LOGGER_BIN" -t smartsafehub-events -- "$*" 2>/dev/null || true
+}
+
+sanitize_token() {
+	printf '%s' "$1" | tr -cd 'A-Za-z0-9_.:-' | cut -c 1-120
+}
+
+now_epoch() {
+	local value
+	value="$("$DATE_BIN" +%s 2>/dev/null || true)"
+	case "$value" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	printf '%s' "$value"
+}
+
+normalized_limit() {
+	case "$MAX_EVENTS" in
+		''|*[!0-9]*) MAX_EVENTS=128 ;;
+	esac
+	if [ "$MAX_EVENTS" -lt 8 ] 2>/dev/null || [ "$MAX_EVENTS" -gt 1024 ] 2>/dev/null; then
+		MAX_EVENTS=128
+	fi
+	case "$MAX_METADATA_BYTES" in
+		''|*[!0-9]*) MAX_METADATA_BYTES=4096 ;;
+	esac
+	if [ "$MAX_METADATA_BYTES" -lt 256 ] 2>/dev/null || [ "$MAX_METADATA_BYTES" -gt 16384 ] 2>/dev/null; then
+		MAX_METADATA_BYTES=4096
+	fi
+}
+
+acquire_lock() {
+	local owner
+	if mkdir "$LOCK_DIR" 2>/dev/null; then
+		printf '%s\n' "$$" > "$LOCK_DIR/pid"
+		return 0
+	fi
+
+	owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+	if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+		return 1
+	fi
+
+	rm -rf "$LOCK_DIR" 2>/dev/null || return 1
+	mkdir "$LOCK_DIR" 2>/dev/null || return 1
+	printf '%s\n' "$$" > "$LOCK_DIR/pid"
+}
+
+release_lock() {
+	rm -rf "$LOCK_DIR" 2>/dev/null || true
+}
+
+metadata_is_valid() {
+	local metadata="$1" file size compact
+	size="$(printf '%s' "$metadata" | wc -c | tr -d '[:space:]')"
+	case "$size" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$size" -le "$MAX_METADATA_BYTES" ] || return 1
+
+	compact="$(printf '%s' "$metadata" | tr -d '[:space:]')"
+	case "$compact" in
+		\{*\}) ;;
+		*) return 1 ;;
+	esac
+
+	file="$RUNTIME_DIR/events-metadata.$$.json"
+	printf '%s\n' "$metadata" > "$file" || return 1
+	if ! "$JSONFILTER_BIN" -i "$file" -e '@' >/dev/null 2>&1; then
+		rm -f "$file"
+		return 1
+	fi
+	rm -f "$file"
+	return 0
+}
+
+next_sequence() {
+	local value
+	value="$(cat "$SEQ_FILE" 2>/dev/null || true)"
+	case "$value" in
+		''|*[!0-9]*) value=0 ;;
+	esac
+	value=$((value + 1))
+	printf '%s\n' "$value" > "$SEQ_FILE"
+	printf '%s' "$value"
+}
+
+boot_id() {
+	local value
+	value="$(cat "$BOOT_ID_FILE" 2>/dev/null || true)"
+	value="$(printf '%s' "$value" | tr -cd 'A-Za-z0-9-')"
+	[ -n "$value" ] || value='unknown'
+	printf '%s' "$value"
+}
+
+emit_event() {
+	local source event_type severity metadata occurred_at sequence current_boot event_id tmp keep_count
+	source="$(sanitize_token "${1:-}")"
+	event_type="$(sanitize_token "${2:-}")"
+	severity="${3:-}"
+	metadata="${4:-}"
+	[ -n "$metadata" ] || metadata='{}'
+	occurred_at="${5:-}"
+
+	[ -n "$source" ] && [ -n "$event_type" ] || return 2
+	case "$severity" in
+		info|success|warning|error) ;;
+		*) return 2 ;;
+	esac
+	case "$occurred_at" in
+		'') occurred_at="$(now_epoch)" || return 1 ;;
+		*[!0-9]*) return 2 ;;
+	esac
+	[ "$occurred_at" -gt 0 ] 2>/dev/null || return 2
+
+	mkdir -p "$RUNTIME_DIR" || return 1
+	normalized_limit
+	metadata_is_valid "$metadata" || return 2
+	acquire_lock || return 75
+	trap release_lock EXIT INT TERM
+
+	sequence="$(next_sequence)"
+	current_boot="$(boot_id)"
+	event_id="${current_boot}-${occurred_at}-${sequence}"
+	tmp="${EVENTS_FILE}.tmp.$$"
+	keep_count=$((MAX_EVENTS - 1))
+
+	if [ -s "$EVENTS_FILE" ] && [ "$keep_count" -gt 0 ]; then
+		tail -n "$keep_count" "$EVENTS_FILE" > "$tmp" 2>/dev/null || : > "$tmp"
+	else
+		: > "$tmp"
+	fi
+	printf '{"schema":1,"event_id":"%s","event_type":"%s","severity":"%s","occurred_at":%s,"device_uuid":null,"source":"%s","metadata":%s}\n' \
+		"$(json_escape "$event_id")" \
+		"$(json_escape "$event_type")" \
+		"$severity" \
+		"$occurred_at" \
+		"$(json_escape "$source")" \
+		"$metadata" >> "$tmp"
+	mv "$tmp" "$EVENTS_FILE"
+
+	release_lock
+	trap - EXIT INT TERM
+	printf '%s\n' "$event_id"
+}
+
+list_events() {
+	local first=1 line
+	printf '{"schema":1,"events":['
+	if [ -s "$EVENTS_FILE" ]; then
+		while IFS= read -r line || [ -n "$line" ]; do
+			[ -n "$line" ] || continue
+			if [ "$first" -eq 0 ]; then
+				printf ','
+			fi
+			printf '%s' "$line"
+			first=0
+		done < "$EVENTS_FILE"
+	fi
+	printf ']}\n'
+}
+
+ack_event() {
+	local event_id tmp needle
+	event_id="$(printf '%s' "${1:-}" | tr -cd 'A-Za-z0-9._:-')"
+	[ -n "$event_id" ] || return 2
+	[ -f "$EVENTS_FILE" ] || return 0
+
+	mkdir -p "$RUNTIME_DIR" || return 1
+	acquire_lock || return 75
+	trap release_lock EXIT INT TERM
+	tmp="${EVENTS_FILE}.tmp.$$"
+	needle="\"event_id\":\"$event_id\""
+	awk -v needle="$needle" 'index($0, needle) == 0 { print }' "$EVENTS_FILE" > "$tmp"
+	mv "$tmp" "$EVENTS_FILE"
+	release_lock
+	trap - EXIT INT TERM
+}
+
+record_boot() {
+	local current previous metadata
+	mkdir -p "$RUNTIME_DIR" || return 1
+	current="$(boot_id)"
+	previous="$(cat "$BOOT_MARKER_FILE" 2>/dev/null || true)"
+	[ "$current" != "$previous" ] || return 0
+	metadata="{\"boot_id\":\"$(json_escape "$current")\"}"
+	emit_event system system.booted info "$metadata" >/dev/null || return $?
+	printf '%s\n' "$current" > "${BOOT_MARKER_FILE}.tmp.$$"
+	mv "${BOOT_MARKER_FILE}.tmp.$$" "$BOOT_MARKER_FILE"
+	log_message "recorded boot event for $current"
+}
+
+usage() {
+	cat <<'EOF_USAGE'
+Usage: smartsafehub-events <command>
+
+Commands:
+  emit SOURCE EVENT_TYPE SEVERITY [METADATA_JSON] [OCCURRED_AT]
+  list
+  ack EVENT_ID
+  boot
+EOF_USAGE
+}
+
+mkdir -p "$RUNTIME_DIR" || exit 1
+
+case "${1:-}" in
+	emit)
+		shift
+		emit_event "$@"
+		;;
+	list)
+		list_events
+		;;
+	ack)
+		shift
+		ack_event "$@"
+		;;
+	boot)
+		record_boot
+		;;
+	*)
+		usage >&2
+		exit 2
+		;;
+esac

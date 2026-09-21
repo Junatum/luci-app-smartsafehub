@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+START=14
+STOP=89
+
+PROG=/usr/libexec/smartsafehub-events
+
+start() {
+	[ -x "$PROG" ] || return 0
+	"$PROG" boot >/dev/null 2>&1 || true
+}

@@ -50,11 +50,14 @@ require_file "$SHELLSPEC_CONFIG"
 require_file "$SHELLSPEC_CONTRACTS"
 [ ! -e "$ROOT_DIR/tests/run.sh" ] || fail 'tests/run.sh must not be used; run shellspec directly'
 
+require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-events"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-maintenance"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-health"
 require_executable "$ROOT_DIR/root/etc/init.d/smartsafehub-license"
+require_file "$ROOT_DIR/root/usr/lib/smartsafehub/common.sh"
+require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-events"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-updater"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-firmware"
 require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-maintenance"
@@ -65,6 +68,8 @@ require_file "$ROOT_DIR/root/usr/libexec/smartsafehub-root-entry"
 require_executable "$ROOT_DIR/root/etc/uci-defaults/99-smartsafehub-root-entry"
 require_executable "$ROOT_DIR/tests/test-static-validation.sh"
 require_executable "$ROOT_DIR/tests/test-shell-pipeline-safety.sh"
+require_executable "$ROOT_DIR/tests/test-events.sh"
+require_executable "$ROOT_DIR/tests/test-common-shell.sh"
 require_executable "$ROOT_DIR/tests/test-updater.sh"
 require_executable "$ROOT_DIR/tests/test-firmware-updater.sh"
 require_executable "$ROOT_DIR/tests/test-package-contract.sh"
@@ -188,6 +193,8 @@ printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package postinst must limit service enable to runtime installation'
 printf '%s\n' "$postinst_block" | grep -Fq 'mkdir -p /tmp/smartsafehub' ||
 	fail 'package postinst must create the SmartSafeHub runtime directory'
+printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-events enable' ||
+	fail 'package postinst must force-enable smartsafehub-events so boot events survive upgrades'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-updater enable' ||
 	fail 'package postinst must force-enable smartsafehub-updater so scheduled checks survive upgrades'
 if printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-updater restart'; then

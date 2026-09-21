@@ -3,6 +3,10 @@
 set -u
 umask 077
 
+COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
+[ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
+. "$COMMON_LIB"
+
 RUNTIME_DIR="${SMARTSAFEHUB_LICENSE_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_LICENSE_STATE_FILE:-$RUNTIME_DIR/license.json}"
 ACTIVATION_LOCK="${SMARTSAFEHUB_LICENSE_ACTIVATION_LOCK:-$RUNTIME_DIR/license-activate.lock}"
@@ -14,6 +18,7 @@ UCLIENT_FETCH_BIN="${SMARTSAFEHUB_LICENSE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 DATE_BIN="${SMARTSAFEHUB_LICENSE_DATE_BIN:-date}"
 LOGGER_BIN="${SMARTSAFEHUB_LICENSE_LOGGER_BIN:-logger}"
 SLEEP_BIN="${SMARTSAFEHUB_LICENSE_SLEEP_BIN:-sleep}"
+EVENTS_BIN="${SMARTSAFEHUB_LICENSE_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
 DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 DEFAULT_CHECK_INTERVAL_S=300
 DEFAULT_STARTUP_DELAY_S=30
@@ -94,20 +99,19 @@ now_epoch() {
 	printf '%s' "$value"
 }
 
-json_escape() {
-	printf '%s' "$1" | sed \
-		-e 's/\\/\\\\/g' \
-		-e 's/"/\\"/g' \
-		-e 's/\r/ /g' \
-		-e 's/\n/ /g'
-}
-
 json_string_or_null() {
 	if [ -n "$1" ]; then
 		printf '"%s"' "$(json_escape "$1")"
 	else
 		printf 'null'
 	fi
+}
+
+emit_license_event() {
+	local event_type="$1" severity="$2" from_plan="$3" to_plan="$4" license_status="$5" reason="$6" metadata
+	[ -x "$EVENTS_BIN" ] || return 0
+	metadata="{\"from_plan\":$(json_string_or_null "$from_plan"),\"to_plan\":$(json_string_or_null "$to_plan"),\"license_status\":$(json_string_or_null "$license_status"),\"reason\":$(json_string_or_null "$reason")}"
+	"$EVENTS_BIN" emit license "$event_type" "$severity" "$metadata" >/dev/null 2>&1 || true
 }
 
 json_value() {
@@ -388,13 +392,14 @@ activate_license() {
 	now="$(now_epoch)"
 	interval="$(check_interval_s)"
 	write_state_fields active activated '' "$now" "$now" "$now" $((now + interval)) "$plan" "$license_status" "$activation_status" none 200 active null
+	emit_license_event license.activated success '' "$plan" "$license_status" explicit_activation
 	log_message '라이선스 활성화와 로컬 적용을 완료했습니다.'
 	activation_cleanup
 	return 0
 }
 
 status_sync() {
-	local now previous_activated interval next_check key fingerprint base action licensed plan license_status activation_status
+	local now previous_activated previous_plan previous_license_status interval next_check key fingerprint base action licensed plan license_status activation_status
 
 	# Activation and periodic reconciliation share one state file. Do not let a
 	# scheduled status check overwrite an in-flight explicit activation result.
@@ -402,6 +407,8 @@ status_sync() {
 
 	now="$(now_epoch)"
 	previous_activated="$(read_previous_number '@.lastActivatedAt')"
+	previous_plan="$(json_value "$STATE_FILE" '@.plan')"
+	previous_license_status="$(json_value "$STATE_FILE" '@.licenseStatus')"
 	interval="$(check_interval_s)"
 	next_check=$((now + interval))
 
@@ -444,6 +451,10 @@ EOF_REQUEST
 
 	if [ "$action" = 'none' ] && { [ "$licensed" = 'true' ] || [ "$licensed" = '1' ]; }; then
 		write_state_fields active active '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" none 200 keep keep
+		if { [ -n "$previous_plan" ] && [ "$previous_plan" != "$plan" ]; } || \
+			{ [ -n "$previous_license_status" ] && [ "$previous_license_status" != "$license_status" ]; }; then
+			emit_license_event license.changed info "$previous_plan" "$plan" "$license_status" status_sync
+		fi
 		return 0
 	fi
 
@@ -454,6 +465,7 @@ EOF_REQUEST
 			return 1
 		fi
 		write_state_fields cleared cleared '' "$now" "$now" "$previous_activated" "$next_check" "$plan" "$license_status" "$activation_status" clear_license 200 keep keep
+		emit_license_event license.cleared info "$previous_plan" '' "$license_status" server_reconcile
 		log_message "서버 라이선스 상태($activation_status)에 따라 로컬 라이선스를 제거했습니다."
 		return 0
 	fi

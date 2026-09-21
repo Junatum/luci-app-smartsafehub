@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.19
-PKG_RELEASE:=7
+PKG_RELEASE:=8
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -30,6 +30,9 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 	mkdir -p /tmp/smartsafehub
 	uci -q delete smartsafehub.firmware.check_enabled >/dev/null 2>&1 || true
 	uci -q commit smartsafehub >/dev/null 2>&1 || true
+	if [ -x /etc/init.d/smartsafehub-events ]; then
+		/etc/init.d/smartsafehub-events enable
+	fi
 	if [ -x /etc/init.d/smartsafehub-updater ]; then
 		/etc/init.d/smartsafehub-updater enable
 	fi

@@ -32,11 +32,14 @@ if grep -Fq '  .ssh-safeshield-license-summary,' "$APP_STYLE"; then
 fi
 
 for script in \
+	root/etc/init.d/smartsafehub-events \
 	root/etc/init.d/smartsafehub-updater \
 	root/etc/init.d/smartsafehub-firmware \
 	root/etc/init.d/smartsafehub-maintenance \
 	root/etc/init.d/smartsafehub-health \
 	root/etc/init.d/smartsafehub-license \
+	root/usr/lib/smartsafehub/common.sh \
+	root/usr/libexec/smartsafehub-events \
 	root/usr/libexec/smartsafehub-updater \
 	root/usr/libexec/smartsafehub-firmware \
 	root/usr/libexec/smartsafehub-maintenance \
@@ -47,6 +50,8 @@ for script in \
 	tests/test-static-validation.sh \
 	tests/test-shell-pipeline-safety.sh \
 	tests/test-package-contract.sh \
+	tests/test-events.sh \
+	tests/test-common-shell.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-tailwind-shadow-dom.sh \
 	tests/test-document-ui-contract.sh \

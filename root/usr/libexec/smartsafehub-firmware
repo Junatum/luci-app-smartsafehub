@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set -u
 
+COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
+[ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
+. "$COMMON_LIB"
+
 RUNTIME_DIR="${SMARTSAFEHUB_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_FIRMWARE_STATE_FILE:-$RUNTIME_DIR/firmware.state}"
 RESOLVE_FILE="${SMARTSAFEHUB_FIRMWARE_RESOLVE_FILE:-$RUNTIME_DIR/firmware-resolve.json}"
@@ -16,6 +20,7 @@ JSONFILTER_BIN="${SMARTSAFEHUB_FIRMWARE_JSONFILTER_BIN:-jsonfilter}"
 SHA256SUM_BIN="${SMARTSAFEHUB_FIRMWARE_SHA256SUM_BIN:-sha256sum}"
 UBUS_BIN="${SMARTSAFEHUB_FIRMWARE_UBUS_BIN:-ubus}"
 SYSUPGRADE_BIN="${SMARTSAFEHUB_FIRMWARE_SYSUPGRADE_BIN:-/sbin/sysupgrade}"
+EVENTS_BIN="${SMARTSAFEHUB_FIRMWARE_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
 DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 CHECK_TIMEOUT_S=20
 DOWNLOAD_TIMEOUT_S=180
@@ -42,6 +47,18 @@ CHECK_INTERVAL_S="$DEFAULT_CHECK_INTERVAL_S"
 
 log_message() {
 	logger -t smartsafehub-firmware -- "$*" 2>/dev/null || true
+}
+
+emit_firmware_event() {
+	local event_type="$1" severity="$2" error_code="$3" keep_settings="$4" keep_json metadata
+	[ -x "$EVENTS_BIN" ] || return 0
+	case "$keep_settings" in
+		1) keep_json='true' ;;
+		0) keep_json='false' ;;
+		*) keep_json='null' ;;
+	esac
+	metadata="{\"source\":\"$(json_escape "$SOURCE")\",\"target_build_id\":\"$(json_escape "$TARGET_BUILD_ID")\",\"keep_settings\":$keep_json,\"error_code\":\"$(json_escape "$error_code")\"}"
+	"$EVENTS_BIN" emit firmware "$event_type" "$severity" "$metadata" >/dev/null 2>&1 || true
 }
 
 sanitize_field() {
@@ -512,20 +529,24 @@ perform_install() {
 	keep_settings="${1:-1}"
 
 	if [ "$PHASE" != "ready" ] || [ ! -s "$IMAGE_FILE" ]; then
+		emit_firmware_event firmware.update.failed error FIRMWARE_NOT_READY "$keep_settings"
 		set_error 'FIRMWARE_NOT_READY' '설치할 펌웨어가 준비되지 않았습니다.'
 		return 1
 	fi
 	if [ "$keep_settings" != "0" ] && [ "$keep_settings" != "1" ]; then
+		emit_firmware_event firmware.update.failed error FIRMWARE_INSTALL_ARGUMENT_INVALID "$keep_settings"
 		set_error 'FIRMWARE_INSTALL_ARGUMENT_INVALID' '펌웨어 설치 옵션이 올바르지 않습니다.'
 		return 1
 	fi
 	if [ "$keep_settings" = "1" ] && [ "$ALLOW_BACKUP" != "1" ]; then
+		emit_firmware_event firmware.update.failed error FIRMWARE_BACKUP_UNSUPPORTED "$keep_settings"
 		set_error 'FIRMWARE_BACKUP_UNSUPPORTED' '이 펌웨어는 현재 설정을 유지한 업그레이드를 지원하지 않습니다.'
 		return 1
 	fi
 
 	actual_sha="$(file_sha256 "$IMAGE_FILE")"
 	if [ -z "$PREPARED_SHA256" ] || [ "$actual_sha" != "$PREPARED_SHA256" ]; then
+		emit_firmware_event firmware.update.failed error FIRMWARE_CHECKSUM_MISMATCH "$keep_settings"
 		set_error 'FIRMWARE_CHECKSUM_MISMATCH' '설치 직전 펌웨어 무결성 검증에 실패했습니다.'
 		return 1
 	fi
@@ -534,6 +555,7 @@ perform_install() {
 	clear_error
 	save_state
 	if ! validate_firmware_image; then
+		emit_firmware_event firmware.update.failed error FIRMWARE_IMAGE_INVALID "$keep_settings"
 		set_error 'FIRMWARE_IMAGE_INVALID' '설치 직전 펌웨어 이미지 검증에 실패했습니다.'
 		return 1
 	fi
@@ -545,6 +567,7 @@ perform_install() {
 	PHASE="flashing"
 	clear_error
 	save_state
+	emit_firmware_event firmware.update.started info '' "$keep_settings"
 	release_lock
 	trap - EXIT INT TERM
 
