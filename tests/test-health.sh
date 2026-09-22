@@ -113,9 +113,29 @@ chmod +x "$TMP/bin/df"
 cat > "$TMP/bin/dnsmasq-init" <<'EOF_DNSMASQ'
 #!/bin/sh
 [ "${1:-}" = "running" ] || exit 1
+
+if [ -n "${MOCK_DNSMASQ_RUNNING_SEQUENCE:-}" ] && [ -n "${MOCK_DNSMASQ_CALL_STATE:-}" ]; then
+	count=0
+	[ ! -f "$MOCK_DNSMASQ_CALL_STATE" ] || count="$(cat "$MOCK_DNSMASQ_CALL_STATE" 2>/dev/null || printf '0')"
+	case "$count" in ''|*[!0-9]*) count=0 ;; esac
+	count=$((count + 1))
+	printf '%s\n' "$count" > "$MOCK_DNSMASQ_CALL_STATE"
+	result="$(printf '%s' "$MOCK_DNSMASQ_RUNNING_SEQUENCE" | cut -d, -f "$count")"
+	[ -n "$result" ] || result="$(printf '%s' "$MOCK_DNSMASQ_RUNNING_SEQUENCE" | awk -F, '{ print $NF }')"
+	[ "$result" = "1" ]
+	exit $?
+fi
+
 [ "${MOCK_DNSMASQ_RUNNING:-1}" = "1" ]
 EOF_DNSMASQ
 chmod +x "$TMP/bin/dnsmasq-init"
+
+cat > "$TMP/bin/sleep" <<'EOF_SLEEP'
+#!/bin/sh
+printf '%s\n' "${1:-}" >> "${MOCK_SLEEP_LOG:?}"
+exit 0
+EOF_SLEEP
+chmod +x "$TMP/bin/sleep"
 
 cat > "$TMP/bin/date" <<'EOF_DATE'
 #!/bin/sh
@@ -175,9 +195,12 @@ UPDATER_STATE="$TMP/runtime/updates.state"
 FIRMWARE_STATE="$TMP/runtime/firmware.state"
 EVENT_LOG="$TMP/events.log"
 EVENT_STATE="$TMP/runtime/activity-observer.state"
+DNSMASQ_CALL_STATE="$TMP/runtime/dnsmasq-running.calls"
+SLEEP_LOG="$TMP/runtime/sleep.log"
 : > "$FETCH_ARGS"
 : > "$FETCH_BODIES"
 : > "$EVENT_LOG"
+: > "$SLEEP_LOG"
 printf 'MemTotal:       100000 kB\nMemAvailable:    50000 kB\n' > "$MEMINFO"
 printf '0.10 0.05 0.01 1/100 100\n' > "$LOADAVG"
 printf 'processor\t: 0\nprocessor\t: 1\n' > "$CPUINFO"
@@ -200,6 +223,10 @@ run_health() {
 	MOCK_LICENSE_CONFIGURED="${MOCK_LICENSE_CONFIGURED:-true}" \
 	MOCK_LICENSE_KEY="${MOCK_LICENSE_KEY:-secret-license-key}" \
 	MOCK_WAN_UP="${MOCK_WAN_UP:-true}" \
+	MOCK_DNSMASQ_RUNNING="${MOCK_DNSMASQ_RUNNING:-1}" \
+	MOCK_DNSMASQ_RUNNING_SEQUENCE="${MOCK_DNSMASQ_RUNNING_SEQUENCE:-}" \
+	MOCK_DNSMASQ_CALL_STATE="$DNSMASQ_CALL_STATE" \
+	MOCK_SLEEP_LOG="$SLEEP_LOG" \
 	MOCK_SAFESHIELD_ENABLED="${MOCK_SAFESHIELD_ENABLED:-true}" \
 	MOCK_SAFESHIELD_STATUS="${MOCK_SAFESHIELD_STATUS:-idle}" \
 	MOCK_SAFESHIELD_STAGE="${MOCK_SAFESHIELD_STAGE:-}" \
@@ -225,6 +252,9 @@ run_health() {
 	SMARTSAFEHUB_HEALTH_UPDATER_STATE_FILE="$UPDATER_STATE" \
 	SMARTSAFEHUB_HEALTH_FIRMWARE_STATE_FILE="$FIRMWARE_STATE" \
 	SMARTSAFEHUB_HEALTH_DNSMASQ_INIT="$TMP/bin/dnsmasq-init" \
+	SMARTSAFEHUB_HEALTH_SLEEP_BIN="$TMP/bin/sleep" \
+	SMARTSAFEHUB_HEALTH_DNSMASQ_CONFIRM_ATTEMPTS="${MOCK_DNSMASQ_CONFIRM_ATTEMPTS:-3}" \
+	SMARTSAFEHUB_HEALTH_DNSMASQ_CONFIRM_INTERVAL_S="${MOCK_DNSMASQ_CONFIRM_INTERVAL_S:-2}" \
 	SMARTSAFEHUB_HEALTH_UCI_BIN="$TMP/bin/uci" \
 	SMARTSAFEHUB_HEALTH_UBUS_BIN="$TMP/bin/ubus" \
 	SMARTSAFEHUB_HEALTH_JSONFILTER_BIN="$TMP/bin/jsonfilter" \
@@ -247,6 +277,10 @@ run_health_case() (
 	MOCK_LICENSE_CONFIGURED=true
 	MOCK_LICENSE_KEY=secret-license-key
 	MOCK_WAN_UP=true
+	MOCK_DNSMASQ_RUNNING=1
+	MOCK_DNSMASQ_RUNNING_SEQUENCE=''
+	MOCK_DNSMASQ_CONFIRM_ATTEMPTS=3
+	MOCK_DNSMASQ_CONFIRM_INTERVAL_S=2
 	MOCK_SAFESHIELD_ENABLED=true
 	MOCK_SAFESHIELD_STATUS=idle
 	MOCK_SAFESHIELD_STAGE=''
@@ -261,7 +295,8 @@ run_health_case() (
 	MOCK_EPOCH=1800000000
 	MOCK_FETCH_EXIT=0
 	export MOCK_LICENSE_PLAN MOCK_LICENSE_STATUS MOCK_LICENSE_CONFIGURED MOCK_LICENSE_KEY
-	export MOCK_WAN_UP MOCK_SAFESHIELD_ENABLED MOCK_SAFESHIELD_STATUS MOCK_SAFESHIELD_STAGE
+	export MOCK_WAN_UP MOCK_DNSMASQ_RUNNING MOCK_DNSMASQ_RUNNING_SEQUENCE MOCK_DNSMASQ_CONFIRM_ATTEMPTS MOCK_DNSMASQ_CONFIRM_INTERVAL_S
+	export MOCK_SAFESHIELD_ENABLED MOCK_SAFESHIELD_STATUS MOCK_SAFESHIELD_STAGE
 	export MOCK_SAFESHIELD_STATUS_EXIT MOCK_DNS_RUNTIME_OK MOCK_BLOCKLIST_INSTALLED MOCK_SAFESHIELD_ERROR
 	export MOCK_SAFESHIELD_LAST_SUCCESS MOCK_SAFESHIELD_LAST_FAILURE MOCK_SAFESHIELD_DOMAIN_COUNT MOCK_SAFESHIELD_ARTIFACT_VERSION
 	export MOCK_EPOCH MOCK_FETCH_EXIT
@@ -285,6 +320,34 @@ jq -e '.schema == 1 and .overall == "ok" and .summary.total >= 8' "$HEALTH_FILE"
 	fail '정상 장치의 로컬 진단은 schema v1과 ok 상태를 생성해야 합니다.'
 grep -Eq '^enabled[[:space:]]+0$' "$REPORT_STATE" || fail '원격 상태 보고는 opt-in 방식이며 기본값이 OFF여야 합니다.'
 [ ! -s "$FETCH_ARGS" ] || fail '로컬 전용 진단은 서버 요청을 보내면 안 됩니다.'
+
+# dnsmasq의 짧은 reload/restart 공백은 재확인으로 흡수하고, 연속 실패만 실제 장애로 판정한다.
+rm -f "$DNSMASQ_CALL_STATE" "$EVENT_STATE"
+: > "$SLEEP_LOG"
+: > "$EVENT_LOG"
+run_health_case MOCK_DNSMASQ_RUNNING_SEQUENCE=0,1 -- run-once
+jq -e '.overall == "ok" and any(.checks[]; .id == "service.dnsmasq" and .status == "ok")' "$HEALTH_FILE" >/dev/null || \
+	fail 'dnsmasq가 첫 확인 뒤 바로 복구되면 transient reload를 critical로 기록하면 안 됩니다.'
+[ "$(cat "$DNSMASQ_CALL_STATE")" -eq 2 ] || fail 'dnsmasq transient 복구는 두 번째 확인에서 종료해야 합니다.'
+[ "$(wc -l < "$SLEEP_LOG" | tr -d ' ')" -eq 1 ] || fail 'dnsmasq transient 복구는 재확인 전 한 번만 대기해야 합니다.'
+[ ! -s "$EVENT_LOG" ] || fail 'dnsmasq transient 복구는 Health activity event를 만들면 안 됩니다.'
+
+rm -f "$DNSMASQ_CALL_STATE"
+: > "$SLEEP_LOG"
+run_health_case MOCK_DNSMASQ_RUNNING_SEQUENCE=0,0,0 -- run-once
+jq -e '.overall == "critical" and any(.checks[]; .id == "service.dnsmasq" and .code == "DNSMASQ_UNAVAILABLE" and .status == "critical")' "$HEALTH_FILE" >/dev/null || \
+	fail 'dnsmasq가 3회 연속 확인에서 실행되지 않으면 실제 critical 장애로 판정해야 합니다.'
+[ "$(cat "$DNSMASQ_CALL_STATE")" -eq 3 ] || fail 'dnsmasq 지속 장애는 설정된 3회 확인을 모두 수행해야 합니다.'
+[ "$(wc -l < "$SLEEP_LOG" | tr -d ' ')" -eq 2 ] || fail 'dnsmasq 3회 확인 사이에는 두 번의 짧은 대기가 있어야 합니다.'
+grep -Fq "emit${TAB}health${TAB}health.issue.started${TAB}error" "$EVENT_LOG" || \
+	fail 'dnsmasq 지속 장애는 baseline 이후 health.issue.started event를 기록해야 합니다.'
+grep -Fq 'DNSMASQ_UNAVAILABLE:critical' "$EVENT_LOG" || \
+	fail 'dnsmasq 지속 장애 event metadata에는 실제 issue fingerprint가 포함되어야 합니다.'
+
+# 이후 활동 기록 observer 시나리오는 dnsmasq 확인 상태와 무관하게 독립적으로 검증한다.
+rm -f "$DNSMASQ_CALL_STATE" "$EVENT_STATE"
+: > "$SLEEP_LOG"
+: > "$EVENT_LOG"
 
 # 활동 기록 observer는 첫 관측을 baseline으로만 저장하고 실제 상태 전이에만 event를 기록한다.
 rm -f "$EVENT_STATE"

@@ -22,6 +22,7 @@ JSONFILTER_BIN="${SMARTSAFEHUB_HEALTH_JSONFILTER_BIN:-jsonfilter}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_HEALTH_UCLIENT_FETCH_BIN:-uclient-fetch}"
 DF_BIN="${SMARTSAFEHUB_HEALTH_DF_BIN:-df}"
 DATE_BIN="${SMARTSAFEHUB_HEALTH_DATE_BIN:-date}"
+SLEEP_BIN="${SMARTSAFEHUB_HEALTH_SLEEP_BIN:-sleep}"
 LOGGER_BIN="${SMARTSAFEHUB_HEALTH_LOGGER_BIN:-logger}"
 EVENTS_BIN="${SMARTSAFEHUB_HEALTH_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
 EVENT_OBSERVER_STATE_FILE="${SMARTSAFEHUB_HEALTH_EVENT_STATE_FILE:-$RUNTIME_DIR/activity-observer.state}"
@@ -35,6 +36,8 @@ REPORT_TIMEOUT_S=15
 REPORT_RETRY_S=300
 DAEMON_TICK_S=60
 DAEMON_INITIAL_DELAY_S=15
+DNSMASQ_CONFIRM_ATTEMPTS="${SMARTSAFEHUB_HEALTH_DNSMASQ_CONFIRM_ATTEMPTS:-3}"
+DNSMASQ_CONFIRM_INTERVAL_S="${SMARTSAFEHUB_HEALTH_DNSMASQ_CONFIRM_INTERVAL_S:-2}"
 
 CHECKS_FILE=""
 ISSUES_FILE=""
@@ -297,11 +300,30 @@ collect_wan() {
 }
 
 collect_dnsmasq() {
-	if [ -x "$DNSMASQ_INIT" ] && "$DNSMASQ_INIT" running >/dev/null 2>&1; then
-		add_check service.dnsmasq 'DNS 서비스' ok '' 'dnsmasq가 실행 중입니다.' null ''
-	else
-		add_check service.dnsmasq 'DNS 서비스' critical 'DNSMASQ_UNAVAILABLE' 'dnsmasq가 실행 중이 아닙니다.' null ''
+	local attempt attempts interval
+
+	if [ ! -x "$DNSMASQ_INIT" ]; then
+		add_check service.dnsmasq 'DNS 서비스' critical 'DNSMASQ_UNAVAILABLE' 'dnsmasq 실행 상태를 확인할 수 없습니다.' null ''
+		return
 	fi
+
+	attempts="$(normalized_integer "$DNSMASQ_CONFIRM_ATTEMPTS" 3 1)"
+	interval="$(normalized_integer "$DNSMASQ_CONFIRM_INTERVAL_S" 2 0)"
+	attempt=1
+	while [ "$attempt" -le "$attempts" ]; do
+		if "$DNSMASQ_INIT" running >/dev/null 2>&1; then
+			add_check service.dnsmasq 'DNS 서비스' ok '' 'dnsmasq가 실행 중입니다.' null ''
+			return
+		fi
+
+		[ "$attempt" -ge "$attempts" ] && break
+		if [ "$interval" -gt 0 ]; then
+			"$SLEEP_BIN" "$interval" >/dev/null 2>&1 || true
+		fi
+		attempt=$((attempt + 1))
+	done
+
+	add_check service.dnsmasq 'DNS 서비스' critical 'DNSMASQ_UNAVAILABLE' "dnsmasq가 ${attempts}회 연속 확인에서 실행 중이 아닙니다." null ''
 }
 
 collect_safeshield() {

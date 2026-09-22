@@ -1,5 +1,17 @@
 # 변경 기록
 
+## [0.2.19-r20] - 2026-09-22
+
+### 수정
+
+- 로컬 Health 진단이 `dnsmasq`를 한 번만 확인한 뒤 즉시 `DNSMASQ_UNAVAILABLE` critical로 판정해 SafeShield 차단 목록 적용 중의 짧은 dnsmasq reload/restart 공백을 실제 장애로 오인하던 문제를 수정했습니다.
+- dnsmasq가 첫 확인에서 보이지 않으면 2초 간격으로 최대 3회까지 짧게 재확인하고, 중간에 정상으로 돌아오면 정상 상태로 처리합니다. 세 번 모두 실행 상태를 확인하지 못한 경우에만 `DNSMASQ_UNAVAILABLE` critical과 Health activity event를 생성합니다. 정상 상태에서는 추가 대기나 재확인을 수행하지 않습니다.
+
+### 테스트 및 문서
+
+- 첫 확인 실패 후 두 번째 확인에서 복구되는 transient dnsmasq 상태는 critical/event를 만들지 않고, 3회 연속 실패는 실제 critical 및 `health.issue.started`로 기록되는 회귀 테스트를 추가했습니다.
+- README의 로컬 Health 진단 설명에 dnsmasq 연속 확인/debounce 정책을 추가했습니다.
+
 ## [0.2.19-r19] - 2026-09-21
 
 ### 기능
