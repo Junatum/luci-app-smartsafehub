@@ -467,6 +467,24 @@
   --tw-ring-color: #134e4a;
 }
 
+.ssh-app[data-theme='dark'] [class~='bg-sky-50'],
+.ssh-app[data-theme='dark'] [class~='bg-sky-50/60'] {
+  background-color: rgb(14 165 233 / 0.12);
+}
+
+.ssh-app[data-theme='dark'] [class~='text-sky-700'] {
+  color: #7dd3fc;
+}
+
+.ssh-app[data-theme='dark'] [class~='border-sky-200'] {
+  border-color: #075985;
+}
+
+.ssh-app[data-theme='dark'] [class~='ring-sky-100'],
+.ssh-app[data-theme='dark'] [class~='ring-sky-200'] {
+  --tw-ring-color: #0c4a6e;
+}
+
 .ssh-app[data-theme='dark'] [class~='bg-emerald-50'],
 .ssh-app[data-theme='dark'] [class~='bg-emerald-100'] {
   background-color: rgb(16 185 129 / 0.13);

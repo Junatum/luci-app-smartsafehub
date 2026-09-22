@@ -388,7 +388,7 @@ export function FirmwareUpdatesCard({
                 <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-sky-700">Available firmware</p>
                 <h3 class="mt-2 mb-0 text-lg font-black text-slate-950">새 펌웨어가 있습니다.</h3>
                 <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">
-                  펌웨어 {data.release.version || '미확인'} · OpenWrt {data.release.openwrtVersion || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {data.settings.channel === 'beta' ? 'Beta' : 'Stable'}
+                  펌웨어 {data.release.version || '미확인'} · OpenWrt {data.release.openwrtVersion || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {(data.release.channel || data.settings.channel) === 'beta' ? 'Beta' : 'Stable'}
                 </p>
               </div>
               <span class="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">

@@ -13,7 +13,6 @@ IMAGE_FILE="${SMARTSAFEHUB_FIRMWARE_IMAGE_FILE:-$RUNTIME_DIR/firmware.bin}"
 LOCK_DIR="${SMARTSAFEHUB_FIRMWARE_LOCK_DIR:-$RUNTIME_DIR/firmware.lock}"
 FIRMWARE_METADATA_FILE="${SMARTSAFEHUB_FIRMWARE_METADATA_FILE:-/usr/share/smartsafehub/firmware.json}"
 BOARD_NAME_FILE="${SMARTSAFEHUB_FIRMWARE_BOARD_NAME_FILE:-/tmp/sysinfo/board_name}"
-REPOSITORY_FILE="${SMARTSAFEHUB_FIRMWARE_REPOSITORY_FILE:-/etc/apk/repositories.d/smartsafehub.list}"
 UCI_BIN="${SMARTSAFEHUB_FIRMWARE_UCI_BIN:-uci}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_FIRMWARE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 JSONFILTER_BIN="${SMARTSAFEHUB_FIRMWARE_JSONFILTER_BIN:-jsonfilter}"
@@ -224,23 +223,23 @@ firmware_device_code() {
 }
 
 firmware_channel() {
-	local line
+	local value
 
-	if [ -f "$REPOSITORY_FILE" ]; then
-		while IFS= read -r line || [ -n "$line" ]; do
-			case "$line" in
-				''|'#'*) continue ;;
-				*/stable/packages/*)
-					printf '%s' 'stable'
-					return 0
-					;;
-				*/beta/packages/*)
-					printf '%s' 'beta'
-					return 0
-					;;
-			esac
-		done < "$REPOSITORY_FILE"
-	fi
+	value="$(json_value "$FIRMWARE_METADATA_FILE" '@.channel')"
+	case "$value" in
+		stable|beta)
+			printf '%s' "$value"
+			return 0
+			;;
+	esac
+
+	value="$(uci_get channel)"
+	case "$value" in
+		stable|beta)
+			printf '%s' "$value"
+			return 0
+			;;
+	esac
 
 	printf '%s' 'stable'
 }

@@ -163,7 +163,6 @@ export SMARTSAFEHUB_FIRMWARE_IMAGE_FILE="$TMP/firmware.bin"
 export SMARTSAFEHUB_FIRMWARE_LOCK_DIR="$TMP/firmware.lock"
 export SMARTSAFEHUB_FIRMWARE_METADATA_FILE="$TMP/firmware.json"
 export SMARTSAFEHUB_FIRMWARE_BOARD_NAME_FILE="$TMP/sysinfo/board_name"
-export SMARTSAFEHUB_FIRMWARE_REPOSITORY_FILE="$TMP/repo/smartsafehub.list"
 export SMARTSAFEHUB_FIRMWARE_UCI_BIN="$TMP/bin/uci"
 export SMARTSAFEHUB_FIRMWARE_UCLIENT_FETCH_BIN="$TMP/bin/uclient-fetch"
 export SMARTSAFEHUB_FIRMWARE_JSONFILTER_BIN="$TMP/bin/jsonfilter"
@@ -175,6 +174,10 @@ export SMARTSAFEHUB_FIRMWARE_SYSUPGRADE_BIN="$TMP/bin/sysupgrade"
 jq -e '.schema == 1 and .device_code == "iptime-ax3000sm" and .channel == "stable" and .current_build_id == "current-build"' "$TMP/request.json" >/dev/null || \
 	fail 'resolve request must contain schema, exact device code, channel and immutable current build id'
 assert_contains "$TMP/fetch.log" 'https://www.smartsafehub.com/api/v1/firmware/resolve'
+printf '%s
+' 'https://repo.smartsafehub.com/beta/packages/aarch64_cortex-a53/smartsafehub/packages.adb' > "$TMP/repo/smartsafehub.list"
+"$FIRMWARE" check
+jq -e '.channel == "stable"' "$TMP/request.json" >/dev/null || 	fail 'firmware resolve must keep the installed firmware channel even when the package repository channel differs'
 jq -e '.current_version == "1.1.0" and .release.version == "1.2.0"' "$TMP/resolved.json" >/dev/null || \
 	fail 'resolved firmware must preserve server-assigned current and available release versions'
 if jq -e 'has("release_version")' "$TMP/firmware.json" >/dev/null; then

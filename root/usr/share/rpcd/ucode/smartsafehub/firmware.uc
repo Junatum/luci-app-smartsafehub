@@ -15,7 +15,6 @@ const FIRMWARE_RESOLVE_FILE = '/tmp/smartsafehub/firmware-resolve.json';
 const FIRMWARE_METADATA_FILE = '/usr/share/smartsafehub/firmware.json';
 const BOARD_NAME_FILE = '/tmp/sysinfo/board_name';
 const OPENWRT_RELEASE_FILE = '/etc/openwrt_release';
-const UPDATE_REPOSITORY_FILE = '/etc/apk/repositories.d/smartsafehub.list';
 const FIRMWARE_HELPER = '/usr/libexec/smartsafehub-firmware';
 const DEFAULT_API_BASE_URL = 'https://www.smartsafehub.com/api/v1';
 
@@ -153,23 +152,17 @@ function read_state() {
 	return state;
 }
 
-function read_update_channel() {
-	const raw = fs.readfile(UPDATE_REPOSITORY_FILE);
-	if (type(raw) != 'string' || !length(raw)) {
-		return 'stable';
+function read_firmware_channel() {
+	const metadata = read_json_file(FIRMWARE_METADATA_FILE, 65536) ?? {};
+	let channel = limited_string(metadata?.channel, 16);
+	if (channel == 'stable' || channel == 'beta') {
+		return channel;
 	}
 
-	for (let line in split(raw, /\r?\n/)) {
-		const repository = trim(line);
-		if (!length(repository) || substr(repository, 0, 1) == '#') {
-			continue;
-		}
-		if (match(repository, /\/stable\/packages\//) != null) {
-			return 'stable';
-		}
-		if (match(repository, /\/beta\/packages\//) != null) {
-			return 'beta';
-		}
+	const ctx = new_uci_cursor();
+	channel = limited_string(ctx?.get('smartsafehub', 'firmware', 'channel'), 16);
+	if (channel == 'stable' || channel == 'beta') {
+		return channel;
 	}
 
 	return 'stable';
@@ -253,7 +246,7 @@ function sanitize_release(document, current) {
 		document?.schema != 1 ||
 		type(document?.update_available) != 'bool' ||
 		document?.device_code != current.deviceCode ||
-		document?.channel != read_update_channel()
+		document?.channel != read_firmware_channel()
 	) {
 		return { currentVersion: null, updateAvailable: false, release: null };
 	}
@@ -324,7 +317,7 @@ export function read_firmware_status() {
 		check_interval = 21600;
 	}
 	state.settings = {
-		channel: read_update_channel(),
+		channel: read_firmware_channel(),
 		apiBaseUrl: read_api_base_url(),
 		checkIntervalSeconds: check_interval,
 		autoInstall: false,

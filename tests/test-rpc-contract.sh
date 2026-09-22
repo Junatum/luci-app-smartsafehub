@@ -163,6 +163,16 @@ grep -Fq '"$SYSUPGRADE_BIN" --test "$IMAGE_FILE"' "$FIRMWARE_HELPER" || \
 	fail 'firmware helper must run sysupgrade --test before flashing'
 grep -Fq '/firmware/resolve' "$FIRMWARE_HELPER" || \
 	fail 'firmware helper must use the Hub firmware resolve API'
+grep -Fq "function read_firmware_channel() {" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must derive firmware channel independently from the package repository'
+if grep -Fq 'UPDATE_REPOSITORY_FILE' "$FIRMWARE_MODULE"; then
+	fail 'firmware RPC must not derive firmware channel from the SmartSafeHub package repository'
+fi
+grep -Fq '@.channel' "$FIRMWARE_HELPER" || \
+	fail 'firmware helper must derive firmware channel from installed firmware metadata first'
+if grep -Fq 'SMARTSAFEHUB_FIRMWARE_REPOSITORY_FILE' "$FIRMWARE_HELPER"; then
+	fail 'firmware helper must not derive firmware channel from the package repository file'
+fi
 if grep -Eq '(--force|-F)[[:space:]]+"?\$IMAGE_FILE' "$FIRMWARE_HELPER"; then
 	fail 'SmartSafeHub firmware updater must not expose forced sysupgrade'
 fi

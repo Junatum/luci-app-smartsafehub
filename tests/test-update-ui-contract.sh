@@ -318,6 +318,10 @@ grep -Fq 'data.release?.version' "$FIRMWARE_CARD" || \
 	fail 'firmware UI must use the Hub release version for the available firmware version'
 grep -Fq "펌웨어 {data.release.version || '미확인'} · OpenWrt" "$FIRMWARE_CARD" || \
 	fail 'available firmware details must distinguish product firmware version from the OpenWrt base version'
+grep -Fq "(data.release.channel || data.settings.channel) === 'beta' ? 'Beta' : 'Stable'" "$FIRMWARE_CARD" || 	fail 'available firmware details must prefer the release firmware channel over package update settings'
+grep -Fq "[class~='bg-sky-50']" "$APP_CSS" || 	fail 'dark mode must define a sky surface override for the firmware update panel'
+grep -Fq "[class~='text-sky-700']" "$APP_CSS" || 	fail 'dark mode must define a sky text override for the firmware update panel'
+grep -Fq "[class~='ring-sky-200']" "$APP_CSS" || 	fail 'dark mode must define a sky ring override for the firmware update panel'
 if grep -Fq 'metadata?.release_version' "$FIRMWARE_RPC"; then
 	fail 'firmware release version must not be read from immutable firmware.json build metadata'
 fi
