@@ -141,7 +141,7 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 - SafeShield 사용 여부와 실행 상태 표시
 - 차단 목록 수동 갱신
 - 수동 갱신 요청의 성공 안내 배너는 유지하지 않고 실제 진행 상태를 보호 카드의 단계 UI로 표시하며, 실패한 경우에만 오류 피드백을 유지
-- 갱신 단계의 원형 progress ring은 track 3px / active arc 4px의 얇은 stroke와 절제된 shadow를 사용해 라이트/다크 모드 모두에서 단계 숫자를 가리지 않고 과도하게 두꺼워 보이지 않도록 유지
+- 갱신 단계의 원형 progress ring은 track 3px / active arc 4px의 얇은 stroke와 절제된 shadow를 유지하면서, 전체 지름도 소폭 줄여 카드 본문 대비 존재감이 과해 보이지 않도록 조정했습니다. 라이트/다크 모드 모두에서 단계 숫자는 계속 선명하게 읽을 수 있습니다.
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
 - 라이선스, 플랜, 아티팩트와 차단 목록 상태 표시
 - 유료 플랜은 PRO(teal), ULTIMATE(bronze), PLUS 등 기타 유료 플랜(blue)의 정적인 premium chip으로 구분합니다. 외부 glow와 shine 애니메이션은 사용하지 않고 얕은 그림자와 1px 테두리만 유지하며, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시

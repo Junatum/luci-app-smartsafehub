@@ -118,12 +118,22 @@ grep -Fq 'const loaderArcLength = loaderCircumference * 0.22;' "$PAGE" || \
 	fail 'SafeShield round loader must keep a compact moving arc so rotation is visually obvious'
 grep -Fq 'const loaderTrackWidth = 3;' "$PAGE" || \
 	fail 'SafeShield refresh track must stay slim instead of inheriting a heavy ring treatment'
+grep -Fq 'const loaderRadius = 17;' "$PAGE" || \
+	fail 'SafeShield refresh donut radius must stay slightly compact so the ring does not dominate the card'
 grep -Fq 'const loaderArcWidth = 4;' "$PAGE" || \
 	fail 'SafeShield refresh active arc must stay compact and only slightly heavier than the track'
 grep -Fq 'strokeWidth={loaderTrackWidth}' "$PAGE" || \
 	fail 'SafeShield refresh track must use the dedicated slim stroke width'
 grep -Fq 'strokeWidth={loaderArcWidth}' "$PAGE" || \
 	fail 'SafeShield refresh arc must use the dedicated slim stroke width'
+grep -Fq 'width: 3.35rem;' "$SOURCE_CSS" || \
+	fail 'SafeShield refresh donut container must remain slightly smaller than the original oversized treatment'
+
+grep -Fq 'min-width: 3.35rem;' "$SOURCE_CSS" || \
+	fail 'SafeShield refresh donut min-width must match the compact container size'
+
+grep -Fq 'height: 3.35rem;' "$SOURCE_CSS" || \
+	fail 'SafeShield refresh donut height must match the compact container size'
 grep -Fq 'filter: drop-shadow(0 0 0.06rem rgb(15 23 42 / 0.28));' "$SOURCE_CSS" || \
 	fail 'SafeShield light refresh arc glow must remain subtle so the ring does not look thicker than its stroke'
 grep -Fq 'filter: drop-shadow(0 0 0.08rem rgb(255 255 255 / 0.55));' "$SOURCE_CSS" || \

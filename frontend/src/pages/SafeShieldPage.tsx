@@ -245,7 +245,7 @@ function RefreshDonut({
   step: number;
   total: number;
 }) {
-  const loaderRadius = 18;
+  const loaderRadius = 17;
   const loaderTrackWidth = 3;
   const loaderArcWidth = 4;
   const loaderCircumference = 2 * Math.PI * loaderRadius;
