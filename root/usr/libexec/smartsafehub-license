@@ -65,6 +65,16 @@ uci_get() {
 	"$UCI_BIN" -q get "smartsafehub.license.$1" 2>/dev/null || true
 }
 
+activity_cloud_sync_enabled() {
+	local value
+	value="$("$UCI_BIN" -q get smartsafehub.activity.cloud_sync_enabled 2>/dev/null || true)"
+	case "$value" in
+		0|false|off|no) return 1 ;;
+		1|true|on|yes|'') return 0 ;;
+		*) return 0 ;;
+	esac
+}
+
 normalized_integer() {
 	local value="$1" fallback="$2" minimum="$3"
 	case "$value" in
@@ -491,7 +501,11 @@ EOF_REQUEST
 
 	if [ "$action" = 'none' ] && { [ "$licensed" = 'true' ] || [ "$licensed" = '1' ]; }; then
 		activity_credential_rc=0
-		store_activity_credential_from_status "$STATUS_RESPONSE_FILE" || activity_credential_rc=$?
+		if activity_cloud_sync_enabled; then
+			store_activity_credential_from_status "$STATUS_RESPONSE_FILE" || activity_credential_rc=$?
+		else
+			rm -f "$ACTIVITY_CREDENTIAL_FILE"
+		fi
 		if [ "$activity_credential_rc" -ne 0 ]; then
 			# License status remains authoritative even when an optional Cloud
 			# feature credential is unavailable. Keep any still-valid cached

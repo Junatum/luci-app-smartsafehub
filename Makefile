@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.19
-PKG_RELEASE:=18
+PKG_RELEASE:=19
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -27,6 +27,16 @@ endef
 define Package/luci-app-smartsafehub/preinst
 #!/bin/sh
 if [ -z "$${IPKG_INSTROOT}" ]; then
+	# r18 and earlier had Cloud activity sync enabled implicitly whenever the
+	# device was eligible. Preserve that behavior across the r19 upgrade even
+	# if opkg replaces an otherwise-unmodified conffile with the new default-off
+	# package config. Fresh installs have no existing activity-sync helper and
+	# therefore keep the new explicit opt-in default.
+	if [ -x /usr/libexec/smartsafehub-activity-sync ] && ! uci -q get smartsafehub.activity.cloud_sync_enabled >/dev/null 2>&1; then
+		mkdir -p /tmp/smartsafehub
+		: > /tmp/smartsafehub/activity-cloud-sync-upgrade-enable
+	fi
+
 	# r12 initially ran SafeShield refresh observation in a separate daemon.
 	# Stop it before files are replaced so the unified event daemon is the only
 	# observer after this package is unpacked.
@@ -43,6 +53,10 @@ define Package/luci-app-smartsafehub/postinst
 if [ -z "$${IPKG_INSTROOT}" ]; then
 	mkdir -p /tmp/smartsafehub
 	uci -q delete smartsafehub.firmware.check_enabled >/dev/null 2>&1 || true
+	if [ -f /tmp/smartsafehub/activity-cloud-sync-upgrade-enable ]; then
+		uci -q set smartsafehub.activity.cloud_sync_enabled='1' >/dev/null 2>&1 || true
+		rm -f /tmp/smartsafehub/activity-cloud-sync-upgrade-enable
+	fi
 	uci -q commit smartsafehub >/dev/null 2>&1 || true
 	# r12 initially shipped the SafeShield refresh observer as a separate procd
 	# service. Stop/disable it when upgrading to the unified event daemon while

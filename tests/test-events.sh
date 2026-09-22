@@ -76,6 +76,7 @@ run_events() {
 	SMARTSAFEHUB_EVENTS_JSONFILTER_BIN="$TMP/bin/jsonfilter" \
 	SMARTSAFEHUB_EVENTS_DATE_BIN="$TMP/bin/date" \
 	SMARTSAFEHUB_EVENTS_LOGGER_BIN="$TMP/bin/logger" \
+	SMARTSAFEHUB_ACTIVITY_CLOUD_SYNC_ENABLED="${MOCK_CLOUD_SYNC_ENABLED:-1}" \
 	SMARTSAFEHUB_EVENTS_MAX_EVENTS=8 \
 	SMARTSAFEHUB_EVENTS_SAFESHIELD_UBUS_BIN="$TMP/bin/ubus" \
 	SMARTSAFEHUB_EVENTS_SAFESHIELD_JSONFILTER_BIN="$TMP/bin/jsonfilter" \
@@ -94,15 +95,40 @@ run_events history > "$TMP/history.json"
 jq -e --arg id "$first_id" '.schema == 1 and (.events | length) == 1 and .events[0].event_id == $id' "$TMP/history.json" >/dev/null || \
 	fail 'local activity history는 outbox와 별도로 동일한 정규화 이벤트를 보존해야 합니다.'
 
-# r8 -> r9 migration: before the dedicated history exists, reads fall back to the
-# old outbox; the first new r9 event must seed history with those r8 records.
-rm -f "$TMP/runtime/activity-history.jsonl"
-run_events history > "$TMP/history-r8-fallback.json"
-jq -e --arg id "$first_id" '(.events | length) == 1 and .events[0].event_id == $id' "$TMP/history-r8-fallback.json" >/dev/null || \
+# Cloud opt-out keeps local history but must not create an upload outbox or wake marker.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq" "$TMP/runtime/activity-sync.wake"
+local_only_id="$(MOCK_CLOUD_SYNC_ENABLED=0 MOCK_EVENT_EPOCH=1800000003 run_events emit activity settings.activity_cloud_sync.disabled info '{"origin":"direct"}' 1800000003)"
+run_events history > "$TMP/history-cloud-off.json"
+MOCK_CLOUD_SYNC_ENABLED=0 run_events list > "$TMP/list-cloud-off.json"
+jq -e --arg id "$local_only_id" '(.events | length) == 1 and .events[0].event_id == $id' "$TMP/history-cloud-off.json" >/dev/null || \
+	fail 'Cloud 전송 OFF에서도 local recent activity는 계속 기록되어야 합니다.'
+jq -e '(.events | length) == 0' "$TMP/list-cloud-off.json" >/dev/null || \
+	fail 'Cloud 전송 OFF에서는 새 이벤트를 upload outbox에 추가하면 안 됩니다.'
+[ ! -e "$TMP/runtime/activity-sync.wake" ] || fail 'Cloud 전송 OFF에서는 activity sync wake marker를 만들면 안 됩니다.'
+
+# r8 -> r9 migration must be tested with an actual legacy r8 outbox fixture.
+# Do not create the fixture through the current emit path: r19 intentionally
+# changes Cloud outbox creation based on cloud_sync_enabled, while an r8 device
+# already has events.jsonl on disk before that setting exists.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" "$TMP/runtime/events.seq"
+legacy_id='11111111-2222-3333-4444-555555555555-1800000001-1'
+printf '%s\n' \
+	'{"schema":1,"event_id":"11111111-2222-3333-4444-555555555555-1800000001-1","event_type":"safeshield.blocklist.updated","severity":"success","occurred_at":1800000001,"device_uuid":null,"source":"safeshield","metadata":{"domain_count":33818}}' \
+	> "$TMP/runtime/events.jsonl"
+
+# Before the dedicated history exists, history reads must expose the already
+# collected r8 outbox regardless of the current Cloud toggle.
+MOCK_CLOUD_SYNC_ENABLED=0 run_events history > "$TMP/history-r8-fallback.json"
+jq -e --arg id "$legacy_id" '(.events | length) == 1 and .events[0].event_id == $id' "$TMP/history-r8-fallback.json" >/dev/null || \
 	fail '전용 history가 없으면 r8 outbox를 최근 활동 fallback으로 읽어야 합니다.'
-second_id="$(MOCK_EVENT_EPOCH=1800000002 run_events emit network network.internet.recovered success '{"downtime_seconds":48}' 1800000002)"
-run_events history > "$TMP/history-r9-seeded.json"
-jq -e --arg first "$first_id" --arg second "$second_id" '(.events | length) == 2 and .events[0].event_id == $first and .events[1].event_id == $second' "$TMP/history-r9-seeded.json" >/dev/null || \
+
+# The first new event after upgrade must seed dedicated local history from the
+# legacy outbox even when Cloud transfer is currently OFF. The new event stays
+# local-only, while the pre-existing r8 outbox remains untouched until the
+# Cloud toggle policy explicitly clears it.
+second_id="$(MOCK_CLOUD_SYNC_ENABLED=0 MOCK_EVENT_EPOCH=1800000002 run_events emit network network.internet.recovered success '{"downtime_seconds":48}' 1800000002)"
+MOCK_CLOUD_SYNC_ENABLED=0 run_events history > "$TMP/history-r9-seeded.json"
+jq -e --arg first "$legacy_id" --arg second "$second_id" '(.events | length) == 2 and .events[0].event_id == $first and .events[1].event_id == $second' "$TMP/history-r9-seeded.json" >/dev/null || \
 	fail '첫 r9 이벤트는 기존 r8 outbox를 local history에 승계한 뒤 새 이벤트를 추가해야 합니다.'
 
 if run_events emit safeshield bad.event notice '{}' >/dev/null 2>&1; then
@@ -115,17 +141,25 @@ if run_events emit safeshield bad.event info '{broken' >/dev/null 2>&1; then
 	fail '잘못된 JSON metadata를 큐에 기록하면 안 됩니다.'
 fi
 
-# Queue growth is bounded; oldest lines are dropped first.
+# Queue growth is bounded; oldest lines are dropped first. Keep this fixture
+# independent from the preceding legacy migration / Cloud opt-out scenarios.
+# In particular, do not inherit a legacy outbox, dedicated history, sequence,
+# wake marker or a shell-specific temporary Cloud toggle value.
+rm -f "$TMP/runtime/events.jsonl" "$TMP/runtime/activity-history.jsonl" \
+	"$TMP/runtime/events.seq" "$TMP/runtime/activity-sync.wake"
+
 i=0
 while [ "$i" -lt 10 ]; do
 	i=$((i + 1))
-	run_events emit system "test.event.$i" info "{\"index\":$i}" "$((1800000100 + i))" >/dev/null
+	MOCK_CLOUD_SYNC_ENABLED=1 run_events emit system "test.event.$i" info "{\"index\":$i}" "$((1800000100 + i))" >/dev/null
 done
-run_events list > "$TMP/list.json"
-[ "$(jq '.events | length' "$TMP/list.json")" -eq 8 ] || fail 'event queue는 설정된 최대 개수를 초과하면 안 됩니다.'
+MOCK_CLOUD_SYNC_ENABLED=1 run_events list > "$TMP/list.json"
+queue_count="$(jq '.events | length' "$TMP/list.json")"
+[ "$queue_count" -eq 8 ] || fail "event queue는 설정된 최대 개수를 초과하면 안 됩니다. (actual=$queue_count expected=8)"
 [ "$(jq -r '.events[0].metadata.index' "$TMP/list.json")" = '3' ] || fail 'queue 초과 시 가장 오래된 event부터 제거해야 합니다.'
-run_events history > "$TMP/history.json"
-[ "$(jq '.events | length' "$TMP/history.json")" -eq 8 ] || fail 'local activity history도 설정된 최대 개수를 초과하면 안 됩니다.'
+MOCK_CLOUD_SYNC_ENABLED=1 run_events history > "$TMP/history.json"
+history_count="$(jq '.events | length' "$TMP/history.json")"
+[ "$history_count" -eq 8 ] || fail "local activity history도 설정된 최대 개수를 초과하면 안 됩니다. (actual=$history_count expected=8)"
 [ "$(jq -r '.events[0].metadata.index' "$TMP/history.json")" = '3' ] || fail 'history 초과 시 가장 오래된 event부터 제거해야 합니다.'
 
 ack_id="$(jq -r '.events[3].event_id' "$TMP/list.json")"

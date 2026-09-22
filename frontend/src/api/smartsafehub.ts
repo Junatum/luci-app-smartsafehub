@@ -55,6 +55,7 @@ function emptyActivityHistory(): ActivityHistory {
     volatile: true,
     maxEvents: 128,
     cloud: {
+      enabled: false,
       phase: 'preparing',
       eligible: null,
       plan: null,
@@ -72,8 +73,21 @@ function emptyActivityHistory(): ActivityHistory {
 
 export async function fetchActivityHistory(): Promise<ActivityHistory> {
   const status = await callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status');
+  const activity = status.activityHistory ?? emptyActivityHistory();
 
-  return status.activityHistory ?? emptyActivityHistory();
+  return {
+    ...activity,
+    cloud: {
+      ...activity.cloud,
+      // Pre-r19 RPC responses have no explicit toggle and always used Cloud
+      // sync when eligible. Preserve that behavior during rolling upgrades.
+      enabled: activity.cloud.enabled ?? true,
+    },
+  };
+}
+
+export function updateActivityCloudSync(enabled: boolean): Promise<ActivityHistory> {
+  return callApi(API_OBJECT, 'activity_cloud_sync_update', { enabled });
 }
 
 export function fetchStatus(): Promise<SmartSafeHubStatus> {

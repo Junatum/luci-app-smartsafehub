@@ -98,6 +98,7 @@ case "${2:-}" in
 	smartsafehub.license.check_interval_s) printf '%s\n' "${MOCK_CHECK_INTERVAL:-300}" ;;
 	smartsafehub.license.startup_delay_s) printf '%s\n' "${MOCK_STARTUP_DELAY:-0}" ;;
 	smartsafehub.license.api_base_url) printf '%s\n' 'https://www.smartsafehub.com/api/v1' ;;
+	smartsafehub.activity.cloud_sync_enabled) printf '%s\n' "${MOCK_ACTIVITY_CLOUD_SYNC_ENABLED:-1}" ;;
 	*) exit 1 ;;
 esac
 EOF_UCI
@@ -231,6 +232,7 @@ reset_mocks() {
 	MOCK_STATUS_LICENSE_STATUS='active'
 	MOCK_STATUS_ACTIVATION='active'
 	MOCK_EPOCH=1800000000
+	MOCK_ACTIVITY_CLOUD_SYNC_ENABLED=1
 }
 
 run_license() {
@@ -251,6 +253,7 @@ run_license() {
 	MOCK_STATUS_LICENSE_STATUS="${MOCK_STATUS_LICENSE_STATUS:-active}" \
 	MOCK_STATUS_ACTIVATION="${MOCK_STATUS_ACTIVATION:-active}" \
 	MOCK_EPOCH="${MOCK_EPOCH:-1800000000}" \
+	MOCK_ACTIVITY_CLOUD_SYNC_ENABLED="${MOCK_ACTIVITY_CLOUD_SYNC_ENABLED:-1}" \
 	SMARTSAFEHUB_LICENSE_RUNTIME_DIR="$TMP/runtime" \
 	SMARTSAFEHUB_LICENSE_STATE_FILE="$STATE_FILE" \
 	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$ACTIVITY_CREDENTIAL_FILE" \
@@ -310,6 +313,16 @@ grep -Fq '"license_key":"LIC-LOCAL-001"' "$FETCH_BODY_LOG" || fail 'status paylo
 [ "$(jq -r '.token' "$ACTIVITY_CREDENTIAL_FILE")" = 'activity-test-token' ] || fail 'activity credential cache에 Hub가 발급한 token이 저장되어야 합니다.'
 [ "$(jq -r '.plan' "$ACTIVITY_CREDENTIAL_FILE")" = 'ultimate' ] || fail 'activity credential cache에 현재 plan을 저장해야 합니다.'
 [ "$(jq -r '.retention_days' "$ACTIVITY_CREDENTIAL_FILE")" = '90' ] || fail 'activity credential cache에 retention 정책을 저장해야 합니다.'
+
+# Opting out of Cloud activity history does not disable license reconciliation,
+# but the optional activity upload token must not be retained locally.
+reset_mocks
+rm -f "$ACTIVITY_CREDENTIAL_FILE"
+: > "$FETCH_URL_LOG"
+MOCK_ACTIVITY_CLOUD_SYNC_ENABLED=0 MOCK_EPOCH=1800000400 run_license status-sync || fail 'Cloud 활동 OFF에서도 license status-sync 자체는 정상 동작해야 합니다.'
+grep -Fq '/api/v1/licenses/status' "$FETCH_URL_LOG" || fail 'Cloud 활동 OFF에서도 라이선스 reconciliation은 유지되어야 합니다.'
+[ ! -e "$ACTIVITY_CREDENTIAL_FILE" ] || fail 'Cloud 활동 OFF에서는 activity upload credential을 runtime cache에 저장하면 안 됩니다.'
+[ "$(jq -r '.phase' "$STATE_FILE")" = 'active' ] || fail 'Cloud 활동 OFF가 유효한 라이선스 상태를 바꾸면 안 됩니다.'
 
 # Explicit server revocation is authoritative and clears the local key through
 # SafeShield, never by writing SafeShield UCI directly.

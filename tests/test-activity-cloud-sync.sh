@@ -8,6 +8,8 @@ EVENTS_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-events"
 LICENSE_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-license"
 SAFE_ADAPTER="$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/safeshield-management.uc"
 HEALTH_BIN="$ROOT_DIR/root/usr/libexec/smartsafehub-health"
+CONFIG="$ROOT_DIR/root/etc/config/smartsafehub"
+INIT_SYNC="$ROOT_DIR/root/etc/init.d/smartsafehub-activity-sync"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
@@ -16,7 +18,7 @@ fail() {
   exit 1
 }
 
-for file in "$SYNC_BIN" "$EVENTS_BIN" "$LICENSE_BIN" "$SAFE_ADAPTER"; do
+for file in "$SYNC_BIN" "$EVENTS_BIN" "$LICENSE_BIN" "$SAFE_ADAPTER" "$CONFIG" "$INIT_SYNC"; do
   [ -f "$file" ] || fail "missing activity producer/sync component: $file"
 done
 
@@ -41,6 +43,14 @@ grep -Fq 'mv "$WAKE_FILE" "$consumed"' "$SYNC_BIN" || fail 'wake marker consumpt
 grep -Fq 'RETRY_INITIAL_S=900' "$SYNC_BIN" || fail 'Cloud activity status failures must start with a 15-minute retry backoff'
 grep -Fq 'RETRY_MAX_S=3600' "$SYNC_BIN" || fail 'Cloud activity retry backoff must be capped at one hour'
 grep -Fq 'retry_backoff_active' "$SYNC_BIN" || fail 'new event wake markers must respect an active Cloud failure backoff'
+grep -Fq 'cloud_sync_enabled' "$SYNC_BIN" || fail 'activity sync must honor the user Cloud transfer preference before any network work'
+grep -Fq 'apply-config' "$SYNC_BIN" || fail 'activity sync must expose a runtime apply command for immediate toggle cleanup'
+grep -Fq 'activity_cloud_sync_enabled' "$LICENSE_BIN" || fail 'license status must not retain an activity credential while Cloud transfer is disabled'
+grep -Fq "option cloud_sync_enabled '0'" "$CONFIG" || fail 'fresh installs must default Cloud activity transfer to OFF'
+grep -Fq 'activity-cloud-sync-upgrade-enable' "$ROOT_DIR/Makefile" || fail 'package upgrade must preserve pre-r19 implicit Cloud sync'
+grep -Fq "smartsafehub.activity.cloud_sync_enabled='1'" "$ROOT_DIR/Makefile" || fail 'postinst must restore Cloud sync for pre-r19 upgrades'
+grep -Fq "set smartsafehub.activity.cloud_sync_enabled='0'" "$INIT_SYNC" || fail 'dynamically created activity sections must default Cloud activity transfer to OFF'
+grep -Fq "1|true|on|yes|'') return 0" "$SYNC_BIN" || fail 'missing pre-r19 Cloud preference must preserve legacy enabled behavior on upgrade'
 if grep -Fq '$base/licenses/status' "$SYNC_BIN" || grep -Fq '$base/licenses/resolve' "$SYNC_BIN" || grep -Fq 'post_json()' "$SYNC_BIN"; then
   fail 'activity sync must not duplicate license API calls; smartsafehub-license owns license status and activity credential acquisition'
 fi
@@ -113,6 +123,7 @@ chmod +x "$MOCK_BIN/events"
 cat > "$MOCK_BIN/uci" <<'EOF_UCI'
 #!/bin/sh
 case "$*" in
+  *smartsafehub.activity.cloud_sync_enabled*) printf '%s\n' "${MOCK_CLOUD_SYNC_ENABLED:-1}" ;;
   *smartsafehub.activity.sync_interval_s*) printf '300\n' ;;
   *smartsafehub.activity.startup_delay_s*) printf '0\n' ;;
   *smartsafehub.activity.api_base_url*) printf 'https://www.smartsafehub.com/api/v1\n' ;;
@@ -249,6 +260,7 @@ EOF_OUTBOX
 }
 
 run_sync() {
+  cloud_sync_enabled="${2:-1}"
   env \
     SMARTSAFEHUB_COMMON_LIB="$ROOT_DIR/root/usr/lib/smartsafehub/common.sh" \
     SMARTSAFEHUB_ACTIVITY_RUNTIME_DIR="$RUNTIME" \
@@ -263,9 +275,26 @@ run_sync() {
     MOCK_OUTBOX="$OUTBOX" MOCK_ACK_LOG="$ACK_LOG" MOCK_CLEAR_LOG="$CLEAR_LOG" \
     MOCK_FETCH_LOG="$FETCH_LOG" MOCK_LICENSE_CALL_LOG="$LICENSE_CALL_LOG" \
     MOCK_LICENSE_STATUS_FILE="$LICENSE_STATUS_FILE" MOCK_ACTIVITY_CREDENTIAL_FILE="$RUNTIME/activity-sync-credential.json" \
-    MOCK_STATUS_MODE="$1" \
+    MOCK_STATUS_MODE="$1" MOCK_CLOUD_SYNC_ENABLED="$cloud_sync_enabled" \
     "$SYNC_BIN" sync-once
 }
+
+# Explicit opt-out must be fully local: no license status refresh, no upload, no
+# retained Cloud credential, and the bounded Cloud-only outbox is discarded.
+rm -f "$RUNTIME/activity-sync-credential.json" "$RUNTIME/activity-sync.json"
+: > "$ACK_LOG"
+: > "$CLEAR_LOG"
+: > "$FETCH_LOG"
+: > "$LICENSE_CALL_LOG"
+write_outbox
+run_sync unavailable 0 || fail 'disabled Cloud activity sync must settle successfully without network access'
+[ ! -s "$OUTBOX" ] || fail 'disabling Cloud activity sync must clear the Cloud-only outbox'
+grep -Fq 'clear' "$CLEAR_LOG" || fail 'disabled Cloud activity sync must explicitly clear only the Cloud outbox'
+[ ! -e "$RUNTIME/activity-sync-credential.json" ] || fail 'disabled Cloud activity sync must remove the runtime upload credential'
+[ ! -s "$LICENSE_CALL_LOG" ] || fail 'disabled Cloud activity sync must not call license status-sync'
+[ ! -s "$FETCH_LOG" ] || fail 'disabled Cloud activity sync must not perform Cloud HTTP requests'
+jq -e '.phase == "disabled" and .pendingEvents == 0 and .lastErrorCode == null' "$RUNTIME/activity-sync.json" >/dev/null || \
+  fail 'disabled Cloud activity state must be explicit and non-error'
 
 write_outbox
 run_sync paid || fail 'paid activity batch must synchronize successfully'

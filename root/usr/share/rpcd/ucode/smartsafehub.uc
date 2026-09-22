@@ -50,6 +50,9 @@ import {
 	read_license_status
 } from './smartsafehub/license.uc';
 import {
+	update_activity_cloud_sync
+} from './smartsafehub/activity.uc';
+import {
 	mutate_safeshield_rule,
 	refresh_safeshield_blocklist,
 	update_safeshield_enabled,
@@ -305,6 +308,14 @@ const methods = {
 		args: { license_key: '' },
 		call: require_root_password(function(request) {
 			return update_safeshield_license(request);
+		}),
+	},
+	activity_cloud_sync_update: {
+		args: {
+			enabled: false,
+		},
+		call: require_root_password(function(request) {
+			return update_activity_cloud_sync(request);
 		}),
 	},
 	health_reporter_update: {

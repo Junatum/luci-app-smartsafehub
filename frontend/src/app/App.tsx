@@ -83,10 +83,15 @@ export function App() {
     case 'activity':
       content = (
         <ActivityPage
+          actionError={activity.actionError}
+          actionMessage={activity.actionMessage}
           data={activity.data}
           error={activity.error}
           loading={activity.loading}
+          onDismissActionFeedback={activity.dismissActionFeedback}
           onRetry={() => void activity.refresh()}
+          onSetCloudSync={(enabled) => void activity.setCloudSyncEnabled(enabled)}
+          savingCloudSync={activity.savingCloudSync}
         />
       );
       break;

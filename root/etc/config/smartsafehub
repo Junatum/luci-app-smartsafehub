@@ -21,6 +21,7 @@ config license 'license'
 
 
 config activity 'activity'
+	option cloud_sync_enabled '0'
 	option sync_interval_s '300'
 	option startup_delay_s '45'
 	option api_base_url 'https://www.smartsafehub.com/api/v1'

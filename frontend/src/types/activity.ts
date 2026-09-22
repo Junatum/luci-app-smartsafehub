@@ -12,6 +12,7 @@ export interface ActivityEvent {
 }
 
 export interface ActivityCloudSync {
+  enabled: boolean;
   phase: string;
   eligible: boolean | null;
   plan: string | null;

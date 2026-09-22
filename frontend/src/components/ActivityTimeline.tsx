@@ -196,6 +196,18 @@ export function activityPresentation(event: ActivityEvent): ActivityPresentation
         description: 'SmartSafeHub Cloud로의 장치 상태 보고를 중지했습니다.',
       };
 
+    case 'settings.activity_cloud_sync.enabled':
+      return {
+        title: 'Cloud 활동 기록 전송 활성화',
+        description: '이후 발생하는 활동을 SmartSafeHub Cloud에 전송하도록 설정했습니다.',
+      };
+
+    case 'settings.activity_cloud_sync.disabled':
+      return {
+        title: 'Cloud 활동 기록 전송 비활성화',
+        description: 'Cloud 전송을 중지했습니다. 로컬 최근 활동은 계속 기록됩니다.',
+      };
+
     case 'settings.timezone.updated': {
       const zonename = metadataString(event, 'zonename');
       return {

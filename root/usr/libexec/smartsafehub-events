@@ -15,6 +15,7 @@ SEQ_FILE="${SMARTSAFEHUB_EVENTS_SEQ_FILE:-$RUNTIME_DIR/events.seq}"
 BOOT_MARKER_FILE="${SMARTSAFEHUB_EVENTS_BOOT_MARKER_FILE:-$RUNTIME_DIR/events.boot-id}"
 BOOT_ID_FILE="${SMARTSAFEHUB_EVENTS_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}"
 JSONFILTER_BIN="${SMARTSAFEHUB_EVENTS_JSONFILTER_BIN:-jsonfilter}"
+UCI_BIN="${SMARTSAFEHUB_EVENTS_UCI_BIN:-uci}"
 DATE_BIN="${SMARTSAFEHUB_EVENTS_DATE_BIN:-date}"
 LOGGER_BIN="${SMARTSAFEHUB_EVENTS_LOGGER_BIN:-logger}"
 LOCK_SLEEP_BIN="${SMARTSAFEHUB_EVENTS_LOCK_SLEEP_BIN:-sleep}"
@@ -43,6 +44,20 @@ WAIT_PID=''
 
 log_message() {
 	"$LOGGER_BIN" -t smartsafehub-events -- "$*" 2>/dev/null || true
+}
+
+cloud_sync_enabled() {
+	local value
+	if [ -n "${SMARTSAFEHUB_ACTIVITY_CLOUD_SYNC_ENABLED:-}" ]; then
+		value="$SMARTSAFEHUB_ACTIVITY_CLOUD_SYNC_ENABLED"
+	else
+		value="$("$UCI_BIN" -q get smartsafehub.activity.cloud_sync_enabled 2>/dev/null || true)"
+	fi
+	case "$value" in
+		0|false|off|no) return 1 ;;
+		1|true|on|yes|'') return 0 ;;
+		*) return 0 ;;
+	esac
 }
 
 sanitize_token() {
@@ -284,8 +299,14 @@ emit_event() {
 
 	seed_history_from_outbox "$keep_count" || return 1
 	append_bounded_event "$HISTORY_FILE" "$event_json" "$keep_count" || return 1
-	append_bounded_event "$EVENTS_FILE" "$event_json" "$keep_count" || return 1
-	: > "$ACTIVITY_SYNC_WAKE_FILE" 2>/dev/null || true
+	if cloud_sync_enabled; then
+		append_bounded_event "$EVENTS_FILE" "$event_json" "$keep_count" || return 1
+		: > "$ACTIVITY_SYNC_WAKE_FILE" 2>/dev/null || true
+	else
+		: > "${EVENTS_FILE}.tmp.$$" || return 1
+		mv "${EVENTS_FILE}.tmp.$$" "$EVENTS_FILE" || return 1
+		rm -f "$ACTIVITY_SYNC_WAKE_FILE" 2>/dev/null || true
+	fi
 
 	release_lock
 	trap - EXIT INT TERM

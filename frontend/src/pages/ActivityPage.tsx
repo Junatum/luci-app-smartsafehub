@@ -7,6 +7,20 @@ function cloudStatus(cloud: ActivityCloudSync): {
   description: string;
   tone: string;
 } {
+  if (!cloud.enabled) {
+    if (cloud.eligible === false) {
+      return {
+        label: 'Pro / Ultimate 전용',
+        description: '로컬 최근 활동은 계속 사용할 수 있으며, 유료 멤버십에서 Cloud 저장을 선택적으로 켤 수 있습니다.',
+        tone: 'bg-slate-100 text-slate-600 ring-slate-200',
+      };
+    }
+    return {
+      label: 'Cloud 전송 꺼짐',
+      description: '활동 기록은 이 공유기에만 저장됩니다. Cloud에는 새로운 활동을 전송하지 않습니다.',
+      tone: 'bg-slate-100 text-slate-700 ring-slate-200',
+    };
+  }
   if (cloud.eligible === false || cloud.phase === 'ineligible') {
     return {
       label: 'Pro / Ultimate 전용',
@@ -42,24 +56,82 @@ function cloudStatus(cloud: ActivityCloudSync): {
   };
 }
 
-function CloudActivitySyncCard({ cloud }: { cloud: ActivityCloudSync }) {
+function CloudActivitySyncCard({
+  actionError,
+  actionMessage,
+  cloud,
+  onDismissFeedback,
+  onSetEnabled,
+  saving,
+}: {
+  actionError: string | null;
+  actionMessage: string | null;
+  cloud: ActivityCloudSync;
+  onDismissFeedback: () => void;
+  onSetEnabled: (enabled: boolean) => void;
+  saving: boolean;
+}) {
   const status = cloudStatus(cloud);
   const plan = cloud.plan?.toUpperCase() ?? null;
+  const canEnable = cloud.eligible === true;
+  const canToggle = cloud.enabled || canEnable;
 
   return (
     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
       <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div class="min-w-0">
           <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
             Cloud history
           </p>
-          <h2 class="mt-2 mb-0 text-base font-black text-slate-950">Cloud 활동 기록 동기화</h2>
+          <h2 class="mt-2 mb-0 text-base font-black text-slate-950">Cloud 활동 기록</h2>
           <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">{status.description}</p>
         </div>
-        <span class={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${status.tone}`}>
-          {status.label}
-        </span>
+        <div class="flex shrink-0 items-center gap-3">
+          <span class={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${status.tone}`}>
+            {saving ? '설정 중' : status.label}
+          </span>
+          <button
+            aria-checked={cloud.enabled}
+            aria-label="Cloud 활동 기록 전송 사용"
+            class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+              cloud.enabled
+                ? 'border-teal-600 bg-teal-600'
+                : 'border-slate-300 bg-slate-200'
+            }`}
+            disabled={saving || !canToggle}
+            onClick={() => onSetEnabled(!cloud.enabled)}
+            role="switch"
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+                cloud.enabled ? 'left-6' : 'left-1'
+              }`}
+            />
+          </button>
+        </div>
       </div>
+
+      {(actionError || actionMessage) && (
+        <div
+          class={`mt-4 flex min-w-0 items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm font-bold ${
+            actionError
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+          }`}
+          role={actionError ? 'alert' : 'status'}
+        >
+          <span class="min-w-0">{actionError || actionMessage}</span>
+          <button
+            class="shrink-0 rounded-lg px-2 py-1 text-xs font-extrabold hover:bg-black/5"
+            onClick={onDismissFeedback}
+            type="button"
+          >
+            닫기
+          </button>
+        </div>
+      )}
 
       <dl class="mt-5 grid gap-3 sm:grid-cols-4">
         <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
@@ -79,33 +151,43 @@ function CloudActivitySyncCard({ cloud }: { cloud: ActivityCloudSync }) {
         <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
           <dt class="text-xs font-bold text-slate-500">Cloud 보관</dt>
           <dd class="mt-1 text-sm font-black text-slate-900">
-            {cloud.eligible === true && cloud.retentionDays > 0 ? `${cloud.retentionDays}일` : '—'}
+            {cloud.enabled && cloud.eligible === true && cloud.retentionDays > 0 ? `${cloud.retentionDays}일` : '—'}
           </dd>
         </div>
       </dl>
 
-      {cloud.phase === 'error' && cloud.lastErrorCode ? (
+      {cloud.enabled && cloud.phase === 'error' && cloud.lastErrorCode ? (
         <p class="mt-3 mb-0 text-xs font-semibold text-amber-700">
           오류 코드: <code>{cloud.lastErrorCode}</code>
         </p>
       ) : null}
       <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-        Cloud 전송은 Pro 또는 Ultimate 멤버십에서만 동작합니다. 멤버십과 관계없이 현재 부팅의 로컬 활동 기록은 공유기에서 계속 확인할 수 있습니다.
+        Cloud 전송은 Pro 또는 Ultimate 멤버십에서 선택적으로 사용할 수 있습니다. 끄면 전송 대기 데이터와 임시 인증 정보를 삭제하며, 다시 켠 뒤 새로 발생한 활동부터 Cloud에 전송합니다. 로컬 최근 활동은 항상 유지됩니다.
       </p>
     </section>
   );
 }
 
 export function ActivityPage({
+  actionError,
+  actionMessage,
   data,
   error,
   loading,
+  onDismissActionFeedback,
   onRetry,
+  onSetCloudSync,
+  savingCloudSync,
 }: {
+  actionError: string | null;
+  actionMessage: string | null;
   data: ActivityHistory | null;
   error: string | null;
   loading: boolean;
+  onDismissActionFeedback: () => void;
   onRetry: () => void;
+  onSetCloudSync: (enabled: boolean) => void;
+  savingCloudSync: boolean;
 }) {
   return (
     <div class="min-w-0 space-y-5">
@@ -140,8 +222,11 @@ export function ActivityPage({
       </section>
 
       <CloudActivitySyncCard
+        actionError={actionError}
+        actionMessage={actionMessage}
         cloud={
           data?.cloud ?? {
+            enabled: false,
             phase: 'preparing',
             eligible: null,
             plan: null,
@@ -154,6 +239,9 @@ export function ActivityPage({
             nextSyncAt: 0,
           }
         }
+        onDismissFeedback={onDismissActionFeedback}
+        onSetEnabled={onSetCloudSync}
+        saving={savingCloudSync}
       />
 
       <aside class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">

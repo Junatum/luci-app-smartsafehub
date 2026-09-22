@@ -12,6 +12,7 @@ ensure_config() {
 	uci -q get smartsafehub.activity >/dev/null 2>&1 && return 0
 	uci -q batch <<'EOF_UCI'
 set smartsafehub.activity=activity
+set smartsafehub.activity.cloud_sync_enabled='0'
 set smartsafehub.activity.sync_interval_s='300'
 set smartsafehub.activity.startup_delay_s='45'
 set smartsafehub.activity.api_base_url='https://www.smartsafehub.com/api/v1'

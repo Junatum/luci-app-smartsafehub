@@ -268,7 +268,7 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 이벤트는 서로 다른 수명 주기를 갖는 두 개의 `/tmp` 저장소에 최대 128건씩 보관합니다.
 
 - `/tmp/smartsafehub/activity-history.jsonl`: 공유기 웹사이트의 **최근 활동** 표시용 로컬 history. Cloud 전송 여부와 관계없이 현재 부팅 세션의 최근 활동을 유지합니다.
-- `/tmp/smartsafehub/events.jsonl`: 향후 Cloud Console 전송용 outbox. Cloud 업로더는 `list`로 batch를 읽고 서버가 수락한 `event_id`만 `ack`하여 제거할 수 있으며, 이 ack는 로컬 history를 삭제하지 않습니다.
+- `/tmp/smartsafehub/events.jsonl`: Cloud Console 전송을 사용 중일 때만 채워지는 upload outbox. Cloud 업로더는 `list`로 batch를 읽고 서버가 수락한 `event_id`만 `ack`하여 제거할 수 있으며, 이 ack는 로컬 history를 삭제하지 않습니다. Cloud 전송을 끄면 outbox는 즉시 비워지고 OFF 기간의 새 이벤트는 여기에 기록하지 않습니다.
 
 두 저장소 모두 오래된 항목부터 제거하고 `mkdir` lock과 atomic rename으로 직렬화합니다. lock 디렉터리 생성 자체를 소유권 획득으로 취급하며 owner PID 파일이 아직 기록되지 않은 짧은 초기화 구간은 stale로 간주하지 않습니다. dead owner만 별도 reclaim lock 아래에서 회수하고 unlock도 현재 owner만 수행하므로 여러 writer가 동시에 read-modify-replace 구간에 들어가 이벤트를 덮어쓰지 않습니다. 짧은 lock 경합에서는 bounded retry로 writer 순서를 기다리며, rpcd direct producer가 끝내 이벤트를 기록하지 못하면 `logread`에 source/event type을 남깁니다. `metadata`는 JSON object만 허용하고 크기를 제한합니다. `/tmp` 기반이므로 이벤트 수집 때문에 flash에 주기적으로 쓰지 않고 재부팅 시 초기화됩니다. `0.2.19-r8`에서 이미 수집된 `/tmp/smartsafehub/events.jsonl`은 전용 history가 생기기 전까지 RPC가 호환 fallback으로 읽으며, 첫 r9 이벤트가 기록될 때 기존 r8 outbox를 bounded local history로 먼저 승계한 뒤 새 이벤트를 추가합니다. 따라서 같은 부팅 세션에서 업그레이드 직후 수집돼 있던 최근 활동이 history 생성 시 갑자기 사라지지 않습니다. `device_uuid`는 공유기에서 임의로 신뢰하지 않고 현재는 `null`로 두며, Cloud 수집 단계에서 인증된 장치 identity 기준으로 서버가 연결하는 것을 전제로 합니다.
 
@@ -276,7 +276,7 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 
 현재 생산 경로에서 기록하는 event type은 다음 범위입니다.
 
-- 직접 이벤트: `safeshield.protection.enabled/disabled`, `safeshield.statistics.enabled/disabled`, `safeshield.rule.added/removed`, `settings.scheduled_reboot.updated`, `settings.software_updates.updated`, `settings.health_reporter.enabled/disabled`, `settings.timezone.updated`, `settings.wifi.updated`, `settings.lan.updated`, `settings.iptv.updated`
+- 직접 이벤트: `safeshield.protection.enabled/disabled`, `safeshield.statistics.enabled/disabled`, `safeshield.rule.added/removed`, `settings.scheduled_reboot.updated`, `settings.software_updates.updated`, `settings.health_reporter.enabled/disabled`, `settings.activity_cloud_sync.enabled/disabled`, `settings.timezone.updated`, `settings.wifi.updated`, `settings.lan.updated`, `settings.iptv.updated`
 - 기존 직접 결과 이벤트: `software.update.completed/failed`, `firmware.update.started/failed`, `license.activated/changed/cleared`, `system.booted`
 - 관찰 이벤트: `network.internet.disconnected/recovered`, `health.issue.started/changed/resolved`
 - SafeShield 비동기 완료 관찰: `safeshield.blocklist.updated/update_failed`. 수동 refresh가 SafeShield에서 `accepted`되면 `/usr/libexec/smartsafehub-events`의 watcher가 해당 요청 직전의 success/failure timestamp를 기준으로 완료를 기다리고, 같은 `smartsafehub-events daemon`이 자동 refresh 결과도 보완합니다. 별도 SafeShield 이벤트 daemon은 두지 않으며 Health observer도 SafeShield 보호 및 blocklist event를 만들지 않습니다.
@@ -285,11 +285,15 @@ Health observer의 첫 주기는 WAN/Health 현재 상태를 baseline으로만 �
 
 공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**을 제공합니다.
 
-Pro/Ultimate 장치에서는 `/usr/libexec/smartsafehub-activity-sync`가 같은 이벤트의 Cloud outbox를 `/api/v1/activity/events`로 batch 전송합니다. Hub 1.4.86부터 `activity_history` upload credential은 artifact resolve와 분리된 `/api/v1/licenses/status`에서 발급되지만, **license status API의 단일 소유자는 `/usr/libexec/smartsafehub-license`** 입니다. `smartsafehub-license status-sync`가 기존 라이선스 reconciliation과 함께 `activity_history` token/URL을 검증해 `/tmp/smartsafehub/activity-sync-credential.json`에 원자적으로 저장하고, `smartsafehub-activity-sync`는 이 runtime credential을 소비해 upload/ack만 담당합니다. 따라서 activity sync가 license key/device fingerprint를 다시 읽거나 `/licenses/status`와 `/licenses/resolve`를 별도로 호출하지 않습니다.
+Pro/Ultimate 장치에서는 공유기 `최근 활동` 화면에서 **Cloud 활동 기록 전송을 사용자가 직접 ON/OFF**할 수 있습니다. 새 설치는 `smartsafehub.activity.cloud_sync_enabled=0`으로 시작하지만, r18 이하 장치에는 이 옵션이 존재하지 않았으므로 업그레이드 시 누락된 값은 기존 동작을 보존하기 위해 ON으로 해석합니다. 사용자가 OFF로 저장한 값 `0`은 명시적 opt-out으로 취급합니다.
 
-발급받은 credential은 flash가 아닌 `/tmp`에만 보관하며, 기존 token이 만료 10분 전보다 충분히 유효하면 그대로 재사용합니다. credential이 없거나 만료 임박한 경우에만 activity sync가 `smartsafehub-license status-sync`를 요청해 canonical license 경로를 갱신합니다. 유효한 Pro/Ultimate 상태인데 optional activity credential만 누락되면 `ACTIVITY_CREDENTIAL_UNAVAILABLE`로 최대 128건 Cloud outbox를 보존하고, license status 자체를 확인하지 못하면 `ACTIVITY_LICENSE_STATUS_FAILED`로 보존·재시도합니다. 서버가 명시적으로 라이선스를 해제하거나 미설정 상태가 확인된 경우에만 Cloud-only outbox를 정리합니다. `/licenses/resolve`로 fallback하지 않으므로 Cloud credential 확인이 artifact resolve/download token 발급이나 다운로드 감사 로그를 발생시키지 않습니다.
+Cloud 전송이 ON일 때 `/usr/libexec/smartsafehub-activity-sync`가 같은 이벤트의 Cloud outbox를 `/api/v1/activity/events`로 batch 전송합니다. Hub 1.4.86부터 `activity_history` upload credential은 artifact resolve와 분리된 `/api/v1/licenses/status`에서 발급되지만, **license status API의 단일 소유자는 `/usr/libexec/smartsafehub-license`** 입니다. `smartsafehub-license status-sync`가 기존 라이선스 reconciliation과 함께 `activity_history` token/URL을 검증해 `/tmp/smartsafehub/activity-sync-credential.json`에 원자적으로 저장하고, `smartsafehub-activity-sync`는 이 runtime credential을 소비해 upload/ack만 담당합니다. 따라서 activity sync가 license key/device fingerprint를 다시 읽거나 `/licenses/status`와 `/licenses/resolve`를 별도로 호출하지 않습니다.
 
-전송 성공 응답의 `received == accepted + duplicates + expired`가 snapshot batch와 일치할 때 그 snapshot의 `event_id`만 ack하며, 업로드 실패나 불완전 응답에서는 ack하지 않습니다. 실패 주기는 15분 → 30분 → 60분으로 증가해 60분에서 상한을 유지하고, 새 이벤트 wake marker도 활성 backoff를 우회하지 않습니다. Cloud ack와 entitlement 변화는 로컬 `activity-history.jsonl`을 삭제하지 않습니다. 공유기 `최근 활동` 화면에서는 entitlement, 전송 대기 건수, 마지막 성공 시각과 서버 retention을 함께 확인할 수 있습니다.
+Cloud 전송을 끄면 activity-sync daemon을 잠시 중지한 뒤 Cloud-only outbox, wake marker와 `/tmp` runtime credential을 정리하고 `disabled` 상태로 다시 시작합니다. 이후 이벤트 writer는 `activity-history.jsonl`에만 새 이벤트를 기록하므로 로컬 최근 활동은 계속 보이지만 서버 전송 대기 데이터는 생기지 않습니다. 다시 켜도 OFF 기간의 이벤트를 소급 업로드하지 않고 **ON 이후 새로 발생한 이벤트부터** Cloud outbox에 넣습니다. 서버에 이미 저장된 과거 Cloud 기록을 삭제하는 기능과 전송 OFF는 별개의 정책입니다.
+
+발급받은 credential은 flash가 아닌 `/tmp`에만 보관하며, 기존 token이 만료 10분 전보다 충분히 유효하면 그대로 재사용합니다. credential이 없거나 만료 임박한 경우에만 activity sync가 `smartsafehub-license status-sync`를 요청해 canonical license 경로를 갱신합니다. Cloud 전송 OFF에서는 license daemon이 라이선스 reconciliation 자체는 계속 수행하지만 optional activity credential을 로컬 runtime cache에 보관하지 않습니다. 유효한 Pro/Ultimate 상태인데 optional activity credential만 누락되면 `ACTIVITY_CREDENTIAL_UNAVAILABLE`로 최대 128건 Cloud outbox를 보존하고, license status 자체를 확인하지 못하면 `ACTIVITY_LICENSE_STATUS_FAILED`로 보존·재시도합니다. 서버가 명시적으로 라이선스를 해제하거나 미설정 상태가 확인된 경우에만 Cloud-only outbox를 정리합니다. `/licenses/resolve`로 fallback하지 않으므로 Cloud credential 확인이 artifact resolve/download token 발급이나 다운로드 감사 로그를 발생시키지 않습니다.
+
+전송 성공 응답의 `received == accepted + duplicates + expired`가 snapshot batch와 일치할 때 그 snapshot의 `event_id`만 ack하며, 업로드 실패나 불완전 응답에서는 ack하지 않습니다. 실패 주기는 15분 → 30분 → 60분으로 증가해 60분에서 상한을 유지하고, 새 이벤트 wake marker도 활성 backoff를 우회하지 않습니다. Cloud ack와 ON/OFF 전환은 로컬 `activity-history.jsonl`을 삭제하지 않습니다. 공유기 `최근 활동` 화면에서는 ON/OFF 스위치, entitlement, 전송 대기 건수, 마지막 성공 시각과 서버 retention을 함께 확인할 수 있습니다.
 
 최근 활동 문구는 관측 데이터가 실제로 보장하는 범위만 표현합니다. 부팅 이벤트는 전원 인가와 재시작을 구분할 수 없으므로 `공유기 부팅 감지`로 표시하고, WAN 장애 시간은 Health observer가 연결을 확인하지 못한 관측 구간이므로 `약 N초 동안 인터넷 연결이 확인되지 않았습니다.`처럼 안내합니다. 실패 이벤트는 오류 코드만 단독 노출하지 않고 사용자용 실패 설명을 먼저 표시하며, 오류 코드는 진단용 보조 정보로 함께 제공합니다.
 
@@ -573,15 +577,18 @@ smartsafehub-license daemon
   → safeshield.license_get으로 현재 키를 일시 조회
   → safeshield.status에서 physical_fingerprint 조회
   → POST /api/v1/licenses/status
-      ├─ device_action=none: 로컬 상태 유지 + activity_history credential을 /tmp runtime cache에 저장
+      ├─ device_action=none: 로컬 상태 유지
+      │    └─ Cloud 활동 ON일 때만 activity_history credential을 /tmp runtime cache에 저장
       ├─ device_action=clear_license: safeshield.license_update { license_key: "" } + activity credential 제거
       └─ 네트워크/API 실패: 오류만 기록하고 로컬 키/유효한 기존 credential 유지
 
 smartsafehub-activity-sync
-  → 유효한 cached activity credential 사용
-  → credential 없음/만료 임박: smartsafehub-license status-sync 요청
-  → POST /api/v1/activity/events
-  → 성공한 snapshot event_id만 ack
+  ├─ Cloud 활동 OFF: outbox/wake/credential 정리 후 네트워크 작업 없이 disabled 유지
+  └─ Cloud 활동 ON
+       → 유효한 cached activity credential 사용
+       → credential 없음/만료 임박: smartsafehub-license status-sync 요청
+       → POST /api/v1/activity/events
+       → 성공한 snapshot event_id만 ack
 ```
 
 `smartsafehub-license`는 `daemon`, `activate`, `status-sync`, `status` 명령을 독립 subcommand로 제공합니다. `license_activate` RPC 자체는 SafeShield를 동기 호출하지 않으며, 장치 identity와 profile 구성은 detached `activate` subcommand 안에서 수행합니다. 이는 현재는 작은 독립 procd 서비스로 장애 범위와 디버깅 경계를 유지하면서, 향후 주기적인 Hub 동기화 작업이 늘어나면 명령 경계를 그대로 `smartsafehub-agent license ...` 모듈로 옮길 수 있도록 하기 위한 구조입니다. updater처럼 장시간 설치·재부팅 상태 머신을 가지는 기능은 별도 서비스로 유지하는 것을 전제로 합니다.
@@ -775,4 +782,4 @@ apk info luci-app-smartsafehub
 
 ### Cloud 활동 기록 재시도 정책
 
-Cloud Activity API가 아직 배포되지 않았거나 license status/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신과 무관하게 최대 128건을 표시합니다.
+Cloud 활동 기록 전송이 ON이고 Activity API 또는 license status/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. Cloud 전송이 OFF이면 이 네트워크 재시도 경로 자체를 실행하지 않고 outbox도 만들지 않습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신/전송 설정과 무관하게 최대 128건을 표시합니다.

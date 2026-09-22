@@ -76,8 +76,10 @@ grep -Fq 'HISTORY_FILE="${SMARTSAFEHUB_EVENTS_HISTORY_FILE:-$RUNTIME_DIR/activit
 	fail 'event writer must keep a local history separate from the Cloud outbox'
 grep -Fq 'append_bounded_event "$HISTORY_FILE"' "$EVENTS" || \
 	fail 'every normalized event must be appended to local history'
+grep -Fq 'if cloud_sync_enabled; then' "$EVENTS" || \
+	fail 'event writer must gate Cloud outbox writes on the user preference'
 grep -Fq 'append_bounded_event "$EVENTS_FILE"' "$EVENTS" || \
-	fail 'every normalized event must continue to enter the Cloud outbox'
+	fail 'enabled Cloud transfer must append normalized events to the Cloud outbox'
 grep -Fq 'awk -v needle="$needle"' "$EVENTS" || \
 	fail 'ack must continue to operate on the Cloud outbox'
 if grep -A18 '^ack_event()' "$EVENTS" | grep -Fq '"$HISTORY_FILE"'; then
@@ -197,15 +199,23 @@ if grep -Fq 'include_activity_history' "$API" || grep -Fq 'activity_limit' "$API
 fi
 grep -Fq 'activityHistory?: ActivityHistory;' "$API" || \
 	fail 'frontend must tolerate a pre-reload status response without activityHistory'
-grep -Fq 'return status.activityHistory ?? emptyActivityHistory();' "$API" || \
+grep -Fq 'const activity = status.activityHistory ?? emptyActivityHistory();' "$API" || \
 	fail 'frontend must render an empty activity state while an older in-memory RPC handler is draining'
+grep -Fq 'enabled: activity.cloud.enabled ?? true' "$API" || \
+	fail 'pre-r19 activity responses must retain the legacy always-enabled Cloud behavior during rolling upgrades'
 grep -Fq 'const ACTIVITY_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
 	fail 'recent activity may refresh at a lightweight one-minute interval'
 grep -Fq 'refreshOnFocus: true' "$HOOK" || \
 	fail 'recent activity must refresh when the user returns to the page'
 
-grep -Fq 'Cloud 활동 기록 동기화' "$PAGE" || \
-	fail 'activity page must expose Cloud activity synchronization status'
+grep -Fq 'Cloud 활동 기록' "$PAGE" || \
+	fail 'activity page must expose Cloud activity synchronization controls'
+grep -Fq 'aria-label="Cloud 활동 기록 전송 사용"' "$PAGE" || \
+	fail 'Cloud activity card must expose an accessible ON/OFF switch'
+grep -Fq 'Cloud 전송 꺼짐' "$PAGE" || \
+	fail 'Cloud activity card must clearly explain the disabled state'
+grep -Fq '다시 켠 뒤 새로 발생한 활동부터 Cloud에 전송합니다.' "$PAGE" || \
+	fail 'Cloud activity opt-out copy must explain that disabled-period events are not uploaded later'
 grep -Fq 'Pro / Ultimate 전용' "$PAGE" || \
 	fail 'Cloud activity UI must clearly identify the paid entitlement boundary'
 grep -Fq '전송 대기' "$PAGE" || \
@@ -215,6 +225,23 @@ grep -Fq '마지막 동기화' "$PAGE" || \
 grep -Fq 'Cloud 보관' "$PAGE" || \
 	fail 'Cloud activity UI must show server retention when eligible'
 grep -Fq 'cloud: read_cloud_sync()' "$ACTIVITY_RPC" || \
-	fail 'local activity RPC must expose activity Cloud sync state without a new RPC method'
+	fail 'local activity RPC must expose activity Cloud sync state without a new read RPC method'
+grep -Fq 'export function update_activity_cloud_sync(request)' "$ACTIVITY_RPC" || \
+	fail 'activity RPC must expose an explicit Cloud transfer preference mutation'
+grep -Fq "ctx.set('smartsafehub', 'activity', 'cloud_sync_enabled'" "$ACTIVITY_RPC" || \
+	fail 'Cloud transfer preference must persist in UCI'
+grep -Fq "'ACTIVITY_CLOUD_SYNC_NOT_ELIGIBLE'" "$ACTIVITY_RPC" || \
+	fail 'enabling Cloud activity must enforce paid entitlement on the router'
+grep -Fq 'activity_cloud_sync_update' "$RPC_ENTRY" || \
+	fail 'top-level RPC must expose the Cloud activity toggle mutation'
+jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("activity_cloud_sync_update") != null' "$ACL" >/dev/null || \
+	fail 'Cloud activity toggle RPC must be covered by the SmartSafeHub write ACL'
+grep -Fq 'export function updateActivityCloudSync(enabled: boolean)' "$API" || \
+	fail 'frontend API must expose the Cloud activity toggle mutation'
+grep -Fq 'setCloudSyncEnabled' "$HOOK" || \
+	fail 'activity hook must own Cloud activity toggle mutation state'
+for event_type in settings.activity_cloud_sync.enabled settings.activity_cloud_sync.disabled; do
+	grep -Fq "case '$event_type':" "$TIMELINE" || fail "UI renderer missing Cloud activity setting event: $event_type"
+done
 
-printf '%s\n' 'PASS: local recent activity, direct/observed copy, paid Cloud sync status and argument-free status RPC contracts are valid'
+printf '%s\n' 'PASS: local recent activity, direct/observed copy, paid Cloud sync ON/OFF and argument-free status RPC contracts are valid'

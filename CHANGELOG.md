@@ -1,5 +1,26 @@
 # 변경 기록
 
+## [0.2.19-r19] - 2026-09-21
+
+### 기능
+
+- 공유기 `최근 활동` 화면의 Cloud 활동 기록 카드에 ON/OFF 스위치를 추가했습니다. Cloud 전송은 Pro/Ultimate에서 선택적으로 활성화할 수 있고, 로컬 `activity-history.jsonl`은 설정과 관계없이 계속 기록됩니다.
+- 새 설치에서는 `smartsafehub.activity.cloud_sync_enabled=0`으로 시작합니다. r18 이하에서 이미 Cloud 활동 기록을 사용하던 업그레이드 장치는 해당 옵션이 없으면 기존 동작과의 호환을 위해 ON으로 해석하므로 업데이트만으로 기존 동기화가 갑자기 중단되지 않습니다.
+- Cloud 전송을 끄면 `/tmp/smartsafehub/events.jsonl`의 전송 대기 데이터, wake marker, runtime upload credential을 즉시 정리합니다. OFF 상태에서 새 이벤트는 로컬 history에만 기록되며 Cloud outbox에는 들어가지 않으므로, 다시 켜도 OFF 기간의 이벤트를 소급 업로드하지 않습니다.
+- Cloud 전송을 다시 켜면 현재 Pro/Ultimate entitlement를 로컬 license state로 확인한 뒤 설정을 저장하고 activity sync를 다시 시작합니다. credential은 기존 canonical `smartsafehub-license status-sync` 경로에서만 발급/저장하며 activity-sync는 upload/ack 책임만 유지합니다.
+- Cloud ON/OFF 자체도 `settings.activity_cloud_sync.enabled/disabled` 직접 이벤트로 로컬 최근 활동에 기록합니다. OFF 이벤트는 로컬 전용이고 ON 이벤트는 이후 Cloud outbox에도 포함될 수 있습니다.
+
+### 안정성 및 개인정보
+
+- Activity Sync는 Cloud 전송이 꺼진 상태에서 license refresh나 `/activity/events` 업로드를 수행하지 않고 `disabled` 상태로 유지합니다. license daemon은 라이선스 reconciliation은 계속 수행하지만 Cloud 전송이 꺼져 있으면 optional activity credential을 runtime cache에 보관하지 않습니다.
+- 설정 변경 RPC는 daemon을 중지한 뒤 runtime policy를 적용하고 다시 시작하여 명시적인 opt-out과 진행 중 uploader가 경쟁하지 않도록 했습니다. 로컬 recent activity는 이 과정에서 삭제하지 않습니다.
+- 기존 r18 이하 설치에서는 preinst/postinst migration marker로 기존 암묵적 Cloud 전송 ON 상태를 보존해, opkg가 새 기본 설정 파일을 적용하더라도 동작이 갑자기 꺼지지 않도록 했습니다.
+
+### 테스트 및 문서
+
+- Cloud OFF에서 local history만 남고 outbox/wake/credential/network 호출이 생기지 않는지, license status-sync가 Cloud OFF에서도 라이선스 상태를 유지하면서 activity credential을 저장하지 않는지 회귀 테스트를 추가했습니다.
+- UI/RPC/ACL 계약에 유료 entitlement, 접근 가능한 switch semantics, 신규 설치 기본 OFF와 구버전 upgrade 호환 정책을 고정하고 README의 Cloud 활동 기록 데이터 흐름을 갱신했습니다.
+
 ## [0.2.19-r18] - 2026-09-21
 
 ### 수정
