@@ -285,7 +285,7 @@ SmartSafeHub가 생성하는 휘발성 런타임 상태와 임시 파일은 `/tm
 
 Health observer의 첫 주기는 WAN/Health 현재 상태를 baseline으로만 저장하고 이벤트를 만들지 않습니다. 이후 동일 상태를 5분마다 다시 조회해도 새 이벤트가 생성되지 않으며 상태 전이가 있을 때만 기록됩니다. 직접 producer는 성공한 mutation마다 별도로 기록하므로 Health 주기 사이에 SafeShield를 OFF→ON으로 변경해도 두 이벤트가 모두 남습니다. `smartsafehub-events`는 boot event 기록과 SafeShield 비동기 refresh observer를 한 procd daemon에 통합하며, 같은 `boot_id`에서는 중복 `system.booted`를 만들지 않으므로 서비스 재시작을 새 부팅으로 오인하지 않습니다.
 
-공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**을 제공합니다.
+공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 대시보드의 compact 타임라인은 각 항목 사이에 작은 세로 간격을 두어 짧은 제목/설명이 연속해서 붙어 보이지 않도록 합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**을 제공합니다.
 
 Pro/Ultimate 장치에서는 공유기 `최근 활동` 화면에서 **Cloud 활동 기록 전송을 사용자가 직접 ON/OFF**할 수 있습니다. 새 설치는 `smartsafehub.activity.cloud_sync_enabled=0`으로 시작하지만, r18 이하 장치에는 이 옵션이 존재하지 않았으므로 업그레이드 시 누락된 값은 기존 동작을 보존하기 위해 ON으로 해석합니다. 사용자가 OFF로 저장한 값 `0`은 명시적 opt-out으로 취급합니다.
 

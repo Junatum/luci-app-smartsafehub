@@ -431,7 +431,7 @@ export function ActivityTimeline({
   let previousDate = '';
 
   return (
-    <div class={compact ? 'space-y-0' : 'space-y-1'}>
+    <div class={compact ? 'space-y-2' : 'space-y-1'}>
       {events.map((event) => {
         const presentation = activityPresentation(event);
         const tone = severityTone(event.severity);

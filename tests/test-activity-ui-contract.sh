@@ -105,6 +105,8 @@ grep -Fq 'title="최근 활동"' "$HOME" || fail 'Dashboard must expose a recent
 grep -Fq 'href="#activity"' "$HOME" || fail 'Dashboard recent activity must link to the full page'
 grep -Fq '<ActivityTimeline compact events={(activity?.events ?? []).slice(0, 3)} />' "$HOME" || \
 	fail 'Dashboard must show only the latest three activity entries'
+grep -Fq "<div class={compact ? 'space-y-2' : 'space-y-1'}>" "$TIMELINE" || \
+	fail 'Dashboard compact activity items must use space-y-2 while the full timeline keeps space-y-1'
 grep -Fq '현재 부팅 이후의 최근 활동' "$PAGE" || \
 	fail 'full page must clearly describe current-boot scope'
 grep -Fq '재부팅하면 초기화됩니다' "$PAGE" || \
