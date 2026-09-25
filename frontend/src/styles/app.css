@@ -378,6 +378,15 @@
   inline-size: 100%;
   min-inline-size: 0;
   max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+/* Safari/iPadOS can still expose a native minimum through the internal
+ * date/time edit wrapper. Keep that internal box shrinkable as well. */
+.ssh-software-update-time-input::-webkit-date-and-time-value,
+.ssh-software-update-time-input::-webkit-datetime-edit {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Authenticated product color theme. The application lives inside a shadow

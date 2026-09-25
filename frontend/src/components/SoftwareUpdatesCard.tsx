@@ -628,9 +628,9 @@ export function SoftwareUpdatesCard({
                 </div>
               </div>
 
-              <div class="rounded-xl border border-slate-200 p-4 sm:p-5">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
+              <div class="min-w-0 overflow-hidden rounded-xl border border-slate-200 p-4 sm:p-5">
+                <div class="flex min-w-0 items-start justify-between gap-4">
+                  <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">자동으로 업데이트 확인</strong>
                     <span class="mt-1 block text-xs leading-5 text-slate-500">
                       선택한 주기에 새 관리 소프트웨어 버전을 확인합니다.
@@ -670,9 +670,9 @@ export function SoftwareUpdatesCard({
                 </div>
               </div>
 
-              <div class="rounded-xl border border-slate-200 p-4 sm:p-5">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
+              <div class="min-w-0 overflow-hidden rounded-xl border border-slate-200 p-4 sm:p-5">
+                <div class="flex min-w-0 items-start justify-between gap-4">
+                  <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">자동으로 업데이트 설치</strong>
                     <span class="mt-1 block text-xs leading-5 text-slate-500">
                       새 버전이 있으면 지정한 시각에 자동으로 설치합니다.
@@ -697,6 +697,15 @@ export function SoftwareUpdatesCard({
                     <input
                       class="ssh-software-update-time-input min-h-11 min-w-0 max-w-full w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                       disabled={!autoInstall}
+                      style={{
+                        boxSizing: 'border-box',
+                        inlineSize: '100%',
+                        maxInlineSize: '100%',
+                        maxWidth: '100%',
+                        minInlineSize: 0,
+                        minWidth: 0,
+                        width: '100%',
+                      }}
                       onChange={(event) => {
                         const nextAutoInstallTime = event.currentTarget.value;
                         setAutoInstallTime(nextAutoInstallTime);

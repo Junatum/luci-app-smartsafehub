@@ -15,6 +15,8 @@ SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
 ASYNC_RESOURCE="$ROOT_DIR/frontend/src/hooks/useAsyncResource.ts"
 APP_CSS="$ROOT_DIR/frontend/src/styles/app.css"
+RUNTIME_APP_JS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.js"
+RUNTIME_APP_CSS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.css"
 UPDATE_FRESHNESS="$ROOT_DIR/frontend/src/utils/softwareUpdates.ts"
 
 fail() {
@@ -22,7 +24,7 @@ fail() {
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$UPDATE_FRESHNESS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$RUNTIME_APP_JS" "$RUNTIME_APP_CSS" "$UPDATE_FRESHNESS"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -122,6 +124,20 @@ grep -Fq 'min-inline-size: 0;' "$APP_CSS" || \
 	fail 'iPad/WebKit time input must be allowed to shrink below its native intrinsic width'
 grep -Fq 'max-inline-size: 100%;' "$APP_CSS" || \
 	fail 'iPad/WebKit time input must stay inside its settings card'
+grep -Fq "boxSizing: 'border-box'" "$UPDATES_CARD" || \
+	fail 'iPad/WebKit time input must keep a direct border-box fallback in rendered markup'
+grep -Fq "inlineSize: '100%'" "$UPDATES_CARD" || \
+	fail 'iPad/WebKit time input must keep a direct inline-size fallback in rendered markup'
+grep -Fq '.ssh-software-update-time-input::-webkit-date-and-time-value' "$APP_CSS" || \
+	fail 'iPad/WebKit internal time value must be allowed to shrink'
+grep -Fq 'ssh-software-settings-grid' "$RUNTIME_APP_JS" || \
+	fail 'production app.js must include the responsive software settings markup'
+grep -Fq '.ssh-software-settings-grid' "$RUNTIME_APP_CSS" || \
+	fail 'production app.css must include the responsive software settings grid'
+grep -Fq '.ssh-software-update-time-input' "$RUNTIME_APP_CSS" || \
+	fail 'production app.css must include the iPad/WebKit time-input containment rule'
+grep -Fq '.ssh-software-update-time-input::-webkit-date-and-time-value' "$RUNTIME_APP_CSS" || \
+	fail 'production app.css must include the WebKit internal time-value containment rule'
 if grep -Fq 'class="mt-4 grid gap-4 lg:grid-cols-2"' "$UPDATES_CARD"; then
 	fail 'automatic-update nested grid must not use a viewport-only two-column breakpoint'
 fi
