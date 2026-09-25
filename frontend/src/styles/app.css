@@ -366,27 +366,29 @@
   grid-column: 1 / -1;
 }
 
-/* WebKit gives native time controls a fairly large intrinsic inline size.
- * On iPadOS that intrinsic width can win over `width: 100%` inside a narrow
- * grid track and make the field escape its settings card. Explicit logical
- * min/max sizes keep the control bounded without replacing the native picker. */
-.ssh-software-update-time-input {
-  display: block;
+/* iPadOS/WebKit gives native `input[type="time"]` controls a localized
+ * intrinsic width that can exceed a narrow settings card. SmartSafeHub uses
+ * the same custom dropdown primitive as the rest of the product instead of
+ * relying on that native control. Keep both hour/minute tracks explicitly
+ * shrinkable so the selector remains contained at tablet widths. */
+.ssh-time-select {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  inline-size: 100%;
-  min-inline-size: 0;
-  max-inline-size: 100%;
-  box-sizing: border-box;
 }
 
-/* Safari/iPadOS can still expose a native minimum through the internal
- * date/time edit wrapper. Keep that internal box shrinkable as well. */
-.ssh-software-update-time-input::-webkit-date-and-time-value,
-.ssh-software-update-time-input::-webkit-datetime-edit {
+.ssh-time-select > * {
+  min-width: 0;
+}
+
+.ssh-time-select .ssh-custom-select-trigger {
   min-width: 0;
   max-width: 100%;
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
 }
 
 /* Authenticated product color theme. The application lives inside a shadow

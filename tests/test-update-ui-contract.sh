@@ -15,6 +15,7 @@ SETTINGS_PAGE="$ROOT_DIR/frontend/src/pages/SettingsPage.tsx"
 UPDATES_HOOK="$ROOT_DIR/frontend/src/hooks/useSoftwareUpdates.ts"
 ASYNC_RESOURCE="$ROOT_DIR/frontend/src/hooks/useAsyncResource.ts"
 APP_CSS="$ROOT_DIR/frontend/src/styles/app.css"
+TIME_SELECT="$ROOT_DIR/frontend/src/components/TimeSelect.tsx"
 RUNTIME_APP_JS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.js"
 RUNTIME_APP_CSS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.css"
 UPDATE_FRESHNESS="$ROOT_DIR/frontend/src/utils/softwareUpdates.ts"
@@ -24,7 +25,7 @@ fail() {
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$RUNTIME_APP_JS" "$RUNTIME_APP_CSS" "$UPDATE_FRESHNESS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$TIME_SELECT" "$RUNTIME_APP_JS" "$RUNTIME_APP_CSS" "$UPDATE_FRESHNESS"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
 
@@ -106,38 +107,53 @@ grep -Fq 'data-section="software-update-result"' "$UPDATES_CARD" || \
 	fail 'management software card must keep the latest/not-checked result inline'
 
 # Nested automatic-update controls must size from their actual card width on tablet
-# landscape instead of the viewport breakpoint, and native iPadOS time controls
-# must never escape the card because of WebKit's intrinsic input width.
+# landscape. iPadOS browsers all use WebKit, whose localized native time control
+# can keep an intrinsic width larger than the card, so product time settings must
+# use the shared custom time selector instead of input[type="time"].
 grep -Fq 'ssh-software-settings-grid mt-4' "$UPDATES_CARD" || \
 	fail 'automatic-update settings must use the container-width responsive grid'
 grep -Fq 'ssh-software-settings-channel rounded-xl' "$UPDATES_CARD" || \
 	fail 'update channel must span all responsive settings-grid columns'
-grep -Fq 'ssh-software-update-time-input min-h-11 min-w-0 max-w-full w-full' "$UPDATES_CARD" || \
-	fail 'automatic install time field must opt into the bounded iPad/WebKit input style'
 grep -Fq 'grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));' "$APP_CSS" || \
 	fail 'automatic-update settings grid must wrap according to its own available width'
 grep -Fq '.ssh-software-settings-channel {' "$APP_CSS" || \
 	fail 'responsive settings grid must preserve the full-width update-channel row'
-grep -Fq '.ssh-software-update-time-input {' "$APP_CSS" || \
-	fail 'iPad/WebKit time-input containment rule must be defined'
-grep -Fq 'min-inline-size: 0;' "$APP_CSS" || \
-	fail 'iPad/WebKit time input must be allowed to shrink below its native intrinsic width'
-grep -Fq 'max-inline-size: 100%;' "$APP_CSS" || \
-	fail 'iPad/WebKit time input must stay inside its settings card'
-grep -Fq "boxSizing: 'border-box'" "$UPDATES_CARD" || \
-	fail 'iPad/WebKit time input must keep a direct border-box fallback in rendered markup'
-grep -Fq "inlineSize: '100%'" "$UPDATES_CARD" || \
-	fail 'iPad/WebKit time input must keep a direct inline-size fallback in rendered markup'
-grep -Fq '.ssh-software-update-time-input::-webkit-date-and-time-value' "$APP_CSS" || \
-	fail 'iPad/WebKit internal time value must be allowed to shrink'
+grep -Fq '<TimeSelect' "$UPDATES_CARD" || \
+	fail 'automatic install time must use the shared custom time selector'
+grep -Fq 'id="software-update-auto-install-time"' "$UPDATES_CARD" || \
+	fail 'automatic install time selector must expose a stable id prefix'
+grep -Fq '<TimeSelect' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot time must use the shared custom time selector'
+grep -Fq 'id="scheduled-reboot-time"' "$SETTINGS_PAGE" || \
+	fail 'scheduled reboot time selector must preserve its stable id prefix'
+if grep -Fq 'type="time"' "$UPDATES_CARD" || grep -Fq 'type="time"' "$SETTINGS_PAGE"; then
+	fail 'native time inputs must not be reintroduced because iPadOS WebKit can overflow narrow cards'
+fi
+grep -Fq 'const HOUR_OPTIONS = Array.from({ length: 24 }' "$TIME_SELECT" || \
+	fail 'shared time selector must provide every hour'
+grep -Fq 'const MINUTE_OPTIONS = Array.from({ length: 60 }' "$TIME_SELECT" || \
+	fail 'shared time selector must preserve minute-level scheduling precision'
+grep -Fq 'grid-template-columns: repeat(2, minmax(0, 1fr));' "$APP_CSS" || \
+	fail 'shared time selector tracks must remain shrinkable inside narrow cards'
+grep -Fq '.ssh-time-select .ssh-custom-select-trigger {' "$APP_CSS" || \
+	fail 'shared time selector must bound its custom dropdown triggers'
 grep -Fq 'ssh-software-settings-grid' "$RUNTIME_APP_JS" || \
 	fail 'production app.js must include the responsive software settings markup'
+grep -Fq 'software-update-auto-install-time' "$RUNTIME_APP_JS" || \
+	fail 'production app.js must include the custom automatic-install time selector'
+# The production bundle is minified, so local variable names such as `id` are not a
+# stable contract. Verify the derived trigger id in the source component instead.
+grep -Fq 'id={`${id}-hour`}' "$TIME_SELECT" || \
+	fail 'shared time selector must derive a stable hour trigger id'
+grep -Fq 'scheduled-reboot-time-hour' "$RUNTIME_APP_JS" || \
+	fail 'production app.js must include the custom scheduled-reboot hour selector'
 grep -Fq '.ssh-software-settings-grid' "$RUNTIME_APP_CSS" || \
 	fail 'production app.css must include the responsive software settings grid'
-grep -Fq '.ssh-software-update-time-input' "$RUNTIME_APP_CSS" || \
-	fail 'production app.css must include the iPad/WebKit time-input containment rule'
-grep -Fq '.ssh-software-update-time-input::-webkit-date-and-time-value' "$RUNTIME_APP_CSS" || \
-	fail 'production app.css must include the WebKit internal time-value containment rule'
+grep -Fq '.ssh-time-select' "$RUNTIME_APP_CSS" || \
+	fail 'production app.css must include the shared custom time-selector layout'
+if grep -Fq 'ssh-software-update-time-input' "$RUNTIME_APP_JS" || grep -Fq 'ssh-software-update-time-input' "$RUNTIME_APP_CSS"; then
+	fail 'obsolete native software-update time-input workaround must not remain in production assets'
+fi
 if grep -Fq 'class="mt-4 grid gap-4 lg:grid-cols-2"' "$UPDATES_CARD"; then
 	fail 'automatic-update nested grid must not use a viewport-only two-column breakpoint'
 fi
@@ -216,10 +232,10 @@ grep -Fq 'id="software-update-check-interval"' "$UPDATES_CARD" || \
 	fail 'update interval custom dropdown must expose a stable control id'
 grep -Fq 'variant="emphasized"' "$UPDATES_CARD" || \
 	fail 'update interval custom dropdown must use the emphasized form-control surface'
-grep -Fq 'rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold' "$UPDATES_CARD" || \
-	fail 'auto-install time input must use the emphasized form-control surface'
-grep -Fq 'focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100' "$UPDATES_CARD" || \
-	fail 'update form controls must use the shared teal focus treatment'
+grep -Fq 'ariaLabel="자동 업데이트 설치 시각"' "$UPDATES_CARD" || \
+	fail 'auto-install time selector must expose an accessible product label'
+grep -Fq 'variant="emphasized"' "$UPDATES_CARD" || \
+	fail 'auto-install time selector must use the emphasized custom-select surface'
 
 # Unsaved automatic-update edits must be visible and reversible before saving.
 grep -Fq 'const hasSettingsChanges = (next: Partial<SoftwareUpdateSettingsInput> = {}) =>' "$UPDATES_CARD" || \

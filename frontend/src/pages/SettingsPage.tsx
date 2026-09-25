@@ -10,6 +10,7 @@ import {
   getMemoryUsage,
 } from '../app/format';
 import { CustomSelect } from '../components/CustomSelect';
+import { TimeSelect } from '../components/TimeSelect';
 import {
   AlertIcon,
   CalendarIcon,
@@ -1223,16 +1224,14 @@ function ScheduledRebootSection(props: {
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-time">
+              <label class="mb-2 block text-sm font-extrabold text-slate-800" for="scheduled-reboot-time-hour">
                 재부팅 시간
               </label>
-              <input
-                aria-label="예약 재부팅 시간"
-                class="min-h-11 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+              <TimeSelect
+                ariaLabel="예약 재부팅 시간"
                 disabled={!enabled || props.saving || !props.data}
                 id="scheduled-reboot-time"
-                onInput={(event) => setRebootTime(event.currentTarget.value)}
-                type="time"
+                onChange={setRebootTime}
                 value={rebootTime}
               />
             </div>
