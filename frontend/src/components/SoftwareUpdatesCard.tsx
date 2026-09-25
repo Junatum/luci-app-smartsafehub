@@ -610,8 +610,8 @@ export function SoftwareUpdatesCard({
               ) : null}
             </div>
 
-            <div class="mt-4 grid gap-4 lg:grid-cols-2">
-              <div class="rounded-xl border border-slate-200 p-4 sm:p-5 lg:col-span-2">
+            <div class="ssh-software-settings-grid mt-4">
+              <div class="ssh-software-settings-channel rounded-xl border border-slate-200 p-4 sm:p-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">업데이트 채널</strong>
@@ -688,14 +688,14 @@ export function SoftwareUpdatesCard({
                   />
                 </div>
 
-                <label class="mt-4 block">
+                <label class="mt-4 block min-w-0">
                   <span class="text-xs font-extrabold text-slate-700">설치 시각</span>
-                  <div class="relative mt-2">
+                  <div class="relative mt-2 min-w-0 max-w-full">
                     <span class="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-slate-400">
                       <ClockIcon class="size-4" />
                     </span>
                     <input
-                      class="min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                      class="ssh-software-update-time-input min-h-11 min-w-0 max-w-full w-full rounded-xl border-2 border-slate-300 bg-slate-50 py-2.5 pr-4 pl-11 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                       disabled={!autoInstall}
                       onChange={(event) => {
                         const nextAutoInstallTime = event.currentTarget.value;

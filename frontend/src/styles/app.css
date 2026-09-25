@@ -351,6 +351,35 @@
   }
 }
 
+/* The automatic-update section can sit inside the narrower half of the
+ * management-software card on tablet landscape. Viewport breakpoints alone
+ * therefore cannot decide when its two setting cards actually fit. Let the
+ * grid wrap from its own available width instead, and keep the channel card
+ * spanning every generated column. */
+.ssh-software-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.ssh-software-settings-channel {
+  grid-column: 1 / -1;
+}
+
+/* WebKit gives native time controls a fairly large intrinsic inline size.
+ * On iPadOS that intrinsic width can win over `width: 100%` inside a narrow
+ * grid track and make the field escape its settings card. Explicit logical
+ * min/max sizes keep the control bounded without replacing the native picker. */
+.ssh-software-update-time-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
 /* Authenticated product color theme. The application lives inside a shadow
  * root, so these overrides can safely remap the existing utility palette
  * without affecting LuCI itself. */

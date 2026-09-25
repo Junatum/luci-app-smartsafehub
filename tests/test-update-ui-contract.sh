@@ -103,6 +103,29 @@ software_card_close_line="$(grep -n '</article>' "$UPDATES_CARD" | tail -1 | cut
 grep -Fq 'data-section="software-update-result"' "$UPDATES_CARD" || \
 	fail 'management software card must keep the latest/not-checked result inline'
 
+# Nested automatic-update controls must size from their actual card width on tablet
+# landscape instead of the viewport breakpoint, and native iPadOS time controls
+# must never escape the card because of WebKit's intrinsic input width.
+grep -Fq 'ssh-software-settings-grid mt-4' "$UPDATES_CARD" || \
+	fail 'automatic-update settings must use the container-width responsive grid'
+grep -Fq 'ssh-software-settings-channel rounded-xl' "$UPDATES_CARD" || \
+	fail 'update channel must span all responsive settings-grid columns'
+grep -Fq 'ssh-software-update-time-input min-h-11 min-w-0 max-w-full w-full' "$UPDATES_CARD" || \
+	fail 'automatic install time field must opt into the bounded iPad/WebKit input style'
+grep -Fq 'grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));' "$APP_CSS" || \
+	fail 'automatic-update settings grid must wrap according to its own available width'
+grep -Fq '.ssh-software-settings-channel {' "$APP_CSS" || \
+	fail 'responsive settings grid must preserve the full-width update-channel row'
+grep -Fq '.ssh-software-update-time-input {' "$APP_CSS" || \
+	fail 'iPad/WebKit time-input containment rule must be defined'
+grep -Fq 'min-inline-size: 0;' "$APP_CSS" || \
+	fail 'iPad/WebKit time input must be allowed to shrink below its native intrinsic width'
+grep -Fq 'max-inline-size: 100%;' "$APP_CSS" || \
+	fail 'iPad/WebKit time input must stay inside its settings card'
+if grep -Fq 'class="mt-4 grid gap-4 lg:grid-cols-2"' "$UPDATES_CARD"; then
+	fail 'automatic-update nested grid must not use a viewport-only two-column breakpoint'
+fi
+
 # Busy update work should have persistent visual feedback rather than relying on hover text.
 grep -Fq "const installing = action === 'install' || data?.phase === 'installing';" "$UPDATES_CARD" || \
 	fail 'update card must track installing state explicitly'
