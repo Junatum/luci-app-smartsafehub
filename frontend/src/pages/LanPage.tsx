@@ -106,14 +106,13 @@ function Ipv4OctetInput({
   };
 
   return (
-    <div class="mt-2 flex min-h-11 items-center gap-1.5" aria-label="IPv4 주소 입력">
+    <div class="ssh-ipv4-segments mt-2 min-h-11" aria-label="IPv4 주소 입력">
       {octets.map((octet, index) => (
-        <div class="contents" key={index}>
-          {index > 0 ? <span class="text-sm font-black text-slate-400">.</span> : null}
+        <div class="ssh-ipv4-segment" key={index}>
           <input
             aria-label={`IP 주소 ${index + 1}번째 옥텟`}
             autocomplete="off"
-            class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-2 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+            class="min-h-11 w-full min-w-0 max-w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-1.5 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 sm:px-2"
             disabled={disabled}
             inputMode="numeric"
             maxLength={3}
@@ -122,6 +121,11 @@ function Ipv4OctetInput({
             spellcheck={false}
             value={octet}
           />
+          {index < octets.length - 1 ? (
+            <span aria-hidden="true" class="ssh-ipv4-separator text-sm font-black text-slate-400">
+              .
+            </span>
+          ) : null}
         </div>
       ))}
     </div>
@@ -153,28 +157,31 @@ function DhcpHostInput({
   return (
     <label class="block">
       <span class="text-sm font-extrabold text-slate-800">{label}</span>
-      <div class="mt-2 flex min-h-11 items-center gap-1.5" aria-label={`${label} 입력`}>
+      <div class="ssh-ipv4-segments mt-2 min-h-11" aria-label={`${label} 입력`}>
         {prefixParts.map((part, index) => (
-          <div class="contents" key={index}>
-            {index > 0 ? <span class="text-sm font-black text-slate-400">.</span> : null}
-            <span class="grid min-h-11 min-w-0 flex-1 place-items-center rounded-xl border border-slate-200 bg-slate-100 px-2 py-2.5 text-center text-sm font-bold text-slate-500">
+          <div class="ssh-ipv4-segment" key={index}>
+            <span class="grid min-h-11 w-full min-w-0 max-w-full place-items-center rounded-xl border border-slate-200 bg-slate-100 px-1.5 py-2.5 text-center text-sm font-bold text-slate-500 sm:px-2">
               {part || '—'}
+            </span>
+            <span aria-hidden="true" class="ssh-ipv4-separator text-sm font-black text-slate-400">
+              .
             </span>
           </div>
         ))}
-        <span class="text-sm font-black text-slate-400">.</span>
-        <input
-          aria-label={`${label} 마지막 옥텟`}
-          autocomplete="off"
-          class="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-slate-300 bg-slate-50 px-2 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
-          disabled={disabled || !prefix}
-          inputMode="numeric"
-          maxLength={3}
-          onInput={(event) => updateHost(event.currentTarget.value)}
-          pattern="[0-9]*"
-          spellcheck={false}
-          value={host}
-        />
+        <div class="ssh-ipv4-segment">
+          <input
+            aria-label={`${label} 마지막 옥텟`}
+            autocomplete="off"
+            class="min-h-11 w-full min-w-0 max-w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-1.5 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100 sm:px-2"
+            disabled={disabled || !prefix}
+            inputMode="numeric"
+            maxLength={3}
+            onInput={(event) => updateHost(event.currentTarget.value)}
+            pattern="[0-9]*"
+            spellcheck={false}
+            value={host}
+          />
+        </div>
       </div>
       <span class="mt-2 block text-xs text-slate-500">
         앞 3개 주소는 공유기 IP 주소와 동일하게 유지됩니다.
