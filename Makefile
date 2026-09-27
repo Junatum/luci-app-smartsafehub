@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.22
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -36,14 +36,6 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 		mkdir -p /tmp/smartsafehub
 		: > /tmp/smartsafehub/activity-cloud-sync-upgrade-enable
 	fi
-
-	# r12 initially ran SafeShield refresh observation in a separate daemon.
-	# Stop it before files are replaced so the unified event daemon is the only
-	# observer after this package is unpacked.
-	if [ -x /etc/init.d/smartsafehub-safeshield-events ]; then
-		/etc/init.d/smartsafehub-safeshield-events stop >/dev/null 2>&1 || true
-		/etc/init.d/smartsafehub-safeshield-events disable >/dev/null 2>&1 || true
-	fi
 fi
 exit 0
 endef
@@ -58,13 +50,6 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 		rm -f /tmp/smartsafehub/activity-cloud-sync-upgrade-enable
 	fi
 	uci -q commit smartsafehub >/dev/null 2>&1 || true
-	# r12 initially shipped the SafeShield refresh observer as a separate procd
-	# service. Stop/disable it when upgrading to the unified event daemon while
-	# the legacy init script is still present.
-	if [ -x /etc/init.d/smartsafehub-safeshield-events ]; then
-		/etc/init.d/smartsafehub-safeshield-events stop >/dev/null 2>&1 || true
-		/etc/init.d/smartsafehub-safeshield-events disable >/dev/null 2>&1 || true
-	fi
 	if [ -x /etc/init.d/smartsafehub-events ]; then
 		/etc/init.d/smartsafehub-events enable
 		/etc/init.d/smartsafehub-events restart >/dev/null 2>&1 || true

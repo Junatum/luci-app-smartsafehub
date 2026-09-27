@@ -1,5 +1,16 @@
 # 변경 기록
 
+## [0.2.22-r5] - 2026-09-28
+
+### 정리
+
+- 개발 중 잠시 사용했던 독립 `smartsafehub-safeshield-events` 서비스의 업그레이드 호환 처리와 관련 계약 테스트를 제거했습니다. 실제 SafeShield 비동기 갱신 관찰은 기존과 동일하게 통합 `smartsafehub-events` daemon이 담당합니다.
+- 통합 이벤트 daemon의 SafeShield observer 상태/lock 파일명을 `safeshield-observer.*`로 정리해 더 이상 존재하지 않는 독립 서비스와 혼동되지 않도록 했습니다.
+
+### 테스트
+
+- 이벤트 테스트가 새 SafeShield observer 상태 파일명을 사용하도록 갱신하고, 패키지/Cloud activity 계약에서 존재하지 않는 legacy 서비스의 stop/disable migration 요구사항을 제거했습니다.
+
 ## [0.2.22-r4] - 2026-09-28
 
 ### 개선

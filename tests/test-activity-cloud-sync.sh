@@ -31,8 +31,6 @@ grep -Fq 'watch-refresh-detached' "$SAFE_ADAPTER" || fail 'manual refresh must s
 grep -Fq 'safeshield.blocklist.updated' "$EVENTS_BIN" || fail 'unified event daemon must record each observed SafeShield refresh completion'
 grep -Fq 'safeshield.blocklist.update_failed' "$EVENTS_BIN" || fail 'unified event daemon must record SafeShield refresh failures'
 grep -Fq 'safeshield_observe_once' "$EVENTS_BIN" || fail 'SafeShield refresh observer must live in smartsafehub-events'
-[ ! -e "$ROOT_DIR/root/usr/libexec/smartsafehub-safeshield-events" ] || fail 'standalone SafeShield event daemon must be removed'
-[ ! -e "$ROOT_DIR/root/etc/init.d/smartsafehub-safeshield-events" ] || fail 'standalone SafeShield event init service must be removed'
 if grep -Fq 'safeshield.protection.enabled' "$HEALTH_BIN" || grep -Fq 'safeshield.blocklist.updated' "$HEALTH_BIN"; then
   fail 'Health observer must not duplicate SafeShield mutation/refresh events'
 fi
