@@ -168,10 +168,27 @@ function read_firmware_channel() {
 	return 'stable';
 }
 
+function supported_device_code(device_code) {
+	switch (device_code) {
+	case 'iptime-ax3000sm':
+	case 'iptime-a3004t':
+	case 'iptime-ax3000se':
+	case 'gl-mt300n-v2':
+	case 'xiaomi-ax3000t':
+		return true;
+	default:
+		return false;
+	}
+}
+
 function board_device_code(board_name) {
 	switch (board_name) {
 	case 'iptime,ax3000sm':
 		return 'iptime-ax3000sm';
+	case 'iptime,a3004t':
+		return 'iptime-a3004t';
+	case 'iptime,ax3000se':
+		return 'iptime-ax3000se';
 	case 'glinet,gl-mt300n-v2':
 		return 'gl-mt300n-v2';
 	case 'xiaomi,mi-router-ax3000t':
@@ -214,10 +231,10 @@ function read_current_firmware() {
 	let device_code = limited_string(metadata?.device_code, 80);
 	let build_id = limited_string(metadata?.build_id, 80);
 
-	if (device_code != 'iptime-ax3000sm' && device_code != 'gl-mt300n-v2' && device_code != 'xiaomi-ax3000t') {
+	if (!supported_device_code(device_code)) {
 		device_code = limited_string(config?.device_code, 80);
 	}
-	if (device_code != 'iptime-ax3000sm' && device_code != 'gl-mt300n-v2' && device_code != 'xiaomi-ax3000t') {
+	if (!supported_device_code(device_code)) {
 		device_code = board_device_code(board_name);
 	}
 

@@ -194,28 +194,37 @@ safe_build_id() {
 	esac
 }
 
+supported_firmware_device_code() {
+	case "$1" in
+		iptime-ax3000sm|iptime-a3004t|iptime-ax3000se|gl-mt300n-v2|xiaomi-ax3000t)
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
 firmware_device_code() {
 	local value board
 
 	value="$(json_value "$FIRMWARE_METADATA_FILE" '@.device_code')"
-	case "$value" in
-		iptime-ax3000sm|gl-mt300n-v2|xiaomi-ax3000t)
-			printf '%s' "$value"
-			return 0
-			;;
-	esac
+	if supported_firmware_device_code "$value"; then
+		printf '%s' "$value"
+		return 0
+	fi
 
 	value="$(uci_get device_code)"
-	case "$value" in
-		iptime-ax3000sm|gl-mt300n-v2|xiaomi-ax3000t)
-			printf '%s' "$value"
-			return 0
-			;;
-	esac
+	if supported_firmware_device_code "$value"; then
+		printf '%s' "$value"
+		return 0
+	fi
 
 	board="$(cat "$BOARD_NAME_FILE" 2>/dev/null || true)"
 	case "$board" in
 		iptime,ax3000sm) printf '%s' 'iptime-ax3000sm' ;;
+		iptime,a3004t) printf '%s' 'iptime-a3004t' ;;
+		iptime,ax3000se) printf '%s' 'iptime-ax3000se' ;;
 		glinet,gl-mt300n-v2) printf '%s' 'gl-mt300n-v2' ;;
 		xiaomi,mi-router-ax3000t|xiaomi,ax3000t) printf '%s' 'xiaomi-ax3000t' ;;
 		*) return 1 ;;

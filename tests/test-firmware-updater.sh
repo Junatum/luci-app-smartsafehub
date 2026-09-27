@@ -259,6 +259,32 @@ sed '/^case "${1:-}" in$/,$d' "$FIRMWARE" > "$TMP/firmware-lib.sh"
 # shellcheck disable=SC1090
 . "$TMP/firmware-lib.sh"
 
+# Supported-device contract: new ipTIME models must be accepted from immutable
+# firmware metadata and must still be discoverable from OpenWrt board_name when
+# older images do not contain SmartSafeHub metadata.
+cat > "$TMP/firmware.json" <<'EOF2'
+{"device_code":"iptime-a3004t"}
+EOF2
+[ "$(firmware_device_code)" = 'iptime-a3004t' ] || \
+	fail 'A3004T firmware metadata must resolve to iptime-a3004t'
+
+cat > "$TMP/firmware.json" <<'EOF2'
+{"device_code":"iptime-ax3000se"}
+EOF2
+[ "$(firmware_device_code)" = 'iptime-ax3000se' ] || \
+	fail 'AX3000SE firmware metadata must resolve to iptime-ax3000se'
+
+cat > "$TMP/firmware.json" <<'EOF2'
+{"device_code":"unsupported-device"}
+EOF2
+printf '%s\n' 'iptime,a3004t' > "$TMP/sysinfo/board_name"
+[ "$(firmware_device_code)" = 'iptime-a3004t' ] || \
+	fail 'A3004T board_name fallback must resolve to iptime-a3004t'
+
+printf '%s\n' 'iptime,ax3000se' > "$TMP/sysinfo/board_name"
+[ "$(firmware_device_code)" = 'iptime-ax3000se' ] || \
+	fail 'AX3000SE board_name fallback must resolve to iptime-ax3000se'
+
 MOCK_BOOT_CHECK_CALLS=0
 MOCK_BOOT_CHECK_SUCCESS_AT=2
 MOCK_BOOT_SLEEP_LOG="$TMP/firmware-boot-sleep.log"

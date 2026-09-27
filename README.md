@@ -187,7 +187,7 @@ Tailwind CSS v4는 border, ring/shadow, transform 등의 내부 기본값을 `@p
 - 수동 펌웨어 파일은 LuCI dispatcher(`/cgi-bin/luci`)가 아니라 전용 CGI endpoint인 `/cgi-bin/cgi-upload`로 전송하며, 업로드 실패 시 브라우저 콘솔에 endpoint·HTTP 상태·destination·파일 정보를 기록해 ACL/HTTP/네트워크 오류를 구분할 수 있도록 함
 - 설정 유지가 가능한 이미지에서는 기본적으로 현재 설정을 유지하고, 검증 결과가 설정 보존을 허용하지 않는 이미지는 해당 선택을 비활성화
 - 강제 `sysupgrade`는 SmartSafeHub UI와 helper에서 제공하지 않음
-- 지원 장치 코드는 `iptime-ax3000sm`, `gl-mt300n-v2`, `xiaomi-ax3000t`이며 빌드 이미지에는 정확한 현재 빌드를 식별할 수 있도록 `/usr/share/smartsafehub/firmware.json`을 포함하는 것을 권장
+- 지원 장치 코드는 `iptime-ax3000sm`, `iptime-a3004t`, `iptime-ax3000se`, `gl-mt300n-v2`, `xiaomi-ax3000t`이며 빌드 이미지에는 정확한 현재 빌드를 식별할 수 있도록 `/usr/share/smartsafehub/firmware.json`을 포함하는 것을 권장
 
 권장 펌웨어 메타데이터 예시는 다음과 같습니다. `build_id`는 Hub의 펌웨어 배포 `build_id`와 동일해야 하며, 관리자가 게시 시점에 결정하는 `release_version`은 이 파일에 기록하지 않습니다. 메타데이터가 없는 기존 이미지는 보드 이름으로 장치 종류를 식별할 수 있지만 현재 빌드와 릴리즈 버전 매핑 정확도가 낮아질 수 있습니다.
 
@@ -685,6 +685,10 @@ Wi-Fi 또는 SafeShield가 설치되지 않았거나 일시적으로 응답하�
 logread | grep -Ei 'rpcd|ucode|smartsafehub|safeshield' | tail -200
 ```
 
+### Cloud 활동 기록 재시도 정책
+
+Cloud 활동 기록 전송이 ON이고 Activity API 또는 license status/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. Cloud 전송이 OFF이면 이 네트워크 재시도 경로 자체를 실행하지 않고 outbox도 만들지 않습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신/전송 설정과 무관하게 최대 128건을 표시합니다.
+
 ## 프런트엔드 캐시 문제
 
 패키지를 업그레이드했는데 이전 화면이 남으면 다음 순서로 확인합니다.
@@ -780,8 +784,3 @@ apk info luci-app-smartsafehub
 ## 라이선스
 
 이 프로젝트는 [GPL-3.0-or-later](LICENSE) 조건으로 배포됩니다.
-
-
-### Cloud 활동 기록 재시도 정책
-
-Cloud 활동 기록 전송이 ON이고 Activity API 또는 license status/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. Cloud 전송이 OFF이면 이 네트워크 재시도 경로 자체를 실행하지 않고 outbox도 만들지 않습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신/전송 설정과 무관하게 최대 128건을 표시합니다.

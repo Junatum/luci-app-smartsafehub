@@ -223,6 +223,19 @@ grep -Fq 'restore_is_busy && return 75' "$BACKUP_HELPER" || \
 grep -Fq 'current_build_id="$build_id"' "$BACKUP_HELPER" || \
 	fail 'configuration restore must re-sync current firmware identity after applying an older backup'
 
+grep -Fq "case 'iptime-a3004t':" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must accept iptime-a3004t as a supported device code'
+grep -Fq "case 'iptime-ax3000se':" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must accept iptime-ax3000se as a supported device code'
+grep -Fq "case 'iptime,a3004t':" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must map the A3004T OpenWrt board name'
+grep -Fq "case 'iptime,ax3000se':" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must map the AX3000SE OpenWrt board name'
+grep -Fq "return 'iptime-a3004t';" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must normalize A3004T to iptime-a3004t'
+grep -Fq "return 'iptime-ax3000se';" "$FIRMWARE_MODULE" || \
+	fail 'firmware RPC must normalize AX3000SE to iptime-ax3000se'
+
 if grep -Eq '^[[:space:]]*(apk|"\$APK_BIN"|\$APK_BIN)[[:space:]]+upgrade([[:space:]]|$)' "$UPDATER"; then
 	fail 'full-system apk upgrade must not be used by SmartSafeHub updater'
 fi
