@@ -42,8 +42,18 @@ SmartSafeHub는 OpenWrt 지원 공유기에서 장치 상태, Wi-Fi, 연결 기�
 ## 빠른 시작
 
 SmartSafeHub 패키지 저장소를 사용하는 장치에서는 다음과 같이 설치하거나 업데이트합니다.
+현재 지원중인 architecture는 `aarch64_cortex-a53`, `mipsel_24kc`, `x86_64` 입니다.
 
 ```bash
+mkdir -p /etc/apk/keys /etc/apk/repositories.d
+
+uclient-fetch -O /etc/apk/keys/smartsafehub.pem 
+  https://repo.smartsafehub.com/stable/packages/<architecture>/smartsafehub/smartsafehub.pem
+
+printf '%s\n' \
+  'https://repo.smartsafehub.com/stable/packages/<architecture>/smartsafehub/packages.adb' \
+  > /etc/apk/repositories.d/smartsafehub.list
+
 apk update
 apk add --upgrade luci-app-smartsafehub
 ```
