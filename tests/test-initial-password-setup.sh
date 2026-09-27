@@ -12,14 +12,14 @@ ENTRY="$ROOT_DIR/frontend/src/app/AuthenticatedEntry.tsx"
 SETUP_PAGE="$ROOT_DIR/frontend/src/pages/InitialPasswordSetupPage.tsx"
 SETUP_API="$ROOT_DIR/frontend/src/api/initialSetup.ts"
 STYLES="$ROOT_DIR/frontend/src/styles/app.css"
-README="$ROOT_DIR/README.md"
+FEATURES="$ROOT_DIR/docs/FEATURES.md"
 
 fail() {
 	printf 'FAIL: %s\n' "$*" >&2
 	exit 1
 }
 
-for file in "$RPC_ENTRY" "$SECURITY_MODULE" "$ACL" "$LOGIN" "$SESSION" "$ENTRY" "$SETUP_PAGE" "$SETUP_API" "$STYLES" "$README"; do
+for file in "$RPC_ENTRY" "$SECURITY_MODULE" "$ACL" "$LOGIN" "$SESSION" "$ENTRY" "$SETUP_PAGE" "$SETUP_API" "$STYLES" "$FEATURES"; do
 	[ -f "$file" ] || fail "missing initial password setup file: ${file#$ROOT_DIR/}"
 done
 
@@ -123,7 +123,7 @@ grep -Fq '.ssh-password-requirements {' "$STYLES" || \
 	fail 'password policy status must have dedicated styling'
 grep -Fq '.ssh-password-setup-summary {' "$STYLES" || \
 	fail 'initial setup security notice must have dedicated styling'
-grep -Fq 'root 관리자 비밀번호' "$README" || \
-	fail 'README must document the enforced root password initialization flow'
+grep -Fq 'root 관리자 비밀번호' "$FEATURES" || \
+	fail 'FEATURES must document the enforced root password initialization flow'
 
 printf 'PASS: root password initialization, policy, RPC gate and re-login contracts are consistent\n'
