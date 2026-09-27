@@ -136,6 +136,12 @@ grep -Fq 'title="네트워크 보호 활동"' "$HOME" || \
 	fail '대시보드는 네트워크 보호 활동 영역을 표시해야 합니다'
 grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \
 	fail '대시보드는 SafeShield 활동 시각화를 렌더링해야 합니다'
+grep -Fq 'nowTimestamp={relativeNow}' "$HOME" || \
+	fail 'SafeShield 최근 집계 상대 시간은 대시보드의 1분 갱신 시계를 공유해야 합니다'
+grep -Fq 'action={' "$HOME" || \
+	fail '최근 활동 전체 보기 링크는 SectionHeading 제목 행의 action으로 배치해야 합니다'
+grep -Fq 'class="inline-flex whitespace-nowrap text-xs font-extrabold text-teal-700 no-underline hover:text-teal-900"' "$HOME" || \
+	fail '최근 활동 전체 보기 링크는 모바일에서 줄바꿈되지 않아야 합니다'
 grep -Fq 'title="시스템 상태"' "$HOME" || \
 	fail '대시보드는 시스템 상태 영역을 표시해야 합니다'
 grep -Fq 'function DashboardHealthSummary({' "$HOME" || \
@@ -205,6 +211,17 @@ grep -Fq "updates && !updates.settings.checkEnabled" "$HOME" || \
 	fail '소프트웨어 자동 확인이 꺼져 있으면 지연 상태로 표시하지 않아야 합니다'
 grep -Fq 'const RELATIVE_TIME_TICK_MS = 60_000;' "$HOME" || \
 	fail '대시보드 상대 시간 문구는 백엔드 polling 없이 1분마다 갱신되어야 합니다'
+grep -Fq "import { formatNumber, formatRelativeTime, formatTimestamp } from '../app/format';" "$ACTIVITY" || \
+	fail 'SafeShield 최근 활동 카드는 공통 상대 시간 formatter를 사용해야 합니다'
+grep -Fq 'class="shrink-0 whitespace-nowrap text-xs font-extrabold text-teal-700 no-underline hover:text-teal-800"' "$ACTIVITY" || \
+	fail 'SafeShield 상세 통계 링크는 제목 오른쪽에서 모바일 줄바꿈 없이 유지되어야 합니다'
+grep -Fq 'title={formatTimestamp(data.updatedAt)}' "$ACTIVITY" || \
+	fail 'SafeShield 상대 집계 시각은 정확한 절대 시각을 title 정보로 유지해야 합니다'
+grep -Fq '`집계: ${formatRelativeTime(data.updatedAt, nowTimestamp)}`' "$ACTIVITY" || \
+	fail 'SafeShield 최근 집계 시각은 상대 시간으로 표시해야 합니다'
+if grep -Fq '`집계: ${formatTimestamp(data.updatedAt)}`' "$ACTIVITY"; then
+	fail '대시보드 SafeShield 집계 시각을 절대 날짜로 직접 표시하면 안 됩니다'
+fi
 grep -Fq "return '방금 전';" "$FORMAT" || \
 	fail '상대 시간 formatter는 방금 전 상태를 지원해야 합니다'
 grep -Fq 'Math.floor(elapsedSeconds / 60)}분 전' "$FORMAT" || \
