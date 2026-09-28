@@ -1,5 +1,18 @@
 # 변경 기록
 
+## [0.2.24-r3] - 2026-09-29
+
+### 수정
+
+- `90-smartsafehub-system-defaults`가 펌웨어 업그레이드 때 기존 hostname, 시간대, 로그 및 NTP 사용자 설정을 다시 SmartSafeHub 기본값으로 덮어쓰지 않도록 하고, 새 설치의 OpenWrt 기본값 또는 누락된 옵션에만 기본값을 적용하도록 변경했습니다.
+- OpenWrt 표준 설정 백업에 기존 `/usr/share/smartsafehub/firmware.json`을 포함하고 `device_code`가 현재 공유기와 일치하는 경우에만 복원을 허용해 다른 모델의 설정 백업 적용을 차단했습니다. 별도의 장치 identity 파일은 추가하지 않습니다.
+- 백업에 포함된 과거 `firmware.json`은 호환성 검증에만 사용하고, 복원 직후 현재 설치된 펌웨어 metadata를 다시 복구해 `build_id`와 firmware identity가 과거 값으로 되돌아가지 않도록 했습니다.
+
+### 테스트
+
+- 기존 사용자 system/NTP 설정 보존, 새 설치 기본값 적용, `compat_version` 비변경을 검증하는 system-defaults 회귀 테스트를 보강했습니다.
+- 같은 `device_code` 백업 허용, 다른 장치 및 식별 metadata 없는 백업 거부, 성공/실패 복원 후 현재 `firmware.json` 보존을 검증하는 백업 회귀 테스트를 추가했습니다.
+
 ## [0.2.24-r2] - 2026-09-29
 
 ### 개선
