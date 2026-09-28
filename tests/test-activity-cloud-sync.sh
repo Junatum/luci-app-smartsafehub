@@ -68,6 +68,7 @@ for contract in \
   'root/usr/share/rpcd/ucode/smartsafehub/updates.uc:settings.software_updates.updated' \
   'root/usr/share/rpcd/ucode/smartsafehub/health.uc:settings.health_reporter.enabled' \
   'root/usr/share/rpcd/ucode/smartsafehub/wifi-management.uc:settings.wifi.updated' \
+  'root/usr/share/rpcd/ucode/smartsafehub/network-management.uc:settings.wan.updated' \
   'root/usr/share/rpcd/ucode/smartsafehub/network-management.uc:settings.lan.updated' \
   'root/usr/share/rpcd/ucode/smartsafehub/iptv-management.uc:settings.iptv.updated'; do
   file="${contract%%:*}"

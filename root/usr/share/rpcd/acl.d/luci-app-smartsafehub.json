@@ -22,6 +22,7 @@
           "rules_list"
         ],
         "smartsafehub_network": [
+          "wan_settings",
           "lan_settings",
           "iptv_settings"
         ]
@@ -71,6 +72,8 @@
           "license_update"
         ],
         "smartsafehub_network": [
+          "wan_reconnect",
+          "wan_update",
           "lan_update",
           "lan_auto_subnet",
           "iptv_update"

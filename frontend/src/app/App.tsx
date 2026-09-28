@@ -9,6 +9,7 @@ import { useHashRoute } from '../hooks/useHashRoute';
 import { useHealth } from '../hooks/useHealth';
 import { useIptv } from '../hooks/useIptv';
 import { useLan } from '../hooks/useLan';
+import { useWan } from '../hooks/useWan';
 import { useSafeShieldActions } from '../hooks/useSafeShieldActions';
 import { useSafeShieldRules } from '../hooks/useSafeShieldRules';
 import { useSafeShieldStatistics } from '../hooks/useSafeShieldStatistics';
@@ -24,6 +25,7 @@ import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
 import { IptvPage } from '../pages/IptvPage';
 import { LanPage } from '../pages/LanPage';
+import { WanPage } from '../pages/WanPage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
 import { SettingsPage } from '../pages/SettingsPage';
@@ -39,6 +41,7 @@ export function App() {
   const firmware = useFirmwareUpdates(
     route === 'system' || route === 'home' || route === 'settings',
   );
+  const wan = useWan(route === 'wan');
   const lan = useLan(route === 'home' || route === 'lan');
   const iptv = useIptv(route === 'iptv');
   const wifi = useWifi(route === 'wifi');
@@ -61,25 +64,43 @@ export function App() {
   const current =
     route === 'activity'
       ? activity
-      : route === 'lan'
-        ? lan
-        : route === 'wifi'
-          ? wifi
-          : route === 'iptv'
-            ? iptv
-            : route === 'devices'
-              ? devices
-              : route === 'safeshield'
-                ? safeshield
-                : route === 'rules'
-                  ? rules
-                  : route === 'system'
-                    ? updates
-                    : status;
+      : route === 'wan'
+        ? wan
+        : route === 'lan'
+          ? lan
+          : route === 'wifi'
+            ? wifi
+            : route === 'iptv'
+              ? iptv
+              : route === 'devices'
+                ? devices
+                : route === 'safeshield'
+                  ? safeshield
+                  : route === 'rules'
+                    ? rules
+                    : route === 'system'
+                      ? updates
+                      : status;
 
   let content: ComponentChildren;
 
   switch (route) {
+    case 'wan':
+      content = (
+        <WanPage
+          action={wan.action}
+          data={wan.data}
+          error={wan.error}
+          feedback={wan.feedback}
+          loading={wan.loading}
+          onDismissFeedback={wan.dismissFeedback}
+          onReconnect={() => void wan.reconnect()}
+          onRetry={() => void wan.refresh()}
+          onSave={wan.save}
+        />
+      );
+      break;
+
     case 'activity':
       content = (
         <ActivityPage

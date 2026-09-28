@@ -8,6 +8,7 @@ import {
   CloseIcon,
   ClockIcon,
   DevicesIcon,
+  GlobeIcon,
   HomeIcon,
   LogOutIcon,
   MenuIcon,
@@ -42,7 +43,7 @@ const NAVIGATION_GROUPS: readonly {
   routes: readonly AppRoute[];
 }[] = [
   { label: 'Overview', routes: ['home', 'activity'] },
-  { label: 'Network', routes: ['lan', 'wifi', 'iptv', 'devices'] },
+  { label: 'Network', routes: ['wan', 'lan', 'wifi', 'iptv', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
   { label: 'System', routes: ['system', 'settings'] },
 ];
@@ -53,6 +54,8 @@ function NavigationIcon({ route }: { route: AppRoute }) {
       return <HomeIcon class="size-5" />;
     case 'activity':
       return <ClockIcon class="size-5" />;
+    case 'wan':
+      return <GlobeIcon class="size-5" />;
     case 'lan':
       return <CableIcon class="size-5" />;
     case 'wifi':
