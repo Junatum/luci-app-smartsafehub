@@ -42,6 +42,18 @@ grep -Fq "{routeName === 'system' && updateCount > 0 ? (" "$NAVIGATION" || \
 	fail 'update navigation item must render a badge whenever the combined update count is non-zero'
 grep -Fq 'aria-label={`${updateCount}개의 업데이트`}' "$NAVIGATION" || \
 	fail 'collapsed update notification must keep an accessible combined update count'
+grep -Fq 'class="ssh-update-nav-badge"' "$NAVIGATION" || \
+	fail 'update navigation count must use the dedicated high-contrast badge style'
+grep -Fq 'data-collapsed="true"' "$NAVIGATION" || \
+	fail 'collapsed update notification must expose the compact badge variant'
+grep -Fq ".ssh-update-nav-badge[data-collapsed='true']" "$APP_CSS" || \
+	fail 'collapsed update badge must keep a dedicated 20px notification geometry'
+grep -Fq ".ssh-app[data-theme='dark'] .ssh-update-nav-badge {" "$APP_CSS" || \
+	fail 'update badge must define a dedicated dark-mode contrast treatment'
+grep -Fq 'background: #fbbf24;' "$APP_CSS" || \
+	fail 'dark update badge must use a solid amber surface instead of the generic translucent amber background'
+grep -Fq 'color: #422006;' "$APP_CSS" || \
+	fail 'dark update badge count must keep strong contrast against the solid amber surface'
 
 # Firmware and management software must read as separate update products.
 grep -Fq '관리 소프트웨어 업데이트' "$UPDATES_CARD" || \

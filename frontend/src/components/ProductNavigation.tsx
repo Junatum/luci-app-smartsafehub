@@ -156,12 +156,13 @@ function NavigationItems({
                     collapsed ? (
                       <span
                         aria-label={`${updateCount}개의 업데이트`}
-                        class="absolute right-1.5 top-1.5 min-w-4 rounded-full bg-amber-100 px-1 py-0.5 text-center text-[9px] font-black leading-none text-amber-800 ring-2 ring-white"
+                        class="ssh-update-nav-badge"
+                        data-collapsed="true"
                       >
                         {updateCount}
                       </span>
                     ) : (
-                      <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-black text-amber-800">
+                      <span class="ssh-update-nav-badge" data-collapsed="false">
                         {updateCount}
                       </span>
                     )
