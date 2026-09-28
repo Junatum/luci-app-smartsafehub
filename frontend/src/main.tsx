@@ -43,7 +43,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.22-r11',
+    assetVersion: host.dataset.assetVersion ?? '0.2.22-r12',
     locale: document.documentElement.lang || 'ko',
   });
 }
@@ -108,11 +108,13 @@ function renderAuthenticated(
           '관리자 비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.',
         );
       }}
-      onPasswordConfigured={() => {
+      onPasswordConfigured={(recovery) => {
         renderLogin(
           host,
           mountPoint,
-          '관리자 비밀번호가 설정되었습니다. 새 비밀번호로 다시 로그인해 주세요.',
+          recovery
+            ? '관리자 비밀번호 복구가 완료되었습니다. 새 비밀번호로 다시 로그인해 주세요.'
+            : '관리자 비밀번호가 설정되었습니다. 새 비밀번호로 다시 로그인해 주세요.',
         );
       }}
     />,

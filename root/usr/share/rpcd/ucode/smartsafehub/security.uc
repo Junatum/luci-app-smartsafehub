@@ -6,10 +6,13 @@ import * as fs from 'fs';
 import {
 	defer_call,
 	failure,
+	run_command,
 	success
 } from './core.uc';
 
 const SHADOW_FILE = '/etc/shadow';
+const PASSWORD_RECOVERY_MARKER = '/etc/smartsafehub/password-recovery';
+const PASSWORD_RECOVERY_HELPER = '/usr/libexec/smartsafehub-password-recovery';
 
 function root_password_hash() {
 	const shadow = fs.readfile(SHADOW_FILE);
@@ -43,6 +46,17 @@ export function root_password_configured() {
 	// configured rather than silently replacing an administrator-managed lock.
 	return length(password_hash) > 0;
 };
+
+function root_password_recovery_requested() {
+	return fs.stat(PASSWORD_RECOVERY_MARKER) != null;
+}
+
+function password_status(configured) {
+	return {
+		configured: configured,
+		recovery: !configured && root_password_recovery_requested(),
+	};
+}
 
 function password_policy_error(password) {
 	if (type(password) != 'string') {
@@ -83,7 +97,7 @@ export function read_root_password_status(request) {
 		);
 	}
 
-	return success({ configured: configured });
+	return success(password_status(configured));
 };
 
 
@@ -93,7 +107,7 @@ function reply_password_change_success(request) {
 		const logout_request = defer_call('session', 'destroy', {
 			ubus_rpc_session: session_id,
 		}, function(code, response) {
-			request.reply(success({ configured: true }));
+			request.reply(success({ configured: true, recovery: false }));
 		});
 
 		if (logout_request != null) {
@@ -101,7 +115,7 @@ function reply_password_change_success(request) {
 		}
 	}
 
-	request.reply(success({ configured: true }));
+	request.reply(success({ configured: true, recovery: false }));
 	return null;
 }
 
@@ -257,12 +271,24 @@ export function set_initial_root_password(request) {
 			return;
 		}
 
+		if (root_password_recovery_requested()) {
+			// Password recovery deliberately clears only the root password and
+			// temporarily disables Dropbear. Once a new password has been set,
+			// restore the pre-recovery SSH enable state and clear the marker. A
+			// cleanup failure must not turn a successfully changed password into
+			// an unrecoverable form error, so keep the web login usable and let
+			// the boot reconciler retry on the next restart.
+			if (!run_command([PASSWORD_RECOVERY_HELPER, 'complete'], 5000)) {
+				warn('smartsafehub: administrator password recovery cleanup failed\n');
+			}
+		}
+
 		const session_id = request.args.ubus_rpc_session;
 		if (type(session_id) == 'string' && length(session_id)) {
 			const logout_request = defer_call('session', 'destroy', {
 				ubus_rpc_session: session_id,
 			}, function(code, response) {
-				request.reply(success({ configured: true }));
+				request.reply(success({ configured: true, recovery: false }));
 			});
 
 			if (logout_request != null) {
@@ -270,7 +296,7 @@ export function set_initial_root_password(request) {
 			}
 		}
 
-		request.reply(success({ configured: true }));
+		request.reply(success({ configured: true, recovery: false }));
 	});
 
 	if (password_request == null) {

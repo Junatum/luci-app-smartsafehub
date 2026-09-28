@@ -1,5 +1,23 @@
 # 변경 기록
 
+## [0.2.22-r12] - 2026-09-28
+
+### 추가
+
+- SmartSafeHub Reset Policy v1을 추가해 Reset 버튼을 5~9초 누르면 관리자 비밀번호만 복구하고, 10초 이상 누르면 OpenWrt factory reset으로 모든 사용자 설정을 초기화하도록 동작을 분리했습니다.
+- 물리 비밀번호 복구 시 WAN/LAN, Wi-Fi, SafeShield와 라이선스 설정은 유지하고 root 관리자 비밀번호만 비운 뒤 복구 상태로 재부팅합니다.
+- 비밀번호가 비어 있는 복구 구간에는 Dropbear를 중지/비활성화하고, 새 비밀번호 설정이 끝나면 복구 전 SSH 활성 상태를 복원합니다.
+- 복구 상태에서는 최초 설정과 구분되는 관리자 비밀번호 복구 화면을 표시하고 완료 후 새 비밀번호로 다시 로그인하도록 했습니다.
+
+### 호환성
+
+- SmartSafeHub 전용 Reset handler가 `/etc/rc.button/reset`을 소유하도록 변경했습니다. 펌웨어는 OpenWrt의 기본 reset handler를 포함하지 않도록 `CONFIG_TARGET_BUTTON_CUSTOMIZATION=y`와 `CONFIG_TARGET_BUTTON_CUSTOMIZATION_RESET_DISABLED=y`를 사용해야 합니다.
+- 기존 OpenWrt reset handler가 남아 있는 구형 펌웨어에서는 5초 이상 누름이 즉시 factory reset으로 해석될 수 있으므로, 관리 소프트웨어 단독 업그레이드를 차단하고 먼저 호환 펌웨어 업데이트를 요구합니다.
+
+### 테스트
+
+- Reset 5~9초/10초 경계, 구형 펌웨어 업그레이드 차단 계약, 비밀번호 복구 marker, Dropbear 보호/복원, 실패 rollback과 복구 전용 UI를 검증하는 회귀 테스트를 추가했습니다.
+
 ## [0.2.22-r11] - 2026-09-28
 
 ### 추가

@@ -948,6 +948,11 @@ function AdministratorPasswordCard(props: { onChanged: () => void }) {
           변경 후 현재 로그인 세션은 종료됩니다.
         </div>
 
+        <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+          <strong class="block font-extrabold">비밀번호를 잊었을 때</strong>
+          전원이 켜진 상태에서 Reset 버튼을 5~9초 누른 뒤 놓으면 관리자 비밀번호만 복구할 수 있습니다. 네트워크, Wi-Fi와 SafeShield 설정은 유지됩니다. 10초 이상 누르면 모든 사용자 설정을 초기화하는 기기 초기화가 실행됩니다.
+        </div>
+
         <div class="flex justify-end">
           <button
             class="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"

@@ -9,7 +9,7 @@ type SetupPhase = 'checking' | 'required' | 'ready' | 'error';
 
 interface AuthenticatedEntryProps {
   onAdministratorPasswordChanged: () => void;
-  onPasswordConfigured: () => void;
+  onPasswordConfigured: (recovery: boolean) => void;
 }
 
 export function AuthenticatedEntry({
@@ -17,12 +17,14 @@ export function AuthenticatedEntry({
   onPasswordConfigured,
 }: AuthenticatedEntryProps) {
   const [phase, setPhase] = useState<SetupPhase>('checking');
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const refresh = useCallback(async () => {
     setPhase('checking');
 
     try {
       const status = await readRootPasswordStatus();
+      setPasswordRecovery(status.recovery);
       setPhase(status.configured ? 'ready' : 'required');
     } catch {
       setPhase('error');
@@ -38,7 +40,12 @@ export function AuthenticatedEntry({
   }
 
   if (phase === 'required') {
-    return <InitialPasswordSetupPage onCompleted={onPasswordConfigured} />;
+    return (
+      <InitialPasswordSetupPage
+        onCompleted={() => onPasswordConfigured(passwordRecovery)}
+        recovery={passwordRecovery}
+      />
+    );
   }
 
   return (

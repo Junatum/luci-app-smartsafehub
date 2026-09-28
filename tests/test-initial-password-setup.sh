@@ -84,8 +84,10 @@ grep -Fq "setPhase(status.configured ? 'ready' : 'required');" "$ENTRY" || \
 	fail 'authenticated entry must force initial setup when root password is missing'
 grep -Fq "if (phase === 'ready')" "$ENTRY" || \
 	fail 'normal SmartSafeHub App must only mount after the password gate passes'
-grep -Fq '<InitialPasswordSetupPage onCompleted={onPasswordConfigured} />' "$ENTRY" || \
+grep -Fq '<InitialPasswordSetupPage' "$ENTRY" || \
 	fail 'missing-password state must render the dedicated initial setup page'
+grep -Fq 'recovery={passwordRecovery}' "$ENTRY" || \
+	fail 'initial setup entry must pass through password recovery state'
 
 grep -Fq 'length: password.length >= 8' "$PASSWORD_UTIL" || \
 	fail 'shared frontend password policy must require at least eight characters'
@@ -112,8 +114,8 @@ grep -Fq '새 비밀번호로 다시 로그인' "$SETUP_PAGE" || \
 
 grep -Fq '<span class="ssh-password-setup-brand-title-line">SmartSafeHub</span>' "$SETUP_PAGE" || \
 	fail 'initial setup hero must keep SmartSafeHub on its own title line'
-grep -Fq '<span class="ssh-password-setup-brand-title-line">보호 시작</span>' "$SETUP_PAGE" || \
-	fail 'initial setup hero must render protection start on the next title line'
+grep -Fq "recovery ? '비밀번호 복구' : '보호 시작'" "$SETUP_PAGE" || \
+	fail 'initial setup hero must render protection start and recovery variants on the second title line'
 grep -Fq '.ssh-password-setup-brand-title-line {' "$STYLES" || \
 	fail 'initial setup hero title lines must have dedicated block styling'
 grep -Fq '비밀번호는 현재 공유기에 직접 설정되며 외부 서버로 전송되지 않습니다.' "$SETUP_PAGE" || \

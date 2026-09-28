@@ -7,7 +7,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-smartsafehub
 PKG_VERSION:=0.2.22
-PKG_RELEASE:=11
+PKG_RELEASE:=12
 
 PKG_MAINTAINER:=Beomjun Kang <kals323@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -27,6 +27,15 @@ endef
 define Package/luci-app-smartsafehub/preinst
 #!/bin/sh
 if [ -z "$${IPKG_INSTROOT}" ]; then
+	# SmartSafeHub Reset Policy v1 requires the firmware build to remove the
+	# stock OpenWrt /etc/rc.button/reset before this package owns that path.
+	# Refuse live upgrades on older firmware rather than risking a package file
+	# collision or showing 5-9 second recovery guidance while OpenWrt still
+	# interprets the same hold as an immediate factory reset.
+	if [ -f /etc/rc.button/reset ] && ! grep -Fq "SMARTSAFEHUB_RESET_POLICY='smartsafehub-v1'" /etc/rc.button/reset 2>/dev/null; then
+		echo "luci-app-smartsafehub: firmware update required for SmartSafeHub Reset Policy v1" >&2
+		exit 1
+	fi
 	# r18 and earlier had Cloud activity sync enabled implicitly whenever the
 	# device was eligible. Preserve that behavior across the r19 upgrade even
 	# if opkg replaces an otherwise-unmodified conffile with the new default-off
@@ -66,6 +75,10 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 	fi
 	if [ -x /etc/init.d/smartsafehub-maintenance ]; then
 		/etc/init.d/smartsafehub-maintenance enable
+	fi
+	if [ -x /etc/init.d/smartsafehub-password-recovery ]; then
+		/etc/init.d/smartsafehub-password-recovery enable
+		/etc/init.d/smartsafehub-password-recovery start >/dev/null 2>&1 || true
 	fi
 	if [ -x /etc/init.d/smartsafehub-health ]; then
 		/etc/init.d/smartsafehub-health enable
