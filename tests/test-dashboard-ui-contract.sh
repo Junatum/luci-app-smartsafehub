@@ -28,8 +28,8 @@ grep -Fq "const dashboardSafeShield = useSafeShieldStatus(route === 'home');" "$
 	fail '대시보드는 SafeShield 상태를 불러와야 합니다'
 grep -Fq "const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);" "$APP" || \
 	fail '대시보드 SafeShield 통계는 주기 polling을 사용하지 않아야 합니다'
-grep -Fq "route === 'system' || route === 'home' || route === 'settings'" "$APP" || \
-	fail '대시보드와 설정 페이지는 SmartSafeHub 펌웨어 식별 정보를 불러와야 합니다'
+grep -Fq 'const firmware = useFirmwareUpdates(true);' "$APP" || \
+	fail '펌웨어 상태는 대시보드/설정뿐 아니라 전역 업데이트 알림을 위해 모든 화면에서 유지되어야 합니다'
 grep -Fq 'devices={dashboardDevices.data}' "$APP" || \
 	fail '대시보드는 연결 기기 요약 데이터를 전달받아야 합니다'
 grep -Fq 'safeshield={dashboardSafeShield.data}' "$APP" || \

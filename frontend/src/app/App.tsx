@@ -38,9 +38,7 @@ export function App() {
   const activity = useActivityHistory(route === 'home' || route === 'activity');
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
-  const firmware = useFirmwareUpdates(
-    route === 'system' || route === 'home' || route === 'settings',
-  );
+  const firmware = useFirmwareUpdates(true);
   const wan = useWan(route === 'network');
   const lan = useLan(route === 'home' || route === 'network');
   const iptv = useIptv(route === 'iptv');
@@ -401,6 +399,9 @@ export function App() {
     void current.refresh();
   };
 
+  const updateCount =
+    (updates.data?.updateCount ?? 0) + (firmware.data?.updateAvailable ? 1 : 0);
+
   return (
     <AppShell
       loading={route === 'network' ? wan.loading || lan.loading : current.loading}
@@ -426,7 +427,7 @@ export function App() {
         (route === 'safeshield' && safeshieldStatistics.refreshing)
       }
       route={route}
-      updateCount={updates.data?.updateCount ?? 0}
+      updateCount={updateCount}
     >
       {content}
     </AppShell>

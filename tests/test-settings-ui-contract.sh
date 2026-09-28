@@ -30,8 +30,8 @@ grep -Fq "const systemTime = useSystemTimeSettings(route === 'settings');" "$APP
 	fail 'settings route must load dedicated timezone settings'
 grep -Fq "const scheduledReboot = useScheduledRebootSettings(route === 'settings');" "$APP" || \
 	fail 'settings route must load scheduled reboot settings'
-grep -Fq "route === 'system' || route === 'home' || route === 'settings'" "$APP" || \
-	fail 'settings route must load cached SmartSafeHub firmware identity'
+grep -Fq 'const firmware = useFirmwareUpdates(true);' "$APP" || \
+	fail 'settings route must share the globally active SmartSafeHub firmware state used by update notifications'
 grep -Fq 'firmware={firmware.data}' "$APP" || \
 	fail 'settings page must receive SmartSafeHub firmware status'
 grep -Fq 'firmwareError={firmware.error}' "$APP" || \

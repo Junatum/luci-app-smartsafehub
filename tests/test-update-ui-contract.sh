@@ -19,15 +19,29 @@ TIME_SELECT="$ROOT_DIR/frontend/src/components/TimeSelect.tsx"
 RUNTIME_APP_JS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.js"
 RUNTIME_APP_CSS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.css"
 UPDATE_FRESHNESS="$ROOT_DIR/frontend/src/utils/softwareUpdates.ts"
+APP="$ROOT_DIR/frontend/src/app/App.tsx"
+NAVIGATION="$ROOT_DIR/frontend/src/components/ProductNavigation.tsx"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$TIME_SELECT" "$RUNTIME_APP_JS" "$RUNTIME_APP_CSS" "$UPDATE_FRESHNESS"; do
+for file in "$UPDATES_CARD" "$FIRMWARE_CARD" "$FIRMWARE_HOOK" "$FIRMWARE_UPLOAD" "$FIRMWARE_TYPES" "$FIRMWARE_RPC" "$UPDATE_PAGE" "$SETTINGS_PAGE" "$UPDATES_HOOK" "$ASYNC_RESOURCE" "$APP_CSS" "$TIME_SELECT" "$RUNTIME_APP_JS" "$RUNTIME_APP_CSS" "$UPDATE_FRESHNESS" "$APP" "$NAVIGATION"; do
 	[ -f "$file" ] || fail "missing required file: ${file#$ROOT_DIR/}"
 done
+
+# The sidebar update indicator must cover both management software and firmware.
+grep -Fq 'const firmware = useFirmwareUpdates(true);' "$APP" || \
+	fail 'firmware status must stay active on every route so the sidebar notification remains current'
+grep -Fq '(updates.data?.updateCount ?? 0) + (firmware.data?.updateAvailable ? 1 : 0)' "$APP" || \
+	fail 'sidebar update count must include one actionable firmware update'
+grep -Fq 'updateCount={updateCount}' "$APP" || \
+	fail 'App must pass the combined management-software and firmware count to the shell'
+grep -Fq "{routeName === 'system' && updateCount > 0 ? (" "$NAVIGATION" || \
+	fail 'update navigation item must render a badge whenever the combined update count is non-zero'
+grep -Fq 'aria-label={`${updateCount}개의 업데이트`}' "$NAVIGATION" || \
+	fail 'collapsed update notification must keep an accessible combined update count'
 
 # Firmware and management software must read as separate update products.
 grep -Fq '관리 소프트웨어 업데이트' "$UPDATES_CARD" || \
