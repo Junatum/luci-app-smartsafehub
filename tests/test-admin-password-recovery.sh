@@ -15,19 +15,22 @@ SECURITY_TYPES="$ROOT_DIR/frontend/src/types/security.ts"
 MAIN="$ROOT_DIR/frontend/src/main.tsx"
 MAKEFILE="$ROOT_DIR/Makefile"
 FEATURES="$ROOT_DIR/docs/FEATURES.md"
+RECOVERY_BRIDGE="$ROOT_DIR/root/www/cgi-bin/smartsafehub-password-recovery"
+RECOVERY_API="$ROOT_DIR/frontend/src/api/passwordRecovery.ts"
 
 fail() {
 	printf 'FAIL: %s\n' "$*" >&2
 	exit 1
 }
 
-for file in "$RESET_HANDLER" "$HELPER" "$INIT" "$SECURITY_MODULE" "$ENTRY" "$SETUP_PAGE" "$LOGIN_PAGE" "$SETTINGS_PAGE" "$SECURITY_TYPES" "$MAIN" "$MAKEFILE" "$FEATURES"; do
+for file in "$RESET_HANDLER" "$HELPER" "$INIT" "$SECURITY_MODULE" "$ENTRY" "$SETUP_PAGE" "$LOGIN_PAGE" "$SETTINGS_PAGE" "$SECURITY_TYPES" "$MAIN" "$MAKEFILE" "$FEATURES" "$RECOVERY_BRIDGE" "$RECOVERY_API"; do
 	[ -f "$file" ] || fail "missing password recovery file: ${file#$ROOT_DIR/}"
 done
 
 [ -x "$RESET_HANDLER" ] || fail 'SmartSafeHub reset handler must be executable'
 [ -x "$HELPER" ] || fail 'password recovery helper must be executable'
 [ -x "$INIT" ] || fail 'password recovery boot reconciler must be executable'
+[ -x "$RECOVERY_BRIDGE" ] || fail 'public password recovery bridge must be executable'
 
 # SmartSafeHub Reset Policy v1 owns the physical reset gesture. Keep short press
 # reboot behavior, reserve 5-9 seconds for password recovery, and move the
@@ -84,6 +87,21 @@ grep -Fq '비밀번호를 잊었을 때' "$SETTINGS_PAGE" || \
 	fail 'administrator password card must document the recovery path before lockout'
 grep -Fq '관리자 비밀번호 복구가 완료되었습니다.' "$MAIN" || \
 	fail 'recovery completion must return to login with recovery-specific feedback'
+grep -Fq "requestPasswordRecoverySession" "$MAIN" || \
+	fail 'entry bootstrap must probe physical password recovery before normal login'
+recovery_line="$(grep -n 'requestPasswordRecoverySession()' "$MAIN" | head -1 | cut -d: -f1)"
+session_line="$(grep -n 'probeLuciSession()' "$MAIN" | tail -1 | cut -d: -f1)"
+[ -n "$recovery_line" ] && [ -n "$session_line" ] && [ "$recovery_line" -lt "$session_line" ] || \
+	fail 'password recovery probe must run before ordinary LuCI session probing'
+grep -Fq "const RECOVERY_ENDPOINT = '/cgi-bin/smartsafehub-password-recovery';" "$RECOVERY_API" || \
+	fail 'frontend recovery probe must use the package public recovery bridge'
+grep -Fq 'system_root_password_status' "$RECOVERY_BRIDGE" || \
+	fail 'recovery bridge must grant root-password status only for recovery setup'
+grep -Fq 'system_root_password_set' "$RECOVERY_BRIDGE" || \
+	fail 'recovery bridge must grant the initial root-password setter'
+if grep -Eq '\[\"smartsafehub\",\"\*\"\]|system_root_password_change|session.login' "$RECOVERY_BRIDGE"; then
+	fail 'recovery bridge must not grant wildcard, password-change, or full login access'
+fi
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
@@ -223,6 +241,84 @@ rm -f "$STATE_DIR/password-recovery" "$TMP_DIR/rebooted"
 run_helper request
 [ ! -e "$STATE_DIR/password-recovery" ] || fail 'already-empty root password must not create a recovery marker'
 [ ! -e "$TMP_DIR/rebooted" ] || fail 'already-empty root password must not force another reboot'
+
+# The public recovery bridge must remain inert outside a physical recovery
+# state and, while recovery is active, issue only a narrow short-lived ubus
+# session instead of an automatically authenticated root session.
+BRIDGE_MARKER="$TMP_DIR/bridge-password-recovery"
+BRIDGE_SHADOW="$TMP_DIR/bridge-shadow"
+BRIDGE_CALLS="$TMP_DIR/bridge-calls"
+BRIDGE_SID='0123456789abcdef0123456789abcdef'
+: > "$BRIDGE_CALLS"
+
+cat > "$MOCK_BIN/ubus" <<'EOF_UBUS'
+#!/bin/sh
+printf '%s\n' "$*" >> "$MOCK_BRIDGE_CALLS"
+[ "$1" = 'call' ] || exit 2
+case "$2" in
+	session)
+		case "$3" in
+			create) printf '{"ubus_rpc_session":"%s"}\n' "$MOCK_BRIDGE_SID" ;;
+			grant|destroy) printf '{}\n' ;;
+			*) exit 3 ;;
+		esac
+		;;
+	*) exit 4 ;;
+esac
+EOF_UBUS
+chmod +x "$MOCK_BIN/ubus"
+
+cat > "$MOCK_BIN/jsonfilter" <<'EOF_JSONFILTER'
+#!/bin/sh
+cat >/dev/null
+[ "$1" = '-e' ] && [ "$2" = '@.ubus_rpc_session' ] || exit 2
+printf '%s\n' "$MOCK_BRIDGE_SID"
+EOF_JSONFILTER
+chmod +x "$MOCK_BIN/jsonfilter"
+
+run_bridge() {
+	REQUEST_METHOD=GET \
+	SMARTSAFEHUB_RECOVERY_MARKER="$BRIDGE_MARKER" \
+	SMARTSAFEHUB_RECOVERY_SHADOW_FILE="$BRIDGE_SHADOW" \
+	SMARTSAFEHUB_RECOVERY_UBUS_BIN="$MOCK_BIN/ubus" \
+	SMARTSAFEHUB_RECOVERY_JSONFILTER_BIN="$MOCK_BIN/jsonfilter" \
+	MOCK_BRIDGE_CALLS="$BRIDGE_CALLS" \
+	MOCK_BRIDGE_SID="$BRIDGE_SID" \
+	"$RECOVERY_BRIDGE"
+}
+
+printf 'root::20000:0:99999:7:::\n' > "$BRIDGE_SHADOW"
+rm -f "$BRIDGE_MARKER"
+: > "$BRIDGE_CALLS"
+bridge_output="$(run_bridge)"
+printf '%s\n' "$bridge_output" | grep -Fq '{"active":false}' || \
+	fail 'recovery bridge must stay inactive without a physical recovery marker'
+[ ! -s "$BRIDGE_CALLS" ] || fail 'inactive recovery bridge must not create an ubus session'
+
+: > "$BRIDGE_MARKER"
+printf 'root:$6$configured:20000:0:99999:7:::\n' > "$BRIDGE_SHADOW"
+: > "$BRIDGE_CALLS"
+bridge_output="$(run_bridge)"
+printf '%s\n' "$bridge_output" | grep -Fq '{"active":false}' || \
+	fail 'recovery bridge must stay inactive when the root password is configured'
+[ ! -s "$BRIDGE_CALLS" ] || fail 'configured root password must not create a recovery session'
+
+printf 'root::20000:0:99999:7:::\n' > "$BRIDGE_SHADOW"
+: > "$BRIDGE_CALLS"
+bridge_output="$(run_bridge)"
+printf '%s\n' "$bridge_output" | grep -Fq "{\"active\":true,\"sessionId\":\"$BRIDGE_SID\"}" || \
+	fail 'active physical recovery must return a restricted recovery session'
+grep -Fq 'session create {"timeout":900}' "$BRIDGE_CALLS" || \
+	fail 'recovery bridge must create a short-lived fifteen-minute session'
+grep -Fq '"scope":"ubus"' "$BRIDGE_CALLS" || \
+	fail 'recovery bridge must grant only ubus procedure access'
+grep -Fq '["smartsafehub","system_root_password_status"]' "$BRIDGE_CALLS" || \
+	fail 'recovery session must grant password status access'
+grep -Fq '["smartsafehub","system_root_password_set"]' "$BRIDGE_CALLS" || \
+	fail 'recovery session must grant password setup access'
+if grep -Eq 'system_root_password_change|\["smartsafehub","\*"\]|session login' "$BRIDGE_CALLS"; then
+	fail 'recovery session must not receive broader administrator access'
+fi
 
 grep -Fq 'Reset 버튼을 5~9초' "$FEATURES" || \
 	fail 'FEATURES must document the physical administrator password recovery window'

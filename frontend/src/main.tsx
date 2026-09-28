@@ -1,5 +1,6 @@
 import { render } from 'preact';
 
+import { requestPasswordRecoverySession } from './api/passwordRecovery';
 import { probeLuciSession } from './auth/session';
 import {
   markSessionActive,
@@ -43,7 +44,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.22-r12',
+    assetVersion: host.dataset.assetVersion ?? '0.2.22-r13',
     locale: document.documentElement.lang || 'ko',
   });
 }
@@ -173,6 +174,19 @@ async function bootstrapEntry(): Promise<void> {
     />,
     mountPoint,
   );
+
+  try {
+    const recoverySessionId = await requestPasswordRecoverySession();
+
+    if (recoverySessionId) {
+      renderAuthenticated(host, mountPoint, recoverySessionId);
+      return;
+    }
+  } catch {
+    // Recovery session creation is deliberately best-effort here. If the
+    // public recovery bridge is temporarily unavailable, keep the normal LuCI
+    // login path reachable instead of leaving the entry page blank.
+  }
 
   try {
     const sessionId = await probeLuciSession();
