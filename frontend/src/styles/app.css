@@ -549,7 +549,9 @@
   background-color: rgb(14 165 233 / 0.12);
 }
 
-.ssh-app[data-theme='dark'] [class~='text-sky-700'] {
+.ssh-app[data-theme='dark'] [class~='text-sky-700'],
+.ssh-app[data-theme='dark'] [class~='text-sky-800'],
+.ssh-app[data-theme='dark'] [class~='text-sky-950'] {
   color: #7dd3fc;
 }
 

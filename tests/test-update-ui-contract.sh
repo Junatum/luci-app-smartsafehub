@@ -189,6 +189,10 @@ grep -Fq '설치가 완료되면 이 화면이 자동으로 갱신됩니다.' "$
 	fail 'installing copy must explain automatic status refresh'
 grep -Fq '@keyframes ssh-update-progress' "$APP_CSS" || \
 	fail 'update progress indicator must define an indeterminate animation'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='text-sky-800']," "$APP_CSS" || \
+	fail 'dark theme must remap software-update progress description text to a readable sky tone'
+grep -Fq ".ssh-app[data-theme='dark'] [class~='text-sky-950'] {" "$APP_CSS" || \
+	fail 'dark theme must remap software-update progress heading text to a readable sky tone'
 if grep -Fq '완료 후 화면을 새로고침해 주세요.' "$UPDATES_HOOK"; then
 	fail 'install start feedback must not ask the user to refresh manually'
 fi
