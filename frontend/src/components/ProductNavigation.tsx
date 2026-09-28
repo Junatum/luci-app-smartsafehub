@@ -155,7 +155,7 @@ function NavigationItems({
                   {routeName === 'system' && updateCount > 0 ? (
                     collapsed ? (
                       <span
-                        aria-label={`${updateCount}개의 업데이트`}
+                        aria-label={`${updateCount}개의 업데이트 유형`}
                         class="ssh-update-nav-badge"
                         data-collapsed="true"
                       >

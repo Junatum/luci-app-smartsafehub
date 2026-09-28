@@ -34,14 +34,21 @@ done
 # The sidebar update indicator must cover both management software and firmware.
 grep -Fq 'const firmware = useFirmwareUpdates(true);' "$APP" || \
 	fail 'firmware status must stay active on every route so the sidebar notification remains current'
-grep -Fq '(updates.data?.updateCount ?? 0) + (firmware.data?.updateAvailable ? 1 : 0)' "$APP" || \
-	fail 'sidebar update count must include one actionable firmware update'
+grep -Fq 'const managementSoftwareUpdateAvailable = (updates.data?.updateCount ?? 0) > 0;' "$APP" || \
+	fail 'sidebar update badge must collapse any number of management-software updates into one category'
+grep -Fq '(managementSoftwareUpdateAvailable ? 1 : 0) +' "$APP" || \
+	fail 'sidebar update badge must count management software as at most one category'
+grep -Fq '(firmware.data?.updateAvailable ? 1 : 0);' "$APP" || \
+	fail 'sidebar update badge must count firmware as at most one category'
+if grep -Fq '(updates.data?.updateCount ?? 0) + (firmware.data?.updateAvailable ? 1 : 0)' "$APP"; then
+	fail 'sidebar update badge must not expose the raw management-software package count'
+fi
 grep -Fq 'updateCount={updateCount}' "$APP" || \
 	fail 'App must pass the combined management-software and firmware count to the shell'
 grep -Fq "{routeName === 'system' && updateCount > 0 ? (" "$NAVIGATION" || \
 	fail 'update navigation item must render a badge whenever the combined update count is non-zero'
-grep -Fq 'aria-label={`${updateCount}개의 업데이트`}' "$NAVIGATION" || \
-	fail 'collapsed update notification must keep an accessible combined update count'
+grep -Fq 'aria-label={`${updateCount}개의 업데이트 유형`}' "$NAVIGATION" || \
+	fail 'collapsed update notification must describe the combined update-category count accurately'
 grep -Fq 'class="ssh-update-nav-badge"' "$NAVIGATION" || \
 	fail 'update navigation count must use the dedicated high-contrast badge style'
 grep -Fq 'data-collapsed="true"' "$NAVIGATION" || \

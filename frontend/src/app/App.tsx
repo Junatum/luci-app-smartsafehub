@@ -404,8 +404,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     void current.refresh();
   };
 
+  const managementSoftwareUpdateAvailable = (updates.data?.updateCount ?? 0) > 0;
   const updateCount =
-    (updates.data?.updateCount ?? 0) + (firmware.data?.updateAvailable ? 1 : 0);
+    (managementSoftwareUpdateAvailable ? 1 : 0) +
+    (firmware.data?.updateAvailable ? 1 : 0);
 
   return (
     <AppShell
