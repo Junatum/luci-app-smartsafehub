@@ -43,7 +43,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.22-r10',
+    assetVersion: host.dataset.assetVersion ?? '0.2.22-r11',
     locale: document.documentElement.lang || 'ko',
   });
 }
@@ -101,6 +101,13 @@ function renderAuthenticated(
   mountPoint.className = 'smartsafehub-shadow-root';
   render(
     <AuthenticatedEntry
+      onAdministratorPasswordChanged={() => {
+        renderLogin(
+          host,
+          mountPoint,
+          '관리자 비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.',
+        );
+      }}
       onPasswordConfigured={() => {
         renderLogin(
           host,

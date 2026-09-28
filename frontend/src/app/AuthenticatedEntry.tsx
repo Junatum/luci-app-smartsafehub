@@ -8,10 +8,12 @@ import { App } from './App';
 type SetupPhase = 'checking' | 'required' | 'ready' | 'error';
 
 interface AuthenticatedEntryProps {
+  onAdministratorPasswordChanged: () => void;
   onPasswordConfigured: () => void;
 }
 
 export function AuthenticatedEntry({
+  onAdministratorPasswordChanged,
   onPasswordConfigured,
 }: AuthenticatedEntryProps) {
   const [phase, setPhase] = useState<SetupPhase>('checking');
@@ -32,7 +34,7 @@ export function AuthenticatedEntry({
   }, [refresh]);
 
   if (phase === 'ready') {
-    return <App />;
+    return <App onAdministratorPasswordChanged={onAdministratorPasswordChanged} />;
   }
 
   if (phase === 'required') {

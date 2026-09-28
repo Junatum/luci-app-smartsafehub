@@ -32,7 +32,11 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { UpdatePage } from '../pages/UpdatePage';
 import { WifiPage } from '../pages/WifiPage';
 
-export function App() {
+interface AppProps {
+  onAdministratorPasswordChanged: () => void;
+}
+
+export function App({ onAdministratorPasswordChanged }: AppProps) {
   const route = useHashRoute();
   const configurationBackup = useConfigurationBackup();
   const activity = useActivityHistory(route === 'home' || route === 'activity');
@@ -243,6 +247,7 @@ export function App() {
           onSaveScheduledReboot={scheduledReboot.saveSettings}
           onSaveTimezone={systemTime.saveTimezone}
           onSyncTime={systemTime.syncTime}
+          onAdministratorPasswordChanged={onAdministratorPasswordChanged}
           rebootAccepted={systemActions.rebootAccepted}
           scheduledRebootData={scheduledReboot.data}
           scheduledRebootError={scheduledReboot.error}

@@ -20,23 +20,10 @@ import {
   readColorTheme,
 } from '../utils/theme';
 import type { ColorTheme } from '../utils/theme';
+import { passwordPolicy, passwordPolicySatisfied } from '../utils/password';
 
 interface InitialPasswordSetupPageProps {
   onCompleted: () => void;
-}
-
-interface PasswordPolicy {
-  length: boolean;
-  letter: boolean;
-  number: boolean;
-}
-
-function passwordPolicy(password: string): PasswordPolicy {
-  return {
-    length: password.length >= 8,
-    letter: /[A-Za-z]/.test(password),
-    number: /[0-9]/.test(password),
-  };
 }
 
 function ThemeIcon({ theme }: { theme: ColorTheme }) {
@@ -66,7 +53,7 @@ export function InitialPasswordSetupPage({
   const [theme, setTheme] = useState<ColorTheme>(readColorTheme);
 
   const policy = passwordPolicy(password);
-  const policySatisfied = policy.length && policy.letter && policy.number;
+  const policySatisfied = passwordPolicySatisfied(policy);
   const confirmationMatches = confirmation.length > 0 && password === confirmation;
   const themeLabel = theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환';
 

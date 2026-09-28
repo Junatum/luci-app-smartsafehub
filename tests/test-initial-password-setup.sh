@@ -11,6 +11,7 @@ SESSION="$ROOT_DIR/frontend/src/auth/session.ts"
 ENTRY="$ROOT_DIR/frontend/src/app/AuthenticatedEntry.tsx"
 SETUP_PAGE="$ROOT_DIR/frontend/src/pages/InitialPasswordSetupPage.tsx"
 SETUP_API="$ROOT_DIR/frontend/src/api/initialSetup.ts"
+PASSWORD_UTIL="$ROOT_DIR/frontend/src/utils/password.ts"
 STYLES="$ROOT_DIR/frontend/src/styles/app.css"
 FEATURES="$ROOT_DIR/docs/FEATURES.md"
 
@@ -19,7 +20,7 @@ fail() {
 	exit 1
 }
 
-for file in "$RPC_ENTRY" "$SECURITY_MODULE" "$ACL" "$LOGIN" "$SESSION" "$ENTRY" "$SETUP_PAGE" "$SETUP_API" "$STYLES" "$FEATURES"; do
+for file in "$RPC_ENTRY" "$SECURITY_MODULE" "$ACL" "$LOGIN" "$SESSION" "$ENTRY" "$SETUP_PAGE" "$SETUP_API" "$PASSWORD_UTIL" "$STYLES" "$FEATURES"; do
 	[ -f "$file" ] || fail "missing initial password setup file: ${file#$ROOT_DIR/}"
 done
 
@@ -86,12 +87,14 @@ grep -Fq "if (phase === 'ready')" "$ENTRY" || \
 grep -Fq '<InitialPasswordSetupPage onCompleted={onPasswordConfigured} />' "$ENTRY" || \
 	fail 'missing-password state must render the dedicated initial setup page'
 
-grep -Fq 'length: password.length >= 8' "$SETUP_PAGE" || \
-	fail 'frontend password policy must require at least eight characters'
-grep -Fq 'letter: /[A-Za-z]/.test(password)' "$SETUP_PAGE" || \
-	fail 'frontend password policy must require an English letter'
-grep -Fq 'number: /[0-9]/.test(password)' "$SETUP_PAGE" || \
-	fail 'frontend password policy must require a number'
+grep -Fq 'length: password.length >= 8' "$PASSWORD_UTIL" || \
+	fail 'shared frontend password policy must require at least eight characters'
+grep -Fq 'letter: /[A-Za-z]/.test(password)' "$PASSWORD_UTIL" || \
+	fail 'shared frontend password policy must require an English letter'
+grep -Fq 'number: /[0-9]/.test(password)' "$PASSWORD_UTIL" || \
+	fail 'shared frontend password policy must require a number'
+grep -Fq "import { passwordPolicy, passwordPolicySatisfied } from '../utils/password';" "$SETUP_PAGE" || \
+	fail 'initial setup must consume the shared frontend password policy'
 grep -Fq 'if (password !== confirmation)' "$SETUP_PAGE" || \
 	fail 'initial setup must require password confirmation'
 grep -Fq 'autoComplete="new-password"' "$SETUP_PAGE" || \
