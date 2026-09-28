@@ -9,6 +9,8 @@ ACL="$ROOT_DIR/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
 API="$ROOT_DIR/frontend/src/api/smartsafehub.ts"
 HOOK="$ROOT_DIR/frontend/src/hooks/useWan.ts"
 PAGE="$ROOT_DIR/frontend/src/pages/WanPage.tsx"
+IPV4_INPUT="$ROOT_DIR/frontend/src/components/Ipv4OctetInput.tsx"
+LAN_PAGE="$ROOT_DIR/frontend/src/pages/LanPage.tsx"
 TYPES="$ROOT_DIR/frontend/src/types/wan.ts"
 ROUTES="$ROOT_DIR/frontend/src/app/routes.ts"
 HASH_ROUTE="$ROOT_DIR/frontend/src/hooks/useHashRoute.ts"
@@ -21,7 +23,7 @@ fail() {
 	exit 1
 }
 
-for file in "$NETWORK_RPC" "$NETWORK_MODULE" "$ACL" "$API" "$HOOK" "$PAGE" "$TYPES" "$ROUTES" "$HASH_ROUTE" "$NAVIGATION" "$APP" "$ACTIVITY"; do
+for file in "$NETWORK_RPC" "$NETWORK_MODULE" "$ACL" "$API" "$HOOK" "$PAGE" "$IPV4_INPUT" "$LAN_PAGE" "$TYPES" "$ROUTES" "$HASH_ROUTE" "$NAVIGATION" "$APP" "$ACTIVITY"; do
 	[ -f "$file" ] || fail "WAN 설정 계약 파일이 없습니다: ${file#$ROOT_DIR/}"
 done
 
@@ -81,6 +83,16 @@ grep -Fq 'pppoePasswordChanged: form.pppoePassword.length > 0' "$PAGE" || \
 grep -Fq '저장되지 않음' "$PAGE" || fail 'WAN 화면은 미저장 설정 표시를 제공해야 합니다.'
 grep -Fq 'id="wan-protocol"' "$PAGE" || fail 'WAN 연결 방식은 공통 CustomSelect를 사용해야 합니다.'
 grep -Fq 'id="wan-static-prefix-length"' "$PAGE" || fail 'WAN 정적 prefix도 공통 CustomSelect를 사용해야 합니다.'
+[ "$(grep -Fc '<Ipv4OctetInput' "$PAGE")" -eq 4 ] || fail 'WAN 고정 IPv4 주소, gateway, 기본/보조 DNS는 4개의 공용 octet 입력을 사용해야 합니다.'
+grep -Fq 'label="IPv4 주소"' "$PAGE" || fail 'WAN 고정 IPv4 주소 octet 입력이 필요합니다.'
+grep -Fq 'label="기본 게이트웨이"' "$PAGE" || fail 'WAN gateway octet 입력이 필요합니다.'
+grep -Fq 'label="기본 DNS"' "$PAGE" || fail 'WAN 기본 DNS octet 입력이 필요합니다.'
+grep -Fq 'label="보조 DNS"' "$PAGE" || fail 'WAN 보조 DNS octet 입력이 필요합니다.'
+grep -Fq "const DEFAULT_STATIC_SECONDARY_DNS = '1.1.1.1';" "$PAGE" || fail '새 고정 IPv4 설정의 보조 DNS 기본값은 1.1.1.1이어야 합니다.'
+grep -Fq "value === 'static' && !normalized(form.dnsSecondary)" "$PAGE" || fail '고정 IPv4로 전환할 때 보조 DNS가 비어 있으면 기본 DNS를 채워야 합니다.'
+grep -Fq 'inputMode="numeric"' "$IPV4_INPUT" || fail '공용 IPv4 octet 입력은 모바일 숫자 키패드를 사용해야 합니다.'
+grep -Fq "octets.every((octet) => octet === '') ? '' : octets.join('.')" "$IPV4_INPUT" || fail '선택 IPv4 입력은 모든 octet을 지우면 빈 값으로 복원되어야 합니다.'
+grep -Fq "from '../components/Ipv4OctetInput'" "$LAN_PAGE" || fail 'LAN도 WAN과 동일한 공용 IPv4 octet 입력을 재사용해야 합니다.'
 grep -Fq 'onReconnect={reconnect}' "$PAGE" || fail 'WAN 화면에 수동 재연결 기능이 있어야 합니다.'
 grep -Fq "route: 'network'" "$ROUTES" || fail 'WAN과 LAN을 통합한 네트워크 설정 route가 필요합니다.'
 grep -Fq "hash: '#network'" "$ROUTES" || fail '네트워크 설정 route는 #network hash를 사용해야 합니다.'

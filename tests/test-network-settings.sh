@@ -24,8 +24,8 @@ done
 grep -Fq "  | 'network'" "$ROUTES" || fail 'AppRoute must expose the combined network route'
 grep -Fq "route: 'network'" "$ROUTES" || fail 'combined network settings route must be registered'
 grep -Fq "hash: '#network'" "$ROUTES" || fail 'combined network settings route must use #network'
-grep -Fq "label: '네트워크 설정'" "$ROUTES" || fail 'combined route label must be 네트워크 설정'
-grep -Fq "title: '네트워크 설정'" "$ROUTES" || fail 'combined page title must be 네트워크 설정'
+grep -Fq "label: '네트워크'" "$ROUTES" || fail 'combined route label must be 네트워크'
+grep -Fq "title: '네트워크'" "$ROUTES" || fail 'combined page title must be 네트워크'
 if grep -Fq "route: 'wan'" "$ROUTES" || grep -Fq "route: 'lan'" "$ROUTES"; then
 	fail 'WAN and LAN must not remain as separate visible routes'
 fi
@@ -57,9 +57,9 @@ grep -Fq "(route === 'network' && lan.refreshing)" "$APP" || fail 'combined page
 if grep -Fq 'href="#lan"' "$HOME" || grep -Fq 'href="#wan"' "$HOME"; then
 	fail 'dashboard must not link to legacy WAN/LAN hashes'
 fi
-grep -Fq '네트워크 설정 보기' "$HOME" || fail 'dashboard detail action must use the combined settings label'
-grep -Fq '`네트워크 설정` 한 화면' "$README" || fail 'README must describe the combined network screen'
-grep -Fq '## 네트워크 설정 (WAN/LAN 및 DHCP)' "$FEATURES" || fail 'feature docs must describe WAN/LAN as one screen'
+grep -Fq '네트워크 보기' "$HOME" || fail 'dashboard detail action must use the concise network label'
+grep -Fq '**네트워크 관리**:' "$README" || fail 'README must describe the combined network screen'
+grep -Fq '## 네트워크 (WAN/LAN 및 DHCP)' "$FEATURES" || fail 'feature docs must use the concise network page name'
 grep -Fq '| `network` | `#network` | WAN 인터넷 연결 + LAN 및 DHCP |' "$ARCHITECTURE" || fail 'architecture route table must use the combined route'
 
 printf 'PASS: WAN and LAN are exposed through one network settings route while preserving independent settings flows\n'

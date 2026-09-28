@@ -829,7 +829,7 @@ export function HomePage({
               class="mt-5 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-extrabold text-slate-700 no-underline transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
               href="#network"
             >
-              네트워크 설정 보기
+              네트워크 보기
             </a>
           </article>
         </div>

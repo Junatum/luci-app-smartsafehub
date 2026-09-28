@@ -2,6 +2,7 @@ import type { JSX } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
+import { Ipv4OctetInput } from '../components/Ipv4OctetInput';
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -39,6 +40,7 @@ interface WanFormState {
 }
 
 const SUPPORTED_PROTOCOLS: readonly WanProtocol[] = ['dhcp', 'pppoe', 'static'];
+const DEFAULT_STATIC_SECONDARY_DNS = '1.1.1.1';
 const PREFIX_OPTIONS = Array.from({ length: 33 }, (_, index) => index);
 
 function isSupportedProtocol(value: string): value is WanProtocol {
@@ -471,7 +473,13 @@ export function WanPage({
             className="mt-2 max-w-xl"
             disabled={busy}
             id="wan-protocol"
-            onChange={(value) => updateForm({ protocol: value })}
+            onChange={(value) =>
+              updateForm(
+                value === 'static' && !normalized(form.dnsSecondary)
+                  ? { protocol: value, dnsSecondary: DEFAULT_STATIC_SECONDARY_DNS }
+                  : { protocol: value },
+              )
+            }
             options={protocolOptions}
             value={form.protocol}
             variant="emphasized"
@@ -534,14 +542,10 @@ export function WanPage({
           <div class="mt-6 grid gap-5 lg:grid-cols-2">
             <label class="block">
               <span class="text-sm font-extrabold text-slate-800">IPv4 주소</span>
-              <input
-                autocomplete="off"
-                class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <Ipv4OctetInput
                 disabled={busy}
-                inputMode="decimal"
-                onInput={(event) => updateForm({ staticAddress: event.currentTarget.value })}
-                placeholder="203.0.113.10"
-                spellcheck={false}
+                label="IPv4 주소"
+                onChange={(value) => updateForm({ staticAddress: value })}
                 value={form.staticAddress}
               />
             </label>
@@ -565,42 +569,30 @@ export function WanPage({
 
             <label class="block">
               <span class="text-sm font-extrabold text-slate-800">기본 게이트웨이</span>
-              <input
-                autocomplete="off"
-                class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <Ipv4OctetInput
                 disabled={busy}
-                inputMode="decimal"
-                onInput={(event) => updateForm({ staticGateway: event.currentTarget.value })}
-                placeholder="203.0.113.1"
-                spellcheck={false}
+                label="기본 게이트웨이"
+                onChange={(value) => updateForm({ staticGateway: value })}
                 value={form.staticGateway}
               />
             </label>
 
             <label class="block">
               <span class="text-sm font-extrabold text-slate-800">기본 DNS</span>
-              <input
-                autocomplete="off"
-                class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <Ipv4OctetInput
                 disabled={busy}
-                inputMode="decimal"
-                onInput={(event) => updateForm({ dnsPrimary: event.currentTarget.value })}
-                placeholder="1.1.1.1"
-                spellcheck={false}
+                label="기본 DNS"
+                onChange={(value) => updateForm({ dnsPrimary: value })}
                 value={form.dnsPrimary}
               />
             </label>
 
             <label class="block lg:col-start-2">
               <span class="text-sm font-extrabold text-slate-800">보조 DNS (선택)</span>
-              <input
-                autocomplete="off"
-                class="mt-2 min-h-11 w-full rounded-xl border-2 border-slate-300 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-inner outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+              <Ipv4OctetInput
                 disabled={busy}
-                inputMode="decimal"
-                onInput={(event) => updateForm({ dnsSecondary: event.currentTarget.value })}
-                placeholder="8.8.8.8"
-                spellcheck={false}
+                label="보조 DNS"
+                onChange={(value) => updateForm({ dnsSecondary: value })}
                 value={form.dnsSecondary}
               />
             </label>

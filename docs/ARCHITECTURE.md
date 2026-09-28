@@ -394,7 +394,7 @@ ucode module loader가 모듈을 캐시하므로 기능 모듈은 하나의 ubus
 
 #### `smartsafehub-network.uc` / `network-management.uc`
 
-`smartsafehub-network.uc`는 LAN 구현을 별도 `smartsafehub_network` ubus 객체로 등록해 핵심 `smartsafehub` RPC와 장애 범위를 분리합니다. `네트워크 설정` 화면의 내부 네트워크 영역은 이 객체를 직접 호출하며 핵심 RPC가 같은 `rpcd` 프로세스의 다른 ucode 객체를 동기 `ubus.call()`로 다시 호출하지 않습니다. LAN 객체는 자체적으로 관리자 비밀번호 설정 상태를 확인하고 LuCI ACL에는 LAN 메서드만 최소 권한으로 노출합니다. 따라서 LAN 구현이 로드되지 않아도 `system_root_password_status`와 대시보드용 기존 RPC 객체는 유지됩니다.
+`smartsafehub-network.uc`는 LAN 구현을 별도 `smartsafehub_network` ubus 객체로 등록해 핵심 `smartsafehub` RPC와 장애 범위를 분리합니다. `네트워크` 화면의 내부 네트워크 영역은 이 객체를 직접 호출하며 핵심 RPC가 같은 `rpcd` 프로세스의 다른 ucode 객체를 동기 `ubus.call()`로 다시 호출하지 않습니다. LAN 객체는 자체적으로 관리자 비밀번호 설정 상태를 확인하고 LuCI ACL에는 LAN 메서드만 최소 권한으로 노출합니다. 따라서 LAN 구현이 로드되지 않아도 `system_root_password_status`와 대시보드용 기존 RPC 객체는 유지됩니다.
 
 기존 `network-management.uc` 파일명은 그대로 유지합니다. LAN backend 격리와 무관한 파일명 rename을 피하여 패치/checkout 과정에서 구현 모듈이 누락되는 회귀를 방지합니다.
 
@@ -839,9 +839,10 @@ SmartSafeHub의 휘발성 런타임 파일은 `/tmp/smartsafehub/` 한 단계 �
 
 자동화 설정은 `/etc/config/smartsafehub`의 `updates` section에 보존됩니다. `smartsafehub-updater` procd 서비스는 기본 6시간 주기로 확인하며, 자동 설치는 기본 비활성화 상태입니다. 자동 설치를 활성화하면 지정 시각의 다음 실행 기회에 하루 한 번만 설치를 시도합니다. 공유기가 예약 시각 이후에 부팅된 경우 그날의 지난 예약을 즉시 소급 실행하지 않고 다음 예약 시각까지 기다립니다.
 
-### LAN 입력 UX 안전장치
+### IPv4 입력 UX 안전장치
 
-`네트워크 설정` 화면의 내부 네트워크 영역은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, DHCP 시작/종료 주소는 공유기 주소의 앞 3개 octet을 읽기 전용 prefix로 사용한다. 공유기 prefix가 바뀌면 DHCP host octet은 유지하면서 같은 prefix로 동기화한다. 이 프런트엔드 제약은 사용자 입력 오류를 줄이기 위한 것이며, 최종 subnet·DHCP 범위 검증은 계속 `network-management.uc` backend가 담당한다.
+`네트워크` 화면의 내부 네트워크 영역은 공유기 IPv4 주소를 4개 octet으로 분리해 입력받고, DHCP 시작/종료 주소는 공유기 주소의 앞 3개 octet을 읽기 전용 prefix로 사용한다. 공유기 prefix가 바뀌면 DHCP host octet은 유지하면서 같은 prefix로 동기화한다. 이 프런트엔드 제약은 사용자 입력 오류를 줄이기 위한 것이며, 최종 subnet·DHCP 범위 검증은 계속 `network-management.uc` backend가 담당한다.
+WAN 고정 IPv4의 주소, gateway와 DNS도 동일한 `Ipv4OctetInput` 컴포넌트를 사용해 LAN/WAN 입력 제약과 모바일 레이아웃을 공유한다.
 
 
 ### Hash route 새로고침 보존

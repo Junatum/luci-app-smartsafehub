@@ -36,8 +36,8 @@ export const ROUTES: readonly RouteDefinition[] = [
   {
     route: 'network',
     hash: '#network',
-    label: '네트워크 설정',
-    title: '네트워크 설정',
+    label: '네트워크',
+    title: '네트워크',
     description: '인터넷 연결과 내부 네트워크 주소, DHCP 및 네트워크 충돌을 한 곳에서 관리합니다.',
   },
   {

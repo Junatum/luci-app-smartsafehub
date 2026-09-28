@@ -130,8 +130,8 @@ grep -Fq 'firstOctet === undefined || secondOctet === undefined' "$HOME" || \
 if grep -Eq 'octets\[1\][[:space:]]*(>=|<=|===|==|>|<)' "$HOME"; then
 	fail '사설 WAN 판별에서 noUncheckedIndexedAccess를 우회하는 직접 배열 비교를 사용하면 안 됩니다'
 fi
-grep -Fq '네트워크 설정 보기' "$HOME" || \
-	fail '연결 상태 상세 카드의 주 동작은 통합 네트워크 설정으로 이동해야 합니다'
+grep -Fq '네트워크 보기' "$HOME" || \
+	fail '연결 상태 상세 카드의 주 동작은 통합 네트워크 화면으로 이동해야 합니다'
 grep -Fq 'title="네트워크 보호 활동"' "$HOME" || \
 	fail '대시보드는 네트워크 보호 활동 영역을 표시해야 합니다'
 grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \
