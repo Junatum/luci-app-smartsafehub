@@ -82,12 +82,13 @@ grep -Fq '저장되지 않음' "$PAGE" || fail 'WAN 화면은 미저장 설정 �
 grep -Fq 'id="wan-protocol"' "$PAGE" || fail 'WAN 연결 방식은 공통 CustomSelect를 사용해야 합니다.'
 grep -Fq 'id="wan-static-prefix-length"' "$PAGE" || fail 'WAN 정적 prefix도 공통 CustomSelect를 사용해야 합니다.'
 grep -Fq 'onReconnect={reconnect}' "$PAGE" || fail 'WAN 화면에 수동 재연결 기능이 있어야 합니다.'
-grep -Fq "route: 'wan'" "$ROUTES" || fail '인터넷 WAN route가 필요합니다.'
-grep -Fq "hash: '#wan'" "$ROUTES" || fail '인터넷 WAN route는 #wan hash를 사용해야 합니다.'
-grep -Fq "'#wan': 'wan'" "$HASH_ROUTE" || fail 'hash router가 #wan을 해석해야 합니다.'
-grep -Fq "{ label: 'Network', routes: ['wan', 'lan', 'wifi', 'iptv', 'devices'] }" "$NAVIGATION" || \
-	fail 'Network 메뉴에서 인터넷 설정을 LAN보다 먼저 노출해야 합니다.'
-grep -Fq "case 'wan':" "$APP" || fail 'App이 WAN 화면을 렌더링해야 합니다.'
+grep -Fq "route: 'network'" "$ROUTES" || fail 'WAN과 LAN을 통합한 네트워크 설정 route가 필요합니다.'
+grep -Fq "hash: '#network'" "$ROUTES" || fail '네트워크 설정 route는 #network hash를 사용해야 합니다.'
+grep -Fq "'#wan': 'network'" "$HASH_ROUTE" || fail '기존 #wan hash는 통합 네트워크 설정으로 연결되어야 합니다.'
+grep -Fq "{ label: 'Network', routes: ['network', 'wifi', 'iptv', 'devices'] }" "$NAVIGATION" || \
+	fail 'Network 메뉴는 통합 네트워크 설정을 Wi-Fi보다 먼저 노출해야 합니다.'
+grep -Fq "case 'network':" "$APP" || fail 'App이 통합 네트워크 설정 화면을 렌더링해야 합니다.'
+grep -Fq '<WanPage' "$APP" || fail '통합 네트워크 설정 화면에 WAN 영역이 포함되어야 합니다.'
 grep -Fq "case 'settings.wan.updated':" "$ACTIVITY" || fail '최근 활동이 WAN 설정 변경 이벤트를 설명해야 합니다.'
 
 printf '%s\n' 'PASS: WAN DHCP/PPPoE/static IPv4 configuration, safe PPPoE secret handling and reconnect UI contracts are present'

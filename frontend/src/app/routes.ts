@@ -1,8 +1,7 @@
 export type AppRoute =
   | 'home'
   | 'activity'
-  | 'wan'
-  | 'lan'
+  | 'network'
   | 'wifi'
   | 'iptv'
   | 'devices'
@@ -35,18 +34,11 @@ export const ROUTES: readonly RouteDefinition[] = [
     description: '현재 부팅 이후 인터넷, 보호, 업데이트와 진단 상태 변화를 확인합니다.',
   },
   {
-    route: 'wan',
-    hash: '#wan',
-    label: '인터넷',
-    title: '인터넷',
-    description: 'WAN 연결 상태를 확인하고 DHCP, PPPoE 또는 고정 IPv4 연결을 설정합니다.',
-  },
-  {
-    route: 'lan',
-    hash: '#lan',
-    label: 'LAN',
-    title: 'LAN',
-    description: '내부 네트워크 주소, DHCP 범위와 상위 네트워크 충돌을 관리합니다.',
+    route: 'network',
+    hash: '#network',
+    label: '네트워크 설정',
+    title: '네트워크 설정',
+    description: '인터넷 연결과 내부 네트워크 주소, DHCP 및 네트워크 충돌을 한 곳에서 관리합니다.',
   },
   {
     route: 'wifi',

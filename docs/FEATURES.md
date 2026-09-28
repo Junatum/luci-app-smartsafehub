@@ -38,7 +38,7 @@ README에는 제품을 빠르게 파악하는 데 필요한 핵심 기능만 유
 - 대시보드 장치 정보와 설정 페이지 시스템 상태 모두 SmartSafeHub 커스텀 펌웨어가 설치된 이미지에서는 Hub가 resolve한 제품 릴리즈 버전과 immutable build ID를 우선 표시하고, 메타데이터가 없는 기존 이미지만 OpenWrt 배포판/버전/리비전으로 대체 표시. 커널은 현재 실제 실행 중인 커널 버전을 표시
 - 실제 부팅 시각, 실행 시간, 시스템 부하와 메모리 사용량
 - WAN 연결 상태, 프로토콜과 IPv4 주소
-- 대시보드 `INTERNET` 개요 카드는 WAN 주소/프로토콜과 함께 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 충돌 여부를 표시합니다. 정상일 때는 `네트워크 충돌 없음`과 다른 개요 카드와 동일한 `자세히 보기` 링크를 표시하고, 충돌 시에는 `네트워크 충돌`과 `해결하기` 링크를 표시해 `네트워크 > LAN`으로 바로 이동할 수 있습니다.
+- 대시보드 `INTERNET` 개요 카드는 WAN 주소/프로토콜과 함께 `smartsafehub_network.lan_settings`의 WAN/LAN subnet 충돌 여부를 표시합니다. 정상일 때는 `네트워크 충돌 없음`과 다른 개요 카드와 동일한 `자세히 보기` 링크를 표시하고, 충돌 시에는 `네트워크 충돌`과 `해결하기` 링크를 표시해 `네트워크 > 네트워크 설정`으로 바로 이동할 수 있습니다.
 - `네트워크 보호 활동 > 연결 상태` 상세 카드는 상위 WAN 네트워크, SmartSafeHub LAN 네트워크와 대역 충돌 상태를 함께 보여주며, RFC1918 사설 WAN 주소는 `사설 네트워크`로 표시해 상위 NAT 환경임을 구분할 수 있게 합니다.
 - 사설 WAN IPv4 판별 코드는 TypeScript `noUncheckedIndexedAccess` 계약을 따르며, `split()` 결과의 배열 인덱스를 직접 비교하지 않고 존재 여부를 확인한 octet 변수만 사용합니다. 프런트엔드 CI의 `npm run build`/`tsc --noEmit`가 이 타입 안전성을 검증합니다.
 - SafeShield 차단 목록, 연결 기기 목록, 관리 소프트웨어 업데이트의 최근 확인 시각은 별도 하단 섹션 대신 각 개요 카드에서 `차단 목록 갱신: 41분 전`처럼 `항목: 상대 시간` 형식으로 표시하며, 마우스를 올리면 정확한 시각을 확인할 수 있음
@@ -48,9 +48,9 @@ README에는 제품을 빠르게 파악하는 데 필요한 핵심 기능만 유
 - `시스템 상태 > 리소스 사용량` 카드 아래에서 최신 로컬 장치 진단을 함께 요약해 표시. 정상일 때는 전체 상태와 마지막 진단 시각/검사 항목 수를 간결하게 보여주고, 주의·이상 항목이 있으면 최대 2건을 바로 노출하며 상세 진단은 설정 페이지에서 확인
 - 장치 진단 요약의 정상/주의/이상 배경과 세부 항목은 라이트/다크 테마에 각각 맞는 대비를 사용하며, 다크 모드에서 반투명 밝은 배경이 남지 않도록 전용 테마 매핑을 적용
 
-## LAN 및 DHCP 관리
+## 네트워크 설정 (WAN/LAN 및 DHCP)
 
-- SmartSafeHub 내부 IPv4 주소와 DHCP 할당 시작/종료 주소를 `네트워크 > LAN`에서 관리
+- `네트워크 > 네트워크 설정` 한 화면에서 WAN 연결 상태/방식과 SmartSafeHub 내부 IPv4 주소, DHCP 할당 시작/종료 주소를 함께 관리
 - OpenWrt 25.12 기본 형식인 `list ipaddr '192.168.1.1/24'`와 이전 `option ipaddr + option netmask` 형식을 모두 읽을 수 있으며, 25.12 list 형식으로 저장된 경우 CIDR/list 표현을 유지해 변경
 - WAN과 LAN IPv4 subnet이 겹치면 충돌 상태와 상위 네트워크 대역을 표시하고, 활성 인터페이스와 겹치지 않는 안전한 `/24` 사설 대역을 자동 추천
 - 추천 대역 자동 변경 시 공유기 주소는 `.1`, DHCP pool은 `.100~.249`를 기본으로 구성하고 기존 DHCP 사용 여부와 임대 시간은 유지
@@ -282,7 +282,7 @@ Cloud 전송을 끄면 activity-sync daemon을 잠시 중지한 뒤 Cloud-only o
 
 - Wi-Fi 화면은 각 radio에서 선택한 기본 LAN AP 하나만 관리합니다.
 - 게스트 Wi-Fi, VLAN, mesh, 방화벽과 상세 패키지 설정은 기존 LuCI에서 관리합니다.
-- LAN 화면은 기본 `network.lan`/`dhcp.lan`만 관리하며 다중 LAN, VLAN별 DHCP와 방화벽 zone 구성은 기존 LuCI에서 관리합니다.
+- `네트워크 설정` 화면의 내부 네트워크 영역은 기본 `network.lan`/`dhcp.lan`만 관리하며 다중 LAN, VLAN별 DHCP와 방화벽 zone 구성은 기존 LuCI에서 관리합니다.
 - WAN/LAN 충돌 감지는 IPv4 기준이며 WAN 상태는 `network.interface.wan` 객체를 기준으로 합니다.
 - SafeShield 기능은 별도 `safeshield` 패키지와 공식 ubus API 계약에 의존하며, SmartSafeHub는 SafeShield의 상태 파일이나 init script를 직접 다루지 않습니다.
 - 프런트엔드 개발 서버만으로는 LuCI ACL과 실제 ubus 동작을 완전히 재현할 수 없습니다.

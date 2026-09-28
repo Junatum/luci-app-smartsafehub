@@ -41,8 +41,8 @@ export function App() {
   const firmware = useFirmwareUpdates(
     route === 'system' || route === 'home' || route === 'settings',
   );
-  const wan = useWan(route === 'wan');
-  const lan = useLan(route === 'home' || route === 'lan');
+  const wan = useWan(route === 'network');
+  const lan = useLan(route === 'home' || route === 'network');
   const iptv = useIptv(route === 'iptv');
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
@@ -64,40 +64,58 @@ export function App() {
   const current =
     route === 'activity'
       ? activity
-      : route === 'wan'
+      : route === 'network'
         ? wan
-        : route === 'lan'
-          ? lan
-          : route === 'wifi'
-            ? wifi
-            : route === 'iptv'
-              ? iptv
-              : route === 'devices'
-                ? devices
-                : route === 'safeshield'
-                  ? safeshield
-                  : route === 'rules'
-                    ? rules
-                    : route === 'system'
-                      ? updates
-                      : status;
+        : route === 'wifi'
+          ? wifi
+          : route === 'iptv'
+            ? iptv
+            : route === 'devices'
+              ? devices
+              : route === 'safeshield'
+                ? safeshield
+                : route === 'rules'
+                  ? rules
+                  : route === 'system'
+                    ? updates
+                    : status;
 
   let content: ComponentChildren;
 
   switch (route) {
-    case 'wan':
+    case 'network':
       content = (
-        <WanPage
-          action={wan.action}
-          data={wan.data}
-          error={wan.error}
-          feedback={wan.feedback}
-          loading={wan.loading}
-          onDismissFeedback={wan.dismissFeedback}
-          onReconnect={() => void wan.reconnect()}
-          onRetry={() => void wan.refresh()}
-          onSave={wan.save}
-        />
+        <div class="min-w-0">
+          <div aria-label="인터넷 연결 설정" class="min-w-0">
+            <WanPage
+              action={wan.action}
+              data={wan.data}
+              error={wan.error}
+              feedback={wan.feedback}
+              loading={wan.loading}
+              onDismissFeedback={wan.dismissFeedback}
+              onReconnect={() => void wan.reconnect()}
+              onRetry={() => void wan.refresh()}
+              onSave={wan.save}
+            />
+          </div>
+          <div
+            aria-label="내부 네트워크 설정"
+            class="mt-8 min-w-0 border-t border-slate-200 pt-8"
+          >
+            <LanPage
+              action={lan.action}
+              data={lan.data}
+              error={lan.error}
+              feedback={lan.feedback}
+              loading={lan.loading}
+              onApplyRecommendation={lan.applyRecommendation}
+              onDismissFeedback={lan.dismissFeedback}
+              onRetry={() => void lan.refresh()}
+              onSave={lan.save}
+            />
+          </div>
+        </div>
       );
       break;
 
@@ -113,22 +131,6 @@ export function App() {
           onRetry={() => void activity.refresh()}
           onSetCloudSync={(enabled) => void activity.setCloudSyncEnabled(enabled)}
           savingCloudSync={activity.savingCloudSync}
-        />
-      );
-      break;
-
-    case 'lan':
-      content = (
-        <LanPage
-          action={lan.action}
-          data={lan.data}
-          error={lan.error}
-          feedback={lan.feedback}
-          loading={lan.loading}
-          onApplyRecommendation={lan.applyRecommendation}
-          onDismissFeedback={lan.dismissFeedback}
-          onRetry={() => void lan.refresh()}
-          onSave={lan.save}
         />
       );
       break;
@@ -370,6 +372,11 @@ export function App() {
       return;
     }
 
+    if (route === 'network') {
+      void Promise.all([wan.refresh(), lan.refresh()]);
+      return;
+    }
+
     if (route === 'system') {
       void Promise.all([updates.refresh(), firmware.refresh()]);
       return;
@@ -396,10 +403,11 @@ export function App() {
 
   return (
     <AppShell
-      loading={current.loading}
+      loading={route === 'network' ? wan.loading || lan.loading : current.loading}
       onRefresh={refreshCurrent}
       refreshing={
         current.refreshing ||
+        (route === 'network' && lan.refreshing) ||
         (route === 'home' &&
           (activity.refreshing ||
             dashboardDevices.refreshing ||

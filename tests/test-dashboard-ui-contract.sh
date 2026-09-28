@@ -40,7 +40,7 @@ grep -Fq 'firmware={firmware.data}' "$APP" || \
 	fail '대시보드는 SmartSafeHub 펌웨어 상태를 전달받아야 합니다'
 grep -Fq "const health = useHealth(route === 'home' || route === 'settings');" "$APP" || \
 	fail '대시보드와 설정 페이지가 같은 로컬 Health 상태를 조회해야 합니다'
-grep -Fq "const lan = useLan(route === 'home' || route === 'lan');" "$APP" || \
+grep -Fq "const lan = useLan(route === 'home' || route === 'network');" "$APP" || \
 	fail '대시보드는 LAN/WAN 대역과 충돌 상태를 함께 조회해야 합니다'
 grep -Fq 'health={health.data}' "$APP" || \
 	fail '대시보드에 로컬 Health 진단 데이터를 전달해야 합니다'
@@ -107,8 +107,8 @@ grep -Fq 'eyebrow="Software update"' "$HOME" || \
 	fail '대시보드는 소프트웨어 업데이트 정보를 표시해야 합니다'
 grep -Fq 'const networkConflict = Boolean(lan?.conflict.detected);' "$HOME" || \
 	fail 'Internet 개요 카드는 WAN/LAN 대역 충돌 상태를 사용해야 합니다'
-grep -Fq 'href="#lan"' "$HOME" || \
-	fail 'Internet 개요와 연결 상태 상세는 LAN 설정으로 연결되어야 합니다'
+grep -Fq 'href="#network"' "$HOME" || \
+	fail 'Internet 개요와 연결 상태 상세는 통합 네트워크 설정으로 연결되어야 합니다'
 grep -Fq "linkLabel={networkConflict ? '해결하기 →' : '자세히 보기 →'}" "$HOME" || \
 	fail 'Internet 개요 카드는 정상 상태에서 다른 개요 카드와 같은 자세히 보기 문구를 사용하고 충돌 시 해결하기를 표시해야 합니다'
 grep -Fq "? '⚠ LAN 대역과 충돌합니다'" "$HOME" || \
@@ -130,8 +130,8 @@ grep -Fq 'firstOctet === undefined || secondOctet === undefined' "$HOME" || \
 if grep -Eq 'octets\[1\][[:space:]]*(>=|<=|===|==|>|<)' "$HOME"; then
 	fail '사설 WAN 판별에서 noUncheckedIndexedAccess를 우회하는 직접 배열 비교를 사용하면 안 됩니다'
 fi
-grep -Fq 'LAN 설정 보기' "$HOME" || \
-	fail '연결 상태 상세 카드의 주 동작은 LAN 설정으로 이동해야 합니다'
+grep -Fq '네트워크 설정 보기' "$HOME" || \
+	fail '연결 상태 상세 카드의 주 동작은 통합 네트워크 설정으로 이동해야 합니다'
 grep -Fq 'title="네트워크 보호 활동"' "$HOME" || \
 	fail '대시보드는 네트워크 보호 활동 영역을 표시해야 합니다'
 grep -Fq '<DashboardSafeShieldActivity' "$HOME" || \
