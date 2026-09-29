@@ -247,7 +247,7 @@ Health observer의 첫 주기는 WAN/Health 현재 상태를 baseline으로만 �
 
 공유기 웹사이트는 기존 로그인 세션과 RPC 시그니처를 그대로 유지하기 위해 인자 없는 read-only `smartsafehub.status` 응답에 최근 활동을 함께 포함해 읽고, 대시보드에는 최근 3건, `최근 활동` 전용 화면에는 최대 128건을 날짜별로 묶어 표시합니다. 대시보드의 compact 타임라인은 각 항목 사이에 작은 세로 간격을 두어 짧은 제목/설명이 연속해서 붙어 보이지 않도록 합니다. 저장된 원본에는 한국어 제목/설명을 넣지 않고 프론트엔드가 `event_type + metadata`를 렌더링합니다. 로컬 UI는 무료 장치 기능이며 **현재 부팅 이후의 휘발성 이력**을 제공합니다.
 
-Pro/Ultimate 장치에서는 공유기 `최근 활동` 화면에서 **Cloud 활동 기록 전송을 사용자가 직접 ON/OFF**할 수 있습니다. 새 설치는 `smartsafehub.activity.cloud_sync_enabled=0`으로 시작하지만, r18 이하 장치에는 이 옵션이 존재하지 않았으므로 업그레이드 시 누락된 값은 기존 동작을 보존하기 위해 ON으로 해석합니다. 사용자가 OFF로 저장한 값 `0`은 명시적 opt-out으로 취급합니다.
+Pro/Ultimate 장치에서는 공유기 `최근 활동` 화면에서 **Cloud 활동 기록 전송을 사용자가 직접 ON/OFF**할 수 있습니다. `smartsafehub.activity.cloud_sync_enabled=0`이 기본값이며, Cloud 전송은 사용자가 명시적으로 ON으로 저장한 경우에만 동작합니다. 옵션이 없거나 해석할 수 없는 값이면 OFF로 처리해 설정 누락만으로 활동 기록이 서버에 전송되지 않도록 합니다.
 
 Cloud 전송이 ON일 때 `/usr/libexec/smartsafehub-activity-sync`가 같은 이벤트의 Cloud outbox를 `/api/v1/activity/events`로 batch 전송합니다. Hub 1.4.86부터 `activity_history` upload credential은 artifact resolve와 분리된 `/api/v1/licenses/status`에서 발급되지만, **license status API의 단일 소유자는 `/usr/libexec/smartsafehub-license`** 입니다. `smartsafehub-license status-sync`가 기존 라이선스 reconciliation과 함께 `activity_history` token/URL을 검증해 `/tmp/smartsafehub/activity-sync-credential.json`에 원자적으로 저장하고, `smartsafehub-activity-sync`는 이 runtime credential을 소비해 upload/ack만 담당합니다. 따라서 activity sync가 license key/device fingerprint를 다시 읽거나 `/licenses/status`와 `/licenses/resolve`를 별도로 호출하지 않습니다.
 
