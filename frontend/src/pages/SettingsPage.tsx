@@ -42,6 +42,7 @@ import type {
 import { errorMessage } from '../utils/errors';
 import { luciAdminUrl } from '../utils/luci';
 import { passwordPolicy, passwordPolicySatisfied } from '../utils/password';
+import { browserTimezone } from '../utils/timezone';
 
 interface SettingsPageProps {
   action: SystemAction;
@@ -143,14 +144,6 @@ function ActionCard(props: {
       <div class="mt-5">{props.children}</div>
     </article>
   );
-}
-
-function browserTimezone(): string | null {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
-  } catch {
-    return null;
-  }
 }
 
 function TimeSettingsCard(props: {
