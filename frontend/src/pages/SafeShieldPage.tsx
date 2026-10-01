@@ -797,12 +797,12 @@ export function SafeShieldPage({
               value={<BooleanState falseLabel="중지됨" trueLabel="동작 중" value={data.active} />}
             />
             <DetailRow
-              label="dnsmasq"
+              label="DNS 서비스"
               value={<BooleanState falseLabel="중지됨" value={data.runtime.dnsmasqRunning} />}
             />
-            <DetailRow label="DNS 런타임" value={<BooleanState value={data.runtime.dnsRuntimeOk} />} />
+            <DetailRow label="SafeShield DNS 연동" value={<BooleanState value={data.runtime.dnsRuntimeOk} />} />
             <DetailRow
-              label="Refresh daemon"
+              label="차단 목록 갱신"
               value={<BooleanState falseLabel="중지됨" value={data.runtime.refreshdRunning} />}
             />
           </DetailCard>
