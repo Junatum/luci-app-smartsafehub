@@ -474,7 +474,7 @@ function HealthDiagnosticCard(props: {
 
   return (
     <ActionCard
-      description="SmartSafeHub가 장치 상태를 직접 점검하고 이상 항목을 알려줍니다. 로컬 진단은 멤버십과 관계없이 사용할 수 있습니다."
+      description="SmartSafeHub가 장치 상태를 직접 점검하고 이상 항목을 알려줍니다."
       icon={<DownloadIcon class="size-5" />}
       title="진단 및 지원"
     >

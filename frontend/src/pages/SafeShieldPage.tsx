@@ -679,7 +679,7 @@ export function SafeShieldPage({
   function handleToggle(): void {
     if (enabled) {
       const confirmed = window.confirm(
-        'SafeShield 보호를 끄면 현재 차단 목록이 제거되고 DNS 차단이 즉시 중단됩니다. 계속하시겠습니까?',
+        '보호를 끄면, 현재 차단 목록이 제거되어 위험에 노출될 수 있습니다. 그래도 계속하시겠습니까?',
       );
 
       if (!confirmed) {
