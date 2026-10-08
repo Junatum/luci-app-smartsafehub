@@ -100,17 +100,15 @@ README에는 제품을 빠르게 파악하는 데 필요한 핵심 기능만 유
 - 수동 갱신 요청의 성공 안내 배너는 유지하지 않고 실제 진행 상태를 보호 카드의 단계 UI로 표시하며, 실패한 경우에만 오류 피드백을 유지
 - 갱신 단계의 원형 progress ring은 track 3px / active arc 4px의 얇은 stroke와 절제된 shadow를 유지하면서, 전체 지름도 소폭 줄여 카드 본문 대비 존재감이 과해 보이지 않도록 조정했습니다. 라이트/다크 모드 모두에서 단계 숫자는 계속 선명하게 읽을 수 있습니다.
 - 갱신 데몬, dnsmasq와 DNS 런타임 상태 표시
-- 라이선스, 플랜, 아티팩트와 차단 목록 상태 표시
+- SmartSafeHub 계정의 entitlement 플랜, 아티팩트와 차단 목록 상태 표시
 - 유료 플랜은 PRO(teal), ULTIMATE(bronze), PLUS 등 기타 유료 플랜(blue)의 정적인 premium chip으로 구분합니다. 외부 glow와 shine 애니메이션은 사용하지 않고 얕은 그림자와 1px 테두리만 유지하며, FREE 플랜은 `https://www.smartsafehub.com/pricing/` 요금제 안내 CTA를 보호 카드에 표시
 - 로컬 DNS 요청·차단 수, 차단율과 최근 24시간 시간대별 차단 통계 표시
 - 대시보드와 SafeShield의 최근 24시간 통계에서는 제품이 실제로 처리한 결과인 `차단` 수치를 동일한 teal 강조색으로 표시하고, DNS 요청 수와 차단율은 기본 텍스트 색상으로 유지해 지표의 우선순위를 일관되게 표현
 - DHCP 식별 정보를 이용한 기기별 DNS 요청·차단 수·차단율과 IP/MAC 표시. 차단 수 기준 상위 3개 기기를 기본 미리보기로 보여주며 `차단 TOP 3` 배지와 `전체 N개 기기 중 차단 수 기준 상위 3개` 안내로 현재 표시 범위를 명확히 표현. 필요할 때 전체 목록을 펼쳐 10개 단위 페이지네이션으로 확인
 - 통계 RPC는 SafeShield 화면에서만 60초 간격으로 조회하며 숨겨진 브라우저 탭에서는 polling 중지
-- 새 라이선스 등록·변경은 `smartsafehub.license_activate`가 키만 private request로 넘기고 즉시 반환한 뒤 detached `smartsafehub-license activate` helper가 SafeShield 장치 identity를 조회해 Hub `/api/v1/licenses/activate`에서 검증합니다. Hub 성공 뒤에만 SafeShield 공식 `license_update` API로 로컬 저장하며 rpcd 안에서 nested ubus 호출을 수행하지 않습니다.
-- 라이선스 등록·조회·제거의 진행/성공/오류 피드백은 SafeShield 페이지 상단이 아니라 라이선스 입력 카드 안에 표시합니다. activation 상태 조회는 1초 간격, 5초 RPC timeout을 사용하고 일시적인 통신 오류를 제한적으로 재시도합니다.
-- `smartsafehub-license` daemon이 기본 5분마다 Hub `/api/v1/licenses/status`를 확인하고, 서버가 명시적으로 `clear_license`를 반환한 경우에만 SafeShield 공식 API로 로컬 키 제거
-- Hub 상태 확인 실패만으로는 로컬 라이선스를 제거하지 않는 fail-open 동작을 사용하며, 활성화와 주기 확인은 single-flight 경계로 직렬화
-- 현재 라이선스 키는 사용자가 `현재 키 불러오기`를 선택했을 때만 `safeshield.license_get`으로 평문 조회
+- SafeShield 상태는 로컬 라이선스 키가 아니라 `status.entitlement.plan/status`로 현재 계정 플랜과 권한 상태를 표시합니다.
+- 계정 연결과 플랜 동기화는 `smartsafehub-device`가 Device credential로 `/api/v1/devices/sync`를 호출해 담당하며, SafeShield는 동기화 응답의 entitlement와 보호 아티팩트 정보만 소비합니다.
+- 웹사이트에서 기기 등록을 해제하면 device sync가 미연결 상태를 감지하고 Cloud credential을 정리한 뒤 SafeShield 보호 정보를 다시 갱신합니다. 로컬 DNS 보호와 사용자 규칙은 계속 유지됩니다.
 - 사용자 허용 목록과 차단 목록 관리
 - 규칙 저장과 유효성 검사는 SafeShield 공식 API가 담당
 - 규칙 변경은 SafeShield 엔진의 cached-artifact local apply 경로로 즉시 반영

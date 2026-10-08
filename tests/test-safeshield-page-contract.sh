@@ -10,13 +10,14 @@ ASSET_JS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.js"
 ASSET_CSS="$ROOT_DIR/root/www/luci-static/smartsafehub/app.css"
 SOURCE_CSS="$ROOT_DIR/frontend/src/styles/app.css"
 ACTIONS="$ROOT_DIR/frontend/src/hooks/useSafeShieldActions.ts"
+API="$ROOT_DIR/frontend/src/api/safeshield.ts"
 
 fail() {
 	echo "FAIL: $*" >&2
 	exit 1
 }
 
-for file in "$PAGE" "$PANEL" "$NAVIGATION" "$ACTIONS" "$ASSET_JS" "$ASSET_CSS" "$SOURCE_CSS"; do
+for file in "$PAGE" "$PANEL" "$NAVIGATION" "$ACTIONS" "$API" "$ASSET_JS" "$ASSET_CSS" "$SOURCE_CSS"; do
 	[ -f "$file" ] || fail "missing SafeShield product UI source: ${file#$ROOT_DIR/}"
 done
 
@@ -296,7 +297,7 @@ if grep -Fq '차단 목록 갱신 작업을 시작했습니다.' "$ACTIONS" || \
 fi
 grep -Fq 'await requestSafeShieldRefresh();' "$ACTIONS" || \
 	fail 'SafeShield manual refresh must still request the backend refresh operation'
-grep -Fq 'setState({ action: null, error: null, feedbackTarget: null, message: null });' "$ACTIONS" || \
+grep -Fq 'setState({ action: null, error: null, message: null });' "$ACTIONS" || \
 	fail 'SafeShield manual refresh must clear action feedback after the request is accepted'
 if grep -Fq '차단 목록 갱신 작업을 시작했습니다.' "$ASSET_JS" || \
 	grep -Fq '차단 목록을 이미 갱신하고 있습니다.' "$ASSET_JS" || \
@@ -332,4 +333,9 @@ if ! grep -Eq '(^|[^0-9])4500([^0-9]|$)' "$ASSET_JS" && \
 	fail 'checked-in app.js must include the 4.5-second SafeShield success-feedback timeout policy'
 fi
 
-echo 'PASS: SafeShield product page hierarchy, refresh progress and switch contracts are present'
+grep -Fq 'data.entitlement.plan' "$PAGE" || fail 'SafeShield page must read the entitlement plan from SafeShield status'
+grep -Fq 'entitlement?: Record<string, unknown>' "$API" || fail 'SafeShield API must normalize the entitlement status object'
+! grep -Fq 'fetchSafeShieldLicense' "$API" || fail 'retired SafeShield license-key read API must stay removed'
+! grep -Fq 'updateSafeShieldLicense' "$API" || fail 'retired SafeShield license-key update API must stay removed'
+
+echo 'PASS: SafeShield product page hierarchy, refresh progress, entitlement and switch contracts are present'

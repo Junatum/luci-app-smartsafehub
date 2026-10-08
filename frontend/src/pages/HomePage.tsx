@@ -471,7 +471,7 @@ function safeShieldOverview(
     };
   }
 
-  const plan = data.license.plan?.trim();
+  const plan = data.entitlement.plan?.trim();
   const ruleDetail =
     data.blocklist.validLineCount > 0
       ? `${formatNumber(data.blocklist.validLineCount)}개 차단 규칙`

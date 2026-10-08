@@ -59,7 +59,6 @@ import {
 	mutate_safeshield_rule,
 	refresh_safeshield_blocklist,
 	update_safeshield_enabled,
-	update_safeshield_license,
 	update_safeshield_statistics
 } from './smartsafehub/safeshield-management.uc';
 
@@ -309,12 +308,6 @@ const methods = {
 		args: { action: '', domain: '', refresh: true },
 		call: require_root_password(function(request) {
 			return mutate_safeshield_rule(request, 'rule_delete');
-		}),
-	},
-	safeshield_license_update: {
-		args: { license_key: '' },
-		call: require_root_password(function(request) {
-			return update_safeshield_license(request);
 		}),
 	},
 	device_registration_status: {

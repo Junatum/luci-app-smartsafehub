@@ -1,5 +1,21 @@
 # 변경 기록
 
+## [0.2.27-r10] - 2026-10-08
+
+### 개선
+
+- SafeShield 상태의 현재 플랜과 권한 상태를 `license`가 아니라 `entitlement`로 표현해 계정 구독 권한과 과거 로컬 라이선스 키 개념을 분리했습니다.
+- Health Reporter 내부 상태도 `licenseStatus` 대신 `entitlementStatus`를 사용하도록 정리했습니다.
+- 더 이상 사용하지 않는 SafeShield 라이선스 키 읽기·변경 프런트엔드 코드와 SmartSafeHub 중계 RPC/ACL을 제거했습니다.
+
+### 테스트
+
+- SafeShield/Health 상태가 entitlement 명칭만 사용하는지, 제거된 라이선스 키 RPC가 다시 노출되지 않는지 계약 테스트를 보강했습니다.
+
+### 호환성
+
+- SafeShield `0.3.24-r4`의 `status.entitlement` 스키마를 사용합니다. `status.license` 호환 경로는 유지하지 않습니다.
+
 ## [0.2.27-r9] - 2026-10-08
 
 ### 개선

@@ -9,10 +9,6 @@ import type { HealthAccepted, HealthStatus } from '../types/health';
 import type { IptvSettings, IptvSettingsInput, IptvUpdateResult } from '../types/iptv';
 import type { LanSettings, LanSettingsInput, LanUpdateResult } from '../types/lan';
 import type {
-  SmartSafeHubLicenseActivationAccepted,
-  SmartSafeHubLicenseStatus,
-} from '../types/license';
-import type {
   FirmwareAccepted,
   FirmwareStatus,
 } from '../types/firmware';
@@ -99,16 +95,6 @@ export function updateActivityCloudSync(enabled: boolean): Promise<ActivityHisto
 
 export function fetchStatus(): Promise<SmartSafeHubStatus> {
   return callApi(API_OBJECT, 'status');
-}
-
-export function fetchSmartSafeHubLicenseStatus(): Promise<SmartSafeHubLicenseStatus> {
-  return callApi(API_OBJECT, 'license_status', {}, { timeoutMs: 5000 });
-}
-
-export function requestSmartSafeHubLicenseActivation(
-  licenseKey: string,
-): Promise<SmartSafeHubLicenseActivationAccepted> {
-  return callApi(API_OBJECT, 'license_activate', { license_key: licenseKey });
 }
 
 export interface DeviceRegistrationStatus {

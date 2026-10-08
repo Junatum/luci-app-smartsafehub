@@ -115,6 +115,8 @@ grep -Fq '직접 설정을 변경한 작업은 성공 시점에 즉시 기록하
 	fail 'full page must explain direct mutation event recording'
 grep -Fq '외부 상태를 확인해야 하는 항목은 실제 상태 변화가 관찰된 경우에만 추가합니다' "$PAGE" || \
 	fail 'full page must explain observer-owned transition recording'
+grep -Fq '업데이트, 계정 권한과 주요 설정' "$PAGE" || \
+	fail 'activity page must use account entitlement wording instead of license wording'
 grep -Fq '<ActivityTimeline events={data?.events ?? []} />' "$PAGE" || \
 	fail 'full page must render the complete local activity response'
 
@@ -154,8 +156,8 @@ grep -Fq "title: 'SafeShield 보호 활성화'" "$TIMELINE" || \
 	fail 'SafeShield enabled activity must use explicit activation wording'
 grep -Fq "title: 'SafeShield 보호 비활성화'" "$TIMELINE" || \
 	fail 'SafeShield disabled activity must use explicit deactivation wording'
-grep -Fq "title: '라이선스 연결 해제'" "$TIMELINE" || \
-	fail 'license clear activity must describe the router-license link instead of implying license deletion'
+grep -Fq "title: '계정 권한 해제'" "$TIMELINE" || \
+	fail 'legacy license-clear activity must render as current account entitlement wording'
 grep -Fq "title: '확인이 필요한 장치 상태 발견'" "$TIMELINE" || \
 	fail 'health issue activity must use user-facing device-state wording'
 grep -Fq "title: '확인이 필요한 장치 상태 변경'" "$TIMELINE" || \

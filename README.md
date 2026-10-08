@@ -16,7 +16,7 @@ SmartSafeHub는 OpenWrt 공유기를 위한 통합 홈 게이트웨이 관리 UI
 - OpenWrt: **25.12 버전 이상**
 - 백엔드: rpcd ucode 모듈
 - 프런트엔드: Preact, TypeScript, Vite, Tailwind CSS
-- SafeShield: **safeshield (>= 0.3.24-r2)**
+- SafeShield: **safeshield (>= 0.3.24-r4)**
 - 라이선스: **GPL-3.0-or-later**
 
 변경 내역은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
@@ -33,7 +33,7 @@ SmartSafeHub는 OpenWrt 공유기를 위한 통합 홈 게이트웨이 관리 UI
 - **업데이트 관리**: SmartSafeHub 관리 소프트웨어와 펌웨어 업데이트를 확인하고 적용합니다.
 - **장치 진단**: 로컬 진단, 진단 정보 다운로드와 사용자가 동의한 원격 Health Reporter를 제공합니다.
 - **관리자 보안**: 최초 관리자 비밀번호 설정과 현재 비밀번호 확인을 거친 비밀번호 변경, 변경 후 재로그인을 제공합니다.
-- **최근 활동**: 인터넷, 보호, 업데이트, 라이선스와 진단 상태 변화를 로컬 이벤트 타임라인으로 정규화하며, Cloud 활동 기록은 사용자가 명시적으로 켠 경우에만 전송합니다.
+- **최근 활동**: 인터넷, 보호, 업데이트, 계정 권한과 진단 상태 변화를 로컬 이벤트 타임라인으로 정규화하며, Cloud 활동 기록은 사용자가 명시적으로 켠 경우에만 전송합니다.
 - **IPTV (Beta)**: SK Broadband와 LG U+ 환경을 위한 IGMP Proxy/Snooping 구성을 제공합니다.
 
 기능별 동작과 현재 제약은 [docs/FEATURES.md](docs/FEATURES.md)에서 확인할 수 있습니다.
@@ -83,7 +83,7 @@ SMARTSAFEHUB_DEV_ROUTER=http://192.168.1.1 npm run dev
 | [FEATURES.md](docs/FEATURES.md) | 기능별 상세 동작, UI 정책, 성능·안정성 설계와 현재 제약 |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 프런트엔드, rpcd, 데이터 흐름과 보안 경계 |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발, 저장소 구조, 빌드, ucode 검사, 배포 전 검증과 버전 관리 |
-| [OPERATIONS.md](docs/OPERATIONS.md) | 설치, 설치 후 확인, 라이선스 동기화, 진단과 트러블슈팅 |
+| [OPERATIONS.md](docs/OPERATIONS.md) | 설치, 설치 후 확인, 기기 계정/권한 동기화, 진단과 트러블슈팅 |
 | [STATISTICS_TESTING.md](docs/STATISTICS_TESTING.md) | 저사양 장비를 포함한 통계 기능 검증 절차 |
 | [CHANGELOG.md](CHANGELOG.md) | 릴리스별 변경 내역 |
 

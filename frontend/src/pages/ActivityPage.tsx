@@ -219,7 +219,7 @@ export function ActivityPage({
               현재 부팅 이후의 최근 활동
             </h2>
             <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-              인터넷, SafeShield, 업데이트, 라이선스와 주요 설정에서 실제 상태가 변경된 시점만 기록합니다.
+              인터넷, SafeShield, 업데이트, 계정 권한과 주요 설정에서 실제 상태가 변경된 시점만 기록합니다.
             </p>
           </div>
           <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-inset ring-slate-200">

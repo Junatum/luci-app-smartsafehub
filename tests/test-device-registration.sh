@@ -96,6 +96,9 @@ grep -Fq 'const pairingCode = !connected && !expired ? status?.pairingCode : nul
 }
 ! grep -Fq 'license_activate' "$MAIN"
 ! grep -Fq 'smartsafehub-license' "$ROOT/Makefile"
+! grep -Fq 'safeshield_license_update' "$MAIN" || fail 'legacy SafeShield license update RPC must stay removed'
+! grep -Fq '"license_get"' "$ROOT/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json" || fail 'legacy SafeShield license_get ACL must stay removed'
+! grep -Fq '"license_update"' "$ROOT/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json" || fail 'legacy SafeShield license_update ACL must stay removed'
 echo 'device registration contract: ok'
 
 grep -Fq '/etc/smartsafehub/device-credential.json' "$HELPER"

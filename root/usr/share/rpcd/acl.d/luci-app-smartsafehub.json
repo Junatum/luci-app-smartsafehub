@@ -62,7 +62,6 @@
           "safeshield_statistics_update",
           "safeshield_rule_add",
           "safeshield_rule_delete",
-          "safeshield_license_update",
           "device_pairing_refresh"
         ],
         "safeshield": [
@@ -70,9 +69,7 @@
           "config_update",
           "refresh",
           "rule_add",
-          "rule_delete",
-          "license_get",
-          "license_update"
+          "rule_delete"
         ],
         "smartsafehub_network": [
           "wan_reconnect",

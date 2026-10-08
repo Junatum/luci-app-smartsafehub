@@ -13,10 +13,7 @@ import {
 } from '../components/Icons';
 import { SafeShieldStatisticsPanel } from '../components/SafeShieldStatisticsPanel';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
-import type {
-  SafeShieldAction,
-  SafeShieldFeedbackTarget,
-} from '../hooks/useSafeShieldActions';
+import type { SafeShieldAction } from '../hooks/useSafeShieldActions';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import {
   getSafeShieldRefreshErrorMessage,
@@ -35,7 +32,6 @@ const SMARTSAFEHUB_PRICING_URL = 'https://www.smartsafehub.com/pricing/';
 interface SafeShieldPageProps {
   action: SafeShieldAction | null;
   actionError: string | null;
-  actionFeedbackTarget: SafeShieldFeedbackTarget | null;
   actionMessage: string | null;
   data: SafeShieldStatus | null;
   error: string | null;
@@ -581,7 +577,6 @@ function ActionFeedback({
 export function SafeShieldPage({
   action,
   actionError,
-  actionFeedbackTarget,
   actionMessage,
   data,
   error,
@@ -640,7 +635,7 @@ export function SafeShieldPage({
   }
 
   const enabled = data.enabled;
-  const planName = getSafeShieldPlanName(data.license.plan);
+  const planName = getSafeShieldPlanName(data.entitlement.plan);
   const refreshing = isSafeShieldRefreshTransition(data.status, data.stage);
   const actionBusy = action !== null;
   const preserveBlocklistCount = refreshing || getProductProtectionState(data) === 'error';
@@ -746,8 +741,8 @@ export function SafeShieldPage({
       </section>
 
       <ActionFeedback
-        error={actionFeedbackTarget === 'license' ? null : actionError}
-        message={actionFeedbackTarget === 'license' ? null : actionMessage}
+        error={actionError}
+        message={actionMessage}
         onDismiss={onDismissFeedback}
       />
 

@@ -315,7 +315,6 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
         <SafeShieldPage
           action={safeshieldActions.action}
           actionError={safeshieldActions.error}
-          actionFeedbackTarget={safeshieldActions.feedbackTarget}
           actionMessage={safeshieldActions.message}
           data={safeshield.data}
           error={safeshield.error}

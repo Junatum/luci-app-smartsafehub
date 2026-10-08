@@ -612,7 +612,7 @@ entitlement_eligible() {
 }
 
 write_report_state() {
-	local enabled="$1" eligible="$2" plan="$3" license_status="$4" last_report_at="$5" last_result="$6" last_error="$7" fingerprint="$8"
+	local enabled="$1" eligible="$2" plan="$3" entitlement_status="$4" last_report_at="$5" last_result="$6" last_error="$7" fingerprint="$8"
 	local next_retry_at="${9:-}" tmp next_report interval
 	interval="$(report_interval_s)"
 	case "$last_report_at" in ''|*[!0-9]*) last_report_at=0 ;; esac
@@ -627,7 +627,7 @@ write_report_state() {
 		printf 'enabled\t%s\n' "$enabled"
 		printf 'eligible\t%s\n' "$eligible"
 		printf 'plan\t%s\n' "$(sanitize_code "$plan")"
-		printf 'license_status\t%s\n' "$(sanitize_code "$license_status")"
+		printf 'entitlement_status\t%s\n' "$(sanitize_code "$entitlement_status")"
 		printf 'last_report_at\t%s\n' "$last_report_at"
 		printf 'next_report_at\t%s\n' "$next_report"
 		printf 'next_retry_at\t%s\n' "$next_retry_at"
@@ -639,13 +639,13 @@ write_report_state() {
 }
 
 sync_reporter_state() {
-	local eligibility eligible plan license_status enabled last_at last_result last_error fingerprint next_retry_at
+	local eligibility eligible plan entitlement_status enabled last_at last_result last_error fingerprint next_retry_at
 	enabled=0
 	reporter_enabled && enabled=1
 	eligibility="$(entitlement_eligible)"
 	eligible="$(printf '%s' "$eligibility" | cut -f1)"
 	plan="$(printf '%s' "$eligibility" | cut -f2)"
-	license_status="$(printf '%s' "$eligibility" | cut -f3)"
+	entitlement_status="$(printf '%s' "$eligibility" | cut -f3)"
 	last_at="$(state_value "$REPORT_STATE_FILE" last_report_at)"
 	last_result="$(state_value "$REPORT_STATE_FILE" last_result)"
 	last_error="$(state_value "$REPORT_STATE_FILE" last_error_code)"
@@ -666,7 +666,7 @@ sync_reporter_state() {
 		last_error=''
 		next_retry_at=0
 	fi
-	write_report_state "$enabled" "$eligible" "$plan" "$license_status" "$last_at" "$last_result" "$last_error" "$fingerprint" "$next_retry_at"
+	write_report_state "$enabled" "$eligible" "$plan" "$entitlement_status" "$last_at" "$last_result" "$last_error" "$fingerprint" "$next_retry_at"
 }
 
 read_device_credential() {
@@ -691,28 +691,28 @@ EOF_REPORT
 }
 
 maybe_report() {
-	local eligibility eligible plan license_status enabled now last_at last_fingerprint next_retry_at interval due credential base
+	local eligibility eligible plan entitlement_status enabled now last_at last_fingerprint next_retry_at interval due credential base
 	enabled=0
 	reporter_enabled && enabled=1
 	eligibility="$(entitlement_eligible)"
 	eligible="$(printf '%s' "$eligibility" | cut -f1)"
 	plan="$(printf '%s' "$eligibility" | cut -f2)"
-	license_status="$(printf '%s' "$eligibility" | cut -f3)"
+	entitlement_status="$(printf '%s' "$eligibility" | cut -f3)"
 	now="$("$DATE_BIN" +%s 2>/dev/null || printf '0')"
 	last_at="$(state_value "$REPORT_STATE_FILE" last_report_at)"
 	last_fingerprint="$(state_value "$REPORT_STATE_FILE" fingerprint)"
 	case "$last_at" in ''|*[!0-9]*) last_at=0 ;; esac
 
 	if [ "$enabled" -ne 1 ]; then
-		write_report_state 0 "$eligible" "$plan" "$license_status" "$last_at" disabled '' "$last_fingerprint" 0
+		write_report_state 0 "$eligible" "$plan" "$entitlement_status" "$last_at" disabled '' "$last_fingerprint" 0
 		return 0
 	fi
 	if [ "$eligible" != '1' ]; then
-		write_report_state 1 0 "$plan" "$license_status" "$last_at" ineligible 'HEALTH_REPORTER_NOT_ELIGIBLE' "$last_fingerprint" 0
+		write_report_state 1 0 "$plan" "$entitlement_status" "$last_at" ineligible 'HEALTH_REPORTER_NOT_ELIGIBLE' "$last_fingerprint" 0
 		return 0
 	fi
 	if [ "$SAFESHIELD_INITIALIZING" -eq 1 ]; then
-		write_report_state 1 1 "$plan" "$license_status" "$last_at" initializing '' "$last_fingerprint" 0
+		write_report_state 1 1 "$plan" "$entitlement_status" "$last_at" initializing '' "$last_fingerprint" 0
 		return 0
 	fi
 
@@ -728,13 +728,13 @@ maybe_report() {
 	[ "$ISSUE_FINGERPRINT" != "$last_fingerprint" ] && due=1
 	[ "$now" -ge $((last_at + interval)) ] && due=1
 	if [ "$due" -ne 1 ]; then
-		write_report_state 1 1 "$plan" "$license_status" "$last_at" idle '' "$last_fingerprint"
+		write_report_state 1 1 "$plan" "$entitlement_status" "$last_at" idle '' "$last_fingerprint"
 		return 0
 	fi
 
 	credential="$(read_device_credential 2>/dev/null || true)"
 	if [ -z "$credential" ]; then
-		write_report_state 1 1 "$plan" "$license_status" "$last_at" failed 'HEALTH_REPORTER_DEVICE_UNAVAILABLE' "$last_fingerprint" $((now + REPORT_RETRY_S))
+		write_report_state 1 1 "$plan" "$entitlement_status" "$last_at" failed 'HEALTH_REPORTER_DEVICE_UNAVAILABLE' "$last_fingerprint" $((now + REPORT_RETRY_S))
 		return 1
 	fi
 	build_report_payload
@@ -746,26 +746,26 @@ maybe_report() {
 		--header="Authorization: Device $credential" \
 		-O /dev/null \
 		"$base/health/reports"; then
-		write_report_state 1 1 "$plan" "$license_status" "$now" reported '' "$ISSUE_FINGERPRINT" 0
+		write_report_state 1 1 "$plan" "$entitlement_status" "$now" reported '' "$ISSUE_FINGERPRINT" 0
 		return 0
 	fi
 
-	write_report_state 1 1 "$plan" "$license_status" "$last_at" failed 'HEALTH_REPORTER_UPLOAD_FAILED' "$last_fingerprint" $((now + REPORT_RETRY_S))
+	write_report_state 1 1 "$plan" "$entitlement_status" "$last_at" failed 'HEALTH_REPORTER_UPLOAD_FAILED' "$last_fingerprint" $((now + REPORT_RETRY_S))
 	log_message 'HEALTH_REPORTER_UPLOAD_FAILED: 원격 상태 보고를 전송하지 못했습니다.'
 	return 1
 }
 
 set_reporter() {
-	local requested="$1" eligibility eligible plan license_status
+	local requested="$1" eligibility eligible plan entitlement_status
 	case "$requested" in 0|1) ;; *) return 2 ;; esac
 	if [ "$requested" = '1' ]; then
 		collect_health || return 1
 		eligibility="$(entitlement_eligible)"
 		eligible="$(printf '%s' "$eligibility" | cut -f1)"
 		plan="$(printf '%s' "$eligibility" | cut -f2)"
-		license_status="$(printf '%s' "$eligibility" | cut -f3)"
+		entitlement_status="$(printf '%s' "$eligibility" | cut -f3)"
 		if [ "$eligible" != '1' ]; then
-			write_report_state 0 0 "$plan" "$license_status" "$(state_value "$REPORT_STATE_FILE" last_report_at)" ineligible 'HEALTH_REPORTER_NOT_ELIGIBLE' "$(state_value "$REPORT_STATE_FILE" fingerprint)" 0
+			write_report_state 0 0 "$plan" "$entitlement_status" "$(state_value "$REPORT_STATE_FILE" last_report_at)" ineligible 'HEALTH_REPORTER_NOT_ELIGIBLE' "$(state_value "$REPORT_STATE_FILE" fingerprint)" 0
 			return 3
 		fi
 	fi
