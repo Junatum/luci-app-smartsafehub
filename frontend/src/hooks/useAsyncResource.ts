@@ -15,6 +15,7 @@ interface AsyncResourceOptions<T> {
   loader: () => Promise<T>;
   pollInterval?: number | ((data: T | null) => number | null);
   refreshOnFocus?: boolean;
+  staleTimeMs?: number;
 }
 
 export function useAsyncResource<T>({
@@ -23,6 +24,7 @@ export function useAsyncResource<T>({
   loader,
   pollInterval,
   refreshOnFocus = false,
+  staleTimeMs = 30_000,
 }: AsyncResourceOptions<T>) {
   const [state, setState] = useState<AsyncResourceState<T>>({
     data: null,
@@ -100,8 +102,10 @@ export function useAsyncResource<T>({
     }
 
     requested.current = true;
-    void load();
-  }, [active, load]);
+    const fresh = state.data !== null && lastRequestAt.current !== null &&
+      Date.now() - lastRequestAt.current < staleTimeMs;
+    if (!fresh) void load();
+  }, [active, load, staleTimeMs]);
 
   const interval =
     typeof pollInterval === 'function' ? pollInterval(state.data) : pollInterval;

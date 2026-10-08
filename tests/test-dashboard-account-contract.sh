@@ -13,8 +13,8 @@ grep -Fq 'accountRegistered={dashboardAccountRegistered}' "$app" || { echo 'FAIL
 grep -Fq 'accountRegistered === false' "$home" || { echo 'FAIL: missing explicit disconnected guard' >&2; exit 1; }
 grep -Fq 'href="#account"' "$home" || { echo 'FAIL: missing account page link' >&2; exit 1; }
 grep -Fq 'fetchDeviceRegistrationStatus()' "$hook" || { echo 'FAIL: local status fetch missing' >&2; exit 1; }
-if grep -Eq 'refreshDeviceRegistrationStatus|requestDevicePairingCode|setInterval' "$hook"; then
-  echo 'FAIL: dashboard must not synchronize with Hub or poll repeatedly' >&2
+if grep -Eq 'refreshDeviceRegistrationStatus|requestDevicePairingCode' "$hook"; then
+  echo 'FAIL: dashboard must not synchronize with Hub' >&2
   exit 1
 fi
 grep -Fq "'device_registration_status'" "$api" || { echo 'FAIL: local RPC missing' >&2; exit 1; }

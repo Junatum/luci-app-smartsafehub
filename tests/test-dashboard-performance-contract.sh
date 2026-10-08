@@ -10,7 +10,7 @@ assert "useActivityHistory(route === 'activity')" in app
 assert 'activity={status.data?.activityHistory ?? null}' in app
 assert "useSafeShieldStatus(route === 'home' || route === 'safeshield')" in app
 assert "useSafeShieldStatistics(route === 'home' || route === 'safeshield', route === 'safeshield')" in app
-assert "useSoftwareUpdates(route === 'home' || route === 'system')" in app
+assert "useSoftwareUpdates(true)" in app
 assert "useFirmwareUpdates(true)" in app  # sidebar firmware badge stays current
 assert 'if (loading && !data)' in home
 assert "let info_finished = false" in server and "let wan_finished = false" in server

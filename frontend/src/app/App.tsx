@@ -48,7 +48,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const configurationBackup = useConfigurationBackup();
   const activity = useActivityHistory(route === 'activity');
   const status = useStatus(route === 'home' || route === 'settings');
-  const updates = useSoftwareUpdates(route === 'home' || route === 'system');
+  const updates = useSoftwareUpdates(true);
   const firmware = useFirmwareUpdates(true);
   const wan = useWan(route === 'network');
   const lan = useLan(route === 'home' || route === 'network');
