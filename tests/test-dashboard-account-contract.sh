@@ -8,7 +8,9 @@ shell=frontend/src/components/AppShell.tsx
 hook=frontend/src/hooks/useDashboardAccountStatus.ts
 api=frontend/src/api/smartsafehub.ts
 
-grep -Fq "useDashboardAccountStatus(route === 'account')" "$app" || { echo 'FAIL: dashboard-only registration state missing' >&2; exit 1; }
+grep -Fq 'useDashboardAccountStatus(' "$app" || { echo 'FAIL: dashboard account status hook missing' >&2; exit 1; }
+grep -Fq 'deviceRegistration.data?.accountRegistered ?? null' "$app" || { echo 'FAIL: account page state must be shared with the sidebar immediately' >&2; exit 1; }
+grep -Fq 'accountRoute && accountPageRegistered !== null' "$hook" || { echo 'FAIL: sidebar must reflect account page connection status immediately' >&2; exit 1; }
 grep -Fq 'accountRegistered={dashboardAccountRegistered}' "$app" || { echo 'FAIL: missing account state prop' >&2; exit 1; }
 grep -Fq 'accountRegistered === false' "$home" || { echo 'FAIL: missing explicit disconnected guard' >&2; exit 1; }
 grep -Fq 'href="#account"' "$home" || { echo 'FAIL: missing account page link' >&2; exit 1; }

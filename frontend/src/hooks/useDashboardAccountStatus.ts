@@ -4,8 +4,20 @@ import { fetchDeviceRegistrationStatus } from '../api/smartsafehub';
 const ACCOUNT_STATUS_INTERVAL_MS = 60_000;
 
 // Router-local status only; never contact Hub from the dashboard/sidebar.
-export function useDashboardAccountStatus(accountRoute: boolean): boolean | null {
+export function useDashboardAccountStatus(
+  accountRoute: boolean,
+  accountPageRegistered: boolean | null,
+): boolean | null {
   const [registered, setRegistered] = useState<boolean | null>(null);
+
+  // The account page has fresher, locally confirmed state (5s polling or a
+  // pairing/refresh result). Reflect it immediately instead of waiting up to
+  // 60 seconds for the navigation's independent poll.
+  useEffect(() => {
+    if (accountRoute && accountPageRegistered !== null) {
+      setRegistered(accountPageRegistered);
+    }
+  }, [accountRoute, accountPageRegistered]);
 
   useEffect(() => {
     let cancelled = false;

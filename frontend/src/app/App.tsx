@@ -63,7 +63,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
   const deviceRegistration = useDeviceRegistration(route === 'account');
-  const dashboardAccountRegistered = useDashboardAccountStatus(route === 'account');
+  const dashboardAccountRegistered = useDashboardAccountStatus(
+    route === 'account',
+    deviceRegistration.data?.accountRegistered ?? null,
+  );
   const systemActions = useSystemActions(status.data);
   const health = useHealth(route === 'home' || route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
