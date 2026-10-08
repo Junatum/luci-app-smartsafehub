@@ -23,6 +23,7 @@ import { useScheduledRebootSettings } from '../hooks/useScheduledRebootSettings'
 import { useSystemActions } from '../hooks/useSystemActions';
 import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
 import { useDeviceRegistration } from '../hooks/useDeviceRegistration';
+import { useDashboardAccountStatus } from '../hooks/useDashboardAccountStatus';
 import { useWifi } from '../hooks/useWifi';
 import { ActivityPage } from '../pages/ActivityPage';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
@@ -62,6 +63,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
   const deviceRegistration = useDeviceRegistration(route === 'account');
+  const dashboardAccountRegistered = useDashboardAccountStatus(route === 'home');
   const systemActions = useSystemActions(status.data);
   const health = useHealth(route === 'home' || route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
@@ -355,6 +357,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     default:
       content = (
         <HomePage
+          accountRegistered={dashboardAccountRegistered}
           activity={status.data?.activityHistory ?? null}
           activityError={status.error}
           activityLoading={status.loading}

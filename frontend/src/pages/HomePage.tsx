@@ -10,6 +10,7 @@ import {
   MemoryIcon,
   RouterIcon,
   ShieldIcon,
+  UserIcon,
   UpdateIcon,
 } from '../components/Icons';
 import { ActivityLoadState, ActivityTimeline } from '../components/ActivityTimeline';
@@ -36,6 +37,7 @@ import {
 } from '../app/format';
 
 interface HomePageProps {
+  accountRegistered: boolean | null;
   activity: ActivityHistory | null;
   activityError: string | null;
   activityLoading: boolean;
@@ -485,6 +487,7 @@ function safeShieldOverview(
 }
 
 export function HomePage({
+  accountRegistered,
   activity,
   activityError,
   activityLoading,
@@ -740,6 +743,27 @@ export function HomePage({
             value={updateValue}
           />
         </div>
+        {accountRegistered === false ? (
+          <div class="mt-4 flex flex-col gap-4 rounded-2xl border border-teal-200 bg-teal-50 p-4 dark:border-teal-800/70 dark:bg-teal-950/30 sm:flex-row sm:items-center sm:justify-between sm:p-5" role="status">
+            <div class="flex min-w-0 items-start gap-3">
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-900/70 dark:text-teal-300" aria-hidden="true">
+                <UserIcon class="size-5" />
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="m-0 font-bold text-slate-900 dark:text-slate-100">SmartSafeHub 계정을 연결해 주세요</p>
+                  <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[0.7rem] font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">연결 필요</span>
+                </div>
+                <p class="mt-1 mb-0 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  계정을 연결하면 웹사이트에서 기기를 관리하고 구독 정보를 확인할 수 있습니다. DNS 보호는 연결하지 않아도 계속 작동합니다.
+                </p>
+              </div>
+            </div>
+            <a href="#account" class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white no-underline transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:bg-teal-600 dark:hover:bg-teal-500">
+              계정 연결하기 →
+            </a>
+          </div>
+        ) : null}
       </section>
 
       <section aria-labelledby="dashboard-activity-title">
