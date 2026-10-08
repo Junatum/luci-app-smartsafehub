@@ -72,7 +72,7 @@ export function SmartSafeHubAccountPage({
     return () => window.clearTimeout(timeout);
   }, [pairingCopied]);
 
-  if (loading) return <LoadingPanel />;
+  if (loading && !data) return <LoadingPanel />;
   if (error && !data) return <ErrorPanel message={error} onRetry={onRetry} />;
 
   const status = data;
@@ -198,12 +198,22 @@ export function SmartSafeHubAccountPage({
             <dd class="m-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-800">{planLabel(status?.plan ?? null)}</dd>
           </div>
           <div class="flex items-center justify-between gap-4">
-            <dt class="text-sm font-bold text-slate-500">마지막 동기화</dt>
+            <dt class="text-sm font-bold text-slate-500">마지막 확인</dt>
             <dd class="m-0 text-sm font-black text-slate-700">{formatRelativeTime(status?.lastSuccessAt ?? 0)}</dd>
           </div>
         </dl>
-        {refreshing ? <p class="mt-5 mb-0 text-xs font-bold text-teal-700">최신 연결 상태를 확인하고 있습니다…</p> : null}
-        {syncError ? <p class="mt-5 mb-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-800">{syncError} 로컬에 저장된 마지막 상태를 표시합니다.</p> : null}
+        {refreshing ? <p class="mt-5 mb-0 text-xs font-bold text-teal-700">최신 상태를 확인하고 있습니다…</p> : null}
+        {syncError ? (
+          connected ? (
+            <p class="mt-5 mb-0 text-xs font-semibold leading-5 text-slate-500">
+              최신 상태 확인이 지연되고 있습니다. 마지막으로 확인된 연결 상태를 표시합니다.
+            </p>
+          ) : (
+            <p class="mt-5 mb-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-800">
+              {syncError} 로컬에 저장된 마지막 상태를 표시합니다.
+            </p>
+          )
+        ) : null}
       </aside>
     </div>
   );

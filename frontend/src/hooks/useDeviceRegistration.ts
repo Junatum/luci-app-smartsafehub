@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import {
   fetchDeviceRegistrationStatus,
@@ -29,35 +29,47 @@ export function useDeviceRegistration(enabled: boolean) {
   const [loading, setLoading] = useState(enabled);
   const [refreshing, setRefreshing] = useState(false);
   const [pairingBusy, setPairingBusy] = useState(false);
+  const refreshPromiseRef = useRef<Promise<DeviceRegistrationStatus | null> | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback((): Promise<DeviceRegistrationStatus | null> => {
     if (!enabled) {
-      return null;
+      return Promise.resolve(null);
     }
 
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    setSyncError(null);
     setRefreshing(true);
-    try {
-      const status = await refreshDeviceRegistrationStatus();
-      setData(status);
-      setError(null);
-      setSyncError(null);
-      return status;
-    }
-    catch {
-      // status-sync can outlive the RPC timeout while it starts a SafeShield
-      // refresh. The helper persists account connection state first, so read
-      // the local state again before leaving stale pairing data on screen.
-      const localStatus = await fetchDeviceRegistrationStatus().catch(() => null);
-      if (localStatus) {
-        setData(localStatus);
+    const task = (async () => {
+      try {
+        const status = await refreshDeviceRegistrationStatus();
+        setData(status);
         setError(null);
+        setSyncError(null);
+        return status;
       }
-      setSyncError('SmartSafeHub 서버에서 최신 계정 연결 상태를 확인하지 못했습니다.');
-      return localStatus;
-    }
-    finally {
-      setRefreshing(false);
-    }
+      catch {
+        // Hub synchronization is best-effort for this local page. The device
+        // helper may already have persisted a newer account state, so recover
+        // that state without blocking or rolling back the visible UI.
+        const localStatus = await fetchDeviceRegistrationStatus().catch(() => null);
+        if (localStatus) {
+          setData(localStatus);
+          setError(null);
+        }
+        setSyncError('SmartSafeHub 서버의 최신 상태 확인이 지연되고 있습니다.');
+        return localStatus;
+      }
+      finally {
+        setRefreshing(false);
+        refreshPromiseRef.current = null;
+      }
+    })();
+
+    refreshPromiseRef.current = task;
+    return task;
   }, [enabled]);
 
   const requestPairing = useCallback(async () => {
@@ -81,45 +93,30 @@ export function useDeviceRegistration(enabled: boolean) {
 
     let active = true;
     setLoading(true);
+    setError(null);
+    setSyncError(null);
 
+    // Render the router-local state first. Hub availability must not gate the
+    // SmartSafeHub account page; the cloud check continues in the background.
     void fetchDeviceRegistrationStatus()
-      .then(async (localStatus) => {
+      .then((localStatus) => {
         if (!active) return;
         setData(localStatus);
         setError(null);
-
-        // A locally cached pairing code may already have been consumed on the
-        // website. Verify it with Hub before the page is considered loaded so
-        // a browser refresh does not briefly present a stale code as valid.
-        const syncedStatus = await refreshDeviceRegistrationStatus().catch(() => null);
-        if (!active) return;
-        if (syncedStatus) {
-          setData(syncedStatus);
-          setSyncError(null);
-        }
-        else {
-          // The sync RPC may time out after the helper has already persisted
-          // accountRegistered=true and cleared the consumed pairing code.
-          const latestLocalStatus = await fetchDeviceRegistrationStatus().catch(() => null);
-          if (!active) return;
-          if (latestLocalStatus) {
-            setData(latestLocalStatus);
-          }
-          setSyncError('SmartSafeHub 서버에서 최신 계정 연결 상태를 확인하지 못했습니다.');
-        }
+        setLoading(false);
+        void refresh();
       })
       .catch(() => {
         if (!active) return;
         setError('기기 등록 상태를 확인하지 못했습니다.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        setLoading(false);
+        void refresh();
       });
 
     return () => {
       active = false;
     };
-  }, [enabled]);
+  }, [enabled, refresh]);
 
   const shouldPoll = useMemo(() => pairingStillValid(data), [data]);
 

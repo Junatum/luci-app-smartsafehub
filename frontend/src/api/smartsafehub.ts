@@ -130,7 +130,7 @@ export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatu
 }
 
 export function refreshDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
-  return callApi(API_OBJECT, 'device_registration_refresh', {}, { timeoutMs: 15000 });
+  return callApi(API_OBJECT, 'device_registration_refresh', {}, { timeoutMs: 30000 });
 }
 
 export function requestDevicePairingCode(): Promise<DeviceRegistrationStatus> {

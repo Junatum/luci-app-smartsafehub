@@ -60,7 +60,8 @@ fi
 
 # A pairing code is only a temporary bridge to the website. While it is valid,
 # the account page must poll Hub and stop presenting it once registration is
-# observed. The initial page load must also verify Hub before showing cached data.
+# observed. The initial page load must show local state first and refresh Hub
+# asynchronously so Cloud latency never blocks the router UI.
 grep -Fq 'refreshDeviceRegistrationStatus' "$ACCOUNT_HOOK" || {
 	echo 'account registration hook must synchronize the latest Hub state' >&2
 	exit 1
@@ -73,8 +74,12 @@ grep -Fq 'if (!status?.pairingCode || status.accountRegistered === true)' "$ACCO
 	echo 'pairing polling must stop once the account is connected' >&2
 	exit 1
 }
-grep -Fq 'if (loading) return <LoadingPanel />;' "$ACCOUNT_PAGE" || {
-	echo 'account page must not render stale cached pairing data before initial Hub verification' >&2
+grep -Fq 'if (loading && !data) return <LoadingPanel />;' "$ACCOUNT_PAGE" || {
+	echo 'account page must render cached local state without waiting for Hub verification' >&2
+	exit 1
+}
+grep -Fq 'void refresh();' "$ACCOUNT_HOOK" || {
+	echo 'account page must refresh Hub state in the background after local state is available' >&2
 	exit 1
 }
 grep -Fq 'const pairingCode = !connected && !expired ? status?.pairingCode : null;' "$ACCOUNT_PAGE" || {
