@@ -56,6 +56,7 @@
           "activity_cloud_sync_update",
           "health_run",
           "health_reporter_update",
+          "device_registration_refresh",
           "safeshield_set_enabled",
           "safeshield_refresh",
           "safeshield_statistics_update",

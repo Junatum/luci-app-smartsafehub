@@ -49,6 +49,7 @@ import {
 } from './smartsafehub/health.uc';
 import {
 	read_device_registration_status,
+	refresh_device_registration_status,
 	refresh_device_pairing
 } from './smartsafehub/device-registration.uc';
 import {
@@ -319,6 +320,11 @@ const methods = {
 	device_registration_status: {
 		call: require_root_password(function(request) {
 			return read_device_registration_status(request);
+		}),
+	},
+	device_registration_refresh: {
+		call: require_root_password(function(request) {
+			return refresh_device_registration_status(request);
 		}),
 	},
 	device_pairing_refresh: {

@@ -4,11 +4,16 @@ ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 HELPER="$ROOT/root/usr/libexec/smartsafehub-device"
 RPC="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
 MAIN="$ROOT/root/usr/share/rpcd/ucode/smartsafehub.uc"
-SAFE_PAGE="$ROOT/frontend/src/pages/SafeShieldPage.tsx"
+ACCOUNT_PAGE="$ROOT/frontend/src/pages/SmartSafeHubAccountPage.tsx"
+ACCOUNT_HOOK="$ROOT/frontend/src/hooks/useDeviceRegistration.ts"
 INIT="$ROOT/root/etc/init.d/smartsafehub-device"
 grep -Fq 'devices/sync' "$HELPER"
 grep -Fq 'devices/pairing-sessions' "$HELPER"
 grep -Fq 'devices/credentials/rotate' "$HELPER"
+grep -Fq "@.account.connected" "$HELPER" || {
+	echo 'device helper must consume the explicit account connection state from Hub sync' >&2
+	exit 1
+}
 
 grep -Fq 'SMARTSAFEHUB_DEVICE_HEXDUMP_BIN' "$HELPER"
 grep -Fq 'hexdump' "$HELPER"
@@ -18,20 +23,46 @@ if grep -Eq '(^|[^[:alnum:]_])od[[:space:]]' "$HELPER"; then
 fi
 grep -Fq 'Authorization: Device' "$HELPER"
 grep -Fq 'device_registration_status' "$MAIN"
+grep -Fq 'device_registration_refresh' "$MAIN"
 grep -Fq 'device_pairing_refresh' "$MAIN"
+grep -Fq 'refresh_device_registration_status' "$RPC"
 grep -Fq 'refresh_device_pairing' "$RPC"
 
-# Pairing can bootstrap an unregistered local credential itself, so the UI must
-# not deadlock the flow by requiring phase=registered before the user can ask
-# for a pairing code. Only an in-flight request should disable the button.
-grep -Fq 'disabled={pairingBusy}' "$SAFE_PAGE" || {
+# Pairing can bootstrap an unregistered local credential itself, so the
+# dedicated account page must not deadlock the flow by requiring a registered
+# phase before a code can be requested.
+grep -Fq 'disabled={pairingBusy}' "$ACCOUNT_PAGE" || {
 	echo 'pairing button must stay available while device bootstrap is pending' >&2
 	exit 1
 }
-if grep -Fq "pairingBusy || deviceRegistration?.phase !== 'registered'" "$SAFE_PAGE"; then
+if grep -Fq "pairingBusy || data?.phase !== 'registered'" "$ACCOUNT_PAGE"; then
 	echo 'pairing button must not require an already-registered phase' >&2
 	exit 1
 fi
+
+# A pairing code is only a temporary bridge to the website. While it is valid,
+# the account page must poll Hub and stop presenting it once registration is
+# observed. The initial page load must also verify Hub before showing cached data.
+grep -Fq 'refreshDeviceRegistrationStatus' "$ACCOUNT_HOOK" || {
+	echo 'account registration hook must synchronize the latest Hub state' >&2
+	exit 1
+}
+grep -Fq 'const PAIRING_POLL_INTERVAL_MS = 5_000;' "$ACCOUNT_HOOK" || {
+	echo 'account registration hook must poll while a pairing code is active' >&2
+	exit 1
+}
+grep -Fq 'if (!status?.pairingCode || status.accountRegistered === true)' "$ACCOUNT_HOOK" || {
+	echo 'pairing polling must stop once the account is connected' >&2
+	exit 1
+}
+grep -Fq 'if (loading) return <LoadingPanel />;' "$ACCOUNT_PAGE" || {
+	echo 'account page must not render stale cached pairing data before initial Hub verification' >&2
+	exit 1
+}
+grep -Fq 'const pairingCode = !connected && !expired ? status?.pairingCode : null;' "$ACCOUNT_PAGE" || {
+	echo 'account page must hide stale pairing codes after registration' >&2
+	exit 1
+}
 ! grep -Fq 'license_activate' "$MAIN"
 ! grep -Fq 'smartsafehub-license' "$ROOT/Makefile"
 echo 'device registration contract: ok'
@@ -150,6 +181,7 @@ case "$expr" in
 	'@.device.device_code') echo test-router ;;
 	'@.device.device_code_source') echo test ;;
 	'@.device.uuid') echo 11111111-1111-1111-1111-111111111111 ;;
+	'@.account.connected') echo false ;;
 	'@.device.registered') echo false ;;
 	'@.entitlement.plan') echo free ;;
 	'@.credential.rotation_due') echo false ;;

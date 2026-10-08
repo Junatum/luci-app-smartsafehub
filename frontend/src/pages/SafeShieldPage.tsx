@@ -5,10 +5,8 @@ import {
   AlertIcon,
   CalendarIcon,
   CheckCircleIcon,
-  CopyIcon,
   DatabaseIcon,
   DownloadIcon,
-  KeyIcon,
   ListIcon,
   PowerIcon,
   ShieldIcon,
@@ -20,7 +18,6 @@ import type {
   SafeShieldFeedbackTarget,
 } from '../hooks/useSafeShieldActions';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
-import { fetchDeviceRegistrationStatus, requestDevicePairingCode, type DeviceRegistrationStatus } from '../api/smartsafehub';
 import {
   getSafeShieldRefreshErrorMessage,
   getSafeShieldRefreshStep,
@@ -35,35 +32,6 @@ import {
 
 const SMARTSAFEHUB_PRICING_URL = 'https://www.smartsafehub.com/pricing/';
 
-async function copyTextToClipboard(value: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return;
-    }
-    catch {
-      // Local router pages may run outside a secure context. Fall back below.
-    }
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = value;
-  textarea.setAttribute('readonly', '');
-  textarea.style.position = 'fixed';
-  textarea.style.inset = '0 auto auto -9999px';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  textarea.setSelectionRange(0, value.length);
-
-  const copied = document.execCommand('copy');
-  textarea.remove();
-
-  if (!copied) {
-    throw new Error('clipboard_copy_failed');
-  }
-}
-
 interface SafeShieldPageProps {
   action: SafeShieldAction | null;
   actionError: string | null;
@@ -77,14 +45,11 @@ interface SafeShieldPageProps {
   statisticsLoading: boolean;
   statisticsRefreshing: boolean;
   onDismissFeedback: () => void;
-  onReadLicense: () => Promise<string | null>;
   onRefreshBlocklist: () => void;
-  onRemoveLicense: () => Promise<boolean>;
   onRetry: () => void;
   onRetryStatistics: () => void;
   onSetEnabled: (enabled: boolean) => void;
   onSetStatisticsEnabled: (enabled: boolean) => void;
-  onUpdateLicense: (licenseKey: string) => Promise<boolean>;
 }
 
 function BooleanState({
@@ -626,22 +591,13 @@ export function SafeShieldPage({
   statisticsLoading,
   statisticsRefreshing,
   onDismissFeedback,
-  onReadLicense,
   onRefreshBlocklist,
-  onRemoveLicense,
   onRetry,
   onRetryStatistics,
   onSetEnabled,
   onSetStatisticsEnabled,
-  onUpdateLicense,
 }: SafeShieldPageProps) {
-  const [licenseKey, setLicenseKey] = useState('');
-  const [licenseKeyLoaded, setLicenseKeyLoaded] = useState(false);
   const [lastKnownBlocklistCount, setLastKnownBlocklistCount] = useState<number | null>(null);
-  const [deviceRegistration, setDeviceRegistration] = useState<DeviceRegistrationStatus | null>(null);
-  const [pairingBusy, setPairingBusy] = useState(false);
-  const [pairingError, setPairingError] = useState<string | null>(null);
-  const [pairingCopied, setPairingCopied] = useState(false);
 
   useEffect(() => {
     if (
@@ -653,61 +609,7 @@ export function SafeShieldPage({
     }
   }, [data?.available, data?.blocklist.validLineCount, data?.stage, data?.status]);
 
-  useEffect(() => {
-    if (data?.license.configured === false) {
-      setLicenseKey('');
-      setLicenseKeyLoaded(false);
-    }
-  }, [data?.license.configured]);
 
-  useEffect(() => {
-    let active = true;
-    void fetchDeviceRegistrationStatus()
-      .then((status) => { if (active) setDeviceRegistration(status); })
-      .catch(() => { if (active) setPairingError('기기 등록 상태를 확인하지 못했습니다.'); });
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!pairingCopied) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setPairingCopied(false), 1800);
-    return () => window.clearTimeout(timeout);
-  }, [pairingCopied]);
-
-  async function refreshPairingCode(): Promise<void> {
-    setPairingBusy(true);
-    setPairingError(null);
-    setPairingCopied(false);
-    try {
-      setDeviceRegistration(await requestDevicePairingCode());
-    }
-    catch {
-      setPairingError('계정 연결 코드를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-    }
-    finally {
-      setPairingBusy(false);
-    }
-  }
-
-  async function copyPairingCode(): Promise<void> {
-    const pairingCode = deviceRegistration?.pairingCode;
-    if (!pairingCode) {
-      return;
-    }
-
-    try {
-      await copyTextToClipboard(pairingCode);
-      setPairingError(null);
-      setPairingCopied(true);
-    }
-    catch {
-      setPairingCopied(false);
-      setPairingError('연결 코드를 복사하지 못했습니다. 코드를 직접 선택해 복사해 주세요.');
-    }
-  }
 
   if (loading) {
     return <LoadingPanel />;
@@ -755,42 +657,6 @@ export function SafeShieldPage({
     : action === 'enable'
       ? '켜는 중…'
       : '보호 켜기';
-
-  async function handleLoadCurrentLicense(): Promise<void> {
-    if (licenseKey.length > 0) {
-      return;
-    }
-
-    const currentKey = await onReadLicense();
-
-    if (currentKey === null) {
-      return;
-    }
-
-    setLicenseKey(currentKey);
-    setLicenseKeyLoaded(true);
-  }
-
-  function resetLicenseEditor(): void {
-    setLicenseKey('');
-    setLicenseKeyLoaded(false);
-  }
-
-  function handleRemoveLicense(): void {
-    const confirmed = window.confirm(
-      '라이선스 키를 제거하면 SafeShield가 라이선스 없는 상태로 다시 확인하고 차단 목록을 갱신합니다. 계속하시겠습니까?',
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    void onRemoveLicense().then((removed) => {
-      if (removed) {
-        resetLicenseEditor();
-      }
-    });
-  }
 
   function handleToggle(): void {
     if (enabled) {
@@ -974,162 +840,110 @@ export function SafeShieldPage({
 
       <section class="mt-7">
         <SectionHeading
-          description="SmartSafeHub 계정 연결, 현재 적용 중인 보호 데이터와 사용자 규칙을 관리합니다."
+          description="현재 적용 중인 보호 데이터와 사용자 규칙을 관리합니다."
           eyebrow="Settings"
           title="SafeShield 설정"
         />
 
-        <div class="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
-          <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+        <div class="grid gap-4 lg:grid-cols-2">
+          <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
             <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">SmartSafeHub account</p>
-                <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">SmartSafeHub 계정</h3>
-                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">기기 등록은 라이선스 키와 별개로 관리됩니다. 현재 플랜은 {planName}입니다.</p>
-              </div>
-              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"><KeyIcon class="size-5" /></span>
-            </div>
-            <div class="ssh-safeshield-license-summary mt-5">
-              <div class="ssh-safeshield-license-summary-main">
-                <PlanBadge compact plan={planName} />
-                <span class="ssh-safeshield-license-summary-status">{deviceRegistration?.accountRegistered === true ? '계정 연결됨' : deviceRegistration?.phase === 'registered' ? '계정 연결 필요' : 'Cloud 등록 준비 중'}</span>
-              </div>
-            </div>
-            {deviceRegistration?.accountRegistered === true ? (
-              <p class="mt-5 mb-0 text-sm leading-6 text-slate-500">이 기기는 SmartSafeHub 계정에 연결되어 있습니다. 구독 권한은 서버에서 자동으로 동기화됩니다.</p>
-            ) : (
-              <div class="ssh-safeshield-license-editor mt-5">
-                <div class="ssh-safeshield-license-editor-header">
-                  <span class="ssh-safeshield-license-editor-label">계정 연결 코드</span>
-                  <span class="ssh-safeshield-license-editor-hint">코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요. 코드는 10분 동안 유효합니다.</span>
+              <div class="min-w-0">
+                <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                  Protection data
+                </p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <h3 class="m-0 text-lg font-black tracking-tight text-slate-950">
+                    보호 데이터
+                  </h3>
+                  <span
+                    aria-label={`보호 데이터 상태: ${
+                      data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                        ? '최신'
+                        : '확인 필요'
+                    }`}
+                    class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
+                      data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk ? (
+                      <CheckCircleIcon class="size-3.5 shrink-0" />
+                    ) : (
+                      <AlertIcon class="size-3.5 shrink-0" />
+                    )}
+                    {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                      ? '최신'
+                      : '확인 필요'}
+                  </span>
                 </div>
-                {deviceRegistration?.pairingCode ? (
-                  <div class="ssh-safeshield-pairing-code" role="group" aria-label="계정 연결 코드">
-                    <div class="ssh-safeshield-pairing-code-main">
-                      <span class="ssh-safeshield-pairing-code-caption">연결 코드</span>
-                      <code class="ssh-safeshield-pairing-code-value">{deviceRegistration.pairingCode}</code>
-                    </div>
-                    <button
-                      aria-label="계정 연결 코드 복사"
-                      class="ssh-safeshield-pairing-copy-action"
-                      onClick={() => void copyPairingCode()}
-                      type="button"
-                    >
-                      {pairingCopied ? <CheckCircleIcon class="size-4" /> : <CopyIcon class="size-4" />}
-                      <span aria-live="polite">{pairingCopied ? '복사됨' : '복사'}</span>
-                    </button>
-                  </div>
-                ) : null}
-                <div class="ssh-safeshield-license-actions">
-                  <button class="ssh-safeshield-license-primary-action" disabled={pairingBusy} onClick={() => void refreshPairingCode()} type="button">
-                    {pairingBusy ? '발급 중…' : deviceRegistration?.pairingCode ? '새 코드 발급' : '연결 코드 발급'}
-                  </button>
-                </div>
-                {pairingError ? <p class="mt-3 mb-0 text-sm font-semibold text-red-700">{pairingError}</p> : null}
+                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
+                  SafeShield가 기기 성능에 맞춰 사용하는 보호 목록의 구성과 최신 상태를 확인합니다.
+                </p>
               </div>
-            )}
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+                <DatabaseIcon class="size-5" />
+              </span>
+            </div>
+
+            <dl class="mt-5 mb-0 grid grid-cols-2 gap-3">
+              <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <dt class="text-xs font-bold text-slate-500">기기 최적화</dt>
+                <dd class="mt-1 mb-0 text-sm font-extrabold text-slate-950">
+                  {getArtifactOptimizationLabel(data.artifact.tier)}
+                </dd>
+              </div>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                <dt class="text-xs font-bold text-slate-500">마지막 업데이트</dt>
+                <dd class="mt-1 mb-0 text-sm font-extrabold leading-5 text-slate-950">
+                  {formatArtifactUpdatedAt(data.artifact.version)}
+                </dd>
+              </div>
+            </dl>
+
+            <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+              <summary class="cursor-pointer text-sm font-extrabold text-slate-700">
+                세부 정보
+              </summary>
+              <dl class="mt-3 mb-0 grid gap-3 border-t border-slate-200 pt-3">
+                <DetailRow
+                  label="데이터 프로필"
+                  value={data.artifact.tier || '확인되지 않음'}
+                />
+                <DetailRow
+                  label="데이터 버전"
+                  value={data.artifact.version || '확인되지 않음'}
+                />
+              </dl>
+            </details>
           </article>
 
-          <div class="grid gap-4">
-            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
-              <div class="flex items-start justify-between gap-4">
-                <div class="min-w-0">
-                  <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
-                    Protection data
-                  </p>
-                  <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <h3 class="m-0 text-lg font-black tracking-tight text-slate-950">
-                      보호 데이터
-                    </h3>
-                    <span
-                      aria-label={`보호 데이터 상태: ${
-                        data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                          ? '최신'
-                          : '확인 필요'
-                      }`}
-                      class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                        data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-amber-50 text-amber-700'
-                      }`}
-                    >
-                      {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk ? (
-                        <CheckCircleIcon class="size-3.5 shrink-0" />
-                      ) : (
-                        <AlertIcon class="size-3.5 shrink-0" />
-                      )}
-                      {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                        ? '최신'
-                        : '확인 필요'}
-                    </span>
-                  </div>
-                  <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-                    SafeShield가 기기 성능에 맞춰 사용하는 보호 목록의 구성과 최신 상태를 확인합니다.
-                  </p>
-                </div>
-                <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
-                  <DatabaseIcon class="size-5" />
-                </span>
-              </div>
-
-              <dl class="mt-5 mb-0 grid grid-cols-2 gap-3">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <dt class="text-xs font-bold text-slate-500">기기 최적화</dt>
-                  <dd class="mt-1 mb-0 text-sm font-extrabold text-slate-950">
-                    {getArtifactOptimizationLabel(data.artifact.tier)}
-                  </dd>
-                </div>
-                <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <dt class="text-xs font-bold text-slate-500">마지막 업데이트</dt>
-                  <dd class="mt-1 mb-0 text-sm font-extrabold leading-5 text-slate-950">
-                    {formatArtifactUpdatedAt(data.artifact.version)}
-                  </dd>
-                </div>
-              </dl>
-
-              <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                <summary class="cursor-pointer text-sm font-extrabold text-slate-700">
-                  세부 정보
-                </summary>
-                <dl class="mt-3 mb-0 grid gap-3 border-t border-slate-200 pt-3">
-                  <DetailRow
-                    label="데이터 프로필"
-                    value={data.artifact.tier || '확인되지 않음'}
-                  />
-                  <DetailRow
-                    label="데이터 버전"
-                    value={data.artifact.version || '확인되지 않음'}
-                  />
-                </dl>
-              </details>
-            </article>
-
-            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
-              <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
-                Custom rules
-              </p>
-              <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
-                사용자 규칙
-              </h3>
-              <div class="mt-4">
-                <BooleanState
-                  falseLabel="비활성화"
-                  trueLabel="활성화"
-                  value={data.localOverrides.enabled}
-                />
-              </div>
-              <p class="mt-4 mb-0 text-sm font-semibold leading-6 text-slate-500">
-                허용하거나 차단할 도메인을 직접 관리해 SafeShield 보호 정책에 반영합니다.
-              </p>
-              <a
-                class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-extrabold text-white no-underline shadow-sm transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
-                href="#rules"
-              >
-                <ListIcon class="size-4" />
-                사용자 규칙 관리
-              </a>
-            </article>
-          </div>
+          <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5">
+            <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
+              Custom rules
+            </p>
+            <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
+              사용자 규칙
+            </h3>
+            <div class="mt-4">
+              <BooleanState
+                falseLabel="비활성화"
+                trueLabel="활성화"
+                value={data.localOverrides.enabled}
+              />
+            </div>
+            <p class="mt-4 mb-0 text-sm font-semibold leading-6 text-slate-500">
+              허용하거나 차단할 도메인을 직접 관리해 SafeShield 보호 정책에 반영합니다.
+            </p>
+            <a
+              class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-extrabold text-white no-underline shadow-sm transition hover:border-teal-800 hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100"
+              href="#rules"
+            >
+              <ListIcon class="size-4" />
+              사용자 규칙 관리
+            </a>
+          </article>
         </div>
       </section>
     </>

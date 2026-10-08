@@ -146,8 +146,16 @@ grep -Fq "'#wan': 'network'" "$HASH_ROUTE" || \
 	fail 'legacy #wan hash must resolve to combined network settings'
 grep -Fq "'#lan': 'network'" "$HASH_ROUTE" || \
 	fail 'legacy #lan hash must resolve to combined network settings'
-grep -Fq "{ label: 'System', routes: ['system', 'settings'] }" "$NAVIGATION" || \
-	fail 'System navigation group must place settings directly below updates'
+grep -Fq "{ label: 'System', routes: ['account', 'system', 'settings'] }" "$NAVIGATION" || \
+	fail 'System navigation group must expose SmartSafeHub account before updates and settings'
+grep -Fq "route: 'account'" "$ROUTES" || \
+	fail 'SmartSafeHub account route must be registered'
+grep -Fq "hash: '#account'" "$ROUTES" || \
+	fail 'SmartSafeHub account route must expose the #account hash'
+grep -Fq "'#account': 'account'" "$HASH_ROUTE" || \
+	fail 'hash router must resolve #account'
+grep -Fq "case 'account':" "$NAVIGATION" || \
+	fail 'SmartSafeHub account navigation item must have a dedicated icon'
 grep -Fq "case 'settings':" "$NAVIGATION" || \
 	fail 'settings navigation item must have a dedicated icon'
 grep -Fq "route: 'settings'" "$ROUTES" || \

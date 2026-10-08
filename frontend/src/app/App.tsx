@@ -22,6 +22,7 @@ import { useStatus } from '../hooks/useStatus';
 import { useScheduledRebootSettings } from '../hooks/useScheduledRebootSettings';
 import { useSystemActions } from '../hooks/useSystemActions';
 import { useSystemTimeSettings } from '../hooks/useSystemTimeSettings';
+import { useDeviceRegistration } from '../hooks/useDeviceRegistration';
 import { useWifi } from '../hooks/useWifi';
 import { ActivityPage } from '../pages/ActivityPage';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
@@ -32,6 +33,7 @@ import { WanPage } from '../pages/WanPage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { SmartSafeHubAccountPage } from '../pages/SmartSafeHubAccountPage';
 import { UpdatePage } from '../pages/UpdatePage';
 import { WifiPage } from '../pages/WifiPage';
 import { browserTimezone } from '../utils/timezone';
@@ -58,6 +60,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const safeshield = useSafeShieldStatus(route === 'safeshield');
   const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
   const rules = useSafeShieldRules(route === 'rules');
+  const deviceRegistration = useDeviceRegistration(route === 'account');
   const systemActions = useSystemActions(status.data);
   const health = useHealth(route === 'home' || route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
@@ -102,9 +105,11 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
                 ? safeshield
                 : route === 'rules'
                   ? rules
-                  : route === 'system'
-                    ? updates
-                    : status;
+                  : route === 'account'
+                    ? deviceRegistration
+                    : route === 'system'
+                      ? updates
+                      : status;
 
   let content: ComponentChildren;
 
@@ -198,6 +203,21 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           error={devices.error}
           loading={devices.loading}
           onRetry={() => void devices.refresh()}
+        />
+      );
+      break;
+
+    case 'account':
+      content = (
+        <SmartSafeHubAccountPage
+          data={deviceRegistration.data}
+          error={deviceRegistration.error}
+          loading={deviceRegistration.loading}
+          pairingBusy={deviceRegistration.pairingBusy}
+          refreshing={deviceRegistration.refreshing}
+          syncError={deviceRegistration.syncError}
+          onRequestPairing={deviceRegistration.requestPairing}
+          onRetry={() => void deviceRegistration.refresh()}
         />
       );
       break;
@@ -305,16 +325,13 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           statisticsLoading={safeshieldStatistics.loading}
           statisticsRefreshing={safeshieldStatistics.refreshing}
           onDismissFeedback={safeshieldActions.dismissFeedback}
-          onReadLicense={safeshieldActions.readLicense}
           onRefreshBlocklist={() => void safeshieldActions.refreshBlocklist()}
-          onRemoveLicense={safeshieldActions.removeLicense}
           onRetry={() => void safeshield.refresh()}
           onRetryStatistics={() => void safeshieldStatistics.refresh()}
           onSetEnabled={(enabled) => void safeshieldActions.setEnabled(enabled)}
           onSetStatisticsEnabled={(enabled) =>
             void safeshieldActions.setStatisticsEnabled(enabled)
           }
-          onUpdateLicense={safeshieldActions.updateLicense}
         />
       );
       break;

@@ -9,6 +9,7 @@ import {
   DevicesIcon,
   GlobeIcon,
   HomeIcon,
+  KeyIcon,
   LogOutIcon,
   MenuIcon,
   MoonIcon,
@@ -44,7 +45,7 @@ const NAVIGATION_GROUPS: readonly {
   { label: 'Overview', routes: ['home', 'activity'] },
   { label: 'Network', routes: ['network', 'wifi', 'iptv', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
-  { label: 'System', routes: ['system', 'settings'] },
+  { label: 'System', routes: ['account', 'system', 'settings'] },
 ];
 
 function NavigationIcon({ route }: { route: AppRoute }) {
@@ -65,6 +66,8 @@ function NavigationIcon({ route }: { route: AppRoute }) {
       return <ShieldIcon class="size-5" />;
     case 'rules':
       return <UserIcon class="size-5" />;
+    case 'account':
+      return <KeyIcon class="size-5" />;
     case 'system':
       return <UpdateIcon class="size-5" />;
     case 'settings':
