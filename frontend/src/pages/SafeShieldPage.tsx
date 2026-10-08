@@ -19,6 +19,7 @@ import type {
   SafeShieldFeedbackTarget,
 } from '../hooks/useSafeShieldActions';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
+import { fetchDeviceRegistrationStatus, requestDevicePairingCode, type DeviceRegistrationStatus } from '../api/smartsafehub';
 import {
   getSafeShieldRefreshErrorMessage,
   getSafeShieldRefreshStep,
@@ -607,6 +608,9 @@ export function SafeShieldPage({
   const [licenseKey, setLicenseKey] = useState('');
   const [licenseKeyLoaded, setLicenseKeyLoaded] = useState(false);
   const [lastKnownBlocklistCount, setLastKnownBlocklistCount] = useState<number | null>(null);
+  const [deviceRegistration, setDeviceRegistration] = useState<DeviceRegistrationStatus | null>(null);
+  const [pairingBusy, setPairingBusy] = useState(false);
+  const [pairingError, setPairingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (
@@ -624,6 +628,28 @@ export function SafeShieldPage({
       setLicenseKeyLoaded(false);
     }
   }, [data?.license.configured]);
+
+  useEffect(() => {
+    let active = true;
+    void fetchDeviceRegistrationStatus()
+      .then((status) => { if (active) setDeviceRegistration(status); })
+      .catch(() => { if (active) setPairingError('기기 등록 상태를 확인하지 못했습니다.'); });
+    return () => { active = false; };
+  }, []);
+
+  async function refreshPairingCode(): Promise<void> {
+    setPairingBusy(true);
+    setPairingError(null);
+    try {
+      setDeviceRegistration(await requestDevicePairingCode());
+    }
+    catch {
+      setPairingError('계정 연결 코드를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+    finally {
+      setPairingBusy(false);
+    }
+  }
 
   if (loading) {
     return <LoadingPanel />;
@@ -890,7 +916,7 @@ export function SafeShieldPage({
 
       <section class="mt-7">
         <SectionHeading
-          description="라이선스, 현재 적용 중인 SafeShield 보호 데이터와 사용자 규칙을 관리합니다."
+          description="SmartSafeHub 계정 연결, 현재 적용 중인 보호 데이터와 사용자 규칙을 관리합니다."
           eyebrow="Settings"
           title="SafeShield 설정"
         />
@@ -899,126 +925,35 @@ export function SafeShieldPage({
           <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">
-                  License
-                </p>
-                <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">
-                  라이선스
-                </h3>
-                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-                  현재 플랜은 {planName}이며, 라이선스 키를 등록하거나 변경할 수 있습니다.
-                </p>
+                <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">SmartSafeHub account</p>
+                <h3 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">SmartSafeHub 계정</h3>
+                <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">기기 등록은 라이선스 키와 별개로 관리됩니다. 현재 플랜은 {planName}입니다.</p>
               </div>
-              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
-                <KeyIcon class="size-5" />
-              </span>
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500"><KeyIcon class="size-5" /></span>
             </div>
-
             <div class="ssh-safeshield-license-summary mt-5">
               <div class="ssh-safeshield-license-summary-main">
                 <PlanBadge compact plan={planName} />
-                {!data.license.configured ? (
-                  <span class="ssh-safeshield-license-summary-status">라이선스 미설정</span>
-                ) : null}
+                <span class="ssh-safeshield-license-summary-status">{deviceRegistration?.accountRegistered === true ? '계정 연결됨' : deviceRegistration?.phase === 'registered' ? '계정 연결 필요' : 'Cloud 등록 준비 중'}</span>
               </div>
-              {data.license.configured && data.license.keyMasked ? (
-                <span class="ssh-safeshield-license-key-mask">{data.license.keyMasked}</span>
-              ) : null}
+              {deviceRegistration?.pairingCode ? <span class="ssh-safeshield-license-key-mask">{deviceRegistration.pairingCode}</span> : null}
             </div>
-
-            <form
-              class="ssh-safeshield-license-editor mt-5"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void onUpdateLicense(licenseKey).then((updated) => {
-                  if (updated) {
-                    resetLicenseEditor();
-                  }
-                });
-              }}
-            >
-              <div class="ssh-safeshield-license-editor-header">
-                <label class="ssh-safeshield-license-editor-label" for="safeshield-license-key">
-                  {data.license.configured ? '라이선스 키 확인 / 변경' : '라이선스 키 등록'}
-                </label>
-                <span class="ssh-safeshield-license-editor-hint">
-                  {data.license.configured
-                    ? '현재 키를 확인하거나 새 키로 교체할 수 있습니다.'
-                    : '새 라이선스 키를 등록해 프리미엄 기능을 준비하세요.'}
-                </span>
-              </div>
-              <div class="ssh-safeshield-license-input-row">
-                <input
-                  autocomplete="off"
-                  autocapitalize="none"
-                  class="ssh-safeshield-license-input"
-                  data-1p-ignore
-                  data-bwignore="true"
-                  data-lpignore="true"
-                  disabled={actionBusy}
-                  id="safeshield-license-key"
-                  onInput={(event) => {
-                    setLicenseKey(event.currentTarget.value);
-                    setLicenseKeyLoaded(false);
-                  }}
-                  placeholder={data.license.configured ? '새 라이선스 키 입력' : '라이선스 키 입력'}
-                  spellcheck={false}
-                  type="text"
-                  value={licenseKey}
-                />
-                <button
-                  class="ssh-safeshield-license-secondary-action"
-                  disabled={actionBusy || licenseKey.length > 0 || !data.license.configured}
-                  onClick={() => void handleLoadCurrentLicense()}
-                  type="button"
-                >
-                  <DownloadIcon class="size-4" />
-                  {action === 'license-read'
-                    ? '불러오는 중…'
-                    : licenseKeyLoaded
-                      ? '현재 키 불러옴'
-                      : '현재 키 불러오기'}
-                </button>
-              </div>
-              <div class="ssh-safeshield-license-actions">
-                <button
-                  class="ssh-safeshield-license-primary-action"
-                  disabled={actionBusy || licenseKey.trim().length === 0}
-                  type="submit"
-                >
-                  {action === 'license-update'
-                    ? '저장 중…'
-                    : data.license.configured
-                      ? '라이선스 변경'
-                      : '라이선스 등록'}
-                </button>
-                {data.license.configured ? (
-                  <button
-                    class="ssh-safeshield-license-danger-action"
-                    disabled={actionBusy}
-                    onClick={handleRemoveLicense}
-                    type="button"
-                  >
-                    {action === 'license-remove' ? '제거 중…' : '라이선스 제거'}
-                  </button>
-                ) : null}
-              </div>
-              {action === 'license-update' ? (
-                <div
-                  aria-live="polite"
-                  class="mt-4 flex items-center gap-3 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800"
-                  role="status"
-                >
-                  <span class="size-2 shrink-0 animate-pulse rounded-full bg-teal-500" />
-                  라이선스를 확인하고 이 기기에 적용하고 있습니다…
+            {deviceRegistration?.accountRegistered === true ? (
+              <p class="mt-5 mb-0 text-sm leading-6 text-slate-500">이 기기는 SmartSafeHub 계정에 연결되어 있습니다. 구독 권한은 서버에서 자동으로 동기화됩니다.</p>
+            ) : (
+              <div class="ssh-safeshield-license-editor mt-5">
+                <div class="ssh-safeshield-license-editor-header">
+                  <span class="ssh-safeshield-license-editor-label">계정 연결 코드</span>
+                  <span class="ssh-safeshield-license-editor-hint">코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요. 코드는 10분 동안 유효합니다.</span>
                 </div>
-              ) : null}
-              <ActionFeedback
-                error={actionFeedbackTarget === 'license' ? actionError : null}
-                message={actionFeedbackTarget === 'license' ? actionMessage : null}
-                onDismiss={onDismissFeedback}
-              />
-            </form>
+                <div class="ssh-safeshield-license-actions">
+                  <button class="ssh-safeshield-license-primary-action" disabled={pairingBusy || deviceRegistration?.phase !== 'registered'} onClick={() => void refreshPairingCode()} type="button">
+                    {pairingBusy ? '발급 중…' : deviceRegistration?.pairingCode ? '새 코드 발급' : '연결 코드 발급'}
+                  </button>
+                </div>
+                {pairingError ? <p class="mt-3 mb-0 text-sm font-semibold text-red-700">{pairingError}</p> : null}
+              </div>
+            )}
           </article>
 
           <div class="grid gap-4">

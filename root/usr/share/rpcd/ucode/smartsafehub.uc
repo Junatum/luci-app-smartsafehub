@@ -48,9 +48,9 @@ import {
 	update_health_reporter
 } from './smartsafehub/health.uc';
 import {
-	activate_license,
-	read_license_status
-} from './smartsafehub/license.uc';
+	read_device_registration_status,
+	refresh_device_pairing
+} from './smartsafehub/device-registration.uc';
 import {
 	update_activity_cloud_sync
 } from './smartsafehub/activity.uc';
@@ -270,19 +270,6 @@ const methods = {
 			return reboot_system(request);
 		}),
 	},
-	license_status: {
-		call: require_root_password(function(request) {
-			return read_license_status(request);
-		}),
-	},
-	license_activate: {
-		args: {
-			license_key: '',
-		},
-		call: require_root_password(function(request) {
-			return activate_license(request);
-		}),
-	},
 	health_status: {
 		call: require_root_password(function(request) {
 			return read_health_status(request);
@@ -329,6 +316,17 @@ const methods = {
 			return update_safeshield_license(request);
 		}),
 	},
+	device_registration_status: {
+		call: require_root_password(function(request) {
+			return read_device_registration_status(request);
+		}),
+	},
+	device_pairing_refresh: {
+		call: require_root_password(function(request) {
+			return refresh_device_pairing(request);
+		}),
+	},
+
 	activity_cloud_sync_update: {
 		args: {
 			enabled: false,

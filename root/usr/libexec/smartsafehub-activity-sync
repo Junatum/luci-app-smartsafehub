@@ -13,7 +13,8 @@ CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-
 WAKE_FILE="${SMARTSAFEHUB_ACTIVITY_WAKE_FILE:-$RUNTIME_DIR/activity-sync.wake}"
 LOCK_DIR="${SMARTSAFEHUB_ACTIVITY_LOCK_DIR:-$RUNTIME_DIR/activity-sync.lock}"
 EVENTS_BIN="${SMARTSAFEHUB_ACTIVITY_EVENTS_BIN:-/usr/libexec/smartsafehub-events}"
-LICENSE_BIN="${SMARTSAFEHUB_ACTIVITY_LICENSE_BIN:-/usr/libexec/smartsafehub-license}"
+DEVICE_BIN="${SMARTSAFEHUB_ACTIVITY_DEVICE_BIN:-/usr/libexec/smartsafehub-device}"
+DEVICE_STATE_FILE="${SMARTSAFEHUB_ACTIVITY_DEVICE_STATE_FILE:-$RUNTIME_DIR/device.json}"
 UCI_BIN="${SMARTSAFEHUB_ACTIVITY_UCI_BIN:-uci}"
 JSONFILTER_BIN="${SMARTSAFEHUB_ACTIVITY_JSONFILTER_BIN:-jsonfilter}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_ACTIVITY_UCLIENT_FETCH_BIN:-uclient-fetch}"
@@ -30,14 +31,14 @@ RETRY_MAX_S=3600
 
 UPLOAD_BODY_FILE=''
 UPLOAD_RESPONSE_FILE=''
-LICENSE_STATUS_FILE=''
+DEVICE_STATUS_FILE=''
 STOP_REQUESTED=0
 WAIT_PID=''
 
 cleanup_files() {
 	[ -n "$UPLOAD_BODY_FILE" ] && rm -f "$UPLOAD_BODY_FILE"
 	[ -n "$UPLOAD_RESPONSE_FILE" ] && rm -f "$UPLOAD_RESPONSE_FILE"
-	[ -n "$LICENSE_STATUS_FILE" ] && rm -f "$LICENSE_STATUS_FILE"
+	[ -n "$DEVICE_STATUS_FILE" ] && rm -f "$DEVICE_STATUS_FILE"
 }
 
 request_stop() {
@@ -202,31 +203,29 @@ credential_valid() {
 	[ "$expires" -gt $((now + CREDENTIAL_REFRESH_MARGIN_S)) ] 2>/dev/null
 }
 
-refresh_credential_from_license() {
-	local phase plan action
-	[ -x "$LICENSE_BIN" ] || return 1
+refresh_credential_from_device() {
+	local phase result plan
+	[ -x "$DEVICE_BIN" ] || return 1
 
-	# /licenses/status is owned by the license component. It already has the
-	# authoritative device identity, reconciliation rules and proven request
-	# path. Refresh it once, then consume the activity credential it cached.
-	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$CREDENTIAL_FILE" "$LICENSE_BIN" status-sync >/dev/null 2>&1 || return 1
+	# Device sync is the single source for entitlement and short-lived
+	# activity upload credentials.
+	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$CREDENTIAL_FILE" "$DEVICE_BIN" status-sync >/dev/null 2>&1 || return 1
 	credential_valid && return 0
 
-	LICENSE_STATUS_FILE="$RUNTIME_DIR/activity-license-status.$$.json"
-	"$LICENSE_BIN" status > "$LICENSE_STATUS_FILE" 2>/dev/null || return 1
-	phase="$(ascii_lower "$(json_value "$LICENSE_STATUS_FILE" '@.phase')")"
-	plan="$(ascii_lower "$(json_value "$LICENSE_STATUS_FILE" '@.plan')")"
-	action="$(ascii_lower "$(json_value "$LICENSE_STATUS_FILE" '@.deviceAction')")"
+	DEVICE_STATUS_FILE="$DEVICE_STATE_FILE"
+	phase="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.phase')")"
+	result="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.lastResult')")"
+	plan="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.plan')")"
 
-	case "$phase:$action:$plan" in
-		unconfigured:*:*|cleared:*:*|*:clear_license:*|*:*:free)
+	case "$phase:$result:$plan" in
+		registered:active:free)
 			rm -f "$CREDENTIAL_FILE"
 			"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
 			return 2
 			;;
-		active:none:pro|active:none:ultimate)
-			# The license API succeeded and the account is paid, but no usable
-			# activity credential was published. Preserve the bounded outbox.
+		registered:active:pro|registered:active:ultimate)
+			# Sync succeeded and the entitlement is paid, but the Hub did not
+			# publish a usable activity credential. Preserve the bounded outbox.
 			return 3
 			;;
 		*) return 1 ;;
@@ -256,7 +255,7 @@ sync_once() {
 
 	if ! credential_valid; then
 		credential_rc=0
-		refresh_credential_from_license || credential_rc=$?
+		refresh_credential_from_device || credential_rc=$?
 		case "$credential_rc" in
 			2)
 				pending="$(pending_count)"
@@ -271,7 +270,7 @@ sync_once() {
 				;;
 			*)
 				next_sync=$((now + retry_delay))
-				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_LICENSE_STATUS_FAILED "$next_sync"
+				write_state error null '' 0 "$pending" "$now" "$previous_success" 0 ACTIVITY_DEVICE_SYNC_FAILED "$next_sync"
 				release_lock; trap cleanup_files EXIT; return 1
 				;;
 		esac

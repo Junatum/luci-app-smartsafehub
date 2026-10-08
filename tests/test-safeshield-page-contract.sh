@@ -30,7 +30,17 @@ grep -Fq 'eyebrow="Settings"' "$PAGE" || \
 	fail 'SafeShield page must provide a dedicated settings section'
 grep -Fq 'title="SafeShield 설정"' "$PAGE" || \
 	fail 'SafeShield settings section must be clearly labeled'
-grep -Fq '라이선스' "$PAGE" || fail 'SafeShield settings must retain license management'
+grep -Fq 'SmartSafeHub 계정' "$PAGE" || fail 'SafeShield settings must expose SmartSafeHub account connection'
+grep -Fq '계정 연결 코드' "$PAGE" || fail 'SafeShield account card must expose a pairing code flow'
+grep -Fq 'requestDevicePairingCode' "$PAGE" || fail 'SafeShield account card must request pairing codes through device registration'
+grep -Fq 'deviceRegistration?.accountRegistered === true' "$PAGE" || fail 'SafeShield account card must distinguish account-registered devices'
+grep -Fq '구독 권한은 서버에서 자동으로 동기화됩니다.' "$PAGE" || fail 'SafeShield account card must explain server-side entitlement sync'
+if grep -Fq 'ssh-safeshield-license-input' "$PAGE"; then
+	fail 'SafeShield settings must not render a license key input'
+fi
+if grep -Fq '라이선스를 확인하고 이 기기에 적용하고 있습니다…' "$PAGE"; then
+	fail 'SafeShield settings must not expose the legacy license activation flow'
+fi
 grep -Fq 'Custom rules' "$PAGE" || fail 'SafeShield settings must expose product-facing custom rules'
 grep -Fq 'href="#rules"' "$PAGE" || fail 'SafeShield settings must link to the user rules page'
 if grep -Fq 'data.localOverrides.allowlistPath' "$PAGE" || grep -Fq 'data.localOverrides.blocklistPath' "$PAGE"; then
@@ -42,17 +52,9 @@ grep -Fq 'px-5 pb-5 sm:px-6 sm:pb-6' "$PAGE" || \
 grep -Fq 'class="bg-white px-5 py-4 sm:px-6"' "$PAGE" || \
 	fail 'SafeShield summary fact cells must use the protection card surface color'
 grep -Fq 'ssh-safeshield-license-summary' "$PAGE" || \
-	fail 'SafeShield settings must render the refined license summary container'
+	fail 'SafeShield account card must keep the shared summary container'
 grep -Fq 'ssh-safeshield-license-editor' "$PAGE" || \
-	fail 'SafeShield settings must render the refined license editor card'
-grep -Fq 'ssh-safeshield-license-input' "$PAGE" || \
-	fail 'SafeShield license key field must remain visually recognizable as an input'
-grep -Fq 'ssh-safeshield-license-secondary-action' "$PAGE" || \
-	fail 'SafeShield current license key action must remain recognizable as a button'
-grep -Fq "actionFeedbackTarget === 'license' ? actionError : null" "$PAGE" || \
-	fail 'SafeShield license action errors must render inside the license card'
-grep -Fq '라이선스를 확인하고 이 기기에 적용하고 있습니다…' "$PAGE" || \
-	fail 'SafeShield license card must expose activation progress near the input'
+	fail 'SafeShield account card must keep the shared editor container'
 grep -Fq 'border border-teal-700 bg-teal-700' "$PAGE" || \
 	fail 'SafeShield custom rules action must remain recognizable as a primary button'
 
@@ -95,8 +97,8 @@ if grep -Fq '<DetailRow label="Tier"' "$PAGE" || \
 	grep -Fq '<DetailRow label="Unique domains"' "$PAGE"; then
 	fail 'SafeShield protection data card must not expose raw English artifact fields in the default view'
 fi
-grep -Fq 'SafeShield 보호 데이터와 사용자 규칙을 관리합니다.' "$PAGE" || \
-	fail 'SafeShield settings description must use protection data instead of artifact terminology'
+grep -Fq 'SmartSafeHub 계정 연결, 현재 적용 중인 보호 데이터와 사용자 규칙을 관리합니다.' "$PAGE" || \
+	fail 'SafeShield settings description must explain account connection and protection data management'
 
 grep -Fq 'const DISPLAY_HOURS = 24;' "$PANEL" || \
 	fail 'SafeShield activity must continue to use 24 hourly buckets'
@@ -209,10 +211,10 @@ grep -Fq "planName === 'FREE' ? <FreePlanUpgrade /> : null" "$PAGE" || \
 	fail 'SafeShield pricing CTA must be shown only for the FREE plan'
 grep -Fq 'https://www.smartsafehub.com/pricing/' "$PAGE" || \
 	fail 'SafeShield FREE plan CTA must link to the SmartSafeHub pricing page'
-grep -Fq '라이선스 미설정' "$PAGE" || \
-	fail 'SafeShield license summary must provide a localized unconfigured label'
+grep -Fq "deviceRegistration?.accountRegistered === true ? '계정 연결됨' : deviceRegistration?.phase === 'registered' ? '계정 연결 필요' : 'Cloud 등록 준비 중'" "$PAGE" || \
+	fail 'SafeShield account summary must provide localized device registration states'
 if grep -Fq 'data.license.status ||' "$PAGE"; then
-	fail 'SafeShield license summary must not expose raw backend status strings directly'
+	fail 'SafeShield plan summary must not expose raw backend status strings directly'
 fi
 grep -Fq 'rel="noopener noreferrer"' "$PAGE" || \
 	fail 'SafeShield pricing link must isolate the new browsing context'

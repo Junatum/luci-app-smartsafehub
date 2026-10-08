@@ -12,8 +12,8 @@
           "firmware_status",
           "system_time_settings",
           "system_scheduled_reboot_settings",
-          "license_status",
-          "health_status"
+          "health_status",
+          "device_registration_status"
         ],
         "safeshield": [
           "status",
@@ -53,7 +53,6 @@
           "system_backup_validate",
           "system_backup_restore",
           "system_backup_discard",
-          "license_activate",
           "activity_cloud_sync_update",
           "health_run",
           "health_reporter_update",
@@ -62,7 +61,8 @@
           "safeshield_statistics_update",
           "safeshield_rule_add",
           "safeshield_rule_delete",
-          "safeshield_license_update"
+          "safeshield_license_update",
+          "device_pairing_refresh"
         ],
         "safeshield": [
           "set_enabled",

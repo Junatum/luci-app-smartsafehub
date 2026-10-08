@@ -201,6 +201,8 @@ HEALTH_FILE="$TMP/runtime/health.json"
 REPORT_STATE="$TMP/runtime/health-reporter.state"
 UPDATER_STATE="$TMP/runtime/updates.state"
 FIRMWARE_STATE="$TMP/runtime/firmware.state"
+DEVICE_STATE="$TMP/runtime/device.json"
+DEVICE_CREDENTIAL="$TMP/device-credential.json"
 EVENT_LOG="$TMP/events.log"
 EVENT_STATE="$TMP/runtime/activity-observer.state"
 DNSMASQ_CALL_STATE="$TMP/runtime/dnsmasq-running.calls"
@@ -259,6 +261,8 @@ run_health() {
 	SMARTSAFEHUB_HEALTH_UPTIME_FILE="$UPTIME" \
 	SMARTSAFEHUB_HEALTH_UPDATER_STATE_FILE="$UPDATER_STATE" \
 	SMARTSAFEHUB_HEALTH_FIRMWARE_STATE_FILE="$FIRMWARE_STATE" \
+	SMARTSAFEHUB_HEALTH_DEVICE_STATE_FILE="$DEVICE_STATE" \
+	SMARTSAFEHUB_HEALTH_DEVICE_CREDENTIAL_FILE="$DEVICE_CREDENTIAL" \
 	SMARTSAFEHUB_HEALTH_DNSMASQ_INIT="$TMP/bin/dnsmasq-init" \
 	SMARTSAFEHUB_HEALTH_SLEEP_BIN="$TMP/bin/sleep" \
 	SMARTSAFEHUB_HEALTH_DNSMASQ_CONFIRM_ATTEMPTS="${MOCK_DNSMASQ_CONFIRM_ATTEMPTS:-3}" \
@@ -319,10 +323,16 @@ run_health_case() (
 	[ "${1:-}" = '--' ] || fail 'Health test case에는 -- 뒤에 helper 명령이 필요합니다.'
 	shift
 	[ "$#" -gt 0 ] || fail 'Health test case helper 명령이 비어 있습니다.'
+	cat > "$DEVICE_STATE" <<EOF_DEVICE_STATE
+{"schema":1,"component":"device","phase":"registered","lastResult":"active","accountRegistered":true,"plan":"$MOCK_LICENSE_PLAN"}
+EOF_DEVICE_STATE
+	cat > "$DEVICE_CREDENTIAL" <<'EOF_DEVICE_CREDENTIAL'
+{"schema":1,"device_uuid":"test-device","token":"ssh_dev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+EOF_DEVICE_CREDENTIAL
 	run_health "$@"
 )
 
-# 무료/유료 여부와 관계없이 로컬 진단은 동작하고 기본 원격 보고는 꺼져 있어야 한다.
+# entitlement와 관계없이 로컬 진단은 동작하고 기본 원격 보고는 꺼져 있어야 한다.
 run_health_case MOCK_LICENSE_PLAN=FREE MOCK_LICENSE_STATUS=active -- run-once
 jq -e '.schema == 1 and .overall == "ok" and .summary.total >= 8' "$HEALTH_FILE" >/dev/null || \
 	fail '정상 장치의 로컬 진단은 schema v1과 ok 상태를 생성해야 합니다.'
@@ -421,14 +431,14 @@ set -e
 [ "$free_status" -eq 3 ] || fail 'FREE 사용자가 원격 상태 보고를 활성화하려는 요청은 거부해야 합니다.'
 grep -Eq '^smartsafehub.health.reporter_enabled=0$' "$UCI_STATE" || fail 'FREE 사용자의 opt-in 거부 후 Reporter는 비활성 상태를 유지해야 합니다.'
 
-# SafeShield는 plan/status를 소문자나 대문자로 반환할 수 있다. OpenWrt BusyBox tr에서
+# Device sync는 plan을 소문자나 대문자로 반환할 수 있다. OpenWrt BusyBox tr에서
 # POSIX 문자 클래스를 지원하지 않는 대상에서도 pro -> PRO가 정확히 유지되어야 한다.
 run_health_case MOCK_LICENSE_PLAN=pro MOCK_LICENSE_STATUS=ACTIVE -- run-once
 grep -Eq '^plan[[:space:]]+PRO$' "$REPORT_STATE" || fail '소문자 pro 플랜은 BusyBox 호환 방식으로 PRO로 정규화해야 합니다.'
-grep -Eq '^license_status[[:space:]]+active$' "$REPORT_STATE" || fail '대문자 ACTIVE 라이선스 상태는 active로 정규화해야 합니다.'
-grep -Eq '^eligible[[:space:]]+1$' "$REPORT_STATE" || fail '정규화된 PRO active 라이선스는 Health Reporter 유료 권한으로 판정해야 합니다.'
+grep -Eq '^license_status[[:space:]]+active$' "$REPORT_STATE" || fail '활성 device sync 상태는 active로 유지해야 합니다.'
+grep -Eq '^eligible[[:space:]]+1$' "$REPORT_STATE" || fail '정규화된 PRO entitlement는 Health Reporter 유료 권한으로 판정해야 합니다.'
 
-# 유료 active 사용자는 명시적으로 opt-in 할 수 있고, 첫 cycle에서 최소 상태 payload만 전송한다.
+# 유료 entitlement 사용자는 명시적으로 opt-in 할 수 있고, 첫 cycle에서 최소 상태 payload만 전송한다.
 printf 'MemTotal:       100000 kB\nMemAvailable:    50000 kB\n' > "$MEMINFO"
 run_health_case MOCK_LICENSE_PLAN=ULTIMATE MOCK_LICENSE_STATUS=active -- set-reporter 1
 grep -Eq '^smartsafehub.health.reporter_enabled=1$' "$UCI_STATE" || fail '유료 사용자의 opt-in은 reporter_enabled=1로 저장해야 합니다.'
@@ -436,7 +446,7 @@ run_health_case MOCK_LICENSE_PLAN=ULTIMATE MOCK_LICENSE_STATUS=active MOCK_EPOCH
 [ "$(wc -l < "$FETCH_ARGS" | tr -d ' ')" -eq 1 ] || fail '유료 사용자가 opt-in하면 첫 Health 보고를 전송해야 합니다.'
 
 grep -Fq '/health/reports' "$FETCH_ARGS" || fail 'Health Reporter는 전용 Health 보고 endpoint를 사용해야 합니다.'
-grep -Fq 'X-SafeShield-License-Key: secret-license-key' "$FETCH_ARGS" || fail 'Health Reporter는 등록된 SafeShield 라이선스로 인증해야 합니다.'
+grep -Fq 'Authorization: Device ssh_dev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "$FETCH_ARGS" || fail 'Health Reporter는 기기 credential로 인증해야 합니다.'
 
 # 부팅 grace의 준비 중 상태는 서버 장애 이력에 transient issue를 만들지 않도록 보고를 보류한다.
 printf '30.00 10.00\n' > "$UPTIME"
@@ -525,7 +535,10 @@ grep -Fq '개인정보 보호' "$SETTINGS_PAGE" || fail '설정 UI가 Health Rep
 grep -Fq '전송되는 정보' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 전송 항목을 구분해서 안내해야 합니다.'
 grep -Fq '전송하지 않는 정보' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 개인정보 제외 항목을 안내해야 합니다.'
 grep -Fq 'DNS 요청 내용 · 시스템 로그 원문' "$SETTINGS_PAGE" || fail '설정 UI가 DNS 요청 내용과 시스템 로그 원문을 전송하지 않음을 명시해야 합니다.'
-grep -Fq "'@.license.key'" "$HELPER" || \
-	fail 'Health Reporter는 SafeShield license_get의 실제 중첩 응답(.license.key)에서 라이선스 키를 읽어야 합니다.'
+grep -Fq "'@.token'" "$HELPER" || \
+	fail 'Health Reporter는 공용 device credential의 token을 읽어야 합니다.'
+if grep -Fq 'license_get' "$HELPER"; then
+	fail 'Health Reporter는 SafeShield 라이선스 키를 인증 수단으로 사용하면 안 됩니다.'
+fi
 
-echo 'PASS: 무료 로컬 진단과 유료/Trial opt-in 원격 상태 보고 계약이 정상입니다.'
+echo 'PASS: 무료 로컬 진단과 유료 entitlement opt-in 원격 상태 보고 계약이 정상입니다.'

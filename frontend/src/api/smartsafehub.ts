@@ -111,6 +111,28 @@ export function requestSmartSafeHubLicenseActivation(
   return callApi(API_OBJECT, 'license_activate', { license_key: licenseKey });
 }
 
+export interface DeviceRegistrationStatus {
+  schema: number;
+  component: 'device';
+  phase: string;
+  lastResult: string;
+  lastErrorCode: string | null;
+  accountRegistered: boolean | null;
+  plan: string | null;
+  pairingCode: string | null;
+  pairingExpiresAt: string | null;
+  nextSyncAt: number;
+  lastSuccessAt: number;
+}
+
+export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
+  return callApi(API_OBJECT, 'device_registration_status', {}, { timeoutMs: 5000 });
+}
+
+export function requestDevicePairingCode(): Promise<DeviceRegistrationStatus> {
+  return callApi(API_OBJECT, 'device_pairing_refresh', {}, { timeoutMs: 15000 });
+}
+
 export function fetchHealthStatus(): Promise<HealthStatus> {
   return callApi(API_OBJECT, 'health_status');
 }
