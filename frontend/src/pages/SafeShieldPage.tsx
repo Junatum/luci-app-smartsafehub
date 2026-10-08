@@ -5,6 +5,7 @@ import {
   AlertIcon,
   CalendarIcon,
   CheckCircleIcon,
+  CopyIcon,
   DatabaseIcon,
   DownloadIcon,
   KeyIcon,
@@ -33,6 +34,35 @@ import {
 } from '../app/format';
 
 const SMARTSAFEHUB_PRICING_URL = 'https://www.smartsafehub.com/pricing/';
+
+async function copyTextToClipboard(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    catch {
+      // Local router pages may run outside a secure context. Fall back below.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.inset = '0 auto auto -9999px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, value.length);
+
+  const copied = document.execCommand('copy');
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error('clipboard_copy_failed');
+  }
+}
 
 interface SafeShieldPageProps {
   action: SafeShieldAction | null;
@@ -611,6 +641,7 @@ export function SafeShieldPage({
   const [deviceRegistration, setDeviceRegistration] = useState<DeviceRegistrationStatus | null>(null);
   const [pairingBusy, setPairingBusy] = useState(false);
   const [pairingError, setPairingError] = useState<string | null>(null);
+  const [pairingCopied, setPairingCopied] = useState(false);
 
   useEffect(() => {
     if (
@@ -637,9 +668,19 @@ export function SafeShieldPage({
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!pairingCopied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setPairingCopied(false), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [pairingCopied]);
+
   async function refreshPairingCode(): Promise<void> {
     setPairingBusy(true);
     setPairingError(null);
+    setPairingCopied(false);
     try {
       setDeviceRegistration(await requestDevicePairingCode());
     }
@@ -648,6 +689,23 @@ export function SafeShieldPage({
     }
     finally {
       setPairingBusy(false);
+    }
+  }
+
+  async function copyPairingCode(): Promise<void> {
+    const pairingCode = deviceRegistration?.pairingCode;
+    if (!pairingCode) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(pairingCode);
+      setPairingError(null);
+      setPairingCopied(true);
+    }
+    catch {
+      setPairingCopied(false);
+      setPairingError('연결 코드를 복사하지 못했습니다. 코드를 직접 선택해 복사해 주세요.');
     }
   }
 
@@ -936,7 +994,6 @@ export function SafeShieldPage({
                 <PlanBadge compact plan={planName} />
                 <span class="ssh-safeshield-license-summary-status">{deviceRegistration?.accountRegistered === true ? '계정 연결됨' : deviceRegistration?.phase === 'registered' ? '계정 연결 필요' : 'Cloud 등록 준비 중'}</span>
               </div>
-              {deviceRegistration?.pairingCode ? <span class="ssh-safeshield-license-key-mask">{deviceRegistration.pairingCode}</span> : null}
             </div>
             {deviceRegistration?.accountRegistered === true ? (
               <p class="mt-5 mb-0 text-sm leading-6 text-slate-500">이 기기는 SmartSafeHub 계정에 연결되어 있습니다. 구독 권한은 서버에서 자동으로 동기화됩니다.</p>
@@ -946,6 +1003,23 @@ export function SafeShieldPage({
                   <span class="ssh-safeshield-license-editor-label">계정 연결 코드</span>
                   <span class="ssh-safeshield-license-editor-hint">코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요. 코드는 10분 동안 유효합니다.</span>
                 </div>
+                {deviceRegistration?.pairingCode ? (
+                  <div class="ssh-safeshield-pairing-code" role="group" aria-label="계정 연결 코드">
+                    <div class="ssh-safeshield-pairing-code-main">
+                      <span class="ssh-safeshield-pairing-code-caption">연결 코드</span>
+                      <code class="ssh-safeshield-pairing-code-value">{deviceRegistration.pairingCode}</code>
+                    </div>
+                    <button
+                      aria-label="계정 연결 코드 복사"
+                      class="ssh-safeshield-pairing-copy-action"
+                      onClick={() => void copyPairingCode()}
+                      type="button"
+                    >
+                      {pairingCopied ? <CheckCircleIcon class="size-4" /> : <CopyIcon class="size-4" />}
+                      <span aria-live="polite">{pairingCopied ? '복사됨' : '복사'}</span>
+                    </button>
+                  </div>
+                ) : null}
                 <div class="ssh-safeshield-license-actions">
                   <button class="ssh-safeshield-license-primary-action" disabled={pairingBusy} onClick={() => void refreshPairingCode()} type="button">
                     {pairingBusy ? '발급 중…' : deviceRegistration?.pairingCode ? '새 코드 발급' : '연결 코드 발급'}

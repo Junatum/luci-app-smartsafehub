@@ -44,7 +44,7 @@ function installBootstrap(sessionId: string, host: HTMLElement): void {
     sessionId,
     rpcUrl: luciUrl('/admin/ubus'),
     assetBase: host.dataset.assetBase ?? '/luci-static/smartsafehub/',
-    assetVersion: host.dataset.assetVersion ?? '0.2.27-r2',
+    assetVersion: host.dataset.assetVersion ?? '0.2.27-r3',
     locale: document.documentElement.lang || 'ko',
   });
 }

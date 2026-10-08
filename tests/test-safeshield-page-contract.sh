@@ -33,6 +33,11 @@ grep -Fq 'title="SafeShield 설정"' "$PAGE" || \
 grep -Fq 'SmartSafeHub 계정' "$PAGE" || fail 'SafeShield settings must expose SmartSafeHub account connection'
 grep -Fq '계정 연결 코드' "$PAGE" || fail 'SafeShield account card must expose a pairing code flow'
 grep -Fq 'requestDevicePairingCode' "$PAGE" || fail 'SafeShield account card must request pairing codes through device registration'
+grep -Fq 'ssh-safeshield-pairing-code-value' "$PAGE" || fail 'pairing code must be rendered in a dedicated prominent value area'
+grep -Fq 'copyPairingCode' "$PAGE" || fail 'pairing code must provide a copy action'
+grep -Fq '계정 연결 코드 복사' "$PAGE" || fail 'pairing copy action must have an accessible label'
+grep -Fq "navigator.clipboard?.writeText" "$PAGE" || fail 'pairing copy must use the modern clipboard API when available'
+grep -Fq "document.execCommand('copy')" "$PAGE" || fail 'pairing copy must fall back for non-secure local router pages'
 grep -Fq 'deviceRegistration?.accountRegistered === true' "$PAGE" || fail 'SafeShield account card must distinguish account-registered devices'
 grep -Fq '구독 권한은 서버에서 자동으로 동기화됩니다.' "$PAGE" || fail 'SafeShield account card must explain server-side entitlement sync'
 if grep -Fq 'ssh-safeshield-license-input' "$PAGE"; then
