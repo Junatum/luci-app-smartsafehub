@@ -45,14 +45,31 @@ generate_token() {
 }
 
 write_credential() {
- local device_uuid="$1" token="$2" issued_at="$3" tmp dir
+ local device_uuid="$1" token="$2" issued_at="$3" tmp dir device_uuid_json
  dir="${CREDENTIAL_FILE%/*}"; mkdir -p "$dir" || return 1
+ if [ -n "$device_uuid" ]; then
+  device_uuid_json='"'"$(json_escape "$device_uuid")"'"'
+ else
+  device_uuid_json=null
+ fi
  tmp="${CREDENTIAL_FILE}.tmp.$$"
  cat > "$tmp" <<EOF
-{"schema":1,"device_uuid":"$(json_escape "$device_uuid")","token":"$(json_escape "$token")","issued_at":$issued_at}
+{"schema":1,"device_uuid":$device_uuid_json,"token":"$(json_escape "$token")","issued_at":$issued_at}
 EOF
  chmod 600 "$tmp" 2>/dev/null || true
  mv "$tmp" "$CREDENTIAL_FILE"
+}
+
+ensure_local_credential() {
+ local token issued_at
+ if token="$(credential_token 2>/dev/null)"; then
+  printf '%s' "$token"
+  return 0
+ fi
+ token="$(generate_token)" || return 1
+ issued_at="$(now_epoch)"
+ write_credential '' "$token" "$issued_at" || return 1
+ printf '%s' "$token"
 }
 
 write_state() {
@@ -99,15 +116,16 @@ EOF
 }
 
 bootstrap() {
- local token device body out now uuid registered next
+ local token device body out now uuid registered next issued_at
  now="$(now_epoch)"; next=$((now + 60))
- token="$(credential_token 2>/dev/null || true)"; [ -n "$token" ] || token="$(generate_token)" || return 1
+ token="$(ensure_local_credential)" || return 1
  device="$RUNTIME_DIR/device-bootstrap-device.$$.json"; body="$RUNTIME_DIR/device-bootstrap-request.$$.json"; out="$RUNTIME_DIR/device-bootstrap-response.$$.json"
  if ! read_device_payload "$device"; then write_state pending failed DEVICE_IDENTITY_UNAVAILABLE unknown '' '' '' "$next" 0; rm -f "$device"; return 1; fi
  printf '{"credential":"%s","device":' "$(json_escape "$token")" > "$body"; cat "$device" >> "$body"; printf '}\n' >> "$body"
  if ! post_json "$API_BASE_URL/devices/bootstrap" "$body" "$out"; then write_state pending failed DEVICE_BOOTSTRAP_UNAVAILABLE unknown '' '' '' "$next" 0; rm -f "$device" "$body" "$out"; return 1; fi
  uuid="$(json_value "$out" '@.device.uuid')"; [ -n "$uuid" ] || { write_state pending failed DEVICE_BOOTSTRAP_INVALID unknown '' '' '' "$next" 0; rm -f "$device" "$body" "$out"; return 1; }
- write_credential "$uuid" "$token" "$now" || { rm -f "$device" "$body" "$out"; return 1; }
+ issued_at="$(json_value "$CREDENTIAL_FILE" '@.issued_at')"; case "$issued_at" in ''|*[!0-9]*) issued_at="$now" ;; esac
+ write_credential "$uuid" "$token" "$issued_at" || { rm -f "$device" "$body" "$out"; return 1; }
  registered="$(json_value "$out" '@.device.registered')"
  write_state registered active '' "$registered" free '' '' $((now + CHECK_INTERVAL_S)) "$now"
  [ "$registered" = true ] || pairing_session >/dev/null 2>&1 || true

@@ -74,6 +74,7 @@ require_executable "$ROOT_DIR/root/usr/libexec/smartsafehub-backup"
 require_file "$ROOT_DIR/root/lib/upgrade/keep.d/smartsafehub-device"
 grep -Fxq '/etc/smartsafehub/device-credential.json' "$ROOT_DIR/root/lib/upgrade/keep.d/smartsafehub-device" || fail "device credential must be preserved across sysupgrade"
 require_executable "$ROOT_DIR/root/etc/uci-defaults/91-smartsafehub-firmware-identity"
+require_executable "$ROOT_DIR/root/etc/uci-defaults/92-smartsafehub-device"
 require_file "$ROOT_DIR/root/usr/libexec/smartsafehub-root-entry"
 require_executable "$ROOT_DIR/root/etc/uci-defaults/90-smartsafehub-system-defaults"
 require_executable "$ROOT_DIR/root/etc/uci-defaults/99-smartsafehub-root-entry"
@@ -218,6 +219,10 @@ printf '%s\n' "$postinst_block" | grep -Fq '[ -z "$${IPKG_INSTROOT}" ]' ||
 	fail 'package postinst must limit service enable to runtime installation'
 printf '%s\n' "$postinst_block" | grep -Fq 'mkdir -p /tmp/smartsafehub' ||
 	fail 'package postinst must create the SmartSafeHub runtime directory'
+grep -Fq '/etc/init.d/smartsafehub-device enable' "$ROOT_DIR/root/etc/uci-defaults/92-smartsafehub-device" ||
+	fail 'first-boot defaults must enable smartsafehub-device'
+grep -Fq '/etc/init.d/smartsafehub-device start' "$ROOT_DIR/root/etc/uci-defaults/92-smartsafehub-device" ||
+	fail 'first-boot defaults must start smartsafehub-device'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-events enable' ||
 	fail 'package postinst must force-enable smartsafehub-events so boot events survive upgrades'
 printf '%s\n' "$postinst_block" | grep -Fq '/etc/init.d/smartsafehub-events restart' ||
