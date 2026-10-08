@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 
 import { formatRelativeTime } from '../app/format';
-import { CheckCircleIcon, CopyIcon, KeyIcon, ReloadIcon } from '../components/Icons';
+import { CheckCircleIcon, ClockIcon, CopyIcon, KeyIcon, ReloadIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { DeviceRegistrationStatus } from '../api/smartsafehub';
 
@@ -32,8 +32,36 @@ async function copyTextToClipboard(value: string): Promise<void> {
   if (!copied) throw new Error('clipboard_copy_failed');
 }
 
+type AccountPlanTone = 'free' | 'pro' | 'ultimate' | 'paid';
+
 function planLabel(plan: string | null): string {
   return (plan || 'free').toUpperCase();
+}
+
+function planTone(plan: string): AccountPlanTone {
+  if (plan === 'FREE') return 'free';
+  if (plan === 'PRO') return 'pro';
+  if (plan === 'ULTIMATE') return 'ultimate';
+  return 'paid';
+}
+
+function AccountPlanBadge({ plan }: { plan: string }) {
+  const tone = planTone(plan);
+  const paid = tone !== 'free';
+
+  return (
+    <span
+      class="ssh-safeshield-plan-badge"
+      data-compact="false"
+      data-tier={tone}
+      title={paid ? `${plan} 멤버십` : '무료 플랜'}
+    >
+      <span aria-hidden="true" class="ssh-safeshield-plan-badge-mark">
+        {paid ? '✦' : '•'}
+      </span>
+      <span>{plan}</span>
+    </span>
+  );
 }
 
 function pairingExpired(status: DeviceRegistrationStatus): boolean {
@@ -77,6 +105,7 @@ export function SmartSafeHubAccountPage({
 
   const status = data;
   const connected = status?.accountRegistered === true;
+  const currentPlan = planLabel(status?.plan ?? null);
   const expired = status ? pairingExpired(status) : false;
   const pairingCode = !connected && !expired ? status?.pairingCode : null;
 
@@ -112,7 +141,7 @@ export function SmartSafeHubAccountPage({
             <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-teal-700">Account connection</p>
             <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950">기기 계정 연결</h2>
             <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-              이 공유기를 SmartSafeHub 계정에 연결하면 웹사이트에서 기기를 확인하고 Cloud 기능과 구독 권한을 사용할 수 있습니다.
+              계정에 연결하면 웹사이트에서 기기를 관리하고 Cloud 기능과 구독 권한을 사용할 수 있습니다.
             </p>
           </div>
           <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
@@ -143,9 +172,15 @@ export function SmartSafeHubAccountPage({
         ) : (
           <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
             <div>
-              <p class="m-0 text-sm font-black text-slate-900">계정 연결 코드</p>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="m-0 text-sm font-black text-slate-900">계정 연결 코드</p>
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[0.7rem] font-black text-amber-800">
+                  <ClockIcon class="size-3.5" />
+                  10분 동안 유효
+                </span>
+              </div>
               <p class="mt-1 mb-0 text-sm leading-6 text-slate-500">
-                코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요. 코드는 10분 동안 유효합니다.
+                코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요.
               </p>
             </div>
 
@@ -195,7 +230,10 @@ export function SmartSafeHubAccountPage({
           </div>
           <div class="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <dt class="text-sm font-bold text-slate-500">요금제</dt>
-            <dd class="m-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-800">{planLabel(status?.plan ?? null)}</dd>
+            <dd class="m-0 flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <AccountPlanBadge plan={currentPlan} />
+              {currentPlan === 'FREE' ? <span class="ssh-safeshield-plan-caption">기본 플랜</span> : null}
+            </dd>
           </div>
           <div class="flex items-center justify-between gap-4">
             <dt class="text-sm font-bold text-slate-500">마지막 확인</dt>
