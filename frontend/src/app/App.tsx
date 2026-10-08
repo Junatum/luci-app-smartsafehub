@@ -63,7 +63,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
   const deviceRegistration = useDeviceRegistration(route === 'account');
-  const dashboardAccountRegistered = useDashboardAccountStatus(route === 'home');
+  const dashboardAccountRegistered = useDashboardAccountStatus(route === 'account');
   const systemActions = useSystemActions(status.data);
   const health = useHealth(route === 'home' || route === 'settings');
   const scheduledReboot = useScheduledRebootSettings(route === 'settings');
@@ -453,6 +453,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
 
   return (
     <AppShell
+      accountRegistered={dashboardAccountRegistered}
       loading={route === 'network' ? wan.loading || lan.loading : current.loading}
       onRefresh={refreshCurrent}
       refreshing={

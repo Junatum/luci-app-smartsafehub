@@ -26,6 +26,7 @@ import {
 } from './Icons';
 
 interface ProductNavigationProps {
+  accountRegistered: boolean | null;
   collapsed: boolean;
   loading: boolean;
   onRefresh: () => void;
@@ -94,10 +95,12 @@ function navigationClass(active: boolean, collapsed = false): string {
 }
 
 function NavigationItems({
+  accountRegistered,
   collapsed = false,
   route,
   updateCount,
 }: {
+  accountRegistered: boolean | null;
   collapsed?: boolean;
   route: AppRoute;
   updateCount: number;
@@ -155,6 +158,14 @@ function NavigationItems({
                       β
                     </span>
                   ) : null}
+                  {routeName === 'account' && accountRegistered === false ? (
+                    <span
+                      aria-label="계정 연결 필요"
+                      class={`ssh-account-nav-dot ${collapsed ? 'ssh-account-nav-dot-collapsed' : ''}`}
+                      role="img"
+                      title="계정 연결 필요"
+                    />
+                  ) : null}
                   {routeName === 'system' && updateCount > 0 ? (
                     collapsed ? (
                       <span
@@ -181,6 +192,7 @@ function NavigationItems({
 }
 
 export function ProductNavigation({
+  accountRegistered,
   collapsed,
   loading,
   onRefresh,
@@ -272,7 +284,7 @@ export function ProductNavigation({
 
         {mobileMenuOpen ? (
           <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
-            <NavigationItems route={route} updateCount={updateCount} />
+            <NavigationItems accountRegistered={accountRegistered} route={route} updateCount={updateCount} />
             <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
               <a
                 class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
@@ -341,7 +353,7 @@ export function ProductNavigation({
             class={`flex-1 overflow-y-auto py-5 ${collapsed ? 'px-2' : 'px-3'}`}
             id="smartsafehub-desktop-navigation"
           >
-            <NavigationItems collapsed={collapsed} route={route} updateCount={updateCount} />
+            <NavigationItems accountRegistered={accountRegistered} collapsed={collapsed} route={route} updateCount={updateCount} />
           </nav>
           <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
             <a

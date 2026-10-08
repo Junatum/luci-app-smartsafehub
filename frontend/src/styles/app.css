@@ -2152,3 +2152,96 @@
     animation: none;
   }
 }
+
+/* Dashboard account notice: explicit colors for the ShadowRoot theme system.
+ * Avoid mixing Tailwind dark: variants with [data-theme] overrides. */
+.ssh-dashboard-account-banner {
+  border-color: #99e8df;
+  background: #f0fdfa;
+}
+
+.ssh-dashboard-account-banner-icon {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.ssh-dashboard-account-banner-title {
+  color: #0f172a;
+}
+
+.ssh-dashboard-account-banner-description {
+  color: #475569;
+}
+
+.ssh-dashboard-account-banner-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ssh-dashboard-account-banner-action {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.ssh-dashboard-account-banner-action:hover {
+  background: #115e59;
+  color: #ffffff;
+}
+
+.ssh-dashboard-account-banner-action:focus-visible {
+  outline-color: #0d9488;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner {
+  border-color: #115e59;
+  background: #102927;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-icon {
+  background: #134e4a;
+  color: #99f6e4;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-title {
+  color: #f1f5f9;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-description {
+  color: #cbd5e1;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-badge {
+  background: #78350f;
+  color: #fde68a;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-action {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.ssh-app[data-theme='dark'] .ssh-dashboard-account-banner-action:hover {
+  background: #0d9488;
+}
+
+/* A compact action-required indicator, shared by desktop and mobile navigation. */
+.ssh-account-nav-dot {
+  display: block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: auto;
+  border-radius: 50%;
+  background-color: #d97706;
+  box-shadow: 0 0 0 2px var(--ssh-account-dot-ring, #fff);
+}
+.ssh-account-nav-dot-collapsed {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  margin-left: 0;
+}
+.ssh-app[data-theme='dark'] .ssh-account-nav-dot {
+  background-color: #fbbf24;
+  --ssh-account-dot-ring: #0f172a;
+}
