@@ -168,6 +168,9 @@ export function SmartSafeHubAccountPage({
             >
               웹사이트에서 기기 관리
             </a>
+            <p class="mt-3 mb-0 text-xs font-semibold leading-5 text-emerald-800">
+              웹사이트에서 기기 등록을 해제하면 공유기도 다음 계정 상태 동기화에서 자동으로 연결 해제를 반영합니다.
+            </p>
           </div>
         ) : (
           <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">

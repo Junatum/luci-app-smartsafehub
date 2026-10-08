@@ -14,22 +14,22 @@ grep -Fq "@.account.connected" "$HELPER" || {
 	echo 'device helper must consume the explicit account connection state from Hub sync' >&2
 	exit 1
 }
-grep -Fq 'refresh_safeshield_after_registration' "$HELPER" || {
-	echo 'device helper must refresh SafeShield after account registration completes' >&2
+grep -Fq 'refresh_safeshield_after_account_change' "$HELPER" || {
+	echo 'device helper must refresh SafeShield after account connection changes' >&2
 	exit 1
 }
-grep -Fq 'postRegistrationRefreshPending' "$HELPER" || {
-	echo 'device helper must remember a failed post-registration SafeShield refresh for retry' >&2
+grep -Fq 'protectionRefreshPending' "$HELPER" || {
+	echo 'device helper must remember a failed account-change SafeShield refresh for retry' >&2
 	exit 1
 }
 
-# Hub account state must be persisted before the post-registration protection
+# Hub account state must be persisted before the account-change protection
 # refresh. Otherwise an rpcd timeout can leave a consumed pairing code visible.
 status_block_for_order="$(sed -n '/^status_sync() {/,/^}/p' "$HELPER")"
 state_line="$(printf '%s\n' "$status_block_for_order" | grep -n "write_state registered active '' \"\$registered\"" | head -n 1 | cut -d: -f1)"
-refresh_line="$(printf '%s\n' "$status_block_for_order" | grep -n 'refresh_safeshield_after_registration' | head -n 1 | cut -d: -f1)"
+refresh_line="$(printf '%s\n' "$status_block_for_order" | grep -n 'refresh_safeshield_after_account_change' | head -n 1 | cut -d: -f1)"
 [ -n "$state_line" ] && [ -n "$refresh_line" ] && [ "$state_line" -lt "$refresh_line" ] || {
-	echo 'connected account state must be persisted before SafeShield refresh is requested' >&2
+	echo 'account state must be persisted before SafeShield refresh is requested' >&2
 	exit 1
 }
 
@@ -68,6 +68,14 @@ grep -Fq 'refreshDeviceRegistrationStatus' "$ACCOUNT_HOOK" || {
 }
 grep -Fq 'const PAIRING_POLL_INTERVAL_MS = 5_000;' "$ACCOUNT_HOOK" || {
 	echo 'account registration hook must poll while a pairing code is active' >&2
+	exit 1
+}
+grep -Fq 'const LOCAL_STATUS_POLL_INTERVAL_MS = 5_000;' "$ACCOUNT_HOOK" || {
+	echo 'account page must watch router-local registration state while it stays open' >&2
+	exit 1
+}
+grep -Fq 'window.setInterval' "$ACCOUNT_HOOK" || {
+	echo 'account page must periodically reread router-local registration state' >&2
 	exit 1
 }
 grep -Fq 'if (!status?.pairingCode || status.accountRegistered === true)' "$ACCOUNT_HOOK" || {
@@ -169,6 +177,7 @@ FLOW_RUNTIME="$FLOW_DIR/runtime"
 FLOW_CREDENTIAL="$FLOW_DIR/device-credential.json"
 FLOW_URL_LOG="$FLOW_DIR/urls.log"
 FLOW_BOOTSTRAP_BODY="$FLOW_DIR/bootstrap-body.json"
+FLOW_ACTIVITY_CREDENTIAL="$FLOW_DIR/activity-sync-credential.json"
 mkdir -p "$FLOW_RUNTIME"
 cp "$CREDENTIAL_FILE" "$FLOW_CREDENTIAL"
 
@@ -207,7 +216,7 @@ case "$expr" in
 	'@.account.connected') [ "${SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED:-0}" = 1 ] && echo true || echo false ;;
 	'@.device.registered') [ "${SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED:-0}" = 1 ] && echo true || echo false ;;
 	'@.accountRegistered') grep -Fq '"accountRegistered":true' "$file" && echo true || { grep -Fq '"accountRegistered":false' "$file" && echo false || true; } ;;
-	'@.postRegistrationRefreshPending') grep -Fq '"postRegistrationRefreshPending":true' "$file" && echo true || { grep -Fq '"postRegistrationRefreshPending":false' "$file" && echo false || true; } ;;
+	'@.protectionRefreshPending') grep -Fq '"protectionRefreshPending":true' "$file" && echo true || { grep -Fq '"protectionRefreshPending":false' "$file" && echo false || true; } ;;
 	'@.ok') echo true ;;
 	'@.entitlement.plan') echo free ;;
 	'@.credential.rotation_due') echo false ;;
@@ -404,8 +413,8 @@ grep -Fq '"pairingCode":null' "$FLOW_RUNTIME/device.json" || {
 	echo 'consumed pairing code must be cleared after registration' >&2
 	exit 1
 }
-grep -Fq '"postRegistrationRefreshPending":false' "$FLOW_RUNTIME/device.json" || {
-	echo 'accepted post-registration SafeShield refresh must clear the retry marker' >&2
+grep -Fq '"protectionRefreshPending":false' "$FLOW_RUNTIME/device.json" || {
+	echo 'accepted account-change SafeShield refresh must clear the retry marker' >&2
 	exit 1
 }
 
@@ -422,7 +431,60 @@ PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
 
 [ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 1 ] || {
-	echo 'steady connected sync must not repeat the post-registration SafeShield refresh' >&2
+	echo 'steady connected sync must not repeat the account-change SafeShield refresh' >&2
+	exit 1
+}
+
+# Website-side device removal is learned through the normal background device
+# sync. The router must immediately persist the disconnected state, drop Cloud
+# activity credentials, and refresh SafeShield once so Cloud entitlements are
+# downgraded without manual action on the router.
+printf '%s\n' '{"schema":1,"token":"stale","upload_url":"https://example.invalid/upload","expires_at":9999999999,"retention_days":90,"plan":"pro"}' > "$FLOW_ACTIVITY_CREDENTIAL"
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$FLOW_ACTIVITY_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=0 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+grep -Fq '"accountRegistered":false' "$FLOW_RUNTIME/device.json" || {
+	echo 'website-side device removal must be persisted as disconnected on the router' >&2
+	exit 1
+}
+[ ! -e "$FLOW_ACTIVITY_CREDENTIAL" ] || {
+	echo 'disconnecting the SmartSafeHub account must remove the Cloud activity credential' >&2
+	exit 1
+}
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+	echo 'account removal must request one SafeShield refresh' >&2
+	exit 1
+}
+grep -Fq '"protectionRefreshPending":false' "$FLOW_RUNTIME/device.json" || {
+	echo 'successful account-removal SafeShield refresh must clear the retry marker' >&2
+	exit 1
+}
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$FLOW_ACTIVITY_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=0 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+	echo 'steady disconnected sync must not repeat the SafeShield refresh' >&2
 	exit 1
 }
 
@@ -432,7 +494,7 @@ RETRY_RUNTIME="$FLOW_DIR/retry-runtime"
 RETRY_UBUS_LOG="$FLOW_DIR/retry-ubus.log"
 mkdir -p "$RETRY_RUNTIME"
 cat > "$RETRY_RUNTIME/device.json" <<'JSON'
-{"schema":1,"component":"device","phase":"registered","lastResult":"active","lastErrorCode":null,"accountRegistered":false,"plan":"free","pairingCode":"WXYZ-1234","pairingExpiresAt":"2026-10-08T12:00:00Z","postRegistrationRefreshPending":false,"nextSyncAt":0,"lastSuccessAt":0}
+{"schema":1,"component":"device","phase":"registered","lastResult":"active","lastErrorCode":null,"accountRegistered":false,"plan":"free","pairingCode":"WXYZ-1234","pairingExpiresAt":"2026-10-08T12:00:00Z","protectionRefreshPending":false,"nextSyncAt":0,"lastSuccessAt":0}
 JSON
 
 SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$RETRY_RUNTIME" \
@@ -448,8 +510,8 @@ SMARTSAFEHUB_TEST_REFRESH_FAIL=1 \
 PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
 
-grep -Fq '"postRegistrationRefreshPending":true' "$RETRY_RUNTIME/device.json" || {
-	echo 'failed post-registration SafeShield refresh must remain pending for retry' >&2
+grep -Fq '"protectionRefreshPending":true' "$RETRY_RUNTIME/device.json" || {
+	echo 'failed account-change SafeShield refresh must remain pending for retry' >&2
 	exit 1
 }
 
@@ -466,10 +528,10 @@ PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
 
 [ "$(grep -Fc 'call safeshield refresh' "$RETRY_UBUS_LOG" || true)" -eq 2 ] || {
-	echo 'pending post-registration SafeShield refresh must retry on the next device sync' >&2
+	echo 'pending account-change SafeShield refresh must retry on the next device sync' >&2
 	exit 1
 }
-grep -Fq '"postRegistrationRefreshPending":false' "$RETRY_RUNTIME/device.json" || {
+grep -Fq '"protectionRefreshPending":false' "$RETRY_RUNTIME/device.json" || {
 	echo 'successful SafeShield refresh retry must clear the pending marker' >&2
 	exit 1
 }

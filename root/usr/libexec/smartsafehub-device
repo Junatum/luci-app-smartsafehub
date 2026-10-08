@@ -87,7 +87,7 @@ prepare_credential() {
  return 0
 }
 
-refresh_safeshield_after_registration() {
+refresh_safeshield_after_account_change() {
  local out ok
  out="$RUNTIME_DIR/device-safeshield-refresh.$$.json"
  rm -f "$out"
@@ -98,17 +98,17 @@ refresh_safeshield_after_registration() {
  ok="$(json_value "$out" '@.ok')"
  rm -f "$out"
  [ "$ok" != false ] || return 1
- log_message 'requested SafeShield refresh after SmartSafeHub account registration'
+ log_message 'requested SafeShield refresh after SmartSafeHub account connection change'
  return 0
 }
 
 write_state() {
- local phase="$1" result="$2" error="$3" account_registered="$4" plan="$5" pairing_code="$6" pairing_expires_at="$7" next_sync="$8" last_success="$9" post_registration_refresh_pending="${10:-false}" registered_json refresh_pending_json tmp
+ local phase="$1" result="$2" error="$3" account_registered="$4" plan="$5" pairing_code="$6" pairing_expires_at="$7" next_sync="$8" last_success="$9" protection_refresh_pending="${10:-false}" registered_json refresh_pending_json tmp
  case "$account_registered" in true|1) registered_json=true ;; false|0) registered_json=false ;; *) registered_json=null ;; esac
- case "$post_registration_refresh_pending" in true|1) refresh_pending_json=true ;; *) refresh_pending_json=false ;; esac
+ case "$protection_refresh_pending" in true|1) refresh_pending_json=true ;; *) refresh_pending_json=false ;; esac
  mkdir -p "$RUNTIME_DIR" || return 1; tmp="${STATE_FILE}.tmp.$$"
  cat > "$tmp" <<EOF
-{"schema":1,"component":"device","phase":"$(json_escape "$phase")","lastResult":"$(json_escape "$result")","lastErrorCode":$(json_string_or_null "$error"),"accountRegistered":$registered_json,"plan":$(json_string_or_null "$plan"),"pairingCode":$(json_string_or_null "$pairing_code"),"pairingExpiresAt":$(json_string_or_null "$pairing_expires_at"),"postRegistrationRefreshPending":$refresh_pending_json,"nextSyncAt":$next_sync,"lastSuccessAt":$last_success}
+{"schema":1,"component":"device","phase":"$(json_escape "$phase")","lastResult":"$(json_escape "$result")","lastErrorCode":$(json_string_or_null "$error"),"accountRegistered":$registered_json,"plan":$(json_string_or_null "$plan"),"pairingCode":$(json_string_or_null "$pairing_code"),"pairingExpiresAt":$(json_string_or_null "$pairing_expires_at"),"protectionRefreshPending":$refresh_pending_json,"nextSyncAt":$next_sync,"lastSuccessAt":$last_success}
 EOF
  mv "$tmp" "$STATE_FILE"
 }
@@ -200,43 +200,49 @@ rotate_credential_if_due() {
 }
 
 status_sync() {
- local token body out now registered previous_registered plan last_success next code expires post_registration_refresh_pending
+ local token body out now registered previous_registered plan last_success next code expires protection_refresh_pending
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
  ensure_device_bootstrapped || return 1
  token="$(credential_token)" || return 1
  body="$RUNTIME_DIR/device-sync-request.$$.json"; out="$RUNTIME_DIR/device-sync-response.$$.json"; printf '{}\n' > "$body"
- if ! post_json "$API_BASE_URL/devices/sync" "$body" "$out" "$token"; then last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac; post_registration_refresh_pending="$(json_value "$STATE_FILE" '@.postRegistrationRefreshPending')"; write_state registered failed DEVICE_SYNC_UNAVAILABLE unknown '' "$(json_value "$STATE_FILE" '@.pairingCode')" "$(json_value "$STATE_FILE" '@.pairingExpiresAt')" "$next" "$last_success" "$post_registration_refresh_pending"; rm -f "$body" "$out"; return 1; fi
+ if ! post_json "$API_BASE_URL/devices/sync" "$body" "$out" "$token"; then last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac; protection_refresh_pending="$(json_value "$STATE_FILE" '@.protectionRefreshPending')"; write_state registered failed DEVICE_SYNC_UNAVAILABLE unknown '' "$(json_value "$STATE_FILE" '@.pairingCode')" "$(json_value "$STATE_FILE" '@.pairingExpiresAt')" "$next" "$last_success" "$protection_refresh_pending"; rm -f "$body" "$out"; return 1; fi
  previous_registered="$(json_value "$STATE_FILE" '@.accountRegistered')"
  registered="$(json_value "$out" '@.account.connected')"; [ -n "$registered" ] || registered="$(json_value "$out" '@.device.registered')"
  plan="$(json_value "$out" '@.entitlement.plan')"
  code="$(json_value "$STATE_FILE" '@.pairingCode')"
  expires="$(json_value "$STATE_FILE" '@.pairingExpiresAt')"
- post_registration_refresh_pending="$(json_value "$STATE_FILE" '@.postRegistrationRefreshPending')"
- [ "$post_registration_refresh_pending" = true ] || post_registration_refresh_pending=false
+ protection_refresh_pending="$(json_value "$STATE_FILE" '@.protectionRefreshPending')"
+ [ "$protection_refresh_pending" = true ] || protection_refresh_pending=false
+ case "$registered:$previous_registered" in
+  true:false|false:true) protection_refresh_pending=true ;;
+ esac
  if [ "$registered" = true ]; then
-  if [ "$previous_registered" = false ] || [ -n "$code" ]; then
-   post_registration_refresh_pending=true
+  if [ -n "$code" ]; then
+   protection_refresh_pending=true
   fi
   code=''
   expires=''
- else
-  post_registration_refresh_pending=false
+ elif [ "$registered" = false ] && [ "$previous_registered" = true ]; then
+  # A website-side disconnect is authoritative. Drop any stale pairing state;
+  # the user can request a fresh pairing session after this transition.
+  code=''
+  expires=''
  fi
  store_activity_credential "$out" || true
  rotate_credential_if_due "$out" "$token"
 
  # Persist the authoritative Hub account state before requesting a potentially
  # slow SafeShield refresh. rpcd limits status-sync execution time, so waiting
- # for protection refresh first can leave a consumed pairing code cached even
- # though Hub already reports that the account is connected.
- write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$post_registration_refresh_pending"
+ # for protection refresh first can leave stale connected/disconnected state in
+ # the router UI even though Hub already accepted the ownership change.
+ write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$protection_refresh_pending"
 
- if [ "$registered" = true ] && [ "$post_registration_refresh_pending" = true ]; then
-  if refresh_safeshield_after_registration; then
-   post_registration_refresh_pending=false
-   write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$post_registration_refresh_pending"
+ if [ "$protection_refresh_pending" = true ]; then
+  if refresh_safeshield_after_account_change; then
+   protection_refresh_pending=false
+   write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$protection_refresh_pending"
   else
-   log_message 'SafeShield refresh after SmartSafeHub account registration will be retried on the next device sync'
+   log_message 'SafeShield refresh after SmartSafeHub account connection change will be retried on the next device sync'
   fi
  fi
  rm -f "$body" "$out"
@@ -244,14 +250,15 @@ status_sync() {
 }
 
 pairing_session() {
- local token body out code expires registered now plan last_success next
+ local token body out code expires registered now plan last_success next protection_refresh_pending
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
  ensure_device_bootstrapped || return 1
  token="$(credential_token)" || return 1
  body="$RUNTIME_DIR/device-pairing-request.$$.json"; out="$RUNTIME_DIR/device-pairing-response.$$.json"; printf '{}\n' > "$body"
  if ! post_json "$API_BASE_URL/devices/pairing-sessions" "$body" "$out" "$token"; then write_state registered failed DEVICE_PAIRING_SESSION_FAILED unknown '' '' '' "$next" 0; rm -f "$body" "$out"; return 1; fi
  code="$(json_value "$out" '@.pairing_session.code')"; expires="$(json_value "$out" '@.pairing_session.expires_at')"; registered="$(json_value "$out" '@.device.registered')"; plan="$(json_value "$STATE_FILE" '@.plan')"; last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac
- write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$last_success"; rm -f "$body" "$out"
+ protection_refresh_pending="$(json_value "$STATE_FILE" '@.protectionRefreshPending')"; [ "$protection_refresh_pending" = true ] || protection_refresh_pending=false
+ write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$last_success" "$protection_refresh_pending"; rm -f "$body" "$out"
 }
 
 retry_delay() {

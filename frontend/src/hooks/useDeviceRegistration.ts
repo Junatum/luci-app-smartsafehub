@@ -8,6 +8,7 @@ import {
 } from '../api/smartsafehub';
 
 const PAIRING_POLL_INTERVAL_MS = 5_000;
+const LOCAL_STATUS_POLL_INTERVAL_MS = 5_000;
 
 function pairingStillValid(status: DeviceRegistrationStatus | null): boolean {
   if (!status?.pairingCode || status.accountRegistered === true) {
@@ -117,6 +118,36 @@ export function useDeviceRegistration(enabled: boolean) {
       active = false;
     };
   }, [enabled, refresh]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    let active = true;
+    const timer = window.setInterval(() => {
+      void fetchDeviceRegistrationStatus()
+        .then((localStatus) => {
+          if (!active) return;
+          setData((current) => {
+            if ((localStatus.lastSuccessAt || 0) > (current?.lastSuccessAt || 0)) {
+              setSyncError(null);
+            }
+            return localStatus;
+          });
+          setError(null);
+        })
+        .catch(() => {
+          // The periodic local read is best-effort. The initial load and
+          // explicit refresh paths remain responsible for visible errors.
+        });
+    }, LOCAL_STATUS_POLL_INTERVAL_MS);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [enabled]);
 
   const shouldPoll = useMemo(() => pairingStillValid(data), [data]);
 
