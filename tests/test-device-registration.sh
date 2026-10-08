@@ -14,6 +14,14 @@ grep -Fq "@.account.connected" "$HELPER" || {
 	echo 'device helper must consume the explicit account connection state from Hub sync' >&2
 	exit 1
 }
+grep -Fq 'refresh_safeshield_after_registration' "$HELPER" || {
+	echo 'device helper must refresh SafeShield after account registration completes' >&2
+	exit 1
+}
+grep -Fq 'postRegistrationRefreshPending' "$HELPER" || {
+	echo 'device helper must remember a failed post-registration SafeShield refresh for retry' >&2
+	exit 1
+}
 
 grep -Fq 'SMARTSAFEHUB_DEVICE_HEXDUMP_BIN' "$HELPER"
 grep -Fq 'hexdump' "$HELPER"
@@ -181,8 +189,11 @@ case "$expr" in
 	'@.device.device_code') echo test-router ;;
 	'@.device.device_code_source') echo test ;;
 	'@.device.uuid') echo 11111111-1111-1111-1111-111111111111 ;;
-	'@.account.connected') echo false ;;
-	'@.device.registered') echo false ;;
+	'@.account.connected') [ "${SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED:-0}" = 1 ] && echo true || echo false ;;
+	'@.device.registered') [ "${SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED:-0}" = 1 ] && echo true || echo false ;;
+	'@.accountRegistered') grep -Fq '"accountRegistered":true' "$file" && echo true || { grep -Fq '"accountRegistered":false' "$file" && echo false || true; } ;;
+	'@.postRegistrationRefreshPending') grep -Fq '"postRegistrationRefreshPending":true' "$file" && echo true || { grep -Fq '"postRegistrationRefreshPending":false' "$file" && echo false || true; } ;;
+	'@.ok') echo true ;;
 	'@.entitlement.plan') echo free ;;
 	'@.credential.rotation_due') echo false ;;
 	'@.pairing_session.code') echo ABCD-EFGH ;;
@@ -195,9 +206,18 @@ esac
 EOF
 chmod +x "$FAKE_JSONFILTER"
 
+FLOW_UBUS_LOG="$FLOW_DIR/ubus.log"
 FAKE_UBUS="$FLOW_DIR/ubus"
 cat > "$FAKE_UBUS" <<'EOF'
 #!/bin/sh
+printf '%s\n' "$*" >> "${SMARTSAFEHUB_TEST_UBUS_LOG:-/dev/null}"
+if [ "${1:-}" = call ] && [ "${2:-}" = safeshield ] && [ "${3:-}" = refresh ]; then
+	[ "${SMARTSAFEHUB_TEST_REFRESH_FAIL:-0}" = 1 ] && exit 1
+	cat <<'JSON'
+{"ok":true,"accepted":true}
+JSON
+	exit 0
+fi
 cat <<'JSON'
 {"device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint_version":1,"identity_provider":"test","identity_source":"test","identity_strength":"strong","identity_profile":"default","installation_id":"11111111-2222-3333-4444-555555555555","device_code":"test-router","device_code_source":"test","configured":{"vendor":"OpenWrt","model":"TestRouter","arch":"test_arch","memory_mb":256}},"version":"0.3.24-r2"}
 JSON
@@ -284,6 +304,7 @@ SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
 SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
 SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
 SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
 SMARTSAFEHUB_TEST_BOOTSTRAP_BODY="$FLOW_BOOTSTRAP_BODY" \
 PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
@@ -328,6 +349,7 @@ SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
 SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
 SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
 SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
 PATH="$FLOW_DIR:$PATH" \
 "$HELPER" pairing-session >/dev/null 2>&1
 
@@ -337,5 +359,102 @@ grep -Fq '/devices/pairing-sessions' "$FLOW_URL_LOG" || {
 }
 grep -Fq '"pairingCode":"ABCD-EFGH"' "$FLOW_RUNTIME/device.json" || {
 	echo 'pairing session response must be persisted for the router UI' >&2
+	exit 1
+}
+
+# Completing account registration must immediately ask SafeShield to resolve the
+# now-authorized artifact. The consumed pairing code is cleared at the same
+# transition and later syncs must not repeatedly trigger refreshes.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 1 ] || {
+	echo 'account registration completion must request one SafeShield refresh' >&2
+	exit 1
+}
+grep -Fq '"accountRegistered":true' "$FLOW_RUNTIME/device.json" || {
+	echo 'connected account state must be persisted after registration' >&2
+	exit 1
+}
+grep -Fq '"pairingCode":null' "$FLOW_RUNTIME/device.json" || {
+	echo 'consumed pairing code must be cleared after registration' >&2
+	exit 1
+}
+grep -Fq '"postRegistrationRefreshPending":false' "$FLOW_RUNTIME/device.json" || {
+	echo 'accepted post-registration SafeShield refresh must clear the retry marker' >&2
+	exit 1
+}
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 1 ] || {
+	echo 'steady connected sync must not repeat the post-registration SafeShield refresh' >&2
+	exit 1
+}
+
+# A transient SafeShield refresh request failure must not lose the recovery
+# intent. Clear the marker only after a later device sync can request refresh.
+RETRY_RUNTIME="$FLOW_DIR/retry-runtime"
+RETRY_UBUS_LOG="$FLOW_DIR/retry-ubus.log"
+mkdir -p "$RETRY_RUNTIME"
+cat > "$RETRY_RUNTIME/device.json" <<'JSON'
+{"schema":1,"component":"device","phase":"registered","lastResult":"active","lastErrorCode":null,"accountRegistered":false,"plan":"free","pairingCode":"WXYZ-1234","pairingExpiresAt":"2026-10-08T12:00:00Z","postRegistrationRefreshPending":false,"nextSyncAt":0,"lastSuccessAt":0}
+JSON
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$RETRY_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$RETRY_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$RETRY_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_REFRESH_FAIL=1 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+grep -Fq '"postRegistrationRefreshPending":true' "$RETRY_RUNTIME/device.json" || {
+	echo 'failed post-registration SafeShield refresh must remain pending for retry' >&2
+	exit 1
+}
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$RETRY_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$RETRY_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$RETRY_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$RETRY_UBUS_LOG" || true)" -eq 2 ] || {
+	echo 'pending post-registration SafeShield refresh must retry on the next device sync' >&2
+	exit 1
+}
+grep -Fq '"postRegistrationRefreshPending":false' "$RETRY_RUNTIME/device.json" || {
+	echo 'successful SafeShield refresh retry must clear the pending marker' >&2
 	exit 1
 }

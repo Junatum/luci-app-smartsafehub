@@ -6,7 +6,7 @@ const STATE_FILE = '/tmp/smartsafehub/device.json';
 const HELPER = '/usr/libexec/smartsafehub-device';
 function read_state() {
  const raw = fs.readfile(STATE_FILE);
- if (raw == null || length(raw) == 0) return { schema:1, component:'device', phase:'pending', lastResult:'never', lastErrorCode:null, accountRegistered:null, plan:null, pairingCode:null, pairingExpiresAt:null, nextSyncAt:0, lastSuccessAt:0 };
+ if (raw == null || length(raw) == 0) return { schema:1, component:'device', phase:'pending', lastResult:'never', lastErrorCode:null, accountRegistered:null, plan:null, pairingCode:null, pairingExpiresAt:null, postRegistrationRefreshPending:false, nextSyncAt:0, lastSuccessAt:0 };
  try { return json(raw); } catch (e) { return null; }
 }
 export function read_device_registration_status(request) { const state = read_state(); return state != null ? success(state) : failure('DEVICE_STATE_INVALID', '기기 등록 상태를 읽지 못했습니다.'); };
