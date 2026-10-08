@@ -60,7 +60,7 @@ grep -Fq 'h-[4.5rem] min-h-[4.5rem] shrink-0 items-center border-b border-slate-
 	fail 'desktop sidebar brand area must use the shared 72px application-shell height'
 grep -Fq 'class="ssh-sidebar-toggle absolute right-0 top-[4.5rem] z-20 inline-flex size-7 translate-x-1/2 -translate-y-1/2' "$NAVIGATION" || \
 	fail 'sidebar toggle must stay centered on the shared 72px brand/header boundary'
-grep -Fq 'title={collapsed ? item.label : undefined}' "$NAVIGATION" || \
+grep -Fq 'collapsed ? item.label : undefined}' "$NAVIGATION" || \
 	fail 'collapsed navigation items must retain hover labels'
 grep -Fq 'aria-label="Beta 기능"' "$NAVIGATION" || \
 	fail 'collapsed IPTV navigation item must expose an accessible Beta badge'

@@ -127,11 +127,15 @@ function NavigationItems({
               return (
                 <a
                   aria-current={active ? 'page' : undefined}
-                  aria-label={collapsed ? item.label : undefined}
+                  aria-label={routeName === 'account' && accountRegistered === false
+                    ? `${item.label} (계정 연결 필요)`
+                    : collapsed ? item.label : undefined}
                   class={navigationClass(active, collapsed)}
                   href={item.hash}
                   key={routeName}
-                  title={collapsed ? item.label : undefined}
+                  title={routeName === 'account' && accountRegistered === false
+                    ? 'SmartSafeHub 계정 연결 필요'
+                    : collapsed ? item.label : undefined}
                 >
                   <span
                     class={`grid size-9 shrink-0 place-items-center rounded-lg ${
@@ -162,7 +166,7 @@ function NavigationItems({
                     <span
                       aria-label="계정 연결 필요"
                       class={`ssh-account-nav-dot ${collapsed ? 'ssh-account-nav-dot-collapsed' : ''}`}
-                      role="img"
+                      aria-hidden="true"
                       title="계정 연결 필요"
                     />
                   ) : null}

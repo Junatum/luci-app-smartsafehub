@@ -31,7 +31,7 @@ fi
 grep -Fq 'accountRegistered={accountRegistered}' "$shell" || { echo 'FAIL: shell must pass registration state to navigation' >&2; exit 1; }
 grep -Fq "routeName === 'account' && accountRegistered === false" "$nav" || { echo 'FAIL: dot must appear only when disconnected' >&2; exit 1; }
 grep -Fq 'ssh-account-nav-dot-collapsed' "$nav" || { echo 'FAIL: collapsed navigation dot missing' >&2; exit 1; }
-grep -Fq 'aria-label="계정 연결 필요"' "$nav" || { echo 'FAIL: missing accessible account indicator' >&2; exit 1; }
+grep -Fq '`${item.label} (계정 연결 필요)`' "$nav" || { echo 'FAIL: missing accessible account state on navigation link' >&2; exit 1; }
 grep -Fq '.ssh-app[data-theme='"'"'dark'"'"'] .ssh-account-nav-dot' "$styles" || { echo 'FAIL: dark dot style missing' >&2; exit 1; }
 # A tiny dot requires a stronger solid amber than the Beta badge's pale surface.
 # Both themes must set a visible opaque fill without relying on Tailwind color utilities.
