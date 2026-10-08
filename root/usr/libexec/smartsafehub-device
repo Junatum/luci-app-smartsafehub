@@ -38,6 +38,12 @@ credential_token() {
  case "$token" in ssh_dev_*) printf '%s' "$token" ;; *) return 1 ;; esac
 }
 
+credential_device_uuid() {
+ local uuid
+ uuid="$(json_value "$CREDENTIAL_FILE" '@.device_uuid')"
+ case "$uuid" in ''|null) return 1 ;; *) printf '%s' "$uuid" ;; esac
+}
+
 generate_token() {
  local raw
  raw="$("$HEXDUMP_BIN" -n 32 -v -e '1/1 "%02x"' /dev/urandom 2>/dev/null)"
@@ -137,8 +143,12 @@ bootstrap() {
  write_credential "$uuid" "$token" "$issued_at" || { rm -f "$device" "$body" "$out"; return 1; }
  registered="$(json_value "$out" '@.device.registered')"
  write_state registered active '' "$registered" free '' '' $((now + CHECK_INTERVAL_S)) "$now"
- [ "$registered" = true ] || pairing_session >/dev/null 2>&1 || true
  rm -f "$device" "$body" "$out"
+}
+
+ensure_device_bootstrapped() {
+ credential_device_uuid >/dev/null 2>&1 && return 0
+ bootstrap
 }
 
 store_activity_credential() {
@@ -167,7 +177,8 @@ rotate_credential_if_due() {
 status_sync() {
  local token body out now registered plan last_success next code expires
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
- if ! token="$(credential_token)"; then bootstrap || return 1; token="$(credential_token)" || return 1; fi
+ ensure_device_bootstrapped || return 1
+ token="$(credential_token)" || return 1
  body="$RUNTIME_DIR/device-sync-request.$$.json"; out="$RUNTIME_DIR/device-sync-response.$$.json"; printf '{}\n' > "$body"
  if ! post_json "$API_BASE_URL/devices/sync" "$body" "$out" "$token"; then last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac; write_state registered failed DEVICE_SYNC_UNAVAILABLE unknown '' "$(json_value "$STATE_FILE" '@.pairingCode')" "$(json_value "$STATE_FILE" '@.pairingExpiresAt')" "$next" "$last_success"; rm -f "$body" "$out"; return 1; fi
  registered="$(json_value "$out" '@.device.registered')"; plan="$(json_value "$out" '@.entitlement.plan')"; code="$(json_value "$STATE_FILE" '@.pairingCode')"; expires="$(json_value "$STATE_FILE" '@.pairingExpiresAt')"; [ "$registered" = true ] && { code=''; expires=''; }
@@ -176,7 +187,9 @@ status_sync() {
 
 pairing_session() {
  local token body out code expires registered now plan last_success next
- now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S)); if ! token="$(credential_token)"; then bootstrap || return 1; token="$(credential_token)" || return 1; fi
+ now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
+ ensure_device_bootstrapped || return 1
+ token="$(credential_token)" || return 1
  body="$RUNTIME_DIR/device-pairing-request.$$.json"; out="$RUNTIME_DIR/device-pairing-response.$$.json"; printf '{}\n' > "$body"
  if ! post_json "$API_BASE_URL/devices/pairing-sessions" "$body" "$out" "$token"; then write_state registered failed DEVICE_PAIRING_SESSION_FAILED unknown '' '' '' "$next" 0; rm -f "$body" "$out"; return 1; fi
  code="$(json_value "$out" '@.pairing_session.code')"; expires="$(json_value "$out" '@.pairing_session.expires_at')"; registered="$(json_value "$out" '@.device.registered')"; plan="$(json_value "$STATE_FILE" '@.plan')"; last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac
