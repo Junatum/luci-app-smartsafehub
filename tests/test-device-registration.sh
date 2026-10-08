@@ -4,6 +4,7 @@ ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 HELPER="$ROOT/root/usr/libexec/smartsafehub-device"
 RPC="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
 MAIN="$ROOT/root/usr/share/rpcd/ucode/smartsafehub.uc"
+SAFE_PAGE="$ROOT/frontend/src/pages/SafeShieldPage.tsx"
 INIT="$ROOT/root/etc/init.d/smartsafehub-device"
 grep -Fq 'devices/sync' "$HELPER"
 grep -Fq 'devices/pairing-sessions' "$HELPER"
@@ -19,6 +20,18 @@ grep -Fq 'Authorization: Device' "$HELPER"
 grep -Fq 'device_registration_status' "$MAIN"
 grep -Fq 'device_pairing_refresh' "$MAIN"
 grep -Fq 'refresh_device_pairing' "$RPC"
+
+# Pairing can bootstrap an unregistered local credential itself, so the UI must
+# not deadlock the flow by requiring phase=registered before the user can ask
+# for a pairing code. Only an in-flight request should disable the button.
+grep -Fq 'disabled={pairingBusy}' "$SAFE_PAGE" || {
+	echo 'pairing button must stay available while device bootstrap is pending' >&2
+	exit 1
+}
+if grep -Fq "pairingBusy || deviceRegistration?.phase !== 'registered'" "$SAFE_PAGE"; then
+	echo 'pairing button must not require an already-registered phase' >&2
+	exit 1
+fi
 ! grep -Fq 'license_activate' "$MAIN"
 ! grep -Fq 'smartsafehub-license' "$ROOT/Makefile"
 echo 'device registration contract: ok'

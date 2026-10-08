@@ -947,7 +947,7 @@ export function SafeShieldPage({
                   <span class="ssh-safeshield-license-editor-hint">코드를 발급한 뒤 smartsafehub.com에 로그인하여 기기를 연결하세요. 코드는 10분 동안 유효합니다.</span>
                 </div>
                 <div class="ssh-safeshield-license-actions">
-                  <button class="ssh-safeshield-license-primary-action" disabled={pairingBusy || deviceRegistration?.phase !== 'registered'} onClick={() => void refreshPairingCode()} type="button">
+                  <button class="ssh-safeshield-license-primary-action" disabled={pairingBusy} onClick={() => void refreshPairingCode()} type="button">
                     {pairingBusy ? '발급 중…' : deviceRegistration?.pairingCode ? '새 코드 발급' : '연결 코드 발급'}
                   </button>
                 </div>
