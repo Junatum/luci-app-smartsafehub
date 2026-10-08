@@ -16,6 +16,7 @@ JSONFILTER_BIN="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
 DATE_BIN="${SMARTSAFEHUB_DEVICE_DATE_BIN:-date}"
 SLEEP_BIN="${SMARTSAFEHUB_DEVICE_SLEEP_BIN:-sleep}"
 LOGGER_BIN="${SMARTSAFEHUB_DEVICE_LOGGER_BIN:-logger}"
+HEXDUMP_BIN="${SMARTSAFEHUB_DEVICE_HEXDUMP_BIN:-hexdump}"
 UBUS_BIN="${SMARTSAFEHUB_DEVICE_UBUS_BIN:-ubus}"
 REQUEST_TIMEOUT_S=10
 CHECK_INTERVAL_S=300
@@ -39,7 +40,7 @@ credential_token() {
 
 generate_token() {
  local raw
- raw="$(od -An -N32 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+ raw="$("$HEXDUMP_BIN" -n 32 -v -e '1/1 "%02x"' /dev/urandom 2>/dev/null)"
  [ "${#raw}" -eq 64 ] || return 1
  printf 'ssh_dev_%s' "$raw"
 }
@@ -70,6 +71,14 @@ ensure_local_credential() {
  issued_at="$(now_epoch)"
  write_credential '' "$token" "$issued_at" || return 1
  printf '%s' "$token"
+}
+
+prepare_credential() {
+ if ! ensure_local_credential >/dev/null; then
+  log_message 'failed to prepare device credential'
+  return 1
+ fi
+ return 0
 }
 
 write_state() {
@@ -175,7 +184,7 @@ pairing_session() {
 }
 
 retry_delay() {
- local failures="$1" base random jitter
+ local failures="$1" base random random_hex jitter
  case "$failures" in
   0) base=60 ;;
   1) base=300 ;;
@@ -184,7 +193,8 @@ retry_delay() {
   *) base="$MAX_RETRY_S" ;;
  esac
  if [ "$base" -ge "$MAX_RETRY_S" ]; then
-  random="$(od -An -N2 -tu2 /dev/urandom 2>/dev/null | tr -d ' ' || true)"
+  random_hex="$("$HEXDUMP_BIN" -n 2 -v -e '1/1 "%02x"' /dev/urandom 2>/dev/null || true)"
+  case "$random_hex" in ''|*[!0-9a-fA-F]*|?????*) random=600 ;; *) random=$((0x$random_hex)) ;; esac
   case "$random" in ''|*[!0-9]*) random=600 ;; esac
   jitter=$((random % 1201 - 600))
   base=$((base + jitter))
@@ -193,5 +203,5 @@ retry_delay() {
  printf '%s\n' "$base"
 }
 wait_for() { local seconds="$1"; [ "$STOP_REQUESTED" -eq 1 ] && return 1; "$SLEEP_BIN" "$seconds" & WAIT_PID=$!; wait "$WAIT_PID" 2>/dev/null || true; WAIT_PID=''; [ "$STOP_REQUESTED" -eq 0 ]; }
-daemon() { local failures=0 delay; mkdir -p "$RUNTIME_DIR"; wait_for "$STARTUP_DELAY_S" || return 0; while [ "$STOP_REQUESTED" -eq 0 ]; do if status_sync; then failures=0; delay="$CHECK_INTERVAL_S"; else delay="$(retry_delay "$failures")"; [ "$failures" -lt 4 ] && failures=$((failures + 1)); fi; wait_for "$delay" || break; done; }
-case "${1:-daemon}" in bootstrap) bootstrap ;; status-sync) status_sync ;; pairing-session) pairing_session ;; daemon) daemon ;; *) echo "usage: $0 {daemon|bootstrap|status-sync|pairing-session}" >&2; exit 2 ;; esac
+daemon() { local failures=0 delay; mkdir -p "$RUNTIME_DIR"; prepare_credential || true; wait_for "$STARTUP_DELAY_S" || return 0; while [ "$STOP_REQUESTED" -eq 0 ]; do if status_sync; then failures=0; delay="$CHECK_INTERVAL_S"; else delay="$(retry_delay "$failures")"; [ "$failures" -lt 4 ] && failures=$((failures + 1)); fi; wait_for "$delay" || break; done; }
+case "${1:-daemon}" in prepare-credential) prepare_credential ;; bootstrap) bootstrap ;; status-sync) status_sync ;; pairing-session) pairing_session ;; daemon) daemon ;; *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|pairing-session}" >&2; exit 2 ;; esac
