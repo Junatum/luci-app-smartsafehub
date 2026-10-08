@@ -24,6 +24,7 @@ grep -Fq '"device_registration_refresh"' "$ACL" || fail 'ACL must allow authenti
 grep -Fq 'const PAIRING_POLL_INTERVAL_MS = 5_000;' "$HOOK" || fail 'pairing status must poll every five seconds while waiting'
 grep -Fq 'pairingStillValid(data)' "$HOOK" || fail 'polling must only run while a pairing session is active'
 grep -Fq 'refreshDeviceRegistrationStatus().catch(() => null)' "$HOOK" || fail 'page entry must verify cached registration state with Hub'
+grep -Fq 'fetchDeviceRegistrationStatus().catch(() => null)' "$HOOK" || fail 'account UI must recover locally persisted connected state when sync RPC times out'
 grep -Fq 'if (loading) return <LoadingPanel />;' "$PAGE" || fail 'cached pairing code must not flash before initial Hub verification'
 grep -Fq 'const connected = status?.accountRegistered === true;' "$PAGE" || fail 'page must derive explicit account connection state'
 grep -Fq 'const pairingCode = !connected && !expired ? status?.pairingCode : null;' "$PAGE" || fail 'connected devices must never display a stale pairing code'

@@ -217,19 +217,26 @@ status_sync() {
   fi
   code=''
   expires=''
-  if [ "$post_registration_refresh_pending" = true ]; then
-   if refresh_safeshield_after_registration; then
-    post_registration_refresh_pending=false
-   else
-    log_message 'SafeShield refresh after SmartSafeHub account registration will be retried on the next device sync'
-   fi
-  fi
  else
   post_registration_refresh_pending=false
  fi
  store_activity_credential "$out" || true
  rotate_credential_if_due "$out" "$token"
+
+ # Persist the authoritative Hub account state before requesting a potentially
+ # slow SafeShield refresh. rpcd limits status-sync execution time, so waiting
+ # for protection refresh first can leave a consumed pairing code cached even
+ # though Hub already reports that the account is connected.
  write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$post_registration_refresh_pending"
+
+ if [ "$registered" = true ] && [ "$post_registration_refresh_pending" = true ]; then
+  if refresh_safeshield_after_registration; then
+   post_registration_refresh_pending=false
+   write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$post_registration_refresh_pending"
+  else
+   log_message 'SafeShield refresh after SmartSafeHub account registration will be retried on the next device sync'
+  fi
+ fi
  rm -f "$body" "$out"
  return 0
 }

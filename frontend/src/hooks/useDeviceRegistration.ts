@@ -44,8 +44,16 @@ export function useDeviceRegistration(enabled: boolean) {
       return status;
     }
     catch {
+      // status-sync can outlive the RPC timeout while it starts a SafeShield
+      // refresh. The helper persists account connection state first, so read
+      // the local state again before leaving stale pairing data on screen.
+      const localStatus = await fetchDeviceRegistrationStatus().catch(() => null);
+      if (localStatus) {
+        setData(localStatus);
+        setError(null);
+      }
       setSyncError('SmartSafeHub 서버에서 최신 계정 연결 상태를 확인하지 못했습니다.');
-      return null;
+      return localStatus;
     }
     finally {
       setRefreshing(false);
@@ -90,6 +98,13 @@ export function useDeviceRegistration(enabled: boolean) {
           setSyncError(null);
         }
         else {
+          // The sync RPC may time out after the helper has already persisted
+          // accountRegistered=true and cleared the consumed pairing code.
+          const latestLocalStatus = await fetchDeviceRegistrationStatus().catch(() => null);
+          if (!active) return;
+          if (latestLocalStatus) {
+            setData(latestLocalStatus);
+          }
           setSyncError('SmartSafeHub 서버에서 최신 계정 연결 상태를 확인하지 못했습니다.');
         }
       })

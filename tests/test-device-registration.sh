@@ -23,6 +23,16 @@ grep -Fq 'postRegistrationRefreshPending' "$HELPER" || {
 	exit 1
 }
 
+# Hub account state must be persisted before the post-registration protection
+# refresh. Otherwise an rpcd timeout can leave a consumed pairing code visible.
+status_block_for_order="$(sed -n '/^status_sync() {/,/^}/p' "$HELPER")"
+state_line="$(printf '%s\n' "$status_block_for_order" | grep -n "write_state registered active '' \"\$registered\"" | head -n 1 | cut -d: -f1)"
+refresh_line="$(printf '%s\n' "$status_block_for_order" | grep -n 'refresh_safeshield_after_registration' | head -n 1 | cut -d: -f1)"
+[ -n "$state_line" ] && [ -n "$refresh_line" ] && [ "$state_line" -lt "$refresh_line" ] || {
+	echo 'connected account state must be persisted before SafeShield refresh is requested' >&2
+	exit 1
+}
+
 grep -Fq 'SMARTSAFEHUB_DEVICE_HEXDUMP_BIN' "$HELPER"
 grep -Fq 'hexdump' "$HELPER"
 if grep -Eq '(^|[^[:alnum:]_])od[[:space:]]' "$HELPER"; then
