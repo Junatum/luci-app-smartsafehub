@@ -47,36 +47,8 @@ export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
   return callApi(API_OBJECT, 'connected_devices');
 }
 
-interface SmartSafeHubStatusWithActivity extends SmartSafeHubStatus {
-  activityHistory?: ActivityHistory;
-}
-
-function emptyActivityHistory(): ActivityHistory {
-  return {
-    schema: 1,
-    scope: 'current_boot',
-    volatile: true,
-    maxEvents: 128,
-    cloud: {
-      enabled: false,
-      phase: 'preparing',
-      eligible: null,
-      plan: null,
-      retentionDays: 0,
-      pendingEvents: 0,
-      lastAttemptAt: 0,
-      lastSuccessAt: 0,
-      lastUploadedCount: 0,
-      lastErrorCode: null,
-      nextSyncAt: 0,
-    },
-    events: [],
-  };
-}
-
 export async function fetchActivityHistory(): Promise<ActivityHistory> {
-  const status = await callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status');
-  const activity = status.activityHistory ?? emptyActivityHistory();
+  const activity = await callApi<ActivityHistory>(API_OBJECT, 'activity_history');
 
   return {
     ...activity,

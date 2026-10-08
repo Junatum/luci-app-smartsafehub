@@ -31,12 +31,8 @@ status_contract="$(sed -n '/^[[:space:]]*status:[[:space:]]*{/,/^[[:space:]]*},/
 if printf '%s\n' "$status_contract" | grep -Fq 'args:'; then
 	fail 'status RPC must remain argument-free for upgrade/session compatibility'
 fi
-if grep -Eq '^[[:space:]]*activity_history:[[:space:]]*\{' "$RPC_ENTRY"; then
-	fail 'recent activity must not add a standalone RPC method that requires a new session ACL'
-fi
-if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("activity_history") != null' "$ACL" >/dev/null; then
-	fail 'recent activity must reuse the existing status ACL instead of adding a new ACL method'
-fi
+grep -Eq '^[[:space:]]*activity_history:[[:space:]]*\{' "$RPC_ENTRY" || fail 'activity history RPC missing'
+jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub | index("activity_history") != null' "$ACL" >/dev/null || fail 'read ACL missing activity RPC'
 grep -Fq "import { read_activity_history } from './activity.uc';" "$SYSTEM_RPC" || \
 	fail 'system status module must compose the local activity history'
 grep -Fq 'const activity_result = read_activity_history();' "$SYSTEM_RPC" || \
@@ -196,15 +192,7 @@ grep -Fq "bg-slate-100 text-slate-600 ring-slate-200" "$TIMELINE" || \
 
 grep -Fq "export async function fetchActivityHistory(): Promise<ActivityHistory>" "$API" || \
 	fail 'frontend API must expose local Recent Activity'
-grep -Fq "callApi<SmartSafeHubStatusWithActivity>(API_OBJECT, 'status');" "$API" || \
-	fail 'frontend activity API must call the long-lived status RPC without new arguments'
-if grep -Fq 'include_activity_history' "$API" || grep -Fq 'activity_limit' "$API"; then
-	fail 'frontend activity request must not send upgrade-incompatible status arguments'
-fi
-grep -Fq 'activityHistory?: ActivityHistory;' "$API" || \
-	fail 'frontend must tolerate a pre-reload status response without activityHistory'
-grep -Fq 'const activity = status.activityHistory ?? emptyActivityHistory();' "$API" || \
-	fail 'frontend must render an empty activity state while an older in-memory RPC handler is draining'
+grep -Fq "callApi<ActivityHistory>(API_OBJECT, 'activity_history')" "$API" || fail 'activity page must use standalone RPC'
 grep -Fq 'enabled: activity.cloud.enabled ?? false' "$API" || \
 	fail 'activity responses without an explicit Cloud toggle must fail closed to OFF'
 grep -Fq 'const ACTIVITY_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \

@@ -53,6 +53,7 @@ import {
 	refresh_device_pairing
 } from './smartsafehub/device-registration.uc';
 import {
+	read_activity_history,
 	update_activity_cloud_sync
 } from './smartsafehub/activity.uc';
 import {
@@ -326,6 +327,11 @@ const methods = {
 		}),
 	},
 
+	activity_history: {
+		call: require_root_password(function(request) {
+			return read_activity_history();
+		}),
+	},
 	activity_cloud_sync_update: {
 		args: {
 			enabled: false,
