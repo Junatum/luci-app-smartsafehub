@@ -218,8 +218,12 @@ grep -Fq 'Cloud 전송 꺼짐' "$PAGE" || \
 	fail 'Cloud activity card must clearly explain the disabled state'
 grep -Fq '다시 켠 뒤 새로 발생한 활동부터 Cloud에 전송합니다.' "$PAGE" || \
 	fail 'Cloud activity opt-out copy must explain that disabled-period events are not uploaded later'
-grep -Fq 'Pro / Ultimate 전용' "$PAGE" || \
-	fail 'Cloud activity UI must clearly identify the paid entitlement boundary'
+grep -Fq '계정 연결 필요' "$PAGE" || \
+	fail 'Cloud activity UI must explain that account registration is required'
+grep -Fq 'Free는 최근 7일' "$PAGE" || \
+	fail 'Cloud activity UI must explain the Free 7-day retention policy'
+grep -Fq 'Pro와 Ultimate는 최근 90일' "$PAGE" || \
+	fail 'Cloud activity UI must explain the paid 90-day retention policy'
 grep -Fq '전송 대기' "$PAGE" || \
 	fail 'Cloud activity UI must show the pending outbox count'
 grep -Fq '마지막 동기화' "$PAGE" || \
@@ -232,8 +236,19 @@ grep -Fq 'export function update_activity_cloud_sync(request)' "$ACTIVITY_RPC" |
 	fail 'activity RPC must expose an explicit Cloud transfer preference mutation'
 grep -Fq "ctx.set('smartsafehub', 'activity', 'cloud_sync_enabled'" "$ACTIVITY_RPC" || \
 	fail 'Cloud transfer preference must persist in UCI'
+grep -Fq "const DEVICE_STATE_FILE = '/tmp/smartsafehub/device.json';" "$ACTIVITY_RPC" || \
+	fail 'Cloud activity eligibility must use the SmartSafeHub device registration state'
+grep -Fq 'function device_cloud_entitlement()' "$ACTIVITY_RPC" || \
+	fail 'Cloud activity RPC must derive eligibility from the device account state'
+grep -Fq "plan == 'free' || plan == 'pro' || plan == 'ultimate'" "$ACTIVITY_RPC" || \
+	fail 'connected Free, Pro and Ultimate plans must be eligible for Cloud activity history'
+grep -Fq 'state?.accountRegistered == true' "$ACTIVITY_RPC" || \
+	fail 'Cloud activity eligibility must require a connected SmartSafeHub account'
+if grep -Fq 'LICENSE_STATE_FILE' "$ACTIVITY_RPC" || grep -Fq 'license_cloud_entitlement' "$ACTIVITY_RPC"; then
+	fail 'Cloud activity eligibility must not depend on the retired license state'
+fi
 grep -Fq "'ACTIVITY_CLOUD_SYNC_NOT_ELIGIBLE'" "$ACTIVITY_RPC" || \
-	fail 'enabling Cloud activity must enforce paid entitlement on the router'
+	fail 'enabling Cloud activity must reject devices that are not connected to an account'
 grep -Fq 'activity_cloud_sync_update' "$RPC_ENTRY" || \
 	fail 'top-level RPC must expose the Cloud activity toggle mutation'
 jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("activity_cloud_sync_update") != null' "$ACL" >/dev/null || \
@@ -246,4 +261,4 @@ for event_type in settings.activity_cloud_sync.enabled settings.activity_cloud_s
 	grep -Fq "case '$event_type':" "$TIMELINE" || fail "UI renderer missing Cloud activity setting event: $event_type"
 done
 
-printf '%s\n' 'PASS: local recent activity, direct/observed copy, paid Cloud sync ON/OFF and argument-free status RPC contracts are valid'
+printf '%s\n' 'PASS: local recent activity, account-based Cloud sync retention, direct/observed copy and argument-free status RPC contracts are valid'

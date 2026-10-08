@@ -176,10 +176,12 @@ ensure_device_bootstrapped() {
 
 store_activity_credential() {
  local response="$1" token url ttl retention plan now expires tmp
- token="$(json_value "$response" '@.activity_history.token')"; url="$(json_value "$response" '@.activity_history.upload_url')"; ttl="$(json_value "$response" '@.activity_history.token_expires_in_s')"; retention="$(json_value "$response" '@.activity_history.retention_days')"; plan="$(json_value "$response" '@.entitlement.plan')"
+ token="$(json_value "$response" '@.activity_history.token')"; url="$(json_value "$response" '@.activity_history.upload_url')"; ttl="$(json_value "$response" '@.activity_history.token_expires_in_s')"; retention="$(json_value "$response" '@.activity_history.retention_days')"; plan="$(ascii_lower "$(json_value "$response" '@.entitlement.plan')")"
  [ -n "$token" ] || { rm -f "$ACTIVITY_CREDENTIAL_FILE"; return 0; }
  case "$url" in https://*) ;; *) return 1 ;; esac
- case "$ttl" in ''|*[!0-9]*) return 1 ;; esac; case "$retention" in ''|*[!0-9]*) retention=90 ;; esac
+ case "$ttl" in ''|*[!0-9]*|0) return 1 ;; esac
+ case "$retention" in ''|*[!0-9]*|0) return 1 ;; esac
+ case "$plan" in free|pro|ultimate) ;; *) return 1 ;; esac
  now="$(now_epoch)"; expires=$((now + ttl)); tmp="${ACTIVITY_CREDENTIAL_FILE}.tmp.$$"
  cat > "$tmp" <<EOF
 {"schema":1,"token":"$(json_escape "$token")","upload_url":"$(json_escape "$url")","expires_at":$expires,"retention_days":$retention,"plan":"$(json_escape "$plan")"}

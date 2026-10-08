@@ -204,11 +204,11 @@ credential_valid() {
 }
 
 refresh_credential_from_device() {
-	local phase result plan
+	local phase result plan account_registered
 	[ -x "$DEVICE_BIN" ] || return 1
 
-	# Device sync is the single source for entitlement and short-lived
-	# activity upload credentials.
+	# Device sync is the single source for account registration, plan and
+	# short-lived activity upload credentials.
 	SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE="$CREDENTIAL_FILE" "$DEVICE_BIN" status-sync >/dev/null 2>&1 || return 1
 	credential_valid && return 0
 
@@ -216,17 +216,18 @@ refresh_credential_from_device() {
 	phase="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.phase')")"
 	result="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.lastResult')")"
 	plan="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.plan')")"
+	account_registered="$(ascii_lower "$(json_value "$DEVICE_STATUS_FILE" '@.accountRegistered')")"
 
-	case "$phase:$result:$plan" in
-		registered:active:free)
+	case "$phase:$result:$account_registered:$plan" in
+		registered:active:true:free|registered:active:true:pro|registered:active:true:ultimate)
+			# Connected Free and paid accounts are both eligible. If Hub did not
+			# publish a usable credential, preserve the bounded outbox and retry.
+			return 3
+			;;
+		registered:active:false:*)
 			rm -f "$CREDENTIAL_FILE"
 			"$EVENTS_BIN" clear-outbox >/dev/null 2>&1 || true
 			return 2
-			;;
-		registered:active:pro|registered:active:ultimate)
-			# Sync succeeded and the entitlement is paid, but the Hub did not
-			# publish a usable activity credential. Preserve the bounded outbox.
-			return 3
 			;;
 		*) return 1 ;;
 	esac

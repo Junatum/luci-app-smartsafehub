@@ -187,7 +187,7 @@ logread | grep -Ei 'rpcd|ucode|smartsafehub|safeshield' | tail -200
 
 ### Cloud 활동 기록 재시도 정책
 
-Cloud 활동 기록 전송이 ON이고 Activity API 또는 license status/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. Cloud 전송이 OFF이면 이 네트워크 재시도 경로 자체를 실행하지 않고 outbox도 만들지 않습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신/전송 설정과 무관하게 최대 128건을 표시합니다.
+Cloud 활동 기록 전송이 ON이고 Activity API 또는 device sync/Cloud upload가 일시적으로 통신할 수 없는 경우 로컬 최근 활동과 Cloud outbox는 유지됩니다. credential 갱신 또는 upload 실패는 15분, 30분, 60분 순으로 backoff하며 이후 60분 상한을 유지합니다. backoff 중 새 이벤트가 발생해도 즉시 네트워크 재시도를 강제하지 않습니다. `smartsafehub-activity-sync sync-once`는 운영자가 배포 직후 즉시 동기화를 확인할 때 사용할 수 있습니다. Cloud 전송이 OFF이면 이 네트워크 재시도 경로 자체를 실행하지 않고 outbox도 만들지 않습니다. 공유기 웹사이트의 로컬 최근 활동은 Cloud 통신/전송 설정과 무관하게 최대 128건을 표시합니다.
 
 ## 프런트엔드 캐시 문제
 

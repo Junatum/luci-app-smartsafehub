@@ -36,7 +36,7 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
-  It '유료 Cloud 활동 동기화와 직접/관찰 이벤트 분리를 검증한다'
+  It '계정 기반 Cloud 활동 동기화와 직접/관찰 이벤트 분리를 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-activity-cloud-sync.sh"
     The status should be success
     The output should start with 'PASS:'
