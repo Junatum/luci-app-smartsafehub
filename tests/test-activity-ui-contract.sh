@@ -94,12 +94,12 @@ grep -Fq "{ label: 'Overview', routes: ['home', 'activity'] }" "$NAVIGATION" || 
 	fail 'recent activity must sit directly below Dashboard in Overview'
 grep -Fq "case 'activity':" "$NAVIGATION" || fail 'recent activity navigation item must have its own icon'
 
-grep -Fq "const activity = useActivityHistory(route === 'home' || route === 'activity');" "$APP" || \
-	fail 'activity data must load on both Dashboard and the full recent-activity page'
+grep -Fq "const activity = useActivityHistory(route === 'activity');" "$APP" || \
+	fail 'full recent-activity page must load its activity history'
 grep -Fq '<ActivityPage' "$APP" || fail 'App must render the full recent-activity page'
-grep -Fq 'activity={activity.data}' "$APP" || fail 'Dashboard must receive local activity data'
-grep -Fq 'activity.refresh()' "$APP" || fail 'global/dashboard refresh must include recent activity'
-grep -Fq 'activity.refreshing ||' "$APP" || fail 'Dashboard refresh indicator must include recent activity'
+grep -Fq 'activity={status.data?.activityHistory ?? null}' "$APP" || fail 'Dashboard must reuse system status activity data'
+grep -Fq 'status.refresh()' "$APP" || fail 'dashboard refresh must include system status with recent activity'
+grep -Fq 'current.refreshing ||' "$APP" || fail 'Dashboard refresh indicator must include currently active system status'
 
 grep -Fq 'title="최근 활동"' "$HOME" || fail 'Dashboard must expose a recent activity section'
 grep -Fq 'href="#activity"' "$HOME" || fail 'Dashboard recent activity must link to the full page'

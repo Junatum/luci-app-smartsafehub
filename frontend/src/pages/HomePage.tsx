@@ -526,11 +526,11 @@ export function HomePage({
     return () => window.clearInterval(timer);
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return <LoadingPanel />;
   }
 
-  if (error) {
+  if (error && !data) {
     return <ErrorPanel message={error} onRetry={onRetry} />;
   }
 

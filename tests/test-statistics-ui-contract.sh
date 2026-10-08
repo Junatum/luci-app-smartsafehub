@@ -28,8 +28,8 @@ grep -Fq "callSafeShield<RawSafeShieldStatistics>('statistics')" "$API" || \
   fail 'frontend API must call the safeshield statistics RPC'
 grep -Fq 'const STATISTICS_REFRESH_INTERVAL_MS = 60_000;' "$HOOK" || \
   fail 'statistics polling interval must remain 60 seconds'
-grep -Fq "useSafeShieldStatistics(route === 'safeshield')" "$APP" || \
-  fail 'statistics resource must only be active on the SafeShield route'
+grep -Fq "useSafeShieldStatistics(route === 'home' || route === 'safeshield', route === 'safeshield')" "$APP" || \
+  fail 'statistics resource must be shared between home and SafeShield with polling only on SafeShield'
 grep -Fq 'const DISPLAY_HOURS = 24;' "$PANEL" || \
   fail 'statistics chart must display the latest 24 hourly buckets'
 grep -Fq 'DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에 집계합니다.' "$PANEL" || \

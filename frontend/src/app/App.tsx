@@ -45,9 +45,9 @@ interface AppProps {
 export function App({ onAdministratorPasswordChanged }: AppProps) {
   const route = useHashRoute();
   const configurationBackup = useConfigurationBackup();
-  const activity = useActivityHistory(route === 'home' || route === 'activity');
+  const activity = useActivityHistory(route === 'activity');
   const status = useStatus(route === 'home' || route === 'settings');
-  const updates = useSoftwareUpdates(true);
+  const updates = useSoftwareUpdates(route === 'home' || route === 'system');
   const firmware = useFirmwareUpdates(true);
   const wan = useWan(route === 'network');
   const lan = useLan(route === 'home' || route === 'network');
@@ -55,10 +55,11 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const wifi = useWifi(route === 'wifi');
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
-  const dashboardSafeShield = useSafeShieldStatus(route === 'home');
-  const dashboardSafeShieldStatistics = useSafeShieldStatistics(route === 'home', false);
-  const safeshield = useSafeShieldStatus(route === 'safeshield');
-  const safeshieldStatistics = useSafeShieldStatistics(route === 'safeshield');
+  // Both views consume the same resource: switching pages must not re-query RPC.
+  const safeshield = useSafeShieldStatus(route === 'home' || route === 'safeshield');
+  const safeshieldStatistics = useSafeShieldStatistics(route === 'home' || route === 'safeshield', route === 'safeshield');
+  const dashboardSafeShield = safeshield;
+  const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
   const deviceRegistration = useDeviceRegistration(route === 'account');
   const systemActions = useSystemActions(status.data);
@@ -354,9 +355,9 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     default:
       content = (
         <HomePage
-          activity={activity.data}
-          activityError={activity.error}
-          activityLoading={activity.loading}
+          activity={status.data?.activityHistory ?? null}
+          activityError={status.error}
+          activityLoading={status.loading}
           data={status.data}
           devices={dashboardDevices.data}
           devicesError={dashboardDevices.error}
@@ -374,11 +375,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           loading={status.loading}
           onRetry={() =>
             void Promise.all([
-              activity.refresh(),
               status.refresh(),
               dashboardDevices.refresh(),
-              dashboardSafeShield.refresh(),
-              dashboardSafeShieldStatistics.refresh(),
+              safeshield.refresh(),
+              safeshieldStatistics.refresh(),
               updates.refresh(),
               firmware.refresh(),
               health.refresh(),
@@ -402,7 +402,6 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const refreshCurrent = () => {
     if (route === 'home') {
       void Promise.all([
-        activity.refresh(),
         status.refresh(),
         dashboardDevices.refresh(),
         dashboardSafeShield.refresh(),

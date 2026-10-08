@@ -43,8 +43,9 @@ function isActivePhase(phase: FirmwareStatus['phase'] | undefined): boolean {
 }
 
 export function useFirmwareUpdates(active = true) {
+  const [pollingPhase, setPollingPhase] = useState<FirmwareStatus['phase'] | null>(null);
   const resource = useAsyncResource({
-    active,
+    active: active || isActivePhase(pollingPhase ?? undefined),
     fallbackError: '펌웨어 업데이트 상태를 불러오지 못했습니다.',
     loader: fetchFirmwareStatus,
     pollInterval: (data: FirmwareStatus | null) =>
@@ -53,6 +54,10 @@ export function useFirmwareUpdates(active = true) {
         : BACKGROUND_POLL_INTERVAL_MS,
     refreshOnFocus: true,
   });
+  useEffect(() => {
+    setPollingPhase(resource.data?.phase ?? null);
+  }, [resource.data?.phase]);
+
   const [action, setAction] = useState<FirmwareAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -71,6 +76,7 @@ export function useFirmwareUpdates(active = true) {
 
   const markPhase = useCallback(
     (phase: FirmwareStatus['phase']) => {
+      setPollingPhase(phase);
       if (!resource.data) {
         return;
       }
