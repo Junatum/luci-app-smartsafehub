@@ -114,6 +114,7 @@ FLOW_DIR="$TMP_DIR/flow"
 FLOW_RUNTIME="$FLOW_DIR/runtime"
 FLOW_CREDENTIAL="$FLOW_DIR/device-credential.json"
 FLOW_URL_LOG="$FLOW_DIR/urls.log"
+FLOW_BOOTSTRAP_BODY="$FLOW_DIR/bootstrap-body.json"
 mkdir -p "$FLOW_RUNTIME"
 cp "$CREDENTIAL_FILE" "$FLOW_CREDENTIAL"
 
@@ -139,11 +140,12 @@ case "$expr" in
 	'@.device.identity_source') echo test ;;
 	'@.device.identity_strength') echo strong ;;
 	'@.device.identity_profile') echo default ;;
-	'@.device.installation_id') echo install-test ;;
-	'@.device.vendor') echo OpenWrt ;;
-	'@.device.model') echo TestRouter ;;
-	'@.device.arch') echo test_arch ;;
-	'@.device.memory_mb') echo 256 ;;
+	'@.device.installation_id') echo 11111111-2222-3333-4444-555555555555 ;;
+	'@.device.configured.vendor') echo OpenWrt ;;
+	'@.device.configured.model') echo TestRouter ;;
+	'@.device.configured.arch') echo test_arch ;;
+	'@.device.configured.memory_mb') echo 256 ;;
+	'@.device.vendor'|'@.device.model'|'@.device.arch'|'@.device.memory_mb') ;;
 	'@.version') echo 0.3.24-r2 ;;
 	'@.device.device_code') echo test-router ;;
 	'@.device.device_code_source') echo test ;;
@@ -165,7 +167,7 @@ FAKE_UBUS="$FLOW_DIR/ubus"
 cat > "$FAKE_UBUS" <<'EOF'
 #!/bin/sh
 cat <<'JSON'
-{"device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint_version":1,"identity_provider":"test","identity_source":"test","identity_strength":"strong","identity_profile":"default","installation_id":"install-test","vendor":"OpenWrt","model":"TestRouter","arch":"test_arch","memory_mb":256,"device_code":"test-router","device_code_source":"test"},"version":"0.3.24-r2"}
+{"device":{"physical_fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint_version":1,"identity_provider":"test","identity_source":"test","identity_strength":"strong","identity_profile":"default","installation_id":"11111111-2222-3333-4444-555555555555","device_code":"test-router","device_code_source":"test","configured":{"vendor":"OpenWrt","model":"TestRouter","arch":"test_arch","memory_mb":256}},"version":"0.3.24-r2"}
 JSON
 EOF
 chmod +x "$FAKE_UBUS"
@@ -209,10 +211,12 @@ cat > "$FAKE_CURL" <<'EOF'
 #!/bin/sh
 out=''
 url=''
+body=''
 while [ "$#" -gt 0 ]; do
 	case "$1" in
 		-o) out="$2"; shift 2 ;;
-		-H|--data-binary|--connect-timeout|--max-time) shift 2 ;;
+		--data-binary) body="${2#@}"; shift 2 ;;
+		-H|--connect-timeout|--max-time) shift 2 ;;
 		-f|-s|-S|-fsS) shift ;;
 		http://*|https://*) url="$1"; shift ;;
 		*) shift ;;
@@ -221,6 +225,7 @@ done
 printf '%s\n' "$url" >> "$SMARTSAFEHUB_TEST_URL_LOG"
 case "$url" in
 	*/devices/bootstrap)
+		[ -n "$body" ] && cp "$body" "$SMARTSAFEHUB_TEST_BOOTSTRAP_BODY"
 		cat > "$out" <<'JSON'
 {"device":{"uuid":"11111111-1111-1111-1111-111111111111","registered":false},"credential":{"rotate_after":"2027-01-01T00:00:00Z"}}
 JSON
@@ -247,6 +252,7 @@ SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
 SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
 SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN="$FAKE_FETCH" \
 SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_BOOTSTRAP_BODY="$FLOW_BOOTSTRAP_BODY" \
 PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
 
@@ -260,6 +266,26 @@ grep -Fq '/devices/sync' "$FLOW_URL_LOG" || {
 }
 grep -Fq '"device_uuid":"11111111-1111-1111-1111-111111111111"' "$FLOW_CREDENTIAL" || {
 	echo 'successful bootstrap must persist the Hub device UUID' >&2
+	exit 1
+}
+[ -f "$FLOW_BOOTSTRAP_BODY" ] || {
+	echo 'bootstrap request body must be captured' >&2
+	exit 1
+}
+grep -Fq '"vendor":"OpenWrt"' "$FLOW_BOOTSTRAP_BODY" || {
+	echo 'bootstrap must read vendor from the SafeShield device.configured schema' >&2
+	exit 1
+}
+grep -Fq '"model":"TestRouter"' "$FLOW_BOOTSTRAP_BODY" || {
+	echo 'bootstrap must read model from the SafeShield device.configured schema' >&2
+	exit 1
+}
+grep -Fq '"arch":"test_arch"' "$FLOW_BOOTSTRAP_BODY" || {
+	echo 'bootstrap must read arch from the SafeShield device.configured schema' >&2
+	exit 1
+}
+grep -Fq '"memory_mb":256' "$FLOW_BOOTSTRAP_BODY" || {
+	echo 'bootstrap must read memory from the SafeShield device.configured schema' >&2
 	exit 1
 }
 

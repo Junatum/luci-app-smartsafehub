@@ -116,16 +116,23 @@ post_json() {
 }
 
 read_device_payload() {
- local out="$1" status fingerprint fpv provider source strength profile installation vendor model arch memory version code code_source
+ local out="$1" status fingerprint fpv provider source strength profile installation vendor model arch memory memory_json version code code_source
  status="$RUNTIME_DIR/device-safeshield.$$.json"
  "$UBUS_BIN" call safeshield status > "$status" 2>/dev/null || { rm -f "$status"; return 1; }
  fingerprint="$(json_value "$status" '@.device.physical_fingerprint')"; [ "${#fingerprint}" -eq 64 ] || { rm -f "$status"; return 1; }
  fpv="$(json_value "$status" '@.device.fingerprint_version')"; case "$fpv" in ''|*[!0-9]*) fpv=1 ;; esac
  provider="$(json_value "$status" '@.device.identity_provider')"; source="$(json_value "$status" '@.device.identity_source')"; strength="$(json_value "$status" '@.device.identity_strength')"; profile="$(json_value "$status" '@.device.identity_profile')"; installation="$(json_value "$status" '@.device.installation_id')"
- vendor="$(json_value "$status" '@.device.vendor')"; model="$(json_value "$status" '@.device.model')"; arch="$(json_value "$status" '@.device.arch')"; memory="$(json_value "$status" '@.device.memory_mb')"; version="$(json_value "$status" '@.version')"; code="$(json_value "$status" '@.device.device_code')"; code_source="$(json_value "$status" '@.device.device_code_source')"
- case "$memory" in ''|*[!0-9]*) memory=1 ;; esac
+ # SafeShield exposes detected hardware metadata below device.configured. Keep
+ # the former top-level paths as a compatibility fallback for older status
+ # implementations, but never require them for the current schema.
+ vendor="$(json_value "$status" '@.device.configured.vendor')"; [ -n "$vendor" ] || vendor="$(json_value "$status" '@.device.vendor')"
+ model="$(json_value "$status" '@.device.configured.model')"; [ -n "$model" ] || model="$(json_value "$status" '@.device.model')"
+ arch="$(json_value "$status" '@.device.configured.arch')"; [ -n "$arch" ] || arch="$(json_value "$status" '@.device.arch')"
+ memory="$(json_value "$status" '@.device.configured.memory_mb')"; [ -n "$memory" ] || memory="$(json_value "$status" '@.device.memory_mb')"
+ version="$(json_value "$status" '@.version')"; code="$(json_value "$status" '@.device.device_code')"; code_source="$(json_value "$status" '@.device.device_code_source')"
+ case "$memory" in ''|*[!0-9]*|0) memory_json=null ;; *) memory_json="$memory" ;; esac
  cat > "$out" <<EOF
-{"physical_fingerprint":"$(json_escape "$fingerprint")","fingerprint_version":$fpv,"identity_provider":"$(json_escape "$provider")","identity_source":"$(json_escape "$source")","identity_strength":"$(json_escape "$strength")","identity_profile":"$(json_escape "$profile")","installation_id":$(json_string_or_null "$installation"),"vendor":"$(json_escape "$vendor")","model":"$(json_escape "$model")","arch":"$(json_escape "$arch")","memory_mb":$memory,"safeshield_version":"$(json_escape "$version")","device_code":"$(json_escape "$code")","device_code_source":"$(json_escape "$code_source")"}
+{"physical_fingerprint":"$(json_escape "$fingerprint")","fingerprint_version":$fpv,"identity_provider":"$(json_escape "$provider")","identity_source":"$(json_escape "$source")","identity_strength":"$(json_escape "$strength")","identity_profile":"$(json_escape "$profile")","installation_id":$(json_string_or_null "$installation"),"vendor":"$(json_escape "$vendor")","model":"$(json_escape "$model")","arch":"$(json_escape "$arch")","memory_mb":$memory_json,"safeshield_version":"$(json_escape "$version")","device_code":"$(json_escape "$code")","device_code_source":"$(json_escape "$code_source")"}
 EOF
  rm -f "$status"
 }
