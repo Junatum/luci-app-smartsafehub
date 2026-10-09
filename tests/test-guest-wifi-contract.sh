@@ -34,6 +34,19 @@ fi
 grep -q "GUEST_API_OBJECT = 'smartsafehub_guest'" frontend/src/api/smartsafehub.ts
 grep -q "guestError: true" frontend/src/api/smartsafehub.ts
 grep -q "const LOCK = '/tmp/smartsafehub/wifi-update.lock'" "$BACKEND"
+# ucode requires a semicolon after each exported function body. A missing
+# terminator prevents rpcd from registering the entire guest RPC object.
+if ! awk '
+  /^export function / { declared++; in_export = 1; next }
+  in_export && /^}/ {
+    if ($0 != "};") exit 1;
+    checked++; in_export = 0;
+  }
+  END { if (declared != 2 || checked != declared || in_export) exit 1 }
+' "$BACKEND"; then
+  echo 'FAIL: guest ucode exports must terminate with };' >&2
+  exit 1
+fi
 
 # Cannot take over or change existing LAN AP; 2.4 GHz radio is discovered.
 grep -q "section?.\['.name'\] == 'ssh_guest'" "$WIFI"

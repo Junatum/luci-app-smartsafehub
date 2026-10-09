@@ -187,7 +187,7 @@ export function guest_wifi_summary() {
     subnet: active ? string_value(ctx.get('network', GUEST, 'ipaddr'), '') : '',
     radio: string_value(two_g?.device, ''),
   };
-}
+};
 
 function update_guest(request) {
   const args = request?.args ?? {};
@@ -305,4 +305,4 @@ export function update_guest_wifi(request) {
     emit_activity_event('network', 'settings.wifi.guest.updated', 'info', { enabled: request.args.enabled });
   }
   return result;
-}
+};
