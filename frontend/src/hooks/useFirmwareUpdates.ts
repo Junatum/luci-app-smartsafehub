@@ -53,6 +53,7 @@ export function useFirmwareUpdates(active = true) {
         ? ACTIVE_POLL_INTERVAL_MS
         : BACKGROUND_POLL_INTERVAL_MS,
     refreshOnFocus: true,
+    refreshOnVisible: isActivePhase(pollingPhase ?? undefined),
   });
   useEffect(() => {
     setPollingPhase(resource.data?.phase ?? null);

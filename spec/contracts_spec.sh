@@ -15,6 +15,12 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '계정 상태와 캐시·업데이트 폴링 안정화 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-stability-r16.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
   It '패키지 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-package-contract.sh"
     The status should be success

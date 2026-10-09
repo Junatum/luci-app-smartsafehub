@@ -36,6 +36,7 @@ export function useSoftwareUpdates(active = true) {
         : BACKGROUND_POLL_INTERVAL_MS;
     },
     refreshOnFocus: true,
+    refreshOnVisible: pollingPhase === 'checking' || pollingPhase === 'installing',
   });
   useEffect(() => {
     setPollingPhase(resource.data?.phase ?? null);

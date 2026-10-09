@@ -31,6 +31,15 @@ export function useDeviceRegistration(enabled: boolean) {
   const [refreshing, setRefreshing] = useState(false);
   const [pairingBusy, setPairingBusy] = useState(false);
   const refreshPromiseRef = useRef<Promise<DeviceRegistrationStatus | null> | null>(null);
+  const requestGeneration = useRef(0);
+  const mounted = useRef(true);
+  const commitStatus = useCallback((status: DeviceRegistrationStatus, generation: number) => {
+    if (!mounted.current || generation !== requestGeneration.current) return false;
+    setData(status);
+    setError(null);
+    setLoading(false);
+    return true;
+  }, []);
 
   const refresh = useCallback((): Promise<DeviceRegistrationStatus | null> => {
     if (!enabled) {
@@ -41,14 +50,13 @@ export function useDeviceRegistration(enabled: boolean) {
       return refreshPromiseRef.current;
     }
 
+    const generation = ++requestGeneration.current;
     setSyncError(null);
     setRefreshing(true);
     const task = (async () => {
       try {
         const status = await refreshDeviceRegistrationStatus();
-        setData(status);
-        setError(null);
-        setSyncError(null);
+        if (commitStatus(status, generation)) setSyncError(null);
         return status;
       }
       catch {
@@ -57,35 +65,34 @@ export function useDeviceRegistration(enabled: boolean) {
         // that state without blocking or rolling back the visible UI.
         const localStatus = await fetchDeviceRegistrationStatus().catch(() => null);
         if (localStatus) {
-          setData(localStatus);
-          setError(null);
+          commitStatus(localStatus, generation);
         }
-        setSyncError('SmartSafeHub 서버의 최신 상태 확인이 지연되고 있습니다.');
+        if (mounted.current && generation === requestGeneration.current)
+          setSyncError('SmartSafeHub 서버의 최신 상태 확인이 지연되고 있습니다.');
         return localStatus;
       }
       finally {
-        setRefreshing(false);
+        if (mounted.current) setRefreshing(false);
         refreshPromiseRef.current = null;
       }
     })();
 
     refreshPromiseRef.current = task;
     return task;
-  }, [enabled]);
+  }, [enabled, commitStatus]);
 
   const requestPairing = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     setPairingBusy(true);
     try {
       const status = await requestDevicePairingCode();
-      setData(status);
-      setError(null);
-      setSyncError(null);
+      if (commitStatus(status, generation)) setSyncError(null);
       return status;
     }
     finally {
       setPairingBusy(false);
     }
-  }, []);
+  }, [commitStatus]);
 
   useEffect(() => {
     if (!enabled) {
@@ -93,6 +100,8 @@ export function useDeviceRegistration(enabled: boolean) {
     }
 
     let active = true;
+    mounted.current = true;
+    const generation = ++requestGeneration.current;
     setLoading(true);
     setError(null);
     setSyncError(null);
@@ -102,22 +111,23 @@ export function useDeviceRegistration(enabled: boolean) {
     void fetchDeviceRegistrationStatus()
       .then((localStatus) => {
         if (!active) return;
-        setData(localStatus);
-        setError(null);
-        setLoading(false);
+        if (commitStatus(localStatus, generation)) setLoading(false);
         void refresh();
       })
       .catch(() => {
         if (!active) return;
-        setError('기기 등록 상태를 확인하지 못했습니다.');
-        setLoading(false);
+        if (generation === requestGeneration.current) {
+          setError('기기 등록 상태를 확인하지 못했습니다.');
+          setLoading(false);
+        }
         void refresh();
       });
 
     return () => {
       active = false;
+      requestGeneration.current += 1;
     };
-  }, [enabled, refresh]);
+  }, [enabled, refresh, commitStatus]);
 
   useEffect(() => {
     if (!enabled) {
@@ -126,16 +136,12 @@ export function useDeviceRegistration(enabled: boolean) {
 
     let active = true;
     const timer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden' || refreshPromiseRef.current) return;
+      const generation = ++requestGeneration.current;
       void fetchDeviceRegistrationStatus()
         .then((localStatus) => {
           if (!active) return;
-          setData((current) => {
-            if ((localStatus.lastSuccessAt || 0) > (current?.lastSuccessAt || 0)) {
-              setSyncError(null);
-            }
-            return localStatus;
-          });
-          setError(null);
+          if (commitStatus(localStatus, generation)) setSyncError(null);
         })
         .catch(() => {
           // The periodic local read is best-effort. The initial load and
@@ -147,7 +153,9 @@ export function useDeviceRegistration(enabled: boolean) {
       active = false;
       window.clearInterval(timer);
     };
-  }, [enabled]);
+  }, [enabled, commitStatus]);
+
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const shouldPoll = useMemo(() => pairingStillValid(data), [data]);
 
