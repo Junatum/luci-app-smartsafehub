@@ -1,4 +1,4 @@
-import type { JSX } from 'preact';
+import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
@@ -114,7 +114,7 @@ function WifiNetworkCard({
   ];
 
   const submit = async (
-    event: JSX.TargetedSubmitEvent<HTMLFormElement>,
+    event: TargetedSubmitEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
     const normalizedSsid = ssid.trim();

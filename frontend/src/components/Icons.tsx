@@ -1,6 +1,6 @@
-import type { ComponentChildren, JSX } from 'preact';
+import type { ComponentChildren, SVGAttributes } from 'preact';
 
-interface IconProps extends JSX.SVGAttributes<SVGSVGElement> {
+interface IconProps extends SVGAttributes<SVGSVGElement> {
   children?: ComponentChildren;
   title?: string;
 }

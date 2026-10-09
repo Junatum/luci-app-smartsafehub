@@ -790,7 +790,7 @@ function PasswordInputField(props: {
           name={props.name}
           onInput={(event) => props.onInput(event.currentTarget.value)}
           placeholder={props.placeholder}
-          type={visible ? 'text' : 'password'}
+          {...(visible ? { type: 'text' as const } : { type: 'password' as const })}
           value={props.value}
         />
         <button
