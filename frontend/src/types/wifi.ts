@@ -20,6 +20,7 @@ export interface WifiNetworkSummary {
 export interface WifiSummary {
   networks: WifiNetworkSummary[];
   totalClients: number;
+  guest: GuestWifiSummary | null;
 }
 
 export interface WifiUpdateInput {
@@ -34,4 +35,26 @@ export interface WifiUpdateResult {
   changed: boolean;
   reloaded: boolean;
   summary: WifiSummary;
+}
+
+export interface GuestWifiSummary {
+  supported: boolean;
+  configured: boolean;
+  enabled: boolean;
+  ssid: string;
+  passwordConfigured: boolean;
+  subnet: string;
+  radio: string;
+}
+
+export interface GuestWifiUpdateInput {
+  ssid: string;
+  password: string;
+  enabled: boolean;
+}
+
+export interface GuestWifiUpdateResult {
+  changed: boolean;
+  reloaded: boolean;
+  guest: GuestWifiSummary;
 }

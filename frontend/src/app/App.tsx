@@ -182,6 +182,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           onDismissFeedback={wifi.dismissFeedback}
           onRetry={() => void wifi.refresh()}
           onUpdate={wifi.update}
+          onUpdateGuest={wifi.updateGuest}
           updatingSection={wifi.updatingSection}
         />
       );

@@ -28,6 +28,8 @@ import type {
   SoftwareUpdateStatus,
 } from '../types/updates';
 import type {
+  GuestWifiUpdateInput,
+  GuestWifiUpdateResult,
   WifiSummary,
   WifiUpdateInput,
   WifiUpdateResult,
@@ -328,4 +330,8 @@ export function updateWifiNetwork(
     { ...input },
     { timeoutMs: 35_000 },
   );
+}
+
+export function updateGuestWifi(input: GuestWifiUpdateInput): Promise<GuestWifiUpdateResult> {
+  return callApi(API_OBJECT, 'wifi_guest_update', { ...input }, { timeoutMs: 95_000 });
 }

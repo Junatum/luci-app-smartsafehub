@@ -2,11 +2,13 @@ import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
+import { GuestWifiCard } from '../components/GuestWifiCard';
 import { WifiQrDialog } from '../components/WifiQrDialog';
 import { AlertIcon, CheckCircleIcon, QrCodeIcon, RouterIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { WifiFeedback } from '../hooks/useWifi';
 import type {
+  GuestWifiUpdateInput,
   WifiNetworkSummary,
   WifiSecurityChoice,
   WifiSummary,
@@ -22,6 +24,7 @@ interface WifiPageProps {
   onDismissFeedback: () => void;
   onRetry: () => void;
   onUpdate: (input: WifiUpdateInput) => Promise<boolean>;
+  onUpdateGuest: (input: GuestWifiUpdateInput) => Promise<boolean>;
 }
 
 const SECURITY_OPTIONS: ReadonlyArray<{
@@ -349,6 +352,7 @@ export function WifiPage({
   onDismissFeedback,
   onRetry,
   onUpdate,
+  onUpdateGuest,
 }: WifiPageProps) {
   if (loading) {
     return <LoadingPanel />;
@@ -377,7 +381,7 @@ export function WifiPage({
         </h2>
         <p class="mt-2 mb-0 text-sm leading-6 text-amber-900/80">
           변경한 Wi-Fi 이름과 비밀번호로 다시 연결하면 SmartSafeHub를 계속 사용할 수
-          있습니다. VLAN, 게스트 네트워크와 고급 무선 옵션은 기존 LuCI에서 관리합니다.
+          있습니다. VLAN 등 고급 무선 옵션은 기존 LuCI에서 관리합니다.
         </p>
       </section>
 
@@ -404,6 +408,7 @@ export function WifiPage({
           </p>
         </section>
       )}
+      {data.guest && <GuestWifiCard guest={data.guest} busy={updatingSection !== null} saving={updatingSection === 'ssh_guest'} onUpdate={onUpdateGuest} />}
     </>
   );
 }

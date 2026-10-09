@@ -38,6 +38,7 @@
           "system_root_password_set",
           "system_root_password_change",
           "wifi_update",
+          "wifi_guest_update",
           "wifi_qr",
           "system_timezone_initialize",
           "system_timezone_update",

@@ -11,6 +11,7 @@ import {
 	string_value,
 	success
 } from './core.uc';
+import { guest_wifi_summary } from './guest-wifi.uc';
 import {
 	wifi_is_managed_section,
 	wifi_security,
@@ -19,11 +20,16 @@ import {
 } from './wifi.uc';
 
 const WIFI_UPDATE_LOCK = '/tmp/smartsafehub/wifi-update.lock';
-const WIFI_UPDATE_LOCK_STALE_SECONDS = 120;
+const WIFI_UPDATE_LOCK_STALE_SECONDS = 300;
+
+function wifi_summary_with_guest() {
+	const payload = wifi_summary_payload();
+	if (payload != null) payload.guest = guest_wifi_summary();
+	return payload;
+}
 
 export function read_wifi_summary() {
-	const payload = wifi_summary_payload();
-
+	const payload = wifi_summary_with_guest();
 	return payload == null
 		? failure('WIFI_CONFIG_READ_FAILED', 'Wi-Fi 설정을 읽지 못했습니다.')
 		: success(payload);
@@ -237,7 +243,7 @@ function apply_wifi_update(request) {
 		return success({
 			changed: false,
 			reloaded: false,
-			summary: wifi_summary_payload() ?? { networks: [], totalClients: 0 },
+			summary: wifi_summary_with_guest() ?? { networks: [], totalClients: 0, guest: null },
 		});
 	}
 
@@ -276,7 +282,7 @@ function apply_wifi_update(request) {
 	return success({
 		changed: true,
 		reloaded: true,
-		summary: wifi_summary_payload() ?? { networks: [], totalClients: 0 },
+		summary: wifi_summary_with_guest() ?? { networks: [], totalClients: 0, guest: null },
 	});
 };
 
