@@ -161,12 +161,12 @@ grep -Fq 'ssh-safeshield-refresh-loader-arc' "$PAGE" || \
 	fail 'SafeShield refresh donut must render a rounded rotating arc over the loader track'
 grep -Fq 'const loaderArcLength = loaderCircumference * 0.22;' "$PAGE" || \
 	fail 'SafeShield round loader must keep a compact moving arc so rotation is visually obvious'
-grep -Fq 'const loaderTrackWidth = 3;' "$PAGE" || \
-	fail 'SafeShield refresh track must stay slim instead of inheriting a heavy ring treatment'
+grep -Fq 'const loaderTrackWidth = 2.5;' "$PAGE" || \
+	fail 'SafeShield refresh track should be slightly thinner than before'
 grep -Fq 'const loaderRadius = 17;' "$PAGE" || \
 	fail 'SafeShield refresh donut radius must stay slightly compact so the ring does not dominate the card'
-grep -Fq 'const loaderArcWidth = 4;' "$PAGE" || \
-	fail 'SafeShield refresh active arc must stay compact and only slightly heavier than the track'
+grep -Fq 'const loaderArcWidth = 3.5;' "$PAGE" || \
+	fail 'SafeShield refresh arc should stay only slightly heavier than the thinner track'
 grep -Fq 'strokeWidth={loaderTrackWidth}' "$PAGE" || \
 	fail 'SafeShield refresh track must use the dedicated slim stroke width'
 grep -Fq 'strokeWidth={loaderArcWidth}' "$PAGE" || \
