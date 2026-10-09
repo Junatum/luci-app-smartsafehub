@@ -38,7 +38,6 @@ import {
 	read_updates_status,
 	update_update_settings
 } from './smartsafehub/updates.uc';
-import { update_guest_wifi } from './smartsafehub/guest-wifi.uc';
 import {
 	read_wifi_summary,
 	read_wifi_qr,
@@ -122,12 +121,6 @@ const methods = {
 	wifi_summary: {
 		call: require_root_password(function(request) {
 			return read_wifi_summary();
-		}),
-	},
-	wifi_guest_update: {
-		args: { ssid: '', password: '', enabled: false },
-		call: require_root_password(function(request) {
-			return update_guest_wifi(request);
 		}),
 	},
 	wifi_qr: {

@@ -67,7 +67,7 @@ export function useWifi(active: boolean) {
 
       try {
         const result = await updateWifiNetwork(input);
-        resource.replaceData(result.summary);
+        resource.replaceData({ ...result.summary, guest: resource.data?.guest ?? null, guestError: resource.data?.guestError ?? false });
         setMutation({
           updatingSection: null,
           feedback: {
@@ -100,7 +100,7 @@ export function useWifi(active: boolean) {
         return false;
       }
     },
-    [refreshRuntimeAfterReload, resource.replaceData],
+    [refreshRuntimeAfterReload, resource.replaceData, resource.data],
   );
 
   const updateGuest = useCallback(

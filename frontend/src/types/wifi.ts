@@ -21,6 +21,7 @@ export interface WifiSummary {
   networks: WifiNetworkSummary[];
   totalClients: number;
   guest: GuestWifiSummary | null;
+  guestError?: boolean;
 }
 
 export interface WifiUpdateInput {

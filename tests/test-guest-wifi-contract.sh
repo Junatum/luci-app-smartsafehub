@@ -4,16 +4,35 @@
 set -eu
 cd "$(dirname "$0")/.."
 API=root/usr/share/rpcd/ucode/smartsafehub.uc
+GUEST_API=root/usr/share/rpcd/ucode/smartsafehub-guest.uc
 BACKEND=root/usr/share/rpcd/ucode/smartsafehub/guest-wifi.uc
 WIFI=root/usr/share/rpcd/ucode/smartsafehub/wifi.uc
 ACL=root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 PAGE=frontend/src/components/GuestWifiCard.tsx
 
 # Guest actions require the same administrator authentication and lock as primary Wi-Fi.
-grep -q 'wifi_guest_update: {' "$API"
-grep -q 'return update_guest_wifi(request);' "$API"
-grep -q 'require_root_password(function(request)' "$API"
-grep -q '"wifi_guest_update"' "$ACL"
+# Guest code must not be loaded by the main RPC entry (login/security API).
+if grep -q 'guest-wifi.uc\|guest_wifi_summary\|update_guest_wifi\|wifi_guest_update:' "$API"; then
+  echo 'FAIL: guest module must not be eagerly imported into the main RPC object' >&2
+  exit 1
+fi
+if grep -q 'guest-wifi.uc\|guest_wifi_summary' root/usr/share/rpcd/ucode/smartsafehub/wifi-management.uc; then
+  echo 'FAIL: basic Wi-Fi management must not import guest module' >&2
+  exit 1
+fi
+grep -q 'wifi_guest_update: {' "$GUEST_API"
+grep -q 'wifi_guest_summary: {' "$GUEST_API"
+grep -q 'return update_guest_wifi(request);' "$GUEST_API"
+grep -q 'require_root_password(function(request)' "$GUEST_API"
+grep -q 'return { smartsafehub_guest: methods };' "$GUEST_API"
+jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_guest | index("wifi_guest_summary") != null' "$ACL" > /dev/null
+jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub_guest | index("wifi_guest_update") != null' "$ACL" > /dev/null
+if jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("wifi_guest_update") != null' "$ACL" > /dev/null; then
+  echo 'FAIL: guest write method must only exist in the isolated guest RPC object' >&2
+  exit 1
+fi
+grep -q "GUEST_API_OBJECT = 'smartsafehub_guest'" frontend/src/api/smartsafehub.ts
+grep -q "guestError: true" frontend/src/api/smartsafehub.ts
 grep -q "const LOCK = '/tmp/smartsafehub/wifi-update.lock'" "$BACKEND"
 
 # Cannot take over or change existing LAN AP; 2.4 GHz radio is discovered.
@@ -52,5 +71,6 @@ grep -q '게스트 Wi-Fi 사용' "$PAGE"
 grep -q '게스트 전용 비밀번호를 입력' "$PAGE"
 grep -q 'onUpdateGuest={wifi.updateGuest}' frontend/src/app/App.tsx
 grep -q 'updateGuestWifi' frontend/src/hooks/useWifi.ts
+grep -Fq 'guestError: resource.data?.guestError ?? false' frontend/src/hooks/useWifi.ts
 
 echo 'guest Wi-Fi security and UI contract: PASS'

@@ -28,6 +28,7 @@ import type {
   SoftwareUpdateStatus,
 } from '../types/updates';
 import type {
+  GuestWifiSummary,
   GuestWifiUpdateInput,
   GuestWifiUpdateResult,
   WifiSummary,
@@ -43,6 +44,7 @@ import type {
 import { callApi } from './rpc';
 
 const API_OBJECT = 'smartsafehub';
+const GUEST_API_OBJECT = 'smartsafehub_guest';
 const LAN_API_OBJECT = 'smartsafehub_network';
 
 export function fetchConnectedDevices(): Promise<ConnectedDevicesSummary> {
@@ -317,8 +319,15 @@ export function fetchWifiQr(section: string): Promise<WifiQrCredentials> {
   return callApi(API_OBJECT, 'wifi_qr', { section }, { timeoutMs: 8000 });
 }
 
-export function fetchWifiSummary(): Promise<WifiSummary> {
-  return callApi(API_OBJECT, 'wifi_summary');
+export async function fetchWifiSummary(): Promise<WifiSummary> {
+  // The optional guest RPC object must never break ordinary Wi-Fi management.
+  const summary = await callApi<Omit<WifiSummary, 'guest' | 'guestError'>>(API_OBJECT, 'wifi_summary');
+  try {
+    const guest = await callApi<GuestWifiSummary>(GUEST_API_OBJECT, 'wifi_guest_summary');
+    return { ...summary, guest, guestError: false };
+  } catch {
+    return { ...summary, guest: null, guestError: true };
+  }
 }
 
 export function updateWifiNetwork(
@@ -333,5 +342,5 @@ export function updateWifiNetwork(
 }
 
 export function updateGuestWifi(input: GuestWifiUpdateInput): Promise<GuestWifiUpdateResult> {
-  return callApi(API_OBJECT, 'wifi_guest_update', { ...input }, { timeoutMs: 95_000 });
+  return callApi(GUEST_API_OBJECT, 'wifi_guest_update', { ...input }, { timeoutMs: 95_000 });
 }
