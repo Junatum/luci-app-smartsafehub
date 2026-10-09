@@ -61,7 +61,7 @@ if grep -Fq '$base/licenses/status' "$SYNC_BIN" || grep -Fq '$base/licenses/reso
 fi
 grep -Fq 'SMARTSAFEHUB_ACTIVITY_DEVICE_BIN' "$SYNC_BIN" || fail 'activity sync must consume the generic device helper boundary'
 grep -Fq '"$DEVICE_BIN" status-sync' "$SYNC_BIN" || fail 'missing/expired activity credentials must be refreshed through smartsafehub-device status-sync'
-grep -Fq '[ -e "$WAKE_FILE" ] && ! retry_backoff_active' "$SYNC_BIN" || fail 'event wake must not bypass Cloud failure backoff'
+grep -Fq '[ "$wake_pending" -eq 1 ] && ! retry_backoff_active' "$SYNC_BIN" || fail 'event wake must not bypass Cloud failure backoff'
 if grep -Eq "tr ['\"]\[:(lower|upper):\]['\"]" "$SYNC_BIN"; then
   fail 'OpenWrt BusyBox tr 호환성을 위해 activity sync에서 POSIX 문자 클래스 대소문자 변환을 사용하면 안 됩니다.'
 fi

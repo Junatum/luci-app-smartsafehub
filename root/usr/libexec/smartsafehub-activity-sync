@@ -28,6 +28,8 @@ LOGGER_BIN="${SMARTSAFEHUB_ACTIVITY_LOGGER_BIN:-logger}"
 DEFAULT_SYNC_INTERVAL_S=300
 DEFAULT_STARTUP_DELAY_S=45
 DAEMON_TICK_S=15
+# The wake marker remains responsive at every tick; periodic state/UCI checks are less frequent.
+DAEMON_SCHEDULE_CHECK_S=60
 REQUEST_TIMEOUT_S=15
 CREDENTIAL_REFRESH_MARGIN_S=600
 RETRY_INITIAL_S=900
@@ -359,31 +361,47 @@ consume_wake_marker() {
 	return 1
 }
 
+# Evaluate the persisted schedule at most once per minute when no wake is pending.
+# The wake marker still gets checked every 15 seconds, without extra UCI/jsonfilter
+# calls on idle ticks. This bounds config-change latency to one minute.
 daemon_loop() {
-	local delay tick now next_sync
+	local delay tick now next_sync last_schedule_check wake_pending due
 	STOP_REQUESTED=0
 	delay="$(startup_delay_s)"
 	interruptible_sleep "$delay" || return 0
 	consume_wake_marker || true
 	ssh_runtime_execute sync-once sync_once || true
 	tick="$(normalized_integer "$DAEMON_TICK_S" 15 5 60)"
+	last_schedule_check=0
 	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		interruptible_sleep "$tick" || break
-		if ! cloud_sync_enabled; then
+		wake_pending=0
+		[ ! -e "$WAKE_FILE" ] || wake_pending=1
+		now="$(now_epoch)"
+		case "$now" in ''|*[!0-9]*) now=0 ;; esac
+		# Idle ticks only test the wake marker and current time. Re-read state
+		# periodically because it may be updated externally by sync-once.
+		if [ "$wake_pending" -eq 0 ] && [ "$last_schedule_check" -ne 0 ] &&
+			[ "$now" -ge "$last_schedule_check" ] &&
+			[ $((now - last_schedule_check)) -lt "$DAEMON_SCHEDULE_CHECK_S" ]; then
 			continue
 		fi
-		now="$(now_epoch)"
+		last_schedule_check="$now"
+		# Honour a disabled cloud setting even when a wake marker exists;
+		# leave that marker in place until cloud sync is enabled again.
+		cloud_sync_enabled || continue
 		next_sync="$(previous_state_number '@.nextSyncAt')"
-
-		if [ -e "$WAKE_FILE" ] && ! retry_backoff_active; then
-			# Healthy sync may react to a new event immediately. When the backend is
-			# unavailable, keep the marker and honor nextSyncAt so each new event does
-			# not bypass the retry backoff and cause another resolve request.
+		due=0
+		if [ "$next_sync" -le 0 ] 2>/dev/null || [ "$now" -ge "$next_sync" ] 2>/dev/null; then
+			due=1
+		elif [ "$wake_pending" -eq 1 ] && ! retry_backoff_active; then
+			due=1
+		fi
+		if [ "$due" -eq 1 ]; then
 			consume_wake_marker || true
 			ssh_runtime_execute sync-once sync_once || true
-		elif [ "$next_sync" -le 0 ] 2>/dev/null || [ "$now" -ge "$next_sync" ] 2>/dev/null; then
-			consume_wake_marker || true
-			ssh_runtime_execute sync-once sync_once || true
+			# Restart periodic polling window after a completed sync.
+			last_schedule_check="$(now_epoch)"
 		fi
 	done
 }
