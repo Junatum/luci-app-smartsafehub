@@ -1981,7 +1981,8 @@
 
 .ssh-safeshield-refresh {
   display: flex;
-  max-width: 48rem;
+  width: 27rem;
+  max-width: 100%;
   align-items: center;
   gap: 0.875rem;
   margin-top: 1rem;

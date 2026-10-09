@@ -177,6 +177,15 @@ grep -Fq 'strokeWidth={loaderTrackWidth}' "$PAGE" || \
 	fail 'SafeShield refresh track must use the dedicated slim stroke width'
 grep -Fq 'strokeWidth={loaderArcWidth}' "$PAGE" || \
 	fail 'SafeShield refresh arc must use the dedicated slim stroke width'
+REFRESH_CARD_LAYOUT="$(sed -n '/^\.ssh-safeshield-refresh {/,/^}/p' "$SOURCE_CSS")"
+printf '%s\n' "$REFRESH_CARD_LAYOUT" | grep -Fq '  width: 27rem;' || \
+	fail 'SafeShield refresh progress card should be 432px wide on desktop'
+printf '%s\n' "$REFRESH_CARD_LAYOUT" | grep -Fq '  max-width: 100%;' || \
+	fail 'SafeShield refresh progress card must fit narrow screens'
+if printf '%s\n' "$REFRESH_CARD_LAYOUT" | grep -Eq '(height|min-height):'; then
+	fail 'SafeShield refresh progress card height must remain content-driven'
+fi
+
 grep -Fq 'width: 3.35rem;' "$SOURCE_CSS" || \
 	fail 'SafeShield refresh donut container must remain slightly smaller than the original oversized treatment'
 
