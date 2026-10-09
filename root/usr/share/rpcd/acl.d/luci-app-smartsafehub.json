@@ -84,6 +84,7 @@
           "iptv_update"
         ],
         "smartsafehub_guest": [
+          "wifi_guest_qr",
           "wifi_guest_update"
         ]
       },

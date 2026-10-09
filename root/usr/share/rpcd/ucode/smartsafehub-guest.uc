@@ -5,7 +5,7 @@
 // must never prevent the main smartsafehub object (including login) loading.
 import { failure, success } from './smartsafehub/core.uc';
 import { root_password_configured } from './smartsafehub/security.uc';
-import { guest_wifi_summary, update_guest_wifi } from './smartsafehub/guest-wifi.uc';
+import { guest_wifi_summary, read_guest_wifi_qr, update_guest_wifi } from './smartsafehub/guest-wifi.uc';
 
 function require_root_password(handler) {
 	return function(request) {
@@ -27,6 +27,11 @@ const methods = {
 			return guest == null
 				? failure('GUEST_WIFI_READ_FAILED', '게스트 Wi-Fi 설정을 읽지 못했습니다.')
 				: success(guest);
+		}),
+	},
+	wifi_guest_qr: {
+		call: require_root_password(function(request) {
+			return read_guest_wifi_qr();
 		}),
 	},
 	wifi_guest_update: {

@@ -408,7 +408,17 @@ export function WifiPage({
           </p>
         </section>
       )}
-      {data.guest && <GuestWifiCard guest={data.guest} busy={updatingSection !== null} saving={updatingSection === 'ssh_guest'} onUpdate={onUpdateGuest} />}
+      {data.guest && (
+        <>
+          <div role="separator" aria-label="기본 Wi-Fi와 게스트 Wi-Fi 구분" class="mt-5 w-full border-t border-slate-200" />
+          <GuestWifiCard
+            guest={data.guest}
+            busy={updatingSection !== null}
+            saving={updatingSection === 'ssh_guest'}
+            onUpdate={onUpdateGuest}
+          />
+        </>
+      )}
       {data.guestError && (
         <section class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900" role="status">
           게스트 Wi-Fi 정보를 불러오지 못했습니다. 패키지를 설치한 직후라면 로그아웃 후 다시 로그인해 주세요.

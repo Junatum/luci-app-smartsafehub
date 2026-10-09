@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { fetchWifiQr } from '../api/smartsafehub';
+import { fetchGuestWifiQr, fetchWifiQr } from '../api/smartsafehub';
 import { DownloadIcon } from './Icons';
 import { createQrMatrix } from '../utils/qrMatrix';
 
@@ -31,19 +31,19 @@ export function drawWifiQrPng(
   }));
 }
 
-export function WifiQrDialog({ section, onClose }: { section: string; onClose: () => void }) {
+export function WifiQrDialog({ section, guest = false, onClose }: { section: string; guest?: boolean; onClose: () => void }) {
   const [qr, setQr] = useState<{ ssid: string; matrix: boolean[][] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    void fetchWifiQr(section).then((data) => {
+    void (guest ? fetchGuestWifiQr() : fetchWifiQr(section)).then((data) => {
       if (!active) return;
       try { setQr({ ssid: data.ssid, matrix: createQrMatrix(wifiQrPayload(data.ssid, data.security, data.password)) }); }
       catch { setError('QR 코드를 생성할 수 없습니다.'); }
     }).catch(() => { if (active) setError('Wi-Fi 정보를 불러오지 못했습니다.'); });
     return () => { active = false; setQr(null); };
-  }, [section]);
+  }, [section, guest]);
   const count = qr?.matrix.length ?? 0;
   const downloadQr = () => {
     if (!qr) return;

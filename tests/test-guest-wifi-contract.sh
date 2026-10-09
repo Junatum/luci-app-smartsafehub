@@ -22,11 +22,18 @@ if grep -q 'guest-wifi.uc\|guest_wifi_summary' root/usr/share/rpcd/ucode/smartsa
 fi
 grep -q 'wifi_guest_update: {' "$GUEST_API"
 grep -q 'wifi_guest_summary: {' "$GUEST_API"
+grep -q 'wifi_guest_qr: {' "$GUEST_API"
+grep -q 'return read_guest_wifi_qr();' "$GUEST_API"
 grep -q 'return update_guest_wifi(request);' "$GUEST_API"
 grep -q 'require_root_password(function(request)' "$GUEST_API"
 grep -q 'return { smartsafehub_guest: methods };' "$GUEST_API"
 jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_guest | index("wifi_guest_summary") != null' "$ACL" > /dev/null
 jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub_guest | index("wifi_guest_update") != null' "$ACL" > /dev/null
+jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub_guest | index("wifi_guest_qr") != null' "$ACL" > /dev/null
+if jq -e '."luci-app-smartsafehub".read.ubus.smartsafehub_guest | index("wifi_guest_qr") != null' "$ACL" > /dev/null; then
+  echo 'FAIL: guest QR credentials must require write ACL' >&2
+  exit 1
+fi
 if jq -e '."luci-app-smartsafehub".write.ubus.smartsafehub | index("wifi_guest_update") != null' "$ACL" > /dev/null; then
   echo 'FAIL: guest write method must only exist in the isolated guest RPC object' >&2
   exit 1
@@ -42,7 +49,7 @@ if ! awk '
     if ($0 != "};") exit 1;
     checked++; in_export = 0;
   }
-  END { if (declared != 2 || checked != declared || in_export) exit 1 }
+  END { if (declared != 3 || checked != declared || in_export) exit 1 }
 ' "$BACKEND"; then
   echo 'FAIL: guest ucode exports must terminate with };' >&2
   exit 1
@@ -78,10 +85,36 @@ grep -q 'restore_files(snapshot)' "$BACKEND"
 grep -q 'GUEST_WIFI_SUBNET_CONFLICT' "$BACKEND"
 grep -q 'GUEST_WIFI_CONFLICT' "$BACKEND"
 grep -q "passwordConfigured:" "$BACKEND"
-if grep -q 'password: key' "$BACKEND"; then echo 'FAIL: guest password is leaked'; exit 1; fi
+if ! awk '
+  /^export function guest_wifi_summary\(/ { in_summary = 1; next }
+  in_summary && /^};/ { in_summary = 0; verified++; next }
+  in_summary && /password:|key:/ { exit 1 }
+  END { if (verified != 1 || in_summary) exit 1 }
+' "$BACKEND"; then
+  echo 'FAIL: guest summary exposes credentials' >&2
+  exit 1
+fi
+grep -q 'export function read_guest_wifi_qr()' "$BACKEND"
+grep -q 'if (!managed(ctx))' "$BACKEND"
+grep -q "guest?.disabled == '1'" "$BACKEND"
+grep -q "guest?.network != GUEST || guest?.encryption != 'sae-mixed'" "$BACKEND"
+grep -q "success({ ssid: ssid, security: 'sae-mixed', password: key })" "$BACKEND"
 
 grep -q '게스트 Wi-Fi 사용' "$PAGE"
 grep -q '게스트 전용 비밀번호를 입력' "$PAGE"
+grep -Fq 'useState(false)' "$PAGE"
+grep -q 'aria-expanded={expanded}' "$PAGE"
+grep -q 'aria-controls="ssh-guest-settings"' "$PAGE"
+grep -q "expanded ? '' : 'hidden'" "$PAGE"
+grep -q 'busy || dirty || !guest.enabled || !guest.passwordConfigured' "$PAGE"
+grep -q '게스트 Wi-Fi QR 코드 보기' "$PAGE"
+grep -q 'WifiQrDialog guest section="ssh_guest"' "$PAGE"
+grep -q "fetchGuestWifiQr() : fetchWifiQr(section)" frontend/src/components/WifiQrDialog.tsx
+grep -q "callApi(GUEST_API_OBJECT, 'wifi_guest_qr'" frontend/src/api/smartsafehub.ts
+# The guest card is separated from the primary Wi-Fi cards, with a full-width
+# line only when guest settings are available. Reuse the theme-aware border token.
+grep -Fq '{data.guest && (' frontend/src/pages/WifiPage.tsx
+grep -Fq 'role="separator" aria-label="기본 Wi-Fi와 게스트 Wi-Fi 구분" class="mt-5 w-full border-t border-slate-200"' frontend/src/pages/WifiPage.tsx
 grep -q 'onUpdateGuest={wifi.updateGuest}' frontend/src/app/App.tsx
 grep -q 'updateGuestWifi' frontend/src/hooks/useWifi.ts
 grep -Fq 'guestError: resource.data?.guestError ?? false' frontend/src/hooks/useWifi.ts

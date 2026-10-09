@@ -319,6 +319,11 @@ export function fetchWifiQr(section: string): Promise<WifiQrCredentials> {
   return callApi(API_OBJECT, 'wifi_qr', { section }, { timeoutMs: 8000 });
 }
 
+// A separate authenticated RPC, so guest credentials never enter summary responses.
+export function fetchGuestWifiQr(): Promise<WifiQrCredentials> {
+  return callApi(GUEST_API_OBJECT, 'wifi_guest_qr', {}, { timeoutMs: 8000 });
+}
+
 export async function fetchWifiSummary(): Promise<WifiSummary> {
   // The optional guest RPC object must never break ordinary Wi-Fi management.
   const summary = await callApi<Omit<WifiSummary, 'guest' | 'guestError'>>(API_OBJECT, 'wifi_summary');

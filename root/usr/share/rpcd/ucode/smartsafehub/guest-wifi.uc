@@ -189,6 +189,24 @@ export function guest_wifi_summary() {
   };
 };
 
+// Return the password only for an explicit, administrator-authorized QR request.
+// Never include it in the ordinary guest Wi-Fi summary or device diagnostics.
+export function read_guest_wifi_qr() {
+  const ctx = new_uci_cursor();
+  if (!ctx) return failure('GUEST_WIFI_READ_FAILED', '설정을 읽지 못했습니다.');
+  if (!managed(ctx)) return failure('GUEST_WIFI_QR_UNAVAILABLE', '게스트 Wi-Fi가 설정되지 않았습니다.');
+
+  const guest = ctx.get_all('wireless', GUEST);
+  const ssid = string_value(guest?.ssid, '');
+  const key = string_value(guest?.key, '');
+  if (guest?.['.type'] != 'wifi-iface' || guest?.mode != 'ap' ||
+      guest?.network != GUEST || guest?.encryption != 'sae-mixed' ||
+      guest?.disabled == '1' || !valid_ssid(ssid) || !valid_key(key)) {
+    return failure('GUEST_WIFI_QR_UNAVAILABLE', '게스트 Wi-Fi가 켜져 있고 비밀번호가 설정되어 있어야 합니다.');
+  }
+  return success({ ssid: ssid, security: 'sae-mixed', password: key });
+};
+
 function update_guest(request) {
   const args = request?.args ?? {};
   if (type(args.enabled) != 'bool' || !valid_ssid(args.ssid) || type(args.password) != 'string') {
