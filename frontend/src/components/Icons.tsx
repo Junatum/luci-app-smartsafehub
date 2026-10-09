@@ -97,6 +97,16 @@ export function WifiIcon(props: IconProps) {
   );
 }
 
+export function QrCodeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" />
+      <path d="M6.5 6.5h1M16.5 6.5h1M6.5 16.5h1" />
+      <path d="M14 14h2v2h-2zM18 14h2v2h-2zM16 16h2v2h-2zM18 18h2v2h-2zM14 18h1" />
+    </IconBase>
+  );
+}
+
 export function CableIcon(props: IconProps) {
   return (
     <IconBase {...props}>

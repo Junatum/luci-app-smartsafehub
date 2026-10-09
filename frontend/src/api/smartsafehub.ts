@@ -305,6 +305,16 @@ export function updateIptvSettings(
   );
 }
 
+export interface WifiQrCredentials {
+  ssid: string;
+  security: 'none' | 'psk2' | 'sae' | 'sae-mixed';
+  password: string;
+}
+
+export function fetchWifiQr(section: string): Promise<WifiQrCredentials> {
+  return callApi(API_OBJECT, 'wifi_qr', { section }, { timeoutMs: 8000 });
+}
+
 export function fetchWifiSummary(): Promise<WifiSummary> {
   return callApi(API_OBJECT, 'wifi_summary');
 }

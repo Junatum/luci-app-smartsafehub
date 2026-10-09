@@ -40,6 +40,7 @@ import {
 } from './smartsafehub/updates.uc';
 import {
 	read_wifi_summary,
+	read_wifi_qr,
 	update_wifi
 } from './smartsafehub/wifi-management.uc';
 import {
@@ -120,6 +121,12 @@ const methods = {
 	wifi_summary: {
 		call: require_root_password(function(request) {
 			return read_wifi_summary();
+		}),
+	},
+	wifi_qr: {
+		args: { section: '' },
+		call: require_root_password(function(request) {
+			return read_wifi_qr(request);
 		}),
 	},
 	wifi_update: {

@@ -2,7 +2,8 @@ import type { JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
-import { AlertIcon, CheckCircleIcon, RouterIcon } from '../components/Icons';
+import { WifiQrDialog } from '../components/WifiQrDialog';
+import { AlertIcon, CheckCircleIcon, QrCodeIcon, RouterIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { WifiFeedback } from '../hooks/useWifi';
 import type {
@@ -72,6 +73,7 @@ function WifiNetworkCard({
     network.security === 'custom' ? 'keep' : network.security,
   );
   const [password, setPassword] = useState('');
+  const [showQr, setShowQr] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,6 +95,12 @@ function WifiNetworkCard({
     enabled !== network.enabled ||
     security !== savedSecurity ||
     password.length > 0;
+  const qrDisabled =
+    busy ||
+    settingsDirty ||
+    network.security === 'custom' ||
+    !network.enabled ||
+    (network.security !== 'none' && !network.passwordConfigured);
   const securityOptions = [
     ...(network.security === 'custom'
       ? [
@@ -186,6 +194,16 @@ function WifiNetworkCard({
               저장되지 않음
             </span>
           ) : null}
+          <button
+            aria-label={`${network.bandLabel} Wi-Fi QR 코드 보기`}
+            class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm font-extrabold text-slate-800 shadow-sm transition hover:border-teal-300 hover:text-teal-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={qrDisabled}
+            onClick={() => setShowQr(true)}
+            type="button"
+          >
+            <QrCodeIcon class="size-4 shrink-0" />
+            QR 코드 보기
+          </button>
           <span
             class={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${
               network.runtimeUp
@@ -255,7 +273,7 @@ function WifiNetworkCard({
             value={password}
           />
           <span class="mt-2 block text-xs text-slate-500">
-            저장된 비밀번호는 화면이나 API로 다시 노출하지 않습니다.
+            저장된 비밀번호는 일반 설정 조회에 노출되지 않습니다. QR 코드에는 비밀번호가 포함됩니다.
           </span>
         </label>
       </div>
@@ -272,7 +290,7 @@ function WifiNetworkCard({
           이 Wi-Fi 사용
         </label>
         <button
-          class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-0 bg-teal-700 px-5 sm:w-auto py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 disabled:cursor-wait disabled:opacity-60"
+          class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-0 bg-teal-700 px-5 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-200 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
           disabled={busy || !settingsDirty}
           type="submit"
         >
@@ -281,6 +299,7 @@ function WifiNetworkCard({
         </button>
       </div>
 
+      {showQr ? <WifiQrDialog section={network.section} onClose={() => setShowQr(false)} /> : null}
       {validationError ? (
         <p class="mt-4 mb-0 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
           {validationError}

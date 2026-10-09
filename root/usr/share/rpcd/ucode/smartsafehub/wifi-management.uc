@@ -29,6 +29,38 @@ export function read_wifi_summary() {
 		: success(payload);
 };
 
+// Disclose only on explicit request from an authenticated administrator.
+// Never include the key in wifi_summary, diagnostics or persistent state.
+export function read_wifi_qr(request) {
+	const section_name = request?.args?.section;
+	if (type(section_name) != 'string' || !length(section_name)) {
+		return failure('WIFI_SECTION_INVALID', 'Wi-Fi 항목이 올바르지 않습니다.');
+	}
+	const ctx = new_uci_cursor();
+	if (!ctx) {
+		return failure('WIFI_CONFIG_READ_FAILED', 'Wi-Fi 설정을 읽지 못했습니다.');
+	}
+	const current = ctx.get_all('wireless', section_name);
+	const device = string_value(current?.device, null);
+	if (current == null || current?.['.type'] != 'wifi-iface' ||
+		current?.mode != 'ap' || device == null ||
+		ctx.get_all('wireless', device)?.['.type'] != 'wifi-device' ||
+		!wifi_is_managed_section(ctx, section_name, device)) {
+		return failure('WIFI_SECTION_NOT_MANAGED', '기본 Wi-Fi만 공유할 수 있습니다.');
+	}
+	const encryption = string_value(current?.encryption, 'none');
+	const security = wifi_security(encryption);
+	if (security == 'custom') {
+		return failure('WIFI_SECURITY_UNSUPPORTED', '고급 보안 설정의 QR 코드는 지원하지 않습니다.');
+	}
+	const ssid = string_value(current?.ssid, '');
+	const key = string_value(current?.key, '');
+	if (!length(ssid) || (wifi_security_requires_key(encryption) && !length(key))) {
+		return failure('WIFI_QR_UNAVAILABLE', 'Wi-Fi 이름이나 비밀번호를 확인할 수 없습니다.');
+	}
+	return success({ ssid: ssid, security: security, password: security == 'none' ? '' : key });
+};
+
 function valid_wifi_ssid(value) {
 	if (type(value) != 'string') {
 		return null;
