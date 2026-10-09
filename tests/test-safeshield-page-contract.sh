@@ -153,6 +153,12 @@ grep -Fq 'getSafeShieldRefreshErrorMessage' "$REFRESH_MODEL" || \
 
 grep -Fq 'function RefreshDonut' "$PAGE" || \
 	fail 'SafeShield page must render compact donut progress for refresh stages'
+grep -Fq "const refreshing = data.status === 'running';" "$PAGE" || \
+	fail 'SafeShield actions must unlock after a failed refresh with a retained stage'
+grep -Fq ": data.status === 'error'" "$PAGE" || \
+	fail 'SafeShield refresh action must recognize error state for a retry'
+grep -Fq "? '다시 갱신'" "$PAGE" || \
+	fail 'SafeShield retry action must be clear to users after failure'
 grep -Fq 'role="progressbar"' "$PAGE" || \
 	fail 'SafeShield refresh donut must expose accessible progress semantics'
 grep -Fq 'ssh-safeshield-refresh-loader-svg' "$PAGE" || \

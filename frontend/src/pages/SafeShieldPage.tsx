@@ -636,9 +636,13 @@ export function SafeShieldPage({
 
   const enabled = data.enabled;
   const planName = getSafeShieldPlanName(data.entitlement.plan);
-  const refreshing = isSafeShieldRefreshTransition(data.status, data.stage);
+  // A failed refresh keeps its last stage for diagnostics. Only an actively
+  // running refresh should disable protection and retry controls.
+  const refreshing = data.status === 'running';
   const actionBusy = action !== null;
-  const preserveBlocklistCount = refreshing || getProductProtectionState(data) === 'error';
+  const preserveBlocklistCount =
+    isSafeShieldRefreshTransition(data.status, data.stage) ||
+    getProductProtectionState(data) === 'error';
   const displayedBlocklistCount =
     preserveBlocklistCount &&
     data.blocklist.validLineCount === 0 &&
@@ -721,7 +725,9 @@ export function SafeShieldPage({
                 ? '시작 중…'
                 : refreshing
                   ? '갱신 중…'
-                  : '지금 갱신'}
+                  : data.status === 'error'
+                    ? '다시 갱신'
+                    : '지금 갱신'}
             </button>
           </div>
         </div>
