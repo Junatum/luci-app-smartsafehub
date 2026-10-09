@@ -91,7 +91,7 @@ prepare_credential() {
  return 0
 }
 
-refresh_safeshield_after_account_change() {
+refresh_safeshield_after_entitlement_change() {
  local out ok
  out="$RUNTIME_DIR/device-safeshield-refresh.$$.json"
  rm -f "$out"
@@ -102,7 +102,7 @@ refresh_safeshield_after_account_change() {
  ok="$(json_value "$out" '@.ok')"
  rm -f "$out"
  [ "$ok" != false ] || return 1
- log_message 'requested SafeShield refresh after SmartSafeHub account connection change'
+ log_message 'requested SafeShield refresh after SmartSafeHub account or plan change'
  return 0
 }
 
@@ -204,15 +204,18 @@ rotate_credential_if_due() {
 }
 
 status_sync() {
- local token body out now registered previous_registered plan last_success next code expires protection_refresh_pending
+ local token body out now registered previous_registered previous_plan plan last_success next code expires protection_refresh_pending
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
  ensure_device_bootstrapped || return 1
  token="$(credential_token)" || return 1
  body="$RUNTIME_DIR/device-sync-request.$$.json"; out="$RUNTIME_DIR/device-sync-response.$$.json"; printf '{}\n' > "$body"
  if ! post_json "$API_BASE_URL/devices/sync" "$body" "$out" "$token"; then last_success="$(json_value "$STATE_FILE" '@.lastSuccessAt')"; case "$last_success" in ''|*[!0-9]*) last_success=0 ;; esac; protection_refresh_pending="$(json_value "$STATE_FILE" '@.protectionRefreshPending')"; write_state registered failed DEVICE_SYNC_UNAVAILABLE unknown '' "$(json_value "$STATE_FILE" '@.pairingCode')" "$(json_value "$STATE_FILE" '@.pairingExpiresAt')" "$next" "$last_success" "$protection_refresh_pending"; rm -f "$body" "$out"; return 1; fi
  previous_registered="$(json_value "$STATE_FILE" '@.accountRegistered')"
+ previous_plan="$(ascii_lower "$(json_value "$STATE_FILE" '@.plan')")"
  registered="$(json_value "$out" '@.account.connected')"; [ -n "$registered" ] || registered="$(json_value "$out" '@.device.registered')"
- plan="$(json_value "$out" '@.entitlement.plan')"
+ plan="$(ascii_lower "$(json_value "$out" '@.entitlement.plan')")"
+ # Never replace a confirmed entitlement with a malformed cloud response.
+ case "$plan" in free|pro|ultimate) ;; *) rm -f "$body" "$out"; return 1 ;; esac
  code="$(json_value "$STATE_FILE" '@.pairingCode')"
  expires="$(json_value "$STATE_FILE" '@.pairingExpiresAt')"
  protection_refresh_pending="$(json_value "$STATE_FILE" '@.protectionRefreshPending')"
@@ -220,6 +223,12 @@ status_sync() {
  case "$registered:$previous_registered" in
   true:false|false:true) protection_refresh_pending=true ;;
  esac
+ # A license may be assigned or removed without changing account ownership.
+ # Reconcile SafeShield on every actual plan transition, including after a
+ # temporary sync failure left the previously confirmed plan unknown.
+ if [ "$previous_plan" != "$plan" ]; then
+  protection_refresh_pending=true
+ fi
  if [ "$registered" = true ]; then
   if [ -n "$code" ]; then
    protection_refresh_pending=true
@@ -235,18 +244,18 @@ status_sync() {
  store_activity_credential "$out" || true
  rotate_credential_if_due "$out" "$token"
 
- # Persist the authoritative Hub account state before requesting a potentially
+ # Persist the authoritative Hub account and plan before requesting a potentially
  # slow SafeShield refresh. rpcd limits status-sync execution time, so waiting
  # for protection refresh first can leave stale connected/disconnected state in
  # the router UI even though Hub already accepted the ownership change.
  write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$protection_refresh_pending"
 
  if [ "$protection_refresh_pending" = true ]; then
-  if refresh_safeshield_after_account_change; then
+  if refresh_safeshield_after_entitlement_change; then
    protection_refresh_pending=false
    write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$protection_refresh_pending"
   else
-   log_message 'SafeShield refresh after SmartSafeHub account connection change will be retried on the next device sync'
+   log_message 'SafeShield refresh after SmartSafeHub account or plan change will be retried on the next device sync'
   fi
  fi
  rm -f "$body" "$out"

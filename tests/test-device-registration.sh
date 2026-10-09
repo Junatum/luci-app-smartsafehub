@@ -14,7 +14,7 @@ grep -Fq "@.account.connected" "$HELPER" || {
 	echo 'device helper must consume the explicit account connection state from Hub sync' >&2
 	exit 1
 }
-grep -Fq 'refresh_safeshield_after_account_change' "$HELPER" || {
+grep -Fq 'refresh_safeshield_after_entitlement_change' "$HELPER" || {
 	echo 'device helper must refresh SafeShield after account connection changes' >&2
 	exit 1
 }
@@ -27,7 +27,7 @@ grep -Fq 'protectionRefreshPending' "$HELPER" || {
 # refresh. Otherwise an rpcd timeout can leave a consumed pairing code visible.
 status_block_for_order="$(sed -n '/^status_sync() {/,/^}/p' "$HELPER")"
 state_line="$(printf '%s\n' "$status_block_for_order" | grep -n "write_state registered active '' \"\$registered\"" | head -n 1 | cut -d: -f1)"
-refresh_line="$(printf '%s\n' "$status_block_for_order" | grep -n 'refresh_safeshield_after_account_change' | head -n 1 | cut -d: -f1)"
+refresh_line="$(printf '%s\n' "$status_block_for_order" | grep -n 'refresh_safeshield_after_entitlement_change' | head -n 1 | cut -d: -f1)"
 [ -n "$state_line" ] && [ -n "$refresh_line" ] && [ "$state_line" -lt "$refresh_line" ] || {
 	echo 'account state must be persisted before SafeShield refresh is requested' >&2
 	exit 1
@@ -221,7 +221,8 @@ case "$expr" in
 	'@.accountRegistered') grep -Fq '"accountRegistered":true' "$file" && echo true || { grep -Fq '"accountRegistered":false' "$file" && echo false || true; } ;;
 	'@.protectionRefreshPending') grep -Fq '"protectionRefreshPending":true' "$file" && echo true || { grep -Fq '"protectionRefreshPending":false' "$file" && echo false || true; } ;;
 	'@.ok') echo true ;;
-	'@.entitlement.plan') echo free ;;
+	'@.entitlement.plan') sed -n 's/.*"entitlement":{"plan":"\([^"]*\)".*/\1/p' "$file" ;;
+	'@.plan') sed -n 's/.*"plan":"\([^"]*\)".*/\1/p' "$file" ;;
 	'@.credential.rotation_due') echo false ;;
 	'@.pairing_session.code') echo ABCD-EFGH ;;
 	'@.pairing_session.expires_at') echo 2026-10-08T12:00:00Z ;;
@@ -271,9 +272,7 @@ case "$url" in
 JSON
 		;;
 	*/devices/sync)
-		cat > "$out" <<'JSON'
-{"device":{"uuid":"11111111-1111-1111-1111-111111111111","registered":false},"entitlement":{"plan":"free"},"credential":{"rotation_due":false}}
-JSON
+		printf '{"device":{"uuid":"11111111-1111-1111-1111-111111111111","registered":false},"entitlement":{"plan":"%s"},"credential":{"rotation_due":false}}\n' "${SMARTSAFEHUB_TEST_PLAN:-free}" > "$out"
 		;;
 	*/devices/pairing-sessions)
 		cat > "$out" <<'JSON'
@@ -310,9 +309,7 @@ case "$url" in
 JSON
 		;;
 	*/devices/sync)
-		cat > "$out" <<'JSON'
-{"device":{"uuid":"11111111-1111-1111-1111-111111111111","registered":false},"entitlement":{"plan":"free"},"credential":{"rotation_due":false}}
-JSON
+		printf '{"device":{"uuid":"11111111-1111-1111-1111-111111111111","registered":false},"entitlement":{"plan":"%s"},"credential":{"rotation_due":false}}\n' "${SMARTSAFEHUB_TEST_PLAN:-free}" > "$out"
 		;;
 	*/devices/pairing-sessions)
 		cat > "$out" <<'JSON'
@@ -438,6 +435,92 @@ PATH="$FLOW_DIR:$PATH" \
 	exit 1
 }
 
+# Plan-only transitions must reconcile SafeShield even while the device stays
+# registered to exactly the same SmartSafeHub account.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=pro \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+  echo 'Free-to-Pro assignment must immediately request SafeShield refresh' >&2
+  exit 1
+}
+grep -Fq '"plan":"pro"' "$FLOW_RUNTIME/device.json" || {
+  echo 'assigned Pro plan must be persisted before SafeShield refresh' >&2
+  exit 1
+}
+
+# The same PRO response is not a license change. No redundant SafeShield refresh.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=pro \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+  echo 'unchanged PRO must not trigger repeated SafeShield refreshes' >&2
+  exit 1
+}
+
+# Unassigning a license also leaves the account connected: PRO -> FREE must
+# request a new artifact and clear stale SafeShield PRO status.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=free \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 3 ] || {
+  echo 'Pro-to-Free unassignment must immediately request SafeShield refresh' >&2
+  exit 1
+}
+grep -Fq '"accountRegistered":true' "$FLOW_RUNTIME/device.json" || {
+  echo 'unassignment must not disconnect the SmartSafeHub account' >&2
+  exit 1
+}
+grep -Fq '"plan":"free"' "$FLOW_RUNTIME/device.json" || {
+  echo 'unassigned Free plan must be persisted' >&2
+  exit 1
+}
+
+# Repeated FREE synchronization must be idle as well.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$FLOW_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$FLOW_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$FLOW_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=free \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 3 ] || {
+  echo 'unchanged FREE must not trigger repeated SafeShield refreshes' >&2
+  exit 1
+}
+
 # Website-side device removal is learned through the normal background device
 # sync. The router must immediately persist the disconnected state, drop Cloud
 # activity credentials, and refresh SafeShield once so Cloud entitlements are
@@ -464,7 +547,7 @@ grep -Fq '"accountRegistered":false' "$FLOW_RUNTIME/device.json" || {
 	echo 'disconnecting the SmartSafeHub account must remove the Cloud activity credential' >&2
 	exit 1
 }
-[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 4 ] || {
 	echo 'account removal must request one SafeShield refresh' >&2
 	exit 1
 }
@@ -486,7 +569,7 @@ SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=0 \
 PATH="$FLOW_DIR:$PATH" \
 "$HELPER" status-sync >/dev/null 2>&1
 
-[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 2 ] || {
+[ "$(grep -Fc 'call safeshield refresh' "$FLOW_UBUS_LOG" || true)" -eq 4 ] || {
 	echo 'steady disconnected sync must not repeat the SafeShield refresh' >&2
 	exit 1
 }
@@ -537,4 +620,81 @@ PATH="$FLOW_DIR:$PATH" \
 grep -Fq '"protectionRefreshPending":false' "$RETRY_RUNTIME/device.json" || {
 	echo 'successful SafeShield refresh retry must clear the pending marker' >&2
 	exit 1
+}
+
+# License unassignment is retried if SafeShield fails to accept the first
+# refresh request, without losing the already synchronized Free plan.
+PLAN_RETRY_RUNTIME="$FLOW_DIR/plan-retry-runtime"
+PLAN_RETRY_UBUS_LOG="$FLOW_DIR/plan-retry-ubus.log"
+mkdir -p "$PLAN_RETRY_RUNTIME"
+cat > "$PLAN_RETRY_RUNTIME/device.json" <<'JSON'
+{"schema":1,"component":"device","phase":"registered","lastResult":"active","lastErrorCode":null,"accountRegistered":true,"plan":"pro","pairingCode":null,"pairingExpiresAt":null,"protectionRefreshPending":false,"nextSyncAt":0,"lastSuccessAt":0}
+JSON
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$PLAN_RETRY_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$PLAN_RETRY_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$PLAN_RETRY_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=free \
+SMARTSAFEHUB_TEST_REFRESH_FAIL=1 \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+grep -Fq '"plan":"free"' "$PLAN_RETRY_RUNTIME/device.json" || {
+  echo 'Hub Free entitlement must be saved even when SafeShield refresh fails' >&2
+  exit 1
+}
+grep -Fq '"protectionRefreshPending":true' "$PLAN_RETRY_RUNTIME/device.json" || {
+  echo 'a failed plan-change SafeShield refresh must remain pending' >&2
+  exit 1
+}
+
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$PLAN_RETRY_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$PLAN_RETRY_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$PLAN_RETRY_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=free \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1
+
+[ "$(grep -Fc 'call safeshield refresh' "$PLAN_RETRY_UBUS_LOG" || true)" -eq 2 ] || {
+  echo 'failed plan-change refresh must retry on the next sync' >&2
+  exit 1
+}
+grep -Fq '"protectionRefreshPending":false' "$PLAN_RETRY_RUNTIME/device.json" || {
+  echo 'successful plan-change refresh retry must clear the pending flag' >&2
+  exit 1
+}
+
+# A malformed or incomplete successful HTTP response must not overwrite the
+# last confirmed license or accidentally trigger SafeShield refresh.
+SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$PLAN_RETRY_RUNTIME" \
+SMARTSAFEHUB_DEVICE_STATE_FILE="$PLAN_RETRY_RUNTIME/device.json" \
+SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE="$FLOW_CREDENTIAL" \
+SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$FAKE_JSONFILTER" \
+SMARTSAFEHUB_DEVICE_UBUS_BIN="$FAKE_UBUS" \
+SMARTSAFEHUB_TEST_URL_LOG="$FLOW_URL_LOG" \
+SMARTSAFEHUB_TEST_UBUS_LOG="$PLAN_RETRY_UBUS_LOG" \
+SMARTSAFEHUB_TEST_ACCOUNT_CONNECTED=1 \
+SMARTSAFEHUB_TEST_PLAN=invalid \
+PATH="$FLOW_DIR:$PATH" \
+"$HELPER" status-sync >/dev/null 2>&1 && {
+  echo 'malformed device entitlement must be rejected' >&2
+  exit 1
+}
+grep -Fq '"plan":"free"' "$PLAN_RETRY_RUNTIME/device.json" || {
+  echo 'invalid entitlement must leave confirmed Free state unchanged' >&2
+  exit 1
+}
+[ "$(grep -Fc 'call safeshield refresh' "$PLAN_RETRY_UBUS_LOG" || true)" -eq 2 ] || {
+  echo 'invalid entitlement must not request SafeShield refresh' >&2
+  exit 1
 }
