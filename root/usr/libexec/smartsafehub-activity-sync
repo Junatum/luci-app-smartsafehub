@@ -6,6 +6,10 @@ umask 077
 COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
 [ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
 . "$COMMON_LIB"
+RUNTIME_LIB="${SMARTSAFEHUB_RUNTIME_LIB:-$(dirname "$0")/../lib/smartsafehub/runtime.sh}"
+[ -r "$RUNTIME_LIB" ] || exit 1
+. "$RUNTIME_LIB"
+ssh_runtime_init "activity-sync"
 
 RUNTIME_DIR="${SMARTSAFEHUB_ACTIVITY_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_ACTIVITY_STATE_FILE:-$RUNTIME_DIR/activity-sync.json}"
@@ -361,7 +365,7 @@ daemon_loop() {
 	delay="$(startup_delay_s)"
 	interruptible_sleep "$delay" || return 0
 	consume_wake_marker || true
-	sync_once || true
+	ssh_runtime_execute sync-once sync_once || true
 	tick="$(normalized_integer "$DAEMON_TICK_S" 15 5 60)"
 	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		interruptible_sleep "$tick" || break
@@ -376,10 +380,10 @@ daemon_loop() {
 			# unavailable, keep the marker and honor nextSyncAt so each new event does
 			# not bypass the retry backoff and cause another resolve request.
 			consume_wake_marker || true
-			sync_once || true
+			ssh_runtime_execute sync-once sync_once || true
 		elif [ "$next_sync" -le 0 ] 2>/dev/null || [ "$now" -ge "$next_sync" ] 2>/dev/null; then
 			consume_wake_marker || true
-			sync_once || true
+			ssh_runtime_execute sync-once sync_once || true
 		fi
 	done
 }
@@ -390,17 +394,20 @@ Usage: smartsafehub-activity-sync <command>
 
 Commands:
   daemon
-  sync-once
+  sync-once (alias: run-once)
+  runtime-status
   apply-config
   status
 EOF_USAGE
 }
 
 mkdir -p "$RUNTIME_DIR" || exit 1
+ssh_runtime_debug_arg "${1:-}" "${2:-}" || { echo "invalid argument" >&2; exit 2; }
 case "${1:-}" in
 	daemon) daemon_loop ;;
-	sync-once) sync_once ;;
+	sync-once|run-once) ssh_runtime_execute sync-once sync_once ;;
 	apply-config) apply_configuration ;;
 	status) show_status ;;
+	runtime-status) ssh_runtime_status ;;
 	*) usage >&2; exit 2 ;;
 esac

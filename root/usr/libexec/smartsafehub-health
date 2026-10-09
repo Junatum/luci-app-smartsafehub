@@ -5,6 +5,10 @@ set -u
 COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
 [ -r "$COMMON_LIB" ] || { echo "SmartSafeHub common library not found: $COMMON_LIB" >&2; exit 1; }
 . "$COMMON_LIB"
+RUNTIME_LIB="${SMARTSAFEHUB_RUNTIME_LIB:-$(dirname "$0")/../lib/smartsafehub/runtime.sh}"
+[ -r "$RUNTIME_LIB" ] || exit 1
+. "$RUNTIME_LIB"
+ssh_runtime_init "health"
 
 RUNTIME_DIR="${SMARTSAFEHUB_HEALTH_RUNTIME_DIR:-/tmp/smartsafehub}"
 HEALTH_FILE="${SMARTSAFEHUB_HEALTH_FILE:-$RUNTIME_DIR/health.json}"
@@ -799,7 +803,7 @@ run_daemon() {
 		now="$("$DATE_BIN" +%s 2>/dev/null || printf '0')"
 		interval="$(check_interval_s)"
 		if [ "$last_check" -eq 0 ] || [ "$now" -ge $((last_check + interval)) ]; then
-			run_cycle || true
+			ssh_runtime_execute run-cycle run_cycle || true
 			if [ "$SAFESHIELD_INITIALIZING" -eq 1 ]; then
 				# During boot, recheck on the short daemon tick instead of leaving the
 				# UI in a transient state for the full regular health interval.
@@ -816,11 +820,14 @@ run_daemon() {
 
 mkdir -p "$RUNTIME_DIR" || exit 1
 
+if [ "${1:-}" != set-reporter ]; then ssh_runtime_debug_arg "${1:-}" "${2:-}" || { echo "invalid argument" >&2; exit 2; }; fi
 case "${1:-}" in
-	run-once) run_once ;;
-	run-cycle) run_cycle ;;
+	run-once) ssh_runtime_execute run-once run_once ;;
+	run-cycle) ssh_runtime_execute run-cycle run_cycle ;;
 	set-reporter) set_reporter "${2:-}" ;;
 	daemon) run_daemon ;;
+	runtime-status) ssh_runtime_status ;;
+	status) ssh_runtime_status ;;
 	*)
 		echo "usage: $0 {run-once|run-cycle|set-reporter 0|1|daemon}" >&2
 		exit 2

@@ -6,6 +6,10 @@ umask 077
 COMMON_LIB="${SMARTSAFEHUB_COMMON_LIB:-$(dirname "$0")/../lib/smartsafehub/common.sh}"
 [ -r "$COMMON_LIB" ] || exit 1
 . "$COMMON_LIB"
+RUNTIME_LIB="${SMARTSAFEHUB_RUNTIME_LIB:-$(dirname "$0")/../lib/smartsafehub/runtime.sh}"
+[ -r "$RUNTIME_LIB" ] || exit 1
+. "$RUNTIME_LIB"
+ssh_runtime_init "device"
 RUNTIME_DIR="${SMARTSAFEHUB_DEVICE_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_DEVICE_STATE_FILE:-$RUNTIME_DIR/device.json}"
 CREDENTIAL_FILE="${SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE:-/etc/smartsafehub/device-credential.json}"
@@ -281,5 +285,16 @@ retry_delay() {
  printf '%s\n' "$base"
 }
 wait_for() { local seconds="$1"; [ "$STOP_REQUESTED" -eq 1 ] && return 1; "$SLEEP_BIN" "$seconds" & WAIT_PID=$!; wait "$WAIT_PID" 2>/dev/null || true; WAIT_PID=''; [ "$STOP_REQUESTED" -eq 0 ]; }
-daemon() { local failures=0 delay; mkdir -p "$RUNTIME_DIR"; prepare_credential || true; wait_for "$STARTUP_DELAY_S" || return 0; while [ "$STOP_REQUESTED" -eq 0 ]; do if status_sync; then failures=0; delay="$CHECK_INTERVAL_S"; else delay="$(retry_delay "$failures")"; [ "$failures" -lt 4 ] && failures=$((failures + 1)); fi; wait_for "$delay" || break; done; }
-case "${1:-daemon}" in prepare-credential) prepare_credential ;; bootstrap) bootstrap ;; status-sync) status_sync ;; pairing-session) pairing_session ;; daemon) daemon ;; *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|pairing-session}" >&2; exit 2 ;; esac
+daemon() { local failures=0 delay; mkdir -p "$RUNTIME_DIR"; prepare_credential || true; wait_for "$STARTUP_DELAY_S" || return 0; while [ "$STOP_REQUESTED" -eq 0 ]; do if ssh_runtime_execute status-sync status_sync; then failures=0; delay="$CHECK_INTERVAL_S"; else delay="$(retry_delay "$failures")"; [ "$failures" -lt 4 ] && failures=$((failures + 1)); fi; wait_for "$delay" || break; done; }
+# Existing commands retain their behaviour; runtime-status is read-only.
+ssh_runtime_debug_arg "${1:-daemon}" "${2:-}" || { echo 'invalid argument' >&2; exit 2; }
+case "${1:-daemon}" in
+ prepare-credential) prepare_credential ;;
+ bootstrap) bootstrap ;;
+ status-sync|run-once) ssh_runtime_execute status-sync status_sync ;;
+ pairing-session) pairing_session ;;
+ status) [ -s "$STATE_FILE" ] && cat "$STATE_FILE" || printf '{}\n' ;;
+ runtime-status) ssh_runtime_status ;;
+ daemon) daemon ;;
+ *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|run-once|pairing-session|status|runtime-status} [--debug]" >&2; exit 2 ;;
+esac
