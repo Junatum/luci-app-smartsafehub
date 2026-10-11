@@ -54,9 +54,9 @@ export const demoSafeShield: SafeShieldStatus = {
   summary: { label: '보호 중', message: 'DNS 보호가 정상적으로 동작하고 있습니다.', severity: 'info' },
   runtime: { refreshdRunning: true, dnsmasqRunning: true, dnsRuntimeOk: true, lastResult: 'success', lastErrorCode: null },
   entitlement: { plan: 'free', status: 'active' },
-  artifact: { resolved: true, tier: 'light', version: '20261010T010000Z', uniqueDomains: 148000, rules: 148000 },
+  artifact: { resolved: true, tier: 'light', version: '20261010T010000Z', uniqueDomains: 48000, rules: 48000 },
   localOverrides: { enabled: true, allowlistPath: '/etc/safeshield/allowlist', blocklistPath: '/etc/safeshield/blocklist' },
-  blocklist: { installed: true, validLineCount: 148000, fileSizeKb: 4700, verificationOk: true },
+  blocklist: { installed: true, validLineCount: 48000, fileSizeKb: 4700, verificationOk: true },
   health: { overall: 'ok' }, issueCounts: { warnings: 0, errors: 0 },
   timestamps: { lastAttempt: now - 2 * hour, lastSuccess: now - 2 * hour, lastFailure: 0, lastLocalApply: now - 2 * hour, lastLocalApplyFailure: 0, nextRefreshAt: now + 21 * hour, refreshIntervalS: 82800 },
 };
