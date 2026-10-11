@@ -13,9 +13,6 @@ export function LoadingPanel() {
           <h2 class="m-0 text-lg font-extrabold text-slate-950">
             장치 상태를 확인하고 있습니다
           </h2>
-          <p class="mt-1 mb-0 text-sm leading-6 text-slate-600">
-            OpenWrt의 rpcd API에서 정보를 불러오는 중입니다.
-          </p>
         </div>
       </div>
     </section>
