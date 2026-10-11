@@ -89,6 +89,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build standalone router demo
+        run: npm run build:demo
+
+      - name: Validate committed router demo assets
+        shell: bash
+        run: |
+          test -s demo-dist/demo.js
+          test -s demo-dist/demo.css
+          git -C .. ls-files --error-unmatch \
+            frontend/demo-dist/demo.js frontend/demo-dist/demo.css > /dev/null
+          if [ -n "$(git -C .. status --porcelain --untracked-files=all -- frontend/demo-dist/)" ]; then
+            echo 'Router demo build differs from the committed demo-dist files.' >&2
+            git -C .. status --short --untracked-files=all -- frontend/demo-dist/
+            exit 1
+          fi
+
       - name: Validate committed production assets
         run: |
           test -s ../root/www/luci-static/smartsafehub/app.js

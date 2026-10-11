@@ -1,0 +1,97 @@
+// Entirely fictional values. Never use a real router address, MAC, credential or token.
+import type { ActivityHistory } from '../types/activity';
+import type { ConnectedDevicesSummary } from '../types/devices';
+import type { FirmwareStatus } from '../types/firmware';
+import type { HealthStatus } from '../types/health';
+import type { LanSettings } from '../types/lan';
+import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
+import type { SmartSafeHubStatus } from '../types/status';
+import type { SoftwareUpdateStatus } from '../types/updates';
+
+const now = Math.floor(Date.now() / 1000);
+const hour = 3600;
+
+export const demoDevices: ConnectedDevicesSummary = {
+  generatedAt: now,
+  devices: [
+    { id: 'demo-phone', hostname: '거실 스마트폰', mac: '02:00:00:00:00:01', ipv4Address: '192.0.2.101', connection: 'wifi', online: true, leaseActive: true, leaseExpiresAt: now + 6 * hour, interface: 'wlan0', ssid: 'SmartSafeHub', radio: 'radio0', band: '5g', bandLabel: '5 GHz', signalDbm: -43, inactiveMs: 250, connectedSeconds: 8300 },
+    { id: 'demo-laptop', hostname: '작업용 노트북', mac: '02:00:00:00:00:02', ipv4Address: '192.0.2.102', connection: 'wifi', online: true, leaseActive: true, leaseExpiresAt: now + 8 * hour, interface: 'wlan0', ssid: 'SmartSafeHub', radio: 'radio0', band: '5g', bandLabel: '5 GHz', signalDbm: -57, inactiveMs: 720, connectedSeconds: 29200 },
+    { id: 'demo-tv', hostname: '거실 TV', mac: '02:00:00:00:00:03', ipv4Address: '192.0.2.103', connection: 'ethernet', online: true, leaseActive: true, leaseExpiresAt: now + 12 * hour, interface: 'lan1', ssid: null, radio: null, band: null, bandLabel: null, signalDbm: null, inactiveMs: null, connectedSeconds: 140000 },
+    { id: 'demo-tablet', hostname: '태블릿', mac: '02:00:00:00:00:04', ipv4Address: '192.0.2.104', connection: 'wifi', online: false, leaseActive: false, leaseExpiresAt: null, interface: null, ssid: 'SmartSafeHub', radio: 'radio1', band: '2g', bandLabel: '2.4 GHz', signalDbm: null, inactiveMs: null, connectedSeconds: null },
+  ],
+  totals: { known: 4, online: 3, wireless: 2, ethernet: 1, offline: 1 },
+};
+
+export const demoActivity: ActivityHistory = {
+  schema: 1, scope: 'current_boot', volatile: true, maxEvents: 100,
+  cloud: { enabled: false, phase: 'disabled', eligible: false, plan: 'free', retentionDays: 0, pendingEvents: 0, lastAttemptAt: 0, lastSuccessAt: 0, lastUploadedCount: 0, lastErrorCode: null, nextSyncAt: 0 },
+  events: [
+    { schema: 1, eventId: 'demo-event-1', eventType: 'safeshield.blocklist.updated', severity: 'success', occurredAt: now - 7200, deviceUuid: null, source: 'safeshield', metadata: {} },
+    { schema: 1, eventId: 'demo-event-2', eventType: 'system.boot', severity: 'info', occurredAt: now - 86400, deviceUuid: null, source: 'system', metadata: {} },
+  ],
+};
+
+export const demoStatus: SmartSafeHubStatus = {
+  device: { hostname: 'SmartRouter', model: 'ipTIME AX3000SM', boardName: 'iptime,ax3000sm' },
+  software: { distribution: 'OpenWrt', version: '25.12', revision: 'demo', kernel: '6.12' },
+  runtime: { uptime: 86400, localtime: now, load: [0.08, 0.12, 0.05], memory: { total: 268435456, free: 83886080, shared: 4194304, buffered: 41943040, available: 171966464, cached: 41943040 } },
+  network: { available: true, up: true, protocol: 'dhcp', ipv4Address: '198.51.100.20' },
+  activityHistory: demoActivity,
+};
+
+export const demoLan: LanSettings = {
+  lan: { address: '192.168.1.1', prefixLength: 24, netmask: '255.255.255.0', subnet: '192.168.1.0/24' },
+  dhcp: { enabled: true, start: '192.168.1.100', end: '192.168.1.249', leaseTime: '12h' },
+  wan: { connected: true, protocol: 'dhcp', address: '198.51.100.20', prefixLength: 24, subnet: '198.51.100.0/24' },
+  conflict: { detected: false, wanSubnet: null }, recommendation: null,
+};
+
+export const demoSafeShield: SafeShieldStatus = {
+  available: true, version: '0.3.25', enabled: true, active: true, status: 'idle', stage: null,
+  summary: { label: '보호 중', message: 'DNS 보호가 정상적으로 동작하고 있습니다.', severity: 'info' },
+  runtime: { refreshdRunning: true, dnsmasqRunning: true, dnsRuntimeOk: true, lastResult: 'success', lastErrorCode: null },
+  entitlement: { plan: 'free', status: 'active' },
+  artifact: { resolved: true, tier: 'light', version: '20261010T010000Z', uniqueDomains: 148000, rules: 148000 },
+  localOverrides: { enabled: true, allowlistPath: '/etc/safeshield/allowlist', blocklistPath: '/etc/safeshield/blocklist' },
+  blocklist: { installed: true, validLineCount: 148000, fileSizeKb: 4700, verificationOk: true },
+  health: { overall: 'ok' }, issueCounts: { warnings: 0, errors: 0 },
+  timestamps: { lastAttempt: now - 2 * hour, lastSuccess: now - 2 * hour, lastFailure: 0, lastLocalApply: now - 2 * hour, lastLocalApplyFailure: 0, nextRefreshAt: now + 21 * hour, refreshIntervalS: 82800 },
+};
+
+const hourly = Array.from({ length: 24 }, (_, i) => ({
+  bucketStart: now - (23 - i) * hour,
+  queries: 260 + ((i * 47) % 220),
+  blocked: 30 + ((i * 13) % 62),
+}));
+export const demoStatistics: SafeShieldStatistics = {
+  enabled: true, collectorRunning: true, available: true, schemaVersion: 1, volatile: true,
+  startedAt: now - 7 * 86400, updatedAt: now - 30, retentionHours: 168,
+  totals: { queries: hourly.reduce((sum, item) => sum + item.queries, 0), blocked: hourly.reduce((sum, item) => sum + item.blocked, 0) },
+  hourly, deviceLimit: 128, devicesTruncated: false,
+  devices: [
+    { id: 'demo-phone', mac: '02:00:00:00:00:01', ip: '192.0.2.101', hostname: '거실 스마트폰', identified: true, queries: 3400, blocked: 470 },
+    { id: 'demo-laptop', mac: '02:00:00:00:00:02', ip: '192.0.2.102', hostname: '작업용 노트북', identified: true, queries: 2900, blocked: 345 },
+    { id: 'demo-tv', mac: '02:00:00:00:00:03', ip: '192.0.2.103', hostname: '거실 TV', identified: true, queries: 1200, blocked: 185 },
+  ],
+};
+
+export const demoHealth: HealthStatus = {
+  schema: 1, generatedAt: now, overall: 'ok',
+  summary: { message: '모든 주요 항목이 정상입니다.', total: 3, ok: 3, warning: 0, critical: 0, unknown: 0 },
+  metrics: { memoryAvailablePercent: 64, load1m: 0.08, overlayAvailablePercent: 80 },
+  checks: [],
+  reporter: { enabled: false, eligible: false, plan: 'free', entitlementStatus: 'active', lastReportAt: 0, nextReportAt: 0, lastResult: '', lastErrorCode: null },
+};
+
+export const demoUpdates: SoftwareUpdateStatus = {
+  phase: 'idle', updateCount: 0, packages: [], lastCheckAt: now - hour, lastInstallAt: null, lastError: null,
+  releaseNotes: [], releaseNotesComplete: true,
+  settings: { channel: 'stable', checkEnabled: true, checkIntervalSeconds: 21600, autoInstall: true, autoInstallTime: '03:00', repositoryHost: 'example.invalid', updatePackage: 'luci-app-smartsafehub' },
+};
+
+export const demoFirmware: FirmwareStatus = {
+  phase: 'idle', source: null, lastCheckAt: now - hour, lastPrepareAt: null, lastError: null, prepared: null,
+  current: { deviceCode: 'iptime-ax3000sm', boardName: 'iptime,ax3000sm', buildId: 'demo', releaseVersion: '1.0.2', openwrtVersion: '25.12', metadataAvailable: true },
+  updateAvailable: false, release: null,
+  settings: { channel: 'stable', apiBaseUrl: 'https://www.smartsafehub.com', checkIntervalSeconds: 21600, autoInstall: false },
+};

@@ -28,6 +28,12 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The output should start with 'PASS:'
     The error should be blank
   End
+  It '공유기 데모의 실제 기기 접근 차단과 Git 배포 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-router-demo-contract.sh"
+    The status should be success
+    The error should be blank
+  End
+
   It '게스트 Wi-Fi 분리망과 관리 UI 보안 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-guest-wifi-contract.sh"
     The status should be success

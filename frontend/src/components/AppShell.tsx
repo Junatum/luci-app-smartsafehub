@@ -18,6 +18,7 @@ interface AppShellProps {
   refreshing: boolean;
   route: AppRoute;
   updateCount: number;
+  demo?: boolean;
 }
 
 function readSidebarCollapsed(): boolean {
@@ -40,6 +41,7 @@ export function AppShell({
   refreshing,
   route,
   updateCount,
+  demo = false,
 }: AppShellProps) {
   const copy = ROUTE_BY_NAME[route];
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
@@ -72,6 +74,7 @@ export function AppShell({
     >
       <ProductNavigation
         accountRegistered={accountRegistered}
+        demo={demo}
         collapsed={sidebarCollapsed}
         loading={loading}
         onRefresh={onRefresh}

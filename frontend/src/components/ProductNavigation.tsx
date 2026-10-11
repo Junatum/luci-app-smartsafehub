@@ -37,6 +37,7 @@ interface ProductNavigationProps {
   theme: 'dark' | 'light';
   title: string;
   updateCount: number;
+  demo?: boolean;
 }
 
 const NAVIGATION_GROUPS: readonly {
@@ -99,7 +100,9 @@ function NavigationItems({
   collapsed = false,
   route,
   updateCount,
+  demo = false,
 }: {
+  demo?: boolean;
   accountRegistered: boolean | null;
   collapsed?: boolean;
   route: AppRoute;
@@ -107,7 +110,7 @@ function NavigationItems({
 }) {
   return (
     <div class={collapsed ? 'space-y-3' : 'space-y-5'}>
-      {NAVIGATION_GROUPS.map((group, groupIndex) => (
+      {NAVIGATION_GROUPS.filter((group) => !demo || group.routes.some((name) => ['home', 'safeshield', 'devices'].includes(name))).map((group, groupIndex) => (
         <section
           aria-label={group.label}
           class={
@@ -121,7 +124,7 @@ function NavigationItems({
             </p>
           )}
           <div class="space-y-1">
-            {group.routes.map((routeName) => {
+            {group.routes.filter((name) => !demo || ['home', 'safeshield', 'devices'].includes(name)).map((routeName) => {
               const item = ROUTE_BY_NAME[routeName];
               const active = route === routeName;
               return (
@@ -207,6 +210,7 @@ export function ProductNavigation({
   theme,
   title,
   updateCount,
+  demo = false,
 }: ProductNavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const themeLabel = themeActionLabel(theme);
@@ -288,8 +292,8 @@ export function ProductNavigation({
 
         {mobileMenuOpen ? (
           <div class="ssh-mobile-menu border-t border-slate-100 py-4" id="smartsafehub-mobile-menu">
-            <NavigationItems accountRegistered={accountRegistered} route={route} updateCount={updateCount} />
-            <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
+            <NavigationItems accountRegistered={accountRegistered} demo={demo} route={route} updateCount={updateCount} />
+            {!demo ? <div class="mt-5 space-y-1 border-t border-slate-100 pt-4">
               <a
                 class={`${navigationClass(false)} text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
                 href={luciAdminUrl('/admin/logout')}
@@ -299,7 +303,7 @@ export function ProductNavigation({
                 </span>
                 로그아웃
               </a>
-            </div>
+            </div> : null}
           </div>
         ) : null}
       </nav>
@@ -357,9 +361,9 @@ export function ProductNavigation({
             class={`flex-1 overflow-y-auto py-5 ${collapsed ? 'px-2' : 'px-3'}`}
             id="smartsafehub-desktop-navigation"
           >
-            <NavigationItems accountRegistered={accountRegistered} collapsed={collapsed} route={route} updateCount={updateCount} />
+            <NavigationItems accountRegistered={accountRegistered} collapsed={collapsed} demo={demo} route={route} updateCount={updateCount} />
           </nav>
-          <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
+          {!demo ? <div class={`border-t border-slate-100 ${collapsed ? 'p-2' : 'p-3'}`}>
             <a
               aria-label="SmartSafeHub에서 로그아웃"
               class={`${navigationClass(false, collapsed)} mt-1 text-rose-700 hover:bg-rose-50 hover:text-rose-800`}
@@ -371,7 +375,7 @@ export function ProductNavigation({
               </span>
               {collapsed ? null : '로그아웃'}
             </a>
-          </div>
+          </div> : null}
         </div>
       </aside>
     </>
