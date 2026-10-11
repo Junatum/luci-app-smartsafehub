@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 
-import { ROUTE_BY_NAME } from '../app/routes';
+import { DEMO_ROUTES, ROUTE_BY_NAME } from '../app/routes';
 import type { AppRoute } from '../app/routes';
 import { luciAdminUrl } from '../utils/luci';
 import {
@@ -110,7 +110,7 @@ function NavigationItems({
 }) {
   return (
     <div class={collapsed ? 'space-y-3' : 'space-y-5'}>
-      {NAVIGATION_GROUPS.filter((group) => !demo || group.routes.some((name) => ['home', 'safeshield', 'devices'].includes(name))).map((group, groupIndex) => (
+      {NAVIGATION_GROUPS.filter((group) => !demo || group.routes.some((name) => DEMO_ROUTES.includes(name))).map((group, groupIndex) => (
         <section
           aria-label={group.label}
           class={
@@ -124,7 +124,7 @@ function NavigationItems({
             </p>
           )}
           <div class="space-y-1">
-            {group.routes.filter((name) => !demo || ['home', 'safeshield', 'devices'].includes(name)).map((routeName) => {
+            {group.routes.filter((name) => !demo || DEMO_ROUTES.includes(name)).map((routeName) => {
               const item = ROUTE_BY_NAME[routeName];
               const active = route === routeName;
               return (

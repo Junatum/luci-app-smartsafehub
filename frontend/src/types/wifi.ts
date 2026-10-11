@@ -59,3 +59,9 @@ export interface GuestWifiUpdateResult {
   reloaded: boolean;
   guest: GuestWifiSummary;
 }
+
+export interface WifiQrCredentials {
+  ssid: string;
+  security: 'none' | 'psk2' | 'sae' | 'sae-mixed';
+  password: string;
+}

@@ -102,3 +102,8 @@ export const ROUTES: readonly RouteDefinition[] = [
 export const ROUTE_BY_NAME = Object.fromEntries(
   ROUTES.map((definition) => [definition.route, definition]),
 ) as Record<AppRoute, RouteDefinition>;
+
+// Public demo exposes only these read-only, fixture-backed screens.
+export const DEMO_ROUTES: readonly AppRoute[] = [
+  'home', 'activity', 'network', 'wifi', 'devices', 'safeshield', 'rules', 'system',
+];

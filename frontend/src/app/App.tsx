@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { initializeSystemTimezone } from '../api/smartsafehub';
+import { fetchGuestWifiQr, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
 import { useActivityHistory } from '../hooks/useActivityHistory';
@@ -183,6 +183,8 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           onRetry={() => void wifi.refresh()}
           onUpdate={wifi.update}
           onUpdateGuest={wifi.updateGuest}
+          onLoadQr={fetchWifiQr}
+          onLoadGuestQr={fetchGuestWifiQr}
           updatingSection={wifi.updatingSection}
         />
       );

@@ -3,18 +3,20 @@ import { useEffect, useState } from 'preact/hooks';
 
 import { WifiQrDialog } from './WifiQrDialog';
 import { AlertIcon, CheckCircleIcon, ChevronDownIcon, QrCodeIcon, RouterIcon } from './Icons';
-import type { GuestWifiSummary, GuestWifiUpdateInput } from '../types/wifi';
+import type { GuestWifiSummary, GuestWifiUpdateInput, WifiQrCredentials } from '../types/wifi';
 
 export function GuestWifiCard({
   guest,
   busy,
   saving,
   onUpdate,
+  onLoadQr,
 }: {
   guest: GuestWifiSummary;
   busy: boolean;
   saving: boolean;
   onUpdate: (input: GuestWifiUpdateInput) => Promise<boolean>;
+  onLoadQr: () => Promise<WifiQrCredentials>;
 }) {
   // Keep guest settings out of the way until the administrator needs them.
   const [expanded, setExpanded] = useState(false);
@@ -169,7 +171,7 @@ export function GuestWifiCard({
           {validation && <p class="mt-4 mb-0 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{validation}</p>}
         </div>
       </form>
-      {showQr && <WifiQrDialog guest section="ssh_guest" onClose={() => setShowQr(false)} />}
+      {showQr && <WifiQrDialog load={onLoadQr} onClose={() => setShowQr(false)} />}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import type { TargetedSubmitEvent } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
 import { GuestWifiCard } from '../components/GuestWifiCard';
@@ -10,6 +10,7 @@ import type { WifiFeedback } from '../hooks/useWifi';
 import type {
   GuestWifiUpdateInput,
   WifiNetworkSummary,
+  WifiQrCredentials,
   WifiSecurityChoice,
   WifiSummary,
   WifiUpdateInput,
@@ -25,6 +26,8 @@ interface WifiPageProps {
   onRetry: () => void;
   onUpdate: (input: WifiUpdateInput) => Promise<boolean>;
   onUpdateGuest: (input: GuestWifiUpdateInput) => Promise<boolean>;
+  onLoadQr: (section: string) => Promise<WifiQrCredentials>;
+  onLoadGuestQr: () => Promise<WifiQrCredentials>;
 }
 
 const SECURITY_OPTIONS: ReadonlyArray<{
@@ -64,11 +67,13 @@ function WifiNetworkCard({
   busy,
   saving,
   onUpdate,
+  onLoadQr,
 }: {
   network: WifiNetworkSummary;
   busy: boolean;
   saving: boolean;
   onUpdate: (input: WifiUpdateInput) => Promise<boolean>;
+  onLoadQr: (section: string) => Promise<WifiQrCredentials>;
 }) {
   const [ssid, setSsid] = useState(network.ssid);
   const [enabled, setEnabled] = useState(network.enabled);
@@ -77,6 +82,7 @@ function WifiNetworkCard({
   );
   const [password, setPassword] = useState('');
   const [showQr, setShowQr] = useState(false);
+  const loadQr = useCallback(() => onLoadQr(network.section), [onLoadQr, network.section]);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -302,7 +308,7 @@ function WifiNetworkCard({
         </button>
       </div>
 
-      {showQr ? <WifiQrDialog section={network.section} onClose={() => setShowQr(false)} /> : null}
+      {showQr ? <WifiQrDialog load={loadQr} onClose={() => setShowQr(false)} /> : null}
       {validationError ? (
         <p class="mt-4 mb-0 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
           {validationError}
@@ -353,6 +359,8 @@ export function WifiPage({
   onRetry,
   onUpdate,
   onUpdateGuest,
+  onLoadQr,
+  onLoadGuestQr,
 }: WifiPageProps) {
   if (loading) {
     return <LoadingPanel />;
@@ -393,6 +401,7 @@ export function WifiPage({
               busy={updatingSection !== null}
               network={network}
               onUpdate={onUpdate}
+              onLoadQr={onLoadQr}
               saving={updatingSection === network.section}
             />
           ))}
@@ -416,6 +425,7 @@ export function WifiPage({
             busy={updatingSection !== null}
             saving={updatingSection === 'ssh_guest'}
             onUpdate={onUpdateGuest}
+            onLoadQr={onLoadGuestQr}
           />
         </>
       )}

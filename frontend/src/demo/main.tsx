@@ -2,6 +2,13 @@ import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
 import { AppShell } from '../components/AppShell';
+import { DEMO_ROUTES } from '../app/routes';
+import { ActivityPage } from '../pages/ActivityPage';
+import { WanPage } from '../pages/WanPage';
+import { LanPage } from '../pages/LanPage';
+import { WifiPage } from '../pages/WifiPage';
+import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
+import { UpdatePage } from '../pages/UpdatePage';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
@@ -9,11 +16,12 @@ import { SafeShieldPage } from '../pages/SafeShieldPage';
 import {
   demoActivity, demoDevices, demoFirmware, demoHealth, demoLan,
   demoSafeShield, demoStatistics, demoStatus, demoUpdates,
+  demoWan, demoWifi, demoRules, demoWifiQr, demoGuestWifiQr,
 } from './data';
 import '../styles/app.css';
 
 // This entry MUST NOT import App, auth/session, or api/*. No backend is involved.
-const ALLOWED_ROUTES = new Set(['home', 'devices', 'safeshield']);
+const ALLOWED_ROUTES = new Set(DEMO_ROUTES);
 
 function DemoApp() {
   const currentRoute = useHashRoute();
@@ -29,8 +37,54 @@ function DemoApp() {
   const dismiss = () => setNotice('');
   const reset = () => setNotice('예시 데이터가 표시되고 있습니다. 실제 공유기에는 연결되지 않습니다.');
 
+  // All callbacks are local-only. Never load router hooks or the authenticated App.
+  const disabledAction = async (): Promise<boolean> => {
+    readonlyNotice();
+    return false;
+  };
+  const firmware = {
+    action: null, actionError: null, data: demoFirmware, error: null,
+    loading: false, message: null, reconnecting: false, uploadProgress: null,
+    check: readonlyNotice, discard: disabledAction, dismissFeedback: dismiss,
+    install: disabledAction, prepare: readonlyNotice, refresh: reset, upload: disabledAction,
+  };
+
   let content;
   switch (route) {
+    case 'activity':
+      content = <ActivityPage actionError={null} actionMessage={null} data={demoActivity}
+        error={null} loading={false} onDismissActionFeedback={dismiss} onRetry={reset}
+        onSetCloudSync={readonlyNotice} savingCloudSync={false} />;
+      break;
+    case 'network':
+      content = <div class="min-w-0">
+        <div aria-label="인터넷 연결 설정"><WanPage action={null} data={demoWan} error={null}
+          feedback={null} loading={false} onDismissFeedback={dismiss} onReconnect={readonlyNotice}
+          onRetry={reset} onSave={disabledAction} /></div>
+        <div aria-label="내부 네트워크 설정" class="mt-8 min-w-0 border-t border-slate-200 pt-8">
+          <LanPage action={null} data={demoLan} error={null} feedback={null} loading={false}
+            onApplyRecommendation={disabledAction} onDismissFeedback={dismiss} onRetry={reset}
+            onSave={disabledAction} />
+        </div>
+      </div>;
+      break;
+    case 'wifi':
+      content = <WifiPage data={demoWifi} error={null} feedback={null} loading={false}
+        updatingSection={null} onDismissFeedback={dismiss} onRetry={reset}
+        onUpdate={disabledAction} onUpdateGuest={disabledAction}
+        onLoadQr={demoWifiQr} onLoadGuestQr={demoGuestWifiQr} />;
+      break;
+    case 'rules':
+      content = <SafeShieldRulesPage action={null} data={demoRules} error={null}
+        feedback={null} loading={false} onAddRule={disabledAction} onDeleteRule={disabledAction}
+        onDismissFeedback={dismiss} onRetry={reset} />;
+      break;
+    case 'system':
+      content = <UpdatePage action={null} actionError={null} data={demoUpdates}
+        error={null} firmware={firmware} loading={false} message={null}
+        onCheck={readonlyNotice} onDismissFeedback={dismiss} onInstall={readonlyNotice}
+        onRetry={reset} onSaveSettings={disabledAction} />;
+      break;
     case 'devices':
       content = <ConnectedDevicesPage data={demoDevices} error={null} loading={false} onRetry={reset} />;
       break;
@@ -62,7 +116,7 @@ function DemoApp() {
 
   return (
     <AppShell accountRegistered={false} demo loading={false} onRefresh={reset} refreshing={false} route={route} updateCount={0}>
-      <div role="status" class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">
+      <div role="status" class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
         <span>체험 모드 · 표시되는 기기와 보호 통계는 모두 예시입니다.</span>
         <a class="font-extrabold underline" href="/devices/">지원 기기 살펴보기 →</a>
       </div>

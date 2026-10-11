@@ -10,6 +10,8 @@ grep -q 'passwordConfigured: length(key) > 0' root/usr/share/rpcd/ucode/smartsaf
 if grep -q 'password: key' root/usr/share/rpcd/ucode/smartsafehub/wifi.uc; then echo 'FAIL: wifi summary leaks password'; exit 1; fi
 grep -q 'wifi_qr' root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json
 grep -q 'QR 코드 보기' frontend/src/pages/WifiPage.tsx
+grep -Fq 'onLoadQr={fetchWifiQr}' frontend/src/app/App.tsx
+grep -Fq 'load={loadQr}' frontend/src/pages/WifiPage.tsx
 grep -q 'TextEncoder' frontend/src/utils/qrMatrix.ts
 # The PNG is generated in-browser from the same QR matrix; no new RPC endpoint.
 grep -q 'drawWifiQrPng(qr.matrix, context, moduleSize)' frontend/src/components/WifiQrDialog.tsx

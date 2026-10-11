@@ -13,6 +13,9 @@ done
 grep -Fq "<HomePage" "$DEMO"
 grep -Fq "<SafeShieldPage" "$DEMO"
 grep -Fq "<ConnectedDevicesPage" "$DEMO"
+for page in ActivityPage WanPage LanPage WifiPage SafeShieldRulesPage UpdatePage; do
+  grep -Fq "<$page" "$DEMO"
+done
 grep -Fq "demo={demo}" "$ROOT/frontend/src/components/AppShell.tsx"
 grep -Fq "!demo ?" "$ROOT/frontend/src/components/ProductNavigation.tsx"
 grep -Fq "base: '/static/router-demo/'" "$CONFIG"
@@ -23,7 +26,14 @@ if grep -Eq 'callApi|callRpc|fetch\(|probeLuciSession|__SMARTHUB_BOOTSTRAP__|/cg
   exit 1
 fi
 
-node --test "$ROOT/tests/runtime/router-demo.test.mjs"
+# Keep the Node.js test runner output out of ShellSpec stdout on success.
+# Preserve its full diagnostics on stderr if any runtime contract fails.
+node_test_log="$(mktemp)"
+trap 'rm -f "$node_test_log"' 0
+if ! node --test "$ROOT/tests/runtime/router-demo.test.mjs" >"$node_test_log" 2>&1; then
+  cat "$node_test_log" >&2
+  exit 1
+fi
 
 # The Hub consumes a committed, separately built bundle. New developers build
 # it locally, then commit the output; this test does not generate build files.
@@ -33,3 +43,5 @@ if grep -q '^frontend/demo-dist/$' "$ROOT/.gitignore"; then
 fi
 grep -Fq 'Build standalone router demo' "$ROOT/.github/workflows/ci.yml"
 grep -Fq 'Validate committed router demo assets' "$ROOT/.github/workflows/ci.yml"
+
+printf "%s\n" "PASS: router demo contract"

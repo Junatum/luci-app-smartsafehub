@@ -28,6 +28,7 @@ import type {
   SoftwareUpdateStatus,
 } from '../types/updates';
 import type {
+  WifiQrCredentials,
   GuestWifiSummary,
   GuestWifiUpdateInput,
   GuestWifiUpdateResult,
@@ -309,11 +310,7 @@ export function updateIptvSettings(
   );
 }
 
-export interface WifiQrCredentials {
-  ssid: string;
-  security: 'none' | 'psk2' | 'sae' | 'sae-mixed';
-  password: string;
-}
+export type { WifiQrCredentials } from '../types/wifi';
 
 export function fetchWifiQr(section: string): Promise<WifiQrCredentials> {
   return callApi(API_OBJECT, 'wifi_qr', { section }, { timeoutMs: 8000 });

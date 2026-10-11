@@ -31,6 +31,7 @@ Describe 'SmartSafeHub 셸 계약 테스트'
   It '공유기 데모의 실제 기기 접근 차단과 Git 배포 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-router-demo-contract.sh"
     The status should be success
+    The output should start with 'PASS: router demo contract'
     The error should be blank
   End
 

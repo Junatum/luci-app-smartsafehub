@@ -27,3 +27,5 @@ frontend/.env.*.local
 *.orig
 *.rej
 /*.patch
+
+# frontend/demo-dist/ is intentionally committed for the Hub demo.

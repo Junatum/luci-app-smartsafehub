@@ -108,8 +108,9 @@ grep -q 'aria-controls="ssh-guest-settings"' "$PAGE"
 grep -q "expanded ? '' : 'hidden'" "$PAGE"
 grep -q 'busy || dirty || !guest.enabled || !guest.passwordConfigured' "$PAGE"
 grep -q '게스트 Wi-Fi QR 코드 보기' "$PAGE"
-grep -q 'WifiQrDialog guest section="ssh_guest"' "$PAGE"
-grep -q "fetchGuestWifiQr() : fetchWifiQr(section)" frontend/src/components/WifiQrDialog.tsx
+grep -Fq 'WifiQrDialog load={onLoadQr}' "$PAGE"
+grep -Fq 'onLoadGuestQr={fetchGuestWifiQr}' frontend/src/app/App.tsx
+grep -Fq 'void load().then((data)' frontend/src/components/WifiQrDialog.tsx
 grep -q "callApi(GUEST_API_OBJECT, 'wifi_guest_qr'" frontend/src/api/smartsafehub.ts
 # The guest card is separated from the primary Wi-Fi cards, with a full-width
 # line only when guest settings are available. Reuse the theme-aware border token.

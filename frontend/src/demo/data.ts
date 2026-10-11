@@ -2,6 +2,9 @@
 import type { ActivityHistory } from '../types/activity';
 import type { ConnectedDevicesSummary } from '../types/devices';
 import type { FirmwareStatus } from '../types/firmware';
+import type { WanSettings } from '../types/wan';
+import type { WifiSummary, WifiQrCredentials } from '../types/wifi';
+import type { SafeShieldRules } from '../types/rules';
 import type { HealthStatus } from '../types/health';
 import type { LanSettings } from '../types/lan';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
@@ -58,11 +61,46 @@ export const demoSafeShield: SafeShieldStatus = {
   timestamps: { lastAttempt: now - 2 * hour, lastSuccess: now - 2 * hour, lastFailure: 0, lastLocalApply: now - 2 * hour, lastLocalApplyFailure: 0, nextRefreshAt: now + 21 * hour, refreshIntervalS: 82800 },
 };
 
-const hourly = Array.from({ length: 24 }, (_, i) => ({
-  bucketStart: now - (23 - i) * hour,
-  queries: 260 + ((i * 47) % 220),
-  blocked: 30 + ((i * 13) % 62),
-}));
+const latestHourBucket = Math.floor(now / hour) * hour;
+
+const hourlyProfiles = [
+  { queries: 351, blocked: 18 },
+  { queries: 297, blocked: 15 },
+  { queries: 243, blocked: 11 },
+  { queries: 216, blocked: 9 },
+  { queries: 203, blocked: 8 },
+  { queries: 230, blocked: 10 },
+  { queries: 324, blocked: 17 },
+  { queries: 567, blocked: 35 },
+  { queries: 783, blocked: 54 },
+  { queries: 864, blocked: 61 },
+  { queries: 756, blocked: 50 },
+  { queries: 702, blocked: 43 },
+  { queries: 635, blocked: 36 },
+  { queries: 580, blocked: 30 },
+  { queries: 608, blocked: 33 },
+  { queries: 689, blocked: 40 },
+  { queries: 837, blocked: 54 },
+  { queries: 1026, blocked: 73 },
+  { queries: 1256, blocked: 99 },
+  { queries: 1458, blocked: 125 },
+  { queries: 1512, blocked: 135 },
+  { queries: 1323, blocked: 111 },
+  { queries: 1026, blocked: 75 },
+  { queries: 648, blocked: 39 },
+] as const;
+
+const hourly = Array.from({ length: 24 }, (_, i) => {
+  const bucketStart = latestHourBucket - (23 - i) * hour;
+  const hourOfDay = new Date(bucketStart * 1_000).getHours();
+  const profile = hourlyProfiles[hourOfDay]!;
+
+  return {
+    bucketStart,
+    queries: profile.queries,
+    blocked: profile.blocked,
+  };
+});
 export const demoStatistics: SafeShieldStatistics = {
   enabled: true, collectorRunning: true, available: true, schemaVersion: 1, volatile: true,
   startedAt: now - 7 * 86400, updatedAt: now - 30, retentionHours: 168,
@@ -95,3 +133,50 @@ export const demoFirmware: FirmwareStatus = {
   updateAvailable: false, release: null,
   settings: { channel: 'stable', apiBaseUrl: 'https://www.smartsafehub.com', checkIntervalSeconds: 21600, autoInstall: false },
 };
+
+// The interactive demo deliberately uses only invented, RFC 5737 addresses.
+export const demoWan: WanSettings = {
+  configuration: {
+    protocol: 'dhcp', supported: true,
+    pppoe: { username: '', passwordConfigured: false },
+    static: { address: null, prefixLength: null, netmask: null, gateway: null, dns: [] },
+  },
+  status: {
+    connected: true, pending: false, protocol: 'dhcp', device: 'wan',
+    address: '198.51.100.20', prefixLength: 24, gateway: '198.51.100.1',
+    dns: ['1.1.1.1', '8.8.8.8'], uptimeSeconds: 86400,
+  },
+};
+
+export const demoWifi: WifiSummary = {
+  networks: [
+    { section: 'demo_5g', device: 'radio0', band: '5g', bandLabel: '5 GHz',
+      ssid: 'SmartSafeHub', enabled: true, runtimeUp: true, security: 'sae-mixed',
+      securityRaw: 'sae-mixed', passwordConfigured: true, channel: '36',
+      networks: ['lan'], clientCount: 2 },
+    { section: 'demo_2g', device: 'radio1', band: '2g', bandLabel: '2.4 GHz',
+      ssid: 'SmartSafeHub-2G', enabled: true, runtimeUp: true, security: 'sae-mixed',
+      securityRaw: 'sae-mixed', passwordConfigured: true, channel: '6',
+      networks: ['lan'], clientCount: 0 },
+  ],
+  totalClients: 2,
+  guest: { supported: true, configured: true, enabled: true,
+    ssid: 'SmartSafeHub-Guest', passwordConfigured: true,
+    subnet: '192.0.2.0/24', radio: 'radio1' },
+};
+
+export const demoRules: SafeShieldRules = {
+  allow: ['trusted.example', 'updates.example'],
+  block: ['ads.example', 'tracker.example'],
+  counts: { allow: 2, block: 2, total: 4 },
+  safeshieldEnabled: true, applyLocalOverrides: true,
+};
+
+// The QR dialog uses an injected demo-only data provider, never the router RPC.
+export const demoWifiQr = async (section: string): Promise<WifiQrCredentials> => ({
+  ssid: demoWifi.networks.find((network) => network.section === section)?.ssid ?? 'SmartSafeHub',
+  security: 'sae-mixed', password: 'demo-only-2026',
+});
+export const demoGuestWifiQr = async (): Promise<WifiQrCredentials> => ({
+  ssid: 'SmartSafeHub-Guest', security: 'sae-mixed', password: 'guest-demo-only-2026',
+});
