@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useRef, useState } from 'preact/hooks';
 
 import {
   addSafeShieldRule,
@@ -129,14 +129,25 @@ export function useSafeShieldRules(active: boolean) {
     error: null,
     feedback: null,
   });
+  const latestMutationId = useRef(0);
 
   const mutate = useCallback(
     async (
       operation: 'add' | 'delete',
       action: SafeShieldRuleAction,
       domain: string,
+      onPersisted?: () => void,
     ): Promise<boolean> => {
-      setMutation({
+      const mutationId = ++latestMutationId.current;
+      // DNS verification can outlive persistence, while a newer rule is saved.
+      // Never overwrite the newer request's feedback with an older result.
+      const report = (next: SafeShieldRulesMutationState) => {
+        if (latestMutationId.current === mutationId) {
+          setMutation(next);
+        }
+      };
+
+      report({
         action: { operation, action, domain },
         error: null,
         feedback: null,
@@ -153,6 +164,9 @@ export function useSafeShieldRules(active: boolean) {
             : await deleteSafeShieldRule(action, domain, true);
 
         resource.replaceData(result.rules);
+        // A successful rules API response means the rule is saved. Notify the
+        // input immediately, without waiting for DNS apply verification.
+        onPersisted?.();
 
         const shouldApply =
           result.changed &&
@@ -160,7 +174,7 @@ export function useSafeShieldRules(active: boolean) {
           result.rules.applyLocalOverrides;
 
         if (!shouldApply) {
-          setMutation({
+          report({
             action: null,
             error: null,
             feedback: savedOnlyMessage(operation, result),
@@ -169,7 +183,7 @@ export function useSafeShieldRules(active: boolean) {
         }
 
         if (!result.refresh.accepted) {
-          setMutation({
+          report({
             action: null,
             error: `규칙은 저장되었지만 로컬 DNS 적용 요청을 시작하지 못했습니다${result.refresh.reason ? ` (${result.refresh.reason})` : ''}.`,
             feedback: null,
@@ -177,16 +191,28 @@ export function useSafeShieldRules(active: boolean) {
           return true;
         }
 
-        setMutation({
+        report({
           action: null,
           error: null,
           feedback: applyingMessage(operation, result),
         });
 
-        const outcome = await waitForLocalApply(baseline);
+        let outcome: LocalApplyOutcome;
+        try {
+          outcome = await waitForLocalApply(baseline);
+        } catch {
+          // The rule is already saved; a status-query failure must not
+          // incorrectly report the whole mutation as an unsuccessful save.
+          report({
+            action: null,
+            error: '규칙은 저장되었지만 DNS 적용 상태를 확인하지 못했습니다. SafeShield 상태를 확인해 주세요.',
+            feedback: null,
+          });
+          return true;
+        }
 
         if (outcome.kind === 'success') {
-          setMutation({
+          report({
             action: null,
             error: null,
             feedback: appliedMessage(operation, result),
@@ -195,7 +221,7 @@ export function useSafeShieldRules(active: boolean) {
         }
 
         if (outcome.kind === 'disabled') {
-          setMutation({
+          report({
             action: null,
             error: null,
             feedback: '규칙은 저장되었지만 SafeShield가 꺼져 있어 DNS 적용을 대기하고 있습니다.',
@@ -204,7 +230,7 @@ export function useSafeShieldRules(active: boolean) {
         }
 
         if (outcome.kind === 'failure') {
-          setMutation({
+          report({
             action: null,
             error: '규칙은 저장되었지만 로컬 DNS 적용이 실패했습니다. SafeShield 상태를 확인해 주세요.',
             feedback: null,
@@ -212,14 +238,14 @@ export function useSafeShieldRules(active: boolean) {
           return true;
         }
 
-        setMutation({
+        report({
           action: null,
           error: '규칙은 저장되었지만 제한 시간 안에 로컬 DNS 적용 완료를 확인하지 못했습니다.',
           feedback: null,
         });
         return true;
       } catch (error) {
-        setMutation({
+        report({
           action: null,
           error: errorMessage(error, '사용자 규칙을 변경하지 못했습니다.'),
           feedback: null,
@@ -231,8 +257,8 @@ export function useSafeShieldRules(active: boolean) {
   );
 
   const addRule = useCallback(
-    (action: SafeShieldRuleAction, domain: string) =>
-      mutate('add', action, domain),
+    (action: SafeShieldRuleAction, domain: string, onPersisted?: () => void) =>
+      mutate('add', action, domain, onPersisted),
     [mutate],
   );
 

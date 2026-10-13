@@ -23,6 +23,7 @@ interface SafeShieldRulesPageProps {
   onAddRule: (
     action: SafeShieldRuleAction,
     domain: string,
+    onPersisted?: () => void,
   ) => Promise<boolean>;
   onDeleteRule: (
     action: SafeShieldRuleAction,
@@ -38,6 +39,7 @@ interface RuleListCardProps {
   onAddRule: (
     action: SafeShieldRuleAction,
     domain: string,
+    onPersisted?: () => void,
   ) => Promise<boolean>;
   onDeleteRule: (
     action: SafeShieldRuleAction,
@@ -100,11 +102,11 @@ function RuleListCard({
     }
 
     setValidationError(null);
-    const saved = await onAddRule(kind, domain);
-
-    if (saved) {
-      setInput('');
-    }
+    await onAddRule(kind, domain, () => {
+      // Clear as soon as the server has saved the rule, not after DNS apply.
+      // Do not erase a newer draft if the input was edited in the meantime.
+      setInput((current) => normalizeDomain(current) === domain ? '' : current);
+    });
   }
 
   const theme = isAllow

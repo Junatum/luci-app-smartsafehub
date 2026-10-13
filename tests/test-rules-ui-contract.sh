@@ -26,4 +26,39 @@ if grep -Fq 'absolute top-1/2 left-3.5 size-4 -translate-y-1/2' "$PAGE"; then
 	fail 'search icon must not use transform-based vertical positioning'
 fi
 
-echo 'PASS: SafeShield rules input and search icon contracts are present'
+# The add form must clear after the rules API confirms persistence, not
+# after the slower SafeShield local DNS apply has completed (up to 45 s).
+HOOK="$ROOT_DIR/frontend/src/hooks/useSafeShieldRules.ts"
+grep -Fq 'onPersisted?.();' "$HOOK" || \
+  fail 'persisted rule must notify the form before DNS apply finishes'
+grep -Fq "mutate('add', action, domain, onPersisted)" "$HOOK" || \
+  fail 'addRule must forward the persistence callback'
+grep -Fq 'await onAddRule(kind, domain, () => {' "$PAGE" || \
+  fail 'rule form must clear from persistence callback, not final DNS result'
+grep -Fq "setInput((current) => normalizeDomain(current) === domain ? '' : current)" "$PAGE" || \
+  fail 'successful saves must clear only the submitted value'
+if grep -Fq 'if (saved)' "$PAGE"; then
+  fail 'input must not wait for final DNS apply before clearing'
+fi
+# Verify acknowledgement is after the API call and before DNS verification.
+if ! awk '
+  /await addSafeShieldRule\(action, domain, true\)/ { api = NR }
+  /onPersisted\?\.\(\)/ { acknowledged = NR }
+  /outcome = await waitForLocalApply\(baseline\)/ { applied = NR }
+  END { exit !(api > 0 && acknowledged > api && applied > acknowledged) }
+' "$HOOK"; then
+  fail 'save acknowledgement must happen after API success but before DNS apply'
+fi
+
+grep -Fq 'const latestMutationId = useRef(0);' "$HOOK" || \
+  fail 'DNS polling must track the newest mutation when users add another rule'
+grep -Fq 'if (latestMutationId.current === mutationId)' "$HOOK" || \
+  fail 'an earlier DNS result must not overwrite newer save feedback'
+grep -Fq 'DNS 적용 상태를 확인하지 못했습니다.' "$HOOK" || \
+  fail 'DNS status lookup failure must be reported separately from save failure'
+
+# Both add and delete keep their DNS result reporting; only add clears a draft.
+grep -Fq 'onDeleteRule(kind, domain)' "$PAGE" || \
+  fail 'delete action must continue to work independently of form clearing'
+
+echo 'PASS: SafeShield rules input, persistence and DNS apply contracts are present'
