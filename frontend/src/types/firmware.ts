@@ -42,6 +42,8 @@ export interface FirmwareRelease {
   openwrtVersion: string | null;
   publishedAt: string | null;
   releaseNotes: string[];
+  /** Actual SmartSafeHub package embedded in this firmware image, when published by Hub. */
+  bundledSoftware?: { smartsafehub: string } | null;
   sysupgrade: FirmwareImage;
 }
 

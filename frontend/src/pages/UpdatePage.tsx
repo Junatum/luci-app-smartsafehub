@@ -63,6 +63,7 @@ export function UpdatePage({
         action={firmware.action}
         actionError={firmware.actionError}
         data={firmware.data}
+        software={data}
         error={firmware.error}
         loading={firmware.loading}
         message={firmware.message}
@@ -77,6 +78,7 @@ export function UpdatePage({
         onUpload={firmware.upload}
       />
       <SoftwareUpdatesCard
+        firmware={firmware.data}
         action={action}
         actionError={actionError}
         data={data}

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { CustomSelect } from './CustomSelect';
 import { TimeSelect } from './TimeSelect';
 import type { SoftwareUpdateAction } from '../hooks/useSoftwareUpdates';
+import type { FirmwareStatus } from '../types/firmware';
 import type {
   SoftwareUpdateChannel,
   SoftwareUpdateError,
@@ -10,6 +11,7 @@ import type {
   SoftwareUpdateStatus,
 } from '../types/updates';
 import { isSoftwareUpdateCheckStale } from '../utils/softwareUpdates';
+import { compareBundledVersion } from '../utils/firmwareBundling';
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -24,6 +26,7 @@ interface SoftwareUpdatesCardProps {
   action: SoftwareUpdateAction;
   actionError: string | null;
   data: SoftwareUpdateStatus | null;
+  firmware: FirmwareStatus | null;
   error: string | null;
   loading: boolean;
   message: string | null;
@@ -188,6 +191,7 @@ export function SoftwareUpdatesCard({
   action,
   actionError,
   data,
+  firmware,
   error,
   loading,
   message,
@@ -226,6 +230,12 @@ export function SoftwareUpdatesCard({
   const currentPackage = data?.packages.find((item) => item.name === UPDATE_PACKAGE) ??
     data?.packages[0] ??
     null;
+  const firmwareBundledVersion = firmware?.updateAvailable
+    ? firmware.release?.bundledSoftware?.smartsafehub
+    : null;
+  const softwareIncludedInFirmware =
+    Boolean(data?.lastCheckAt && data.updateCount === 0 && !updateCheckStale && currentPackage?.name === UPDATE_PACKAGE) &&
+    compareBundledVersion(firmwareBundledVersion, currentPackage?.installedVersion) === 'same';
 
   const hasSettingsChanges = (next: Partial<SoftwareUpdateSettingsInput> = {}) => {
     if (!data) {
@@ -541,6 +551,11 @@ export function SoftwareUpdatesCard({
                   <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
                     마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
                   </p>
+                  {softwareIncludedInFirmware ? (
+                    <p class="mt-2 mb-0 text-xs leading-5 text-emerald-800" data-section="software-firmware-match">
+                      새 펌웨어에도 동일한 관리 소프트웨어({firmwareBundledVersion})가 포함되어 있어 별도로 업데이트할 필요가 없습니다.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </section>

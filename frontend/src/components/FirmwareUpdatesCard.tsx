@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import type { FirmwareAction } from '../hooks/useFirmwareUpdates';
 import type { FirmwareStatus } from '../types/firmware';
+import type { SoftwareUpdateStatus } from '../types/updates';
+import { compareBundledVersion } from '../utils/firmwareBundling';
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -16,6 +18,7 @@ interface FirmwareUpdatesCardProps {
   action: FirmwareAction;
   actionError: string | null;
   data: FirmwareStatus | null;
+  software: SoftwareUpdateStatus | null;
   error: string | null;
   loading: boolean;
   message: string | null;
@@ -146,6 +149,7 @@ export function FirmwareUpdatesCard({
   action,
   actionError,
   data,
+  software,
   error,
   loading,
   message,
@@ -180,6 +184,9 @@ export function FirmwareUpdatesCard({
   const checking = action === 'check' || data?.phase === 'checking';
   const preparing = action === 'prepare' || data?.phase === 'downloading' || data?.phase === 'verifying';
   const uploading = action === 'upload' || action === 'validate-upload';
+  const bundledVersion = data?.release?.bundledSoftware?.smartsafehub ?? null;
+  const installedVersion = software?.packages.find((item) => item.name === 'luci-app-smartsafehub')?.installedVersion ?? null;
+  const bundledComparison = compareBundledVersion(bundledVersion, installedVersion);
 
   const uploadSelected = async () => {
     if (!selectedFile) {
@@ -400,6 +407,35 @@ export function FirmwareUpdatesCard({
                 {data.release.version || 'Latest'}
               </span>
             </div>
+            {bundledVersion ? (
+              <div
+                class="mt-4 rounded-xl border border-sky-100 bg-white p-4"
+                data-section="firmware-bundled-software"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <span class="text-xs font-extrabold text-slate-800">포함된 관리 소프트웨어</span>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-black text-slate-950">{bundledVersion}</span>
+                    {bundledComparison === 'same' ? (
+                      <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                        현재 버전과 동일
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <p class="mt-2 mb-0 text-xs leading-5 text-slate-600">
+                  {bundledComparison === 'same'
+                    ? '관리 소프트웨어는 이미 같은 버전입니다. 펌웨어 업데이트는 시스템 구성 요소를 갱신합니다.'
+                    : bundledComparison === 'older'
+                      ? `현재 설치된 관리 소프트웨어(${installedVersion})보다 이전 버전이 포함되어 있습니다. 펌웨어 설치 전 버전을 확인해 주세요.`
+                      : bundledComparison === 'newer'
+                        ? `현재 설치된 관리 소프트웨어(${installedVersion})보다 새 버전이 포함되어 있습니다.`
+                        : installedVersion
+                          ? `현재 설치 버전 ${installedVersion} · 펌웨어 포함 버전 ${bundledVersion}`
+                          : '이 펌웨어에 포함된 관리 소프트웨어 버전입니다.'}
+                </p>
+              </div>
+            ) : null}
             {data.release.releaseNotes.length ? (
               <ul class="mt-4 mb-0 space-y-2 rounded-xl bg-white p-4 pl-9 text-sm leading-6 text-slate-700 ring-1 ring-inset ring-sky-100">
                 {data.release.releaseNotes.map((note, index) => (

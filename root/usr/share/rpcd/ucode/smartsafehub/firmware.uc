@@ -301,6 +301,14 @@ function sanitize_release(document, current) {
 		}
 	}
 
+	// Hub may expose the manifest field directly or within the build metadata.
+	// An absent or malformed version is unknown, not evidence that it matches.
+	const bundled = release?.bundled_software ?? release?.metadata?.bundled_software;
+	let bundled_version = limited_string(bundled?.smartsafehub, 40);
+	if (bundled_version != null && match(bundled_version, /^[0-9]+\.[0-9]+\.[0-9]+(-r[0-9]+)?$/) == null) {
+		bundled_version = null;
+	}
+
 	const size = integer_value(image?.size_bytes, 0);
 	return {
 		currentVersion: current_version,
@@ -316,6 +324,7 @@ function sanitize_release(document, current) {
 			openwrtVersion: limited_string(release?.openwrt_version, 80),
 			publishedAt: limited_string(release?.published_at, 80),
 			releaseNotes: notes,
+			bundledSoftware: bundled_version != null ? { smartsafehub: bundled_version } : null,
 			sysupgrade: {
 				id: integer_value(image?.id, 0),
 				filename: limited_string(image?.filename, 180),
