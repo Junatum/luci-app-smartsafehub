@@ -106,6 +106,22 @@ printf '{}\n' > "$TMP/response.json"
 assert_rules '["manual.example.org"]'
 # The UI must not allow manual deletion of entries owned by the cloud.
 grep -Fq 'device_recommended_rules_status' "$RPC"
+# A missing semicolon after an exported ucode function prevents the whole
+# smartsafehub rpcd object from loading, including the security status RPC.
+# Check this even on hosts without the ucode compiler (real compilation is
+# separately mandatory in CI via tests/test-ucode-syntax.sh).
+DEVICE_RPC="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
+awk '
+  /^export function read_device_registration_status\(/ {
+    found = 1
+    if (previous !~ /^[[:space:]]*};[[:space:]]*$/) exit 1
+  }
+  { if ($0 !~ /^[[:space:]]*$/) previous = $0 }
+  END { if (!found) exit 1 }
+' "$DEVICE_RPC" || {
+  echo '추천 규칙 RPC 함수는 }; 로 끝나야 합니다 (ucode 모듈 로딩 실패 방지).' >&2
+  exit 1
+}
 # Keep the shared rules page independent from executable API imports so that
 # the public router demo does not inherit authenticated RPC dependencies.
 grep -Fq 'onLoadRecommendedRulesStatus' "$PAGE"
