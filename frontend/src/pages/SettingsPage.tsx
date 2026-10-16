@@ -3,15 +3,13 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 
 import {
   formatBytes,
-  formatLoadAverage,
   formatRelativeTime,
   formatTimestampInTimezone,
-  formatUptime,
-  getMemoryUsage,
 } from '../app/format';
 import { changeRootPassword } from '../api/security';
 import { logoutLuciSession } from '../auth/session';
 import { CustomSelect } from '../components/CustomSelect';
+import { PageTabs } from '../components/PageTabs';
 import { TimeSelect } from '../components/TimeSelect';
 import {
   AlertIcon,
@@ -28,9 +26,9 @@ import {
   ShieldIcon,
 } from '../components/Icons';
 import type { ConfigurationBackupAction } from '../hooks/useConfigurationBackup';
+import type { SettingsTab } from '../hooks/usePageTabs';
 import type { SystemAction } from '../hooks/useSystemActions';
 import type { ConfigurationBackupValidation } from '../types/backup';
-import type { FirmwareStatus } from '../types/firmware';
 import type { HealthReporterStatus, HealthSeverity, HealthStatus } from '../types/health';
 import type { SmartSafeHubStatus } from '../types/status';
 import type {
@@ -46,6 +44,7 @@ import { passwordPolicy, passwordPolicySatisfied } from '../utils/password';
 import { browserTimezone } from '../utils/timezone';
 
 interface SettingsPageProps {
+  activeTab: SettingsTab;
   action: SystemAction;
   backupAction: ConfigurationBackupAction;
   backupError: string | null;
@@ -57,9 +56,6 @@ interface SettingsPageProps {
   error: string | null;
   feedbackError: string | null;
   feedbackMessage: string | null;
-  firmware: FirmwareStatus | null;
-  firmwareError: string | null;
-  firmwareLoading: boolean;
   health: HealthStatus | null;
   healthActionError: string | null;
   healthActionMessage: string | null;
@@ -100,20 +96,6 @@ interface SettingsPageProps {
   onSaveTimezone: (zonename: string) => Promise<boolean>;
   onSyncTime: () => Promise<boolean>;
   onAdministratorPasswordChanged: () => void;
-}
-
-function InfoCard(props: { label: string; value: string; description: string }) {
-  return (
-    <article class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-        {props.label}
-      </p>
-      <p class="mt-3 mb-0 break-words text-2xl font-black tracking-tight text-slate-950">
-        {props.value}
-      </p>
-      <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">{props.description}</p>
-    </article>
-  );
 }
 
 function ActionCard(props: {
@@ -1562,6 +1544,7 @@ function ScheduledRebootSection(props: {
 }
 
 export function SettingsPage({
+  activeTab,
   action,
   backupAction,
   backupError,
@@ -1573,9 +1556,6 @@ export function SettingsPage({
   error,
   feedbackError,
   feedbackMessage,
-  firmware,
-  firmwareError,
-  firmwareLoading,
   health,
   healthActionError,
   healthActionMessage,
@@ -1619,62 +1599,8 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const [confirmingReboot, setConfirmingReboot] = useState(false);
 
-  if (loading && !data) {
-    return (
-      <div class="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm shadow-slate-900/5">
-        <p class="m-0 text-sm font-bold text-slate-500">시스템 정보를 확인하고 있습니다.</p>
-      </div>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <div class="rounded-2xl border border-rose-200 bg-rose-50 p-6">
-        <h2 class="m-0 text-lg font-black text-rose-900">
-          시스템 정보를 불러오지 못했습니다.
-        </h2>
-        <p class="mt-2 mb-0 text-sm leading-6 text-rose-700">{error}</p>
-        <button
-          class="mt-4 inline-flex min-h-10 items-center rounded-xl bg-rose-700 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-rose-800"
-          onClick={onRetry}
-          type="button"
-        >
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
-  const memory = data?.runtime.memory;
-  const totalMemory = memory?.total ?? 0;
-  const memoryUsage = memory ? getMemoryUsage(memory) : null;
-  const usedMemory = memoryUsage?.used ?? 0;
-  const memoryPercent = Math.round(memoryUsage?.percent ?? 0);
   const advancedSystemUrl = luciAdminUrl('/admin/system');
   const logsUrl = luciAdminUrl('/admin/status/logs');
-  const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);
-  const firmwareValue = !data
-    ? '미확인'
-    : firmwareLoading && !firmware
-      ? '확인 중'
-      : firmwareError && !firmware
-        ? '확인 필요'
-        : customFirmwareAvailable
-          ? firmware?.current.releaseVersion
-            ? `SmartSafeHub ${firmware.current.releaseVersion}`
-            : 'SmartSafeHub 펌웨어'
-          : `${data.software.distribution} ${data.software.version}`;
-  const firmwareDescription = !data
-    ? '버전 정보를 확인할 수 없습니다.'
-    : firmwareLoading && !firmware
-      ? '펌웨어 정보를 확인하고 있습니다.'
-      : firmwareError && !firmware
-        ? firmwareError
-        : customFirmwareAvailable
-          ? firmware?.current.buildId
-            ? `빌드 ID ${firmware.current.buildId}`
-            : '빌드 ID를 확인할 수 없습니다.'
-          : `리비전 ${data.software.revision}`;
 
   return (
     <section class="min-w-0 space-y-7">
@@ -1699,57 +1625,63 @@ export function SettingsPage({
         </div>
       )}
 
-      <section class="min-w-0">
-        <div class="mb-4">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-            System
-          </p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 상태</h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            장치의 펌웨어, 실행 시간, 메모리와 시스템 부하를 확인합니다.
-          </p>
-        </div>
-        <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <InfoCard
-            label="Firmware"
-            value={firmwareValue}
-            description={firmwareDescription}
-          />
-          <InfoCard
-            label="Uptime"
-            value={data ? formatUptime(data.runtime.uptime) : '미확인'}
-            description={
-              data ? `커널 ${data.software.kernel}` : '실행 시간을 확인할 수 없습니다.'
-            }
-          />
-          <InfoCard
-            label="Memory"
-            value={`${memoryPercent}%`}
-            description={`${formatBytes(usedMemory)} / ${formatBytes(totalMemory)} 사용`}
-          />
-          <InfoCard
-            label="Load"
-            value={data ? formatLoadAverage(data.runtime.load[0]) : '0.00'}
-            description={
-              data
-                ? `5분 ${formatLoadAverage(data.runtime.load[1])} · 15분 ${formatLoadAverage(data.runtime.load[2])}`
-                : '시스템 부하를 확인할 수 없습니다.'
-            }
+      <PageTabs
+        active={activeTab}
+        label="설정 메뉴"
+        tabs={[
+          { id: 'diagnostics', label: '진단 및 지원', href: '#settings' },
+          { id: 'time', label: '시간 및 예약', href: '#settings/time' },
+          { id: 'management', label: '관리 및 복구', href: '#settings/management' },
+        ]}
+      />
+
+      <section
+        aria-labelledby="diagnostics-tab"
+        class="min-w-0"
+        hidden={activeTab !== 'diagnostics'}
+        id="diagnostics-panel"
+        role="tabpanel"
+      >
+        {error && !data ? (
+          <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900" role="status">
+            <p class="m-0">시스템 정보를 불러오지 못해 진단 파일 다운로드가 제한될 수 있습니다. {error}</p>
+            <button class="mt-2 rounded-lg border border-current px-3 py-1.5 text-xs font-extrabold" onClick={onRetry} type="button">다시 시도</button>
+          </div>
+        ) : loading && !data ? (
+          <p class="mb-4 text-sm font-semibold text-slate-500" role="status">진단 파일에 필요한 시스템 정보를 확인하고 있습니다.</p>
+        ) : null}
+        <div class="min-w-0">
+          <HealthDiagnosticCard
+            actionError={healthActionError}
+            actionMessage={healthActionMessage}
+            data={health}
+            downloadBusy={action === 'diagnostics'}
+            error={healthError}
+            loading={healthLoading}
+            onDismissFeedback={onDismissHealthFeedback}
+            onDownload={onDownloadDiagnostics}
+            onRetry={onRetry}
+            onRun={onRunHealth}
+            onSetReporter={onSetHealthReporter}
+            running={healthRunning}
+            savingReporter={healthSavingReporter}
           />
         </div>
       </section>
 
-      <section class="min-w-0">
+      <section
+        aria-labelledby="time-tab"
+        class="min-w-0"
+        hidden={activeTab !== 'time'}
+        id="time-panel"
+        role="tabpanel"
+      >
         <div class="mb-4">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-            Device settings
-          </p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">장치 설정</h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            시간 기준과 예약 재부팅, 진단 정보를 SmartSafeHub에서 직접 관리합니다.
-          </p>
+          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Device settings</p>
+          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시간 및 예약</h2>
+          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">시간 기준과 예약 재부팅을 SmartSafeHub에서 직접 관리합니다.</p>
         </div>
-        <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+        <div class="min-w-0 max-w-4xl">
           <TimeSettingsCard
             data={timeData}
             error={timeError}
@@ -1771,26 +1703,16 @@ export function SettingsPage({
             scheduledRebootSaving={scheduledRebootSaving}
             syncing={timeSyncing}
           />
-
-          <HealthDiagnosticCard
-            actionError={healthActionError}
-            actionMessage={healthActionMessage}
-            data={health}
-            downloadBusy={action === 'diagnostics'}
-            error={healthError}
-            loading={healthLoading}
-            onDismissFeedback={onDismissHealthFeedback}
-            onDownload={onDownloadDiagnostics}
-            onRetry={onRetry}
-            onRun={onRunHealth}
-            onSetReporter={onSetHealthReporter}
-            running={healthRunning}
-            savingReporter={healthSavingReporter}
-          />
         </div>
       </section>
 
-      <section class="min-w-0">
+      <section
+        aria-labelledby="management-tab"
+        class="min-w-0"
+        hidden={activeTab !== 'management'}
+        id="management-panel"
+        role="tabpanel"
+      >
         <div class="mb-4">
           <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
             System management
@@ -1816,7 +1738,6 @@ export function SettingsPage({
             uploadProgress={backupUploadProgress}
             validated={backupValidated}
           />
-
 
           <SystemToolsCard
             action={action}

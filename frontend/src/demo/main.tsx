@@ -10,6 +10,8 @@ import { WifiPage } from '../pages/WifiPage';
 import { SafeShieldRulesPage } from '../pages/SafeShieldRulesPage';
 import { UpdatePage } from '../pages/UpdatePage';
 import { useHashRoute } from '../hooks/useHashRoute';
+import { usePageTabs } from '../hooks/usePageTabs';
+import { PageTabs } from '../components/PageTabs';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
 import { SafeShieldPage } from '../pages/SafeShieldPage';
@@ -25,6 +27,7 @@ const ALLOWED_ROUTES = new Set(DEMO_ROUTES);
 
 function DemoApp() {
   const currentRoute = useHashRoute();
+  const tabs = usePageTabs();
   const route = ALLOWED_ROUTES.has(currentRoute) ? currentRoute : 'home';
   const [notice, setNotice] = useState('');
   useEffect(() => {
@@ -58,10 +61,14 @@ function DemoApp() {
       break;
     case 'network':
       content = <div class="min-w-0">
-        <div aria-label="인터넷 연결 설정"><WanPage action={null} data={demoWan} error={null}
+        <PageTabs active={tabs.network} label="네트워크 설정 메뉴" tabs={[
+          { id: 'internet', label: '인터넷 연결', href: '#network' },
+          { id: 'lan', label: 'LAN 및 DHCP', href: '#network/lan' },
+        ]} />
+        <div aria-label="인터넷 연결 설정" aria-labelledby="internet-tab" hidden={tabs.network !== 'internet'} id="internet-panel" role="tabpanel"><WanPage action={null} data={demoWan} error={null}
           feedback={null} loading={false} onDismissFeedback={dismiss} onReconnect={readonlyNotice}
           onRetry={reset} onSave={disabledAction} /></div>
-        <div aria-label="내부 네트워크 설정" class="mt-8 min-w-0 border-t border-slate-200 pt-8">
+        <div aria-label="내부 네트워크 설정" aria-labelledby="lan-tab" hidden={tabs.network !== 'lan'} id="lan-panel" role="tabpanel">
           <LanPage action={null} data={demoLan} error={null} feedback={null} loading={false}
             onApplyRecommendation={disabledAction} onDismissFeedback={dismiss} onRetry={reset}
             onSave={disabledAction} />

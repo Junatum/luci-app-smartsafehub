@@ -32,12 +32,8 @@ grep -Fq "const scheduledReboot = useScheduledRebootSettings(route === 'settings
 	fail 'settings route must load scheduled reboot settings'
 grep -Fq 'const firmware = useFirmwareUpdates(true);' "$APP" || \
 	fail 'settings route must share the globally active SmartSafeHub firmware state used by update notifications'
-grep -Fq 'firmware={firmware.data}' "$APP" || \
-	fail 'settings page must receive SmartSafeHub firmware status'
-grep -Fq 'firmwareError={firmware.error}' "$APP" || \
-	fail 'settings page must receive firmware status errors'
-grep -Fq 'firmwareLoading={firmware.loading}' "$APP" || \
-	fail 'settings page must receive firmware loading state'
+grep -Fq 'activeTab={tabs.settings}' "$APP" || \
+	fail 'settings must receive its selected tab'
 grep -Fq 'const configurationBackup = useConfigurationBackup();' "$APP" || \
 	fail 'settings route must wire configuration backup and restore actions'
 grep -Fq "case 'system':" "$APP" || fail 'update route must remain registered in App'
@@ -177,21 +173,15 @@ if grep -Fq 'SoftwareUpdatesCard' "$SETTINGS_PAGE"; then
 	fail 'settings page must not embed the software update experience'
 fi
 
-grep -Fq "const customFirmwareAvailable = Boolean(firmware?.current.metadataAvailable);" "$SETTINGS_PAGE" || \
-	fail 'settings system status must detect SmartSafeHub custom firmware metadata'
-grep -Fq '`SmartSafeHub ${firmware.current.releaseVersion}`' "$SETTINGS_PAGE" || \
-	fail 'settings system status must prefer the SmartSafeHub product firmware version'
-grep -Fq '`빌드 ID ${firmware.current.buildId}`' "$SETTINGS_PAGE" || \
-	fail 'settings system status must show the immutable SmartSafeHub build ID'
-grep -Fq '`${data.software.distribution} ${data.software.version}`' "$SETTINGS_PAGE" || \
-	fail 'settings system status must retain OpenWrt firmware fallback for legacy images'
-grep -Fq '`리비전 ${data.software.revision}`' "$SETTINGS_PAGE" || \
-	fail 'settings system status must retain OpenWrt revision fallback for legacy images'
-grep -Fq '`커널 ${data.software.kernel}`' "$SETTINGS_PAGE" || \
-	fail 'settings system status must keep the actual running kernel version'
+if grep -Fq 'label="Firmware"' "$SETTINGS_PAGE"; then
+	fail 'settings must not duplicate dashboard firmware/memory/load summary cards'
+fi
+grep -Fq 'id="diagnostics-panel"' "$SETTINGS_PAGE" || fail 'diagnostics must have its own panel'
+grep -Fq 'id="time-panel"' "$SETTINGS_PAGE" || fail 'time and scheduled reboot must have their own panel'
+grep -Fq 'id="management-panel"' "$SETTINGS_PAGE" || fail 'management must have its own panel'
 grep -Fq 'Device settings' "$SETTINGS_PAGE" || \
 	fail 'settings page must visually separate device settings from system management'
-grep -Fq '시간 기준과 예약 재부팅, 진단 정보를 SmartSafeHub에서 직접 관리합니다.' "$SETTINGS_PAGE" || \
+grep -Fq '시간 기준과 예약 재부팅을 SmartSafeHub에서 직접 관리합니다.' "$SETTINGS_PAGE" || \
 	fail 'device settings description must include scheduled reboot after regrouping'
 grep -Fq 'System management' "$SETTINGS_PAGE" || \
 	fail 'settings page must retain a dedicated system management section'

@@ -525,8 +525,9 @@ grep -Fq 'window.location.reload();' "$FIRMWARE_HOOK" || \
 if grep -Fq '시스템 상태' "$UPDATE_PAGE" || grep -Fq '시스템 관리' "$UPDATE_PAGE"; then
 	fail 'update page must not mix system status or management controls'
 fi
-grep -Fq '시스템 상태' "$SETTINGS_PAGE" || \
-	fail 'settings page must own system status'
+if grep -Fq 'label="Firmware"' "$SETTINGS_PAGE"; then
+	fail 'system summary cards should live only on dashboard'
+fi
 grep -Fq '시스템 관리' "$SETTINGS_PAGE" || \
 	fail 'settings page must own system management actions'
 

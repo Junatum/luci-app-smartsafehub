@@ -6,6 +6,8 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
   '#home': 'home',
   '#activity': 'activity',
   '#network': 'network',
+  '#network/internet': 'network',
+  '#network/lan': 'network',
   '#wan': 'network',
   '#lan': 'network',
   '#wifi': 'wifi',
@@ -16,6 +18,9 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
   '#account': 'account',
   '#system': 'system',
   '#settings': 'settings',
+  '#settings/diagnostics': 'settings',
+  '#settings/time': 'settings',
+  '#settings/management': 'settings',
 };
 
 function routeFromHash(): AppRoute {
