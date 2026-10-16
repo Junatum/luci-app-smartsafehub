@@ -94,6 +94,48 @@ export function formatRelativeTime(timestamp: number, nowTimestamp = Date.now() 
   return `${Math.floor(elapsedSeconds / 86_400)}일 전`;
 }
 
+/** Recent event timestamps use a readable elapsed time; older events retain their date. */
+export function formatRecentTimestamp(timestamp: number, nowTimestamp = Date.now() / 1000): string {
+  if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp > 8.64e12) {
+    return '기록 없음';
+  }
+
+  if (!Number.isFinite(nowTimestamp)) {
+    return formatTimestamp(timestamp);
+  }
+
+  // Large future offsets can happen with a router clock mismatch; do not call them "just now".
+  if (timestamp > nowTimestamp + 300 || nowTimestamp - timestamp >= 7 * 86_400) {
+    return formatTimestamp(timestamp);
+  }
+
+  return formatRelativeTime(timestamp, nowTimestamp);
+}
+
+/** Artifact versions contain a UTC timestamp, e.g. 20261016T020000Z. */
+export function parseArtifactVersionTimestamp(version: string | null): number | null {
+  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(version ?? '');
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day, hour, minute, second] = match;
+  const timestamp = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() + 1 !== Number(month) ||
+    date.getUTCDate() !== Number(day) ||
+    date.getUTCHours() !== Number(hour) ||
+    date.getUTCMinutes() !== Number(minute) ||
+    date.getUTCSeconds() !== Number(second) ||
+    timestamp <= 0
+  ) {
+    return null;
+  }
+  return timestamp / 1000;
+}
+
 export function formatTimestampInTimezone(
   timestamp: number,
   zonename: string,

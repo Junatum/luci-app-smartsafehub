@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
+import { RelativeTimestamp } from './RelativeTimestamp';
 import type { FirmwareAction } from '../hooks/useFirmwareUpdates';
 import type { FirmwareStatus } from '../types/firmware';
 import type { SoftwareUpdateStatus } from '../types/updates';
@@ -41,16 +42,6 @@ function formatBytes(value: number | null | undefined): string {
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
   }
   return `${(value / 1024).toFixed(1)} KB`;
-}
-
-function formatTimestamp(value: number | null): string {
-  if (!value) {
-    return '아직 없음';
-  }
-  return new Date(value * 1000).toLocaleString('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
 }
 
 function phaseLabel(data: FirmwareStatus): string {
@@ -387,7 +378,7 @@ export function FirmwareUpdatesCard({
               </div>
               <div class="bg-white p-4">
                 <dt class="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Last check</dt>
-                <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">{formatTimestamp(data.lastCheckAt)}</dd>
+                <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950"><RelativeTimestamp fallback="아직 없음" timestamp={data.lastCheckAt} /></dd>
               </div>
             </dl>
           </>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from './CustomSelect';
+import { RelativeTimestamp } from './RelativeTimestamp';
 import { TimeSelect } from './TimeSelect';
 import type { SoftwareUpdateAction } from '../hooks/useSoftwareUpdates';
 import type { FirmwareStatus } from '../types/firmware';
@@ -505,7 +506,7 @@ export function SoftwareUpdatesCard({
                   Last check
                 </dt>
                 <dd class="mt-2 mb-0 ml-0 text-sm font-black text-slate-950">
-                  {formatTimestamp(data.lastCheckAt)}
+                  <RelativeTimestamp fallback="아직 없음" timestamp={data.lastCheckAt} />
                 </dd>
               </div>
               <div class="bg-white p-4">
@@ -532,7 +533,7 @@ export function SoftwareUpdatesCard({
                 <div>
                   <h3 class="m-0 text-base font-black text-amber-950">업데이트 확인이 지연되고 있습니다.</h3>
                   <p class="mt-1 mb-0 text-sm leading-6 text-amber-800">
-                    마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다. 자동 확인 상태를 점검하거나 업데이트 확인을 실행해 주세요.
+                    마지막 업데이트 확인: <RelativeTimestamp timestamp={data.lastCheckAt} />. 자동 확인 상태를 점검하거나 업데이트 확인을 실행해 주세요.
                   </p>
                 </div>
               </div>
@@ -549,7 +550,7 @@ export function SoftwareUpdatesCard({
                 <div>
                   <h3 class="m-0 text-base font-black text-emerald-950">최신 버전을 사용 중입니다.</h3>
                   <p class="mt-1 mb-0 text-sm leading-6 text-emerald-800">
-                    마지막 확인은 {formatTimestamp(data.lastCheckAt)}에 완료되었습니다.
+                    마지막 업데이트 확인: <RelativeTimestamp timestamp={data.lastCheckAt} />.
                   </p>
                   {softwareIncludedInFirmware ? (
                     <p class="mt-2 mb-0 text-xs leading-5 text-emerald-800" data-section="software-firmware-match">

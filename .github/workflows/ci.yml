@@ -86,6 +86,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test relative timestamp formatting
+        run: node --experimental-strip-types --test ../tests/runtime/relative-time.test.mjs
+
       - name: Build
         run: npm run build
 

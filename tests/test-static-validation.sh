@@ -67,6 +67,7 @@ for script in \
 	tests/test-wan-uci-runtime.sh \
 	tests/test-iptv.sh \
 	tests/test-update-ui-contract.sh \
+	tests/test-relative-time-contract.sh \
 	tests/test-reload-safety.sh \
 	tests/test-settings-ui-contract.sh \
 	tests/test-system-time-contract.sh \

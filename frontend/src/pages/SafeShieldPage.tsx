@@ -12,6 +12,7 @@ import {
   ShieldIcon,
 } from '../components/Icons';
 import { SafeShieldStatisticsPanel } from '../components/SafeShieldStatisticsPanel';
+import { RelativeTimestamp } from '../components/RelativeTimestamp';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { SafeShieldAction } from '../hooks/useSafeShieldActions';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
@@ -25,6 +26,7 @@ import {
   formatInterval,
   formatNumber,
   formatTimestamp,
+  parseArtifactVersionTimestamp,
 } from '../app/format';
 
 const SMARTSAFEHUB_PRICING_URL = 'https://www.smartsafehub.com/pricing/';
@@ -152,28 +154,11 @@ function getArtifactOptimizationLabel(tier: string | null): string {
   return '자동 최적화';
 }
 
-function formatArtifactUpdatedAt(version: string | null): string {
-  if (!version) {
-    return '확인되지 않음';
-  }
-
-  const match = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(version);
-
-  if (!match) {
-    return '확인되지 않음';
-  }
-
-  const [, year, month, day, hour, minute, second] = match;
-  const timestamp = Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-  ) / 1000;
-
-  return formatTimestamp(timestamp);
+function formatArtifactUpdatedAt(version: string | null): ComponentChildren {
+  const timestamp = parseArtifactVersionTimestamp(version);
+  return timestamp === null
+    ? '확인되지 않음'
+    : <RelativeTimestamp timestamp={timestamp} />;
 }
 
 function getSummaryMessage(data: SafeShieldStatus): string {
@@ -369,13 +354,13 @@ function RefreshProgress({ data }: { data: SafeShieldStatus }) {
   );
 }
 
-function SummaryFact({ label, value }: { label: string; value: string }) {
+function SummaryFact({ label, value }: { label: string; value: ComponentChildren }) {
   return (
     <div class="bg-white px-5 py-4 sm:px-6">
       <dt class="text-[0.68rem] font-black uppercase tracking-[0.14em] text-slate-400">
         {label}
       </dt>
-      <dd class="mt-2 mb-0 ml-0 truncate text-sm font-extrabold text-slate-950" title={value}>
+      <dd class="mt-2 mb-0 ml-0 text-sm font-extrabold text-slate-950" title={typeof value === 'string' ? value : undefined}>
         {value}
       </dd>
     </div>
@@ -739,7 +724,7 @@ export function SafeShieldPage({
               label="Blocklist"
               value={`${formatNumber(displayedBlocklistCount)}개 도메인`}
             />
-            <SummaryFact label="Last refresh" value={formatTimestamp(data.timestamps.lastSuccess)} />
+            <SummaryFact label="Last refresh" value={<RelativeTimestamp timestamp={data.timestamps.lastSuccess} />} />
             <PlanSummary plan={planName} />
           </dl>
           {planName === 'FREE' ? <FreePlanUpgrade /> : null}
@@ -815,7 +800,7 @@ export function SafeShieldPage({
             icon={<CalendarIcon class="size-5" />}
             title="차단 목록 갱신"
           >
-            <DetailRow label="마지막 성공" value={formatTimestamp(data.timestamps.lastSuccess)} />
+            <DetailRow label="마지막 성공" value={<RelativeTimestamp timestamp={data.timestamps.lastSuccess} />} />
             <DetailRow label="다음 갱신" value={formatTimestamp(data.timestamps.nextRefreshAt)} />
             <DetailRow label="갱신 주기" value={formatInterval(data.timestamps.refreshIntervalS)} />
             <DetailRow
