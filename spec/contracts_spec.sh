@@ -63,6 +63,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '추천 사용자 규칙의 적용과 해제 및 수동 규칙 보존을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-recommended-rules.sh"
+    The status should be success
+    The output should start with '추천 사용자 규칙 동기화 및 UI 계약: PASS'
+    The error should be blank
+  End
+
   It '계정 기반 Cloud 활동 동기화와 직접/관찰 이벤트 분리를 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-activity-cloud-sync.sh"
     The status should be success

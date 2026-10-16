@@ -50,6 +50,7 @@ import {
 } from './smartsafehub/health.uc';
 import {
 	read_device_registration_status,
+	read_recommended_rules_status,
 	refresh_device_registration_status,
 	refresh_device_pairing
 } from './smartsafehub/device-registration.uc';
@@ -316,6 +317,11 @@ const methods = {
 		args: { action: '', domain: '', refresh: true },
 		call: require_root_password(function(request) {
 			return mutate_safeshield_rule(request, 'rule_delete');
+		}),
+	},
+	device_recommended_rules_status: {
+		call: require_root_password(function(request) {
+			return read_recommended_rules_status(request);
 		}),
 	},
 	device_registration_status: {

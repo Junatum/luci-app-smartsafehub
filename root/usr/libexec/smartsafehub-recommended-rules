@@ -1,0 +1,122 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Reconcile only allow domains inserted on behalf of SmartSafeHub Hub.
+# A locally existing allow entry is never claimed or deleted.
+set -eu
+umask 077
+
+RESPONSE="${1:?missing device sync response}"
+STATE="${SMARTSAFEHUB_RECOMMENDED_STATE_FILE:-/etc/smartsafehub/recommended-rules.state}"
+JSONFILTER="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
+UBUS="${SMARTSAFEHUB_DEVICE_UBUS_BIN:-ubus}"
+RUNTIME="${SMARTSAFEHUB_DEVICE_RUNTIME_DIR:-/tmp/smartsafehub}"
+mkdir -p "$RUNTIME" "${STATE%/*}"
+LOCK="$RUNTIME/recommended-rules.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  # A crashed reconciler may have left its lock; a live one must win.
+  owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  case "$owner" in ''|*[!0-9]*) exit 1 ;; esac
+  kill -0 "$owner" 2>/dev/null && exit 1
+  rm -f "$LOCK/pid"
+  rmdir "$LOCK" 2>/dev/null || exit 1
+  mkdir "$LOCK" 2>/dev/null || exit 1
+fi
+printf '%s\n' "$$" > "$LOCK/pid"
+DESIRED="$RUNTIME/recommended-desired.$$"
+OWNED="$RUNTIME/recommended-owned.$$"
+SNAPSHOT="$RUNTIME/recommended-snapshot.$$"
+REPLY="$RUNTIME/recommended-reply.$$"
+ALLOW="$RUNTIME/recommended-allow.$$"
+cleanup() { rm -f "$DESIRED" "$OWNED" "$SNAPSHOT" "$REPLY" "$ALLOW" "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null || true; }
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+field() { "$JSONFILTER" -i "$1" -e "$2" 2>/dev/null || true; }
+valid_hash() { [ "${#1}" -eq 64 ] && ! printf '%s' "$1" | LC_ALL=C grep -q '[^0-9a-f]'; }
+valid_domain() {
+  [ -n "$1" ] && [ "${#1}" -le 253 ] || return 1
+  printf '%s\n' "$1" | LC_ALL=C grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' || return 1
+  ! printf '%s\n' "$1" | LC_ALL=C grep -Eq '\.[0-9]+$' || return 1
+  rest="$1"
+  while [ -n "$rest" ]; do
+    label="${rest%%.*}"
+    [ "${#label}" -le 63 ] || return 1
+    case "$rest" in *.*) rest="${rest#*.}" ;; *) break ;; esac
+  done
+}
+
+revision="$(field "$RESPONSE" '@.recommended_rules.revision')"
+# Do not erase cloud-managed rules if the server is not yet sending this feature.
+[ -n "$revision" ] || exit 0
+valid_hash "$revision" || exit 1
+"$JSONFILTER" -i "$RESPONSE" -e '@.recommended_rules.domains[*]' > "$DESIRED" || exit 1
+[ "$(wc -l < "$DESIRED")" -le 100 ] || exit 1
+while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$DESIRED"
+sort -u "$DESIRED" -o "$DESIRED"
+
+previous=''
+: > "$OWNED"
+if [ -e "$STATE" ]; then
+  [ -f "$STATE" ] && [ ! -L "$STATE" ] || exit 1
+  previous="$(sed -n '1p' "$STATE")"
+  [ "$previous" = '-' ] || valid_hash "$previous" || exit 1
+  sed '1d' "$STATE" > "$OWNED"
+  while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$OWNED"
+  sort -u "$OWNED" -o "$OWNED"
+fi
+persist() {
+  temp="${STATE}.tmp.$$"
+  { printf '%s\n' "$1"; sort -u "$OWNED"; } > "$temp"
+  chmod 600 "$temp"
+  mv -f "$temp" "$STATE"
+}
+
+"$UBUS" call safeshield rules_list '{}' > "$REPLY" || exit 1
+[ "$(field "$REPLY" '@.ok')" != false ] || exit 1
+# A broken or truncated rules_list must never be mistaken for an empty list.
+LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
+"$JSONFILTER" -i "$REPLY" -e '@.allow[*]' > "$ALLOW" || exit 1
+while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$ALLOW"
+sort -u "$ALLOW" -o "$ALLOW"
+
+mutate() {
+  method="$1"; domain="$2"
+  "$UBUS" call safeshield "$method" "{\"action\":\"allow\",\"domain\":\"$domain\",\"refresh\":false}" > "$REPLY" || return 1
+  [ "$(field "$REPLY" '@.ok')" != false ] || return 1
+}
+
+# Refresh is retried after a partial or unsuccessful reconciliation.
+need_refresh=0
+[ "$previous" = '-' ] && need_refresh=1
+cp "$OWNED" "$SNAPSHOT"
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if ! grep -Fxq "$domain" "$DESIRED"; then
+    if grep -Fxq "$domain" "$ALLOW"; then
+      mutate rule_delete "$domain" || exit 1
+      need_refresh=1
+    fi
+    grep -Fxv "$domain" "$OWNED" > "$REPLY" || true
+    mv "$REPLY" "$OWNED"
+    persist '-'
+  fi
+done < "$SNAPSHOT"
+
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if ! grep -Fxq "$domain" "$ALLOW"; then
+    mutate rule_add "$domain" || exit 1
+    need_refresh=1
+    if ! grep -Fxq "$domain" "$OWNED"; then
+      printf '%s\n' "$domain" >> "$OWNED"
+    fi
+    persist '-'
+  fi
+done < "$DESIRED"
+
+if [ "$need_refresh" -eq 1 ]; then
+  "$UBUS" call safeshield refresh '{}' > "$REPLY" || exit 1
+  [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
+  [ "$(field "$REPLY" '@.accepted')" != false ] || exit 1
+fi
+persist "$revision"

@@ -67,3 +67,15 @@ test('demo actions never call RPC and Wi-Fi credentials are injected', () => {
   assert.match(data, /demoWifiQr = async/);
   assert.match(data, /demoGuestWifiQr = async/);
 });
+
+// The shared rules page must remain presentational: only the authenticated
+// app supplies the status reader, never the fixture-backed public demo.
+test('추천 규칙 API 조회는 실제 공유기 앱에서만 주입된다', () => {
+  const page = readFileSync(resolve(root, 'pages/SafeShieldRulesPage.tsx'), 'utf8');
+  const app = readFileSync(resolve(root, 'app/App.tsx'), 'utf8');
+  const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
+  assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
+  assert.match(page, /if \(!onLoadRecommendedRulesStatus\) return;/);
+  assert.match(app, /onLoadRecommendedRulesStatus=\{fetchRecommendedRulesStatus\}/);
+  assert.doesNotMatch(demo, /onLoadRecommendedRulesStatus=/);
+});

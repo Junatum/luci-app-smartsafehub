@@ -1,5 +1,5 @@
 import type { TargetedEvent, TargetedSubmitEvent } from 'preact';
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import {
   AlertIcon,
@@ -31,6 +31,8 @@ interface SafeShieldRulesPageProps {
   ) => Promise<boolean>;
   onDismissFeedback: () => void;
   onRetry: () => void;
+  // Injected only by the authenticated router app; the public demo has no RPC.
+  onLoadRecommendedRulesStatus?: () => Promise<{ domains: string[] }>;
 }
 
 interface RuleListCardProps {
@@ -46,6 +48,7 @@ interface RuleListCardProps {
     domain: string,
   ) => Promise<boolean>;
   rules: string[];
+  recommendedDomains: string[];
 }
 
 function normalizeDomain(value: string): string {
@@ -75,6 +78,7 @@ function RuleListCard({
   onAddRule,
   onDeleteRule,
   rules,
+  recommendedDomains,
 }: RuleListCardProps) {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -219,6 +223,7 @@ function RuleListCard({
           {filteredRules.length > 0 ? (
             <ul class="m-0 list-none divide-y divide-slate-200 p-0">
               {filteredRules.map((domain) => {
+                const cloudManaged = isAllow && recommendedDomains.includes(domain);
                 const deleting =
                   action?.operation === 'delete' &&
                   action.action === kind &&
@@ -229,12 +234,15 @@ function RuleListCard({
                     <code class="min-w-0 break-all font-mono text-sm font-semibold text-slate-800">
                       {domain}
                     </code>
+                    {cloudManaged ? (
+                      <span class="shrink-0 rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800" title="웹사이트에서 적용한 규칙입니다. 웹사이트에서 적용 해제해 주세요.">웹사이트 추천</span>
+                    ) : null}
                     <button
                       aria-label={`${domain} ${theme.label}에서 삭제`}
                       class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={busy}
+                      disabled={busy || cloudManaged}
                       onClick={() => void onDeleteRule(kind, domain)}
-                      title="삭제"
+                      title={cloudManaged ? '웹사이트에서 적용 해제할 수 있습니다.' : '삭제'}
                       type="button"
                     >
                       <TrashIcon class={`size-4 ${deleting ? 'animate-pulse' : ''}`} />
@@ -269,7 +277,27 @@ export function SafeShieldRulesPage({
   onDeleteRule,
   onDismissFeedback,
   onRetry,
+  onLoadRecommendedRulesStatus,
 }: SafeShieldRulesPageProps) {
+  const [recommendedDomains, setRecommendedDomains] = useState<string[]>([]);
+  const [recommendedKnown, setRecommendedKnown] = useState(false);
+  useEffect(() => {
+    if (!onLoadRecommendedRulesStatus) return;
+    let mounted = true;
+    void onLoadRecommendedRulesStatus()
+      .then((status) => {
+        if (mounted) {
+          setRecommendedDomains(status.domains);
+          setRecommendedKnown(true);
+        }
+      })
+      .catch(() => {
+        // Older firmware/API errors must not hide or break manual rules.
+        if (mounted) setRecommendedKnown(false);
+      });
+    return () => { mounted = false; };
+  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus]);
+
   if (loading && !data) {
     return <LoadingPanel />;
   }
@@ -316,6 +344,23 @@ export function SafeShieldRulesPage({
               <dd class="mt-1 mb-0 ml-0 text-lg font-black text-slate-950">{data.counts.total}</dd>
             </div>
           </dl>
+        </div>
+      </section>
+
+      <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5" aria-label="추천 사용자 규칙">
+        <div class="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="grid size-8 place-items-center rounded-lg bg-teal-50 text-teal-700"><CheckCircleIcon class="size-4" /></span>
+              <h2 class="m-0 text-base font-extrabold text-slate-950">추천 사용자 규칙</h2>
+              {recommendedKnown && recommendedDomains.length > 0 ? (
+                <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">적용 중 {recommendedDomains.length}개 도메인</span>
+              ) : null}
+            </div>
+            <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">다른 사용자가 공유한 검증된 허용 규칙을 찾아보고, 이 공유기에 적용하거나 해제할 수 있습니다.</p>
+            <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기 선택과 적용 관리는 SmartSafeHub 웹사이트에서 진행합니다. 적용 결과는 다음 기기 동기화 후 반영되며, 연결된 모든 기기에 영향을 줍니다.</p>
+          </div>
+          <a class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 sm:w-auto" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
         </div>
       </section>
 
@@ -373,6 +418,7 @@ export function SafeShieldRulesPage({
           onAddRule={onAddRule}
           onDeleteRule={onDeleteRule}
           rules={data.allow}
+          recommendedDomains={recommendedDomains}
         />
         <RuleListCard
           action={action}
@@ -380,6 +426,7 @@ export function SafeShieldRulesPage({
           onAddRule={onAddRule}
           onDeleteRule={onDeleteRule}
           rules={data.block}
+          recommendedDomains={recommendedDomains}
         />
       </section>
 

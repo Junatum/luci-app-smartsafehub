@@ -14,6 +14,7 @@
           "system_scheduled_reboot_settings",
           "health_status",
           "device_registration_status",
+          "device_recommended_rules_status",
           "activity_history"
         ],
         "safeshield": [

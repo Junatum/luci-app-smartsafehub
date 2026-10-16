@@ -14,6 +14,7 @@ RUNTIME_DIR="${SMARTSAFEHUB_DEVICE_RUNTIME_DIR:-/tmp/smartsafehub}"
 STATE_FILE="${SMARTSAFEHUB_DEVICE_STATE_FILE:-$RUNTIME_DIR/device.json}"
 CREDENTIAL_FILE="${SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE:-/etc/smartsafehub/device-credential.json}"
 ACTIVITY_CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-sync-credential.json}"
+RECOMMENDED_HELPER="${SMARTSAFEHUB_RECOMMENDED_HELPER:-/usr/libexec/smartsafehub-recommended-rules}"
 API_BASE_URL="${SMARTSAFEHUB_DEVICE_API_BASE_URL:-https://www.smartsafehub.com/api/v1}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 JSONFILTER_BIN="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
@@ -249,6 +250,13 @@ status_sync() {
  # for protection refresh first can leave stale connected/disconnected state in
  # the router UI even though Hub already accepted the ownership change.
  write_state registered active '' "$registered" "$plan" "$code" "$expires" "$next" "$now" "$protection_refresh_pending"
+
+ # Hub-approved recommendations are reconciled by a separate local helper.
+ # Keep the account state available even when SafeShield cannot be reached;
+ # a failed reconciliation is retried on the next device sync.
+ if [ -x "$RECOMMENDED_HELPER" ]; then
+  "$RECOMMENDED_HELPER" "$out" || log_message 'recommended rules will retry on next device sync'
+ fi
 
  if [ "$protection_refresh_pending" = true ]; then
   if refresh_safeshield_after_entitlement_change; then

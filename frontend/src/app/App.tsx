@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { fetchGuestWifiQr, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
+import { fetchGuestWifiQr, fetchRecommendedRulesStatus, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
 import { PageTabs } from '../components/PageTabs';
@@ -374,6 +374,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           loading={rules.loading}
           onAddRule={rules.addRule}
           onDeleteRule={rules.deleteRule}
+          onLoadRecommendedRulesStatus={fetchRecommendedRulesStatus}
           onDismissFeedback={rules.dismissFeedback}
           onRetry={() => void rules.refresh()}
         />

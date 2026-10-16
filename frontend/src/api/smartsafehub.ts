@@ -88,6 +88,15 @@ export interface DeviceRegistrationStatus {
   lastSuccessAt: number;
 }
 
+export interface RecommendedRulesStatus {
+  revision: string | null;
+  domains: string[];
+}
+
+export function fetchRecommendedRulesStatus(): Promise<RecommendedRulesStatus> {
+  return callApi(API_OBJECT, 'device_recommended_rules_status', {}, { timeoutMs: 5000 });
+}
+
 export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
   return callApi(API_OBJECT, 'device_registration_status', {}, { timeoutMs: 5000 });
 }
