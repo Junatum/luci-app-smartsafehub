@@ -92,10 +92,29 @@ obj=json.load(open(sys.argv[1]))
 assert obj['rules'][0]['id'] == 42
 assert obj['rules'][0]['domains'] == ['tv.example.org']
 PY_CATALOG
+# 회귀: 삭제 후 SafeShield refresh가 실패하면 추천 소유 정보를 잃으면 안 됩니다.
+# 그 사이 허용 목록에 도메인이 남거나 다시 나타나더라도 재할당 시 수동
+# 규칙으로 잘못 분류되어서는 안 됩니다.
+response '[]'
+if FAIL_METHOD=refresh "$HELPER" "$TMP/response.json"; then
+  echo 'FAIL: failed SafeShield refresh must fail reconciliation' >&2; exit 1
+fi
+[ "$(sed -n '1p' "$TMP/etc/state")" = '-' ]
+grep -Fqx 'tv.example.org' "$TMP/etc/state"
+# Simulate a still-present allow entry after the failed refresh.
+printf '["tv.example.org"]' > "$TMP/rules.json"
+response '["tv.example.org"]'
+"$HELPER" "$TMP/response.json"
+python3 - "$TMP/etc/receipt.json" <<'PY_REASSIGN'
+import json,sys
+receipt=json.load(open(sys.argv[1]))
+assert receipt['domains'] == [{'domain':'tv.example.org','source':'managed'}], receipt
+PY_REASSIGN
 # A valid empty recommended_rules.domains array must also be accepted.
 response '[]'
 "$HELPER" "$TMP/response.json"
 assert_rules '[]'
+[ "$(wc -l < "$TMP/etc/state")" -eq 1 ]
 # An empty allow list on both the initial read and verification is valid.
 "$HELPER" "$TMP/response.json"
 assert_rules '[]'
@@ -257,6 +276,7 @@ sed -n '/^recommended_fast_sync() {/,/^}/p' "$DEVICE" > "$TMP/fast-function.sh"
   write_recommended_sync_status() { printf '%s\n' "$1" > "$TMP/fast-status"; }
   post_json() {
     printf '%s\n' "$1" > "$TMP/fast-url"
+    cp "$2" "$TMP/fast-request.json"
     cp "$TMP/hub-poll.json" "$3"
   }
   python3 - "$TMP/hub-poll.json" <<'PY_FAST'
@@ -274,6 +294,21 @@ PY_FAST
   revision="$(sed -n '1p' "$RECOMMENDED_STATE")"
   printf '{"changed":false,"revision":"%s"}\n' "$revision" > "$TMP/hub-poll.json"
   recommended_fast_sync
+  [ "$old_count" -eq "$(wc -l < "$TMP/calls.log")" ] || exit 1
+  # 회귀: 이전 동기화가 수신 확인서를 잃으면 revision이 같더라도
+  # 변경 없음으로 인정하지 말고 Hub에서 전체 데이터를 다시 요청합니다.
+  rm -f "$RECOMMENDED_RECEIPT"
+  python3 - "$TMP/hub-poll.json" <<'PY_RECOVER'
+import hashlib,json,sys
+items=['tv.example.org']; revision=hashlib.sha256('\n'.join(items).encode()).hexdigest()
+json.dump({'changed':True,'recommended_rules':{'revision':revision,'domains':items}},open(sys.argv[1],'w'))
+PY_RECOVER
+  recommended_fast_sync
+  python3 - "$TMP/fast-request.json" <<'PY_REQUEST'
+import json,sys
+assert json.load(open(sys.argv[1]))['revision'] == ''
+PY_REQUEST
+  [ -f "$RECOMMENDED_RECEIPT" ]
   [ "$old_count" -eq "$(wc -l < "$TMP/calls.log")" ] || exit 1
   # Removing an assigned rule must remove only the Hub-owned rule.
   python3 - "$TMP/hub-poll.json" <<'PY_EMPTY'

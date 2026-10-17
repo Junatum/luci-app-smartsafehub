@@ -74,3 +74,13 @@ test('추천 규칙 상태는 화면을 새로고침하지 않아도 주기적�
   assert.match(page, /const loadStatus = onLoadRecommendedRulesStatus;/);
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
 });
+
+
+test('갱신 실패 후에도 추천 규칙의 소유권을 유지하고 확인서가 없으면 재조회한다', () => {
+  const device = readFileSync(resolve(root, 'root/usr/libexec/smartsafehub-device'), 'utf8');
+  assert.match(helper, /Keep the ownership claim until the final SafeShield read confirms/);
+  assert.match(helper, /Only after successful reconciliation may we forget ownership/);
+  assert.match(helper, /ownership intent before creating the allow entry/);
+  assert.match(device, /A state revision alone is not proof that SafeShield applied the rules/);
+  assert.match(device, /json_value "\$RECOMMENDED_RECEIPT" '@\.revision'/);
+});

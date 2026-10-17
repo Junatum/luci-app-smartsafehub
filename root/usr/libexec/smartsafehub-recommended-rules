@@ -113,8 +113,9 @@ while IFS= read -r domain; do
       mutate rule_delete "$domain" || exit 1
       need_refresh=1
     fi
-    grep -Fxv "$domain" "$OWNED" > "$REPLY" || true
-    mv "$REPLY" "$OWNED"
+    # Keep the ownership claim until the final SafeShield read confirms the
+    # domain is gone. A refresh failure must not turn a leftover cloud entry
+    # into an apparently user-created allow rule on the next assignment.
     persist '-'
   fi
 done < "$SNAPSHOT"
@@ -122,11 +123,15 @@ done < "$SNAPSHOT"
 while IFS= read -r domain; do
   [ -n "$domain" ] || continue
   if ! grep -Fxq "$domain" "$ALLOW"; then
-    mutate rule_add "$domain" || exit 1
-    need_refresh=1
+    # Write the ownership intent before creating the allow entry. If the
+    # process is interrupted after rule_add, the retry must still recognize
+    # the entry as cloud-managed rather than silently treating it as manual.
     if ! grep -Fxq "$domain" "$OWNED"; then
       printf '%s\n' "$domain" >> "$OWNED"
+      persist '-'
     fi
+    mutate rule_add "$domain" || exit 1
+    need_refresh=1
     persist '-'
   fi
 done < "$DESIRED"
@@ -147,6 +152,26 @@ while IFS= read -r domain; do
   [ -n "$domain" ] || continue
   grep -Fxq "$domain" "$VERIFY" || exit 1
 done < "$DESIRED"
+# Do not retire ownership if a previously managed, now-unassigned domain is
+# still present in SafeShield. It may reappear during a failed refresh or an
+# overlapping request, and a subsequent recommendation must not adopt it as a
+# manual rule. Retry the deletion while the ownership marker remains intact.
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if ! grep -Fxq "$domain" "$DESIRED" && grep -Fxq "$domain" "$VERIFY"; then
+    exit 1
+  fi
+done < "$OWNED"
+# Only after successful reconciliation may we forget ownership of removed
+# domains. The preserved marker survives a failed refresh and a reassignment.
+cp "$OWNED" "$SNAPSHOT"
+: > "$OWNED"
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if grep -Fxq "$domain" "$DESIRED"; then
+    printf '%s\n' "$domain" >> "$OWNED"
+  fi
+done < "$SNAPSHOT"
 # The receipt describes *allow-list presence*, not proven DNS query results.
 # Domains not in OWNED existed before this recommendation (manual configuration).
 receipt_tmp="${RECEIPT}.tmp.$$"

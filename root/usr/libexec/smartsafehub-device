@@ -350,6 +350,15 @@ recommended_fast_sync() {
    *) [ "${#revision}" -eq 64 ] || revision='' ;;
   esac
  fi
+ # A state revision alone is not proof that SafeShield applied the rules.
+ # When a prior reconciliation lost its receipt, force a full payload from
+ # Hub rather than acknowledging 'changed: false' forever.
+ if [ -n "$revision" ] && {
+   [ "$(json_value "$RECOMMENDED_RECEIPT" '@.revision')" != "$revision" ] ||
+   [ "$(json_value "$RECOMMENDED_RECEIPT" '@.status')" != confirmed ];
+ }; then
+  revision=''
+ fi
  rules_revision="$(json_value "${RECOMMENDED_CATALOG:-$RUNTIME_DIR/recommended-rules.catalog.json}" '@.rules_revision')"
  case "$rules_revision" in *[!0-9a-f]*|'') rules_revision='' ;; *) [ "${#rules_revision}" -eq 64 ] || rules_revision='' ;; esac
  body="$RUNTIME_DIR/recommended-poll-request.$$.json"
