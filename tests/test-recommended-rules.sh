@@ -166,7 +166,7 @@ grep -Fq '"device_recommended_rules_refresh"' "$ACL"
 grep -Fq 'refreshRecommendedRulesStatus' "$API"
 grep -Fq 'onSyncRecommendedRules={refreshRecommendedRulesStatus}' "$APP"
 grep -Fq '지금 동기화' "$PAGE"
-grep -Fq 'recommendedStatus.confirmedDomains.map' "$PAGE"
+! grep -Fq 'recommendedStatus.confirmedDomains.map' "$PAGE" # no repeated list
 # Exercise the real helper's atomic status writer with an isolated temp dir.
 sed -n '/^write_recommended_sync_status() {/,/^}/p' "$DEVICE" > "$TMP/status-function.sh"
 (
@@ -206,7 +206,18 @@ grep -Fq 'onLoadRecommendedRulesStatus' "$PAGE"
 grep -Fq 'onLoadRecommendedRulesStatus={fetchRecommendedRulesStatus}' "$ROOT/frontend/src/app/App.tsx"
 grep -Fq 'disabled={busy || cloudManaged}' "$PAGE"
 grep -Fq "cloudManaged ? '추천 규칙' : '직접 추가'" "$PAGE"
-grep -Fq 'aria-label="추천 규칙 분류"' "$PAGE"
+# Group allow entries by who controls them without repeating the domains.
+grep -Fq 'aria-label="직접 추가한 허용 규칙"' "$PAGE"
+grep -Fq 'aria-label="웹사이트 추천 규칙"' "$PAGE"
+grep -Fq 'recommendedDomains.includes(domain)' "$PAGE"
+grep -Fq 'aria-expanded={showRecommended}' "$PAGE"
+grep -Fq 'const showRecommended = searching ||' "$PAGE"
+grep -Fq 'max-h-[20rem]' "$PAGE"
+grep -Fq '약 30초마다 확인합니다' "$PAGE"
+! grep -Fq '추천 규칙은 약 5분마다 자동 동기화됩니다' "$PAGE"
+# Never invent service names that the router API does not provide.
+! grep -Fq '삼성 TV Plus' "$PAGE"
+grep -Fq 'aria-label="추천 사용자 규칙"' "$PAGE"
 grep -Fq 'https://www.smartsafehub.com/dashboard/recommended-rules/' "$PAGE"
 grep -Fq 'RECOMMENDED_HELPER' "$DEVICE"
 grep -Fq 'recommended_rules_ack' "$DEVICE"
