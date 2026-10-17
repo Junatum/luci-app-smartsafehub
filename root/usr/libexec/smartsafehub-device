@@ -16,6 +16,7 @@ CREDENTIAL_FILE="${SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE:-/etc/smartsafehub/device
 ACTIVITY_CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-sync-credential.json}"
 RECOMMENDED_HELPER="${SMARTSAFEHUB_RECOMMENDED_HELPER:-/usr/libexec/smartsafehub-recommended-rules}"
 RECOMMENDED_RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-$RUNTIME_DIR/recommended-rules.receipt.json}"
+RECOMMENDED_SYNC_STATUS="${SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE:-$RUNTIME_DIR/recommended-rules.sync.json}"
 API_BASE_URL="${SMARTSAFEHUB_DEVICE_API_BASE_URL:-https://www.smartsafehub.com/api/v1}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 JSONFILTER_BIN="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
@@ -205,6 +206,20 @@ rotate_credential_if_due() {
  rm -f "$body" "$out"
 }
 
+# Keep the latest reconciliation outcome in tmpfs, not flash. A successful
+# device/account sync does not imply SafeShield accepted the recommended rules.
+write_recommended_sync_status() {
+ local result="$1" now tmp
+ now="$(now_epoch)"
+ mkdir -p "$RUNTIME_DIR" || return 0
+ tmp="${RECOMMENDED_SYNC_STATUS}.tmp.$$"
+ if printf '{"status":"%s","checkedAt":%s}\n' "$result" "$now" > "$tmp"; then
+  mv -f "$tmp" "$RECOMMENDED_SYNC_STATUS" 2>/dev/null || rm -f "$tmp"
+ else
+  rm -f "$tmp"
+ fi
+}
+
 status_sync() {
  local token body out now registered previous_registered previous_plan plan last_success next code expires protection_refresh_pending
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
@@ -265,8 +280,13 @@ status_sync() {
  # Hub-approved recommendations are reconciled by a separate local helper.
  # Keep the account state available even when SafeShield cannot be reached;
  # a failed reconciliation is retried on the next device sync.
- if [ -x "$RECOMMENDED_HELPER" ]; then
-  "$RECOMMENDED_HELPER" "$out" || log_message 'recommended rules will retry on next device sync'
+ if [ -n "$(json_value "$out" '@.recommended_rules.revision')" ]; then
+  if [ -x "$RECOMMENDED_HELPER" ] && "$RECOMMENDED_HELPER" "$out"; then
+   write_recommended_sync_status confirmed
+  else
+   write_recommended_sync_status failed
+   log_message 'recommended rules will retry on next device sync'
+  fi
  fi
 
  if [ "$protection_refresh_pending" = true ]; then

@@ -33,3 +33,26 @@ test('허용 규칙 출처를 조회하지 못하면 직접 추가로 단정하�
   assert.match(page, /!onLoadRecommendedRulesStatus\) return;/);
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
 });
+
+
+test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 사용하지 않는다', () => {
+  const app = readFileSync(resolve(root, 'frontend/src/app/App.tsx'), 'utf8');
+  const api = readFileSync(resolve(root, 'frontend/src/api/smartsafehub.ts'), 'utf8');
+  const main = readFileSync(resolve(root, 'root/usr/share/rpcd/ucode/smartsafehub.uc'), 'utf8');
+  const acl = readFileSync(resolve(root, 'root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json'), 'utf8');
+  const device = readFileSync(resolve(root, 'root/usr/libexec/smartsafehub-device'), 'utf8');
+  assert.match(page, /onSyncRecommendedRules\?: \(\) => Promise<RecommendedRulesStatus>/);
+  assert.match(page, /지금 동기화/);
+  assert.match(page, /SafeShield 차단 목록 다운로드와 별개의 작업/);
+  assert.match(page, /status\.syncStatus === 'confirmed'/);
+  assert.match(page, /recommendedStatus\.confirmedDomains\.map/);
+  assert.match(app, /onSyncRecommendedRules=\{refreshRecommendedRulesStatus\}/);
+  assert.match(api, /callApi\(API_OBJECT, 'device_recommended_rules_refresh'/);
+  assert.match(main, /device_recommended_rules_refresh/);
+  assert.match(acl, /"device_recommended_rules_refresh"/);
+  assert.match(device, /write_recommended_sync_status failed/);
+  assert.match(device, /write_recommended_sync_status confirmed/);
+  assert.match(rpc, /device\?\.lastResult == 'failed' \|\| sync\?\.status == 'failed'/);
+  assert.match(rpc, /const confirmed = revision != null && receipt\?\.status == 'confirmed'/);
+  assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
+});

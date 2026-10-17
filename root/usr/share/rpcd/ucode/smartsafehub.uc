@@ -51,6 +51,7 @@ import {
 import {
 	read_device_registration_status,
 	read_recommended_rules_status,
+	refresh_recommended_rules_status,
 	refresh_device_registration_status,
 	refresh_device_pairing
 } from './smartsafehub/device-registration.uc';
@@ -322,6 +323,11 @@ const methods = {
 	device_recommended_rules_status: {
 		call: require_root_password(function(request) {
 			return read_recommended_rules_status(request);
+		}),
+	},
+	device_recommended_rules_refresh: {
+		call: require_root_password(function(request) {
+			return refresh_recommended_rules_status(request);
 		}),
 	},
 	device_registration_status: {

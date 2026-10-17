@@ -36,3 +36,15 @@ export interface SafeShieldRuleMutationResult {
   };
   rules: SafeShieldRules;
 }
+
+// Local SafeShield allow-list confirmation, not a DNS traffic test.
+export interface RecommendedRulesStatus {
+  revision: string | null;
+  domains: string[];
+  confirmedDomains: Array<{ domain: string; source: 'managed' | 'manual' }>;
+  syncStatus: 'pending' | 'confirmed' | 'failed';
+  lastCheckedAt: number;
+  lastDeviceSyncAt: number;
+  nextDeviceSyncAt: number;
+  accountRegistered: boolean;
+}

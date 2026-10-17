@@ -12,7 +12,7 @@ import {
 } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { SafeShieldRulesAction } from '../hooks/useSafeShieldRules';
-import type { SafeShieldRuleAction, SafeShieldRules } from '../types/rules';
+import type { RecommendedRulesStatus, SafeShieldRuleAction, SafeShieldRules } from '../types/rules';
 
 interface SafeShieldRulesPageProps {
   action: SafeShieldRulesAction | null;
@@ -32,7 +32,8 @@ interface SafeShieldRulesPageProps {
   onDismissFeedback: () => void;
   onRetry: () => void;
   // Injected only by the authenticated router app; the public demo has no RPC.
-  onLoadRecommendedRulesStatus?: () => Promise<{ domains: string[] }>;
+  onLoadRecommendedRulesStatus?: () => Promise<RecommendedRulesStatus>;
+  onSyncRecommendedRules?: () => Promise<RecommendedRulesStatus>;
 }
 
 interface RuleListCardProps {
@@ -295,16 +296,22 @@ export function SafeShieldRulesPage({
   onDismissFeedback,
   onRetry,
   onLoadRecommendedRulesStatus,
+  onSyncRecommendedRules,
 }: SafeShieldRulesPageProps) {
-  const [recommendedDomains, setRecommendedDomains] = useState<string[]>([]);
+  const [recommendedStatus, setRecommendedStatus] = useState<RecommendedRulesStatus | null>(null);
   const [recommendedKnown, setRecommendedKnown] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const recommendedDomains = recommendedStatus?.domains ?? [];
+
   useEffect(() => {
     if (!onLoadRecommendedRulesStatus) return;
     let mounted = true;
     void onLoadRecommendedRulesStatus()
       .then((status) => {
         if (mounted) {
-          setRecommendedDomains(status.domains);
+          setRecommendedStatus(status);
           setRecommendedKnown(true);
         }
       })
@@ -314,6 +321,28 @@ export function SafeShieldRulesPage({
       });
     return () => { mounted = false; };
   }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus]);
+
+  async function handleSyncRecommended(): Promise<void> {
+    if (!onSyncRecommendedRules || syncing) return;
+    setSyncing(true);
+    setSyncError(null);
+    setSyncMessage(null);
+    try {
+      const status = await onSyncRecommendedRules();
+      setRecommendedStatus(status);
+      setRecommendedKnown(true);
+      setSyncMessage(status.syncStatus === 'confirmed'
+        ? '서버에서 규칙을 가져와 SafeShield 허용 목록을 확인했습니다.'
+        : status.syncStatus === 'failed'
+          ? '기기 연결은 확인했지만 추천 규칙 반영에 실패했습니다. 다음 자동 동기화에서 다시 시도합니다.'
+          : '동기화를 요청했습니다. 아직 확인된 추천 규칙이 없습니다.');
+      onRetry(); // Reload the actual SafeShield allow list after reconciliation.
+    } catch {
+      setSyncError('추천 규칙을 동기화하지 못했습니다. 서버 연결 및 기기 등록 상태를 확인해 주세요.');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   if (loading && !data) {
     return <LoadingPanel />;
@@ -374,6 +403,16 @@ export function SafeShieldRulesPage({
                 <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">추천으로 추가 {recommendedDomains.length}개</span>
               ) : null}
             </div>
+            {onLoadRecommendedRulesStatus ? (
+              <div class="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+                <span class={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${recommendedStatus?.syncStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : recommendedStatus?.syncStatus === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {recommendedStatus?.syncStatus === 'confirmed' ? '허용 목록 확인' : recommendedStatus?.syncStatus === 'failed' ? '동기화 실패' : '동기화 대기'}
+                </span>
+                {recommendedStatus?.lastCheckedAt ? (
+                  <span class="text-xs text-slate-500">최근 확인 {new Date(recommendedStatus.lastCheckedAt * 1000).toLocaleString('ko-KR')}</span>
+                ) : null}
+              </div>
+            ) : null}
             <div class="mt-2 flex flex-wrap items-center gap-2" aria-label="추천 규칙 분류">
               <span class="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">공식 추천</span>
               <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">커뮤니티</span>
@@ -381,9 +420,46 @@ export function SafeShieldRulesPage({
             <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">SmartSafeHub의 공식 추천과 관리자가 검토한 커뮤니티 허용 규칙을 확인하고, 필요한 규칙을 적용해 보세요.</p>
             <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기 선택과 적용 관리는 SmartSafeHub 웹사이트에서 진행합니다. 적용 결과는 다음 기기 동기화 후 반영되며, 연결된 모든 기기에 영향을 줍니다.</p>
           </div>
-          <a class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 sm:w-auto" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
+          <div class="flex w-full flex-col gap-2 sm:w-auto">
+            {onSyncRecommendedRules ? (
+              <button
+                class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                disabled={syncing}
+                onClick={() => void handleSyncRecommended()}
+                type="button"
+              >{syncing ? '동기화 중…' : '지금 동기화'}</button>
+            ) : null}
+            <a class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
+          </div>
         </div>
       </section>
+
+      {onLoadRecommendedRulesStatus ? (
+        <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label="추천 규칙 적용 상태">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 class="m-0 text-sm font-extrabold text-slate-900">이 공유기에서 확인된 추천 허용 도메인</h3>
+              <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">추천 규칙은 약 5분마다 자동 동기화됩니다. '지금 동기화'는 SafeShield 차단 목록 다운로드와 별개의 작업입니다.</p>
+            </div>
+            <span class="text-xs font-bold text-slate-600">{recommendedStatus?.confirmedDomains.length ?? 0}개 확인</span>
+          </div>
+          {recommendedStatus?.confirmedDomains.length ? (
+            <ul class="mt-3 grid list-none gap-2 p-0 sm:grid-cols-2">
+              {recommendedStatus.confirmedDomains.map((entry) => (
+                <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2" key={entry.domain}>
+                  <code class="min-w-0 break-all text-xs font-semibold text-slate-800">{entry.domain}</code>
+                  <span class="shrink-0 text-[11px] font-bold text-slate-600">{entry.source === 'managed' ? '웹사이트 추천' : '기존 직접 허용'}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="mt-3 mb-0 text-sm text-slate-500">아직 확인된 추천 허용 도메인이 없습니다. 웹사이트에서 규칙을 적용한 뒤 동기화해 주세요.</p>
+          )}
+          <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">여기서 '확인'은 SafeShield 허용 목록 등록 여부만 뜻합니다. 실제 DNS 처리 및 서비스 재생 성공을 보장하지 않습니다. 규칙의 적용·해제는 웹사이트에서 관리합니다.</p>
+          {syncMessage ? <p class="mt-2 mb-0 text-sm font-semibold text-teal-800" role="status">{syncMessage}</p> : null}
+          {syncError ? <p class="mt-2 mb-0 text-sm font-semibold text-red-700" role="alert">{syncError}</p> : null}
+        </section>
+      ) : null}
 
       {!data.applyLocalOverrides ? (
         <section class="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4" role="alert">

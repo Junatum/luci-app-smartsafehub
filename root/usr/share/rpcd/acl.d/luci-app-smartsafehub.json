@@ -63,6 +63,7 @@
           "health_run",
           "health_reporter_update",
           "device_registration_refresh",
+          "device_recommended_rules_refresh",
           "safeshield_set_enabled",
           "safeshield_refresh",
           "safeshield_statistics_update",

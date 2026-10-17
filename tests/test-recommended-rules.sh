@@ -150,6 +150,36 @@ if "$HELPER" "$TMP/response.json"; then exit 1; fi
 printf '{}\n' > "$TMP/response.json"
 "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
+# The last reconciliation result must be written to tmpfs and distinguish a
+# SafeShield rule failure from a successful device account synchronization.
+RECOMMENDED_STATUS="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
+ACL="$ROOT/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json"
+API="$ROOT/frontend/src/api/smartsafehub.ts"
+APP="$ROOT/frontend/src/app/App.tsx"
+grep -Fq 'RECOMMENDED_SYNC_STATUS=' "$DEVICE"
+grep -Fq 'write_recommended_sync_status failed' "$DEVICE"
+grep -Fq 'write_recommended_sync_status confirmed' "$DEVICE"
+grep -Fq "sync?.status == 'failed'" "$RECOMMENDED_STATUS"
+grep -Fq 'refresh_recommended_rules_status' "$RECOMMENDED_STATUS"
+grep -Fq 'device_recommended_rules_refresh' "$RPC"
+grep -Fq '"device_recommended_rules_refresh"' "$ACL"
+grep -Fq 'refreshRecommendedRulesStatus' "$API"
+grep -Fq 'onSyncRecommendedRules={refreshRecommendedRulesStatus}' "$APP"
+grep -Fq '지금 동기화' "$PAGE"
+grep -Fq 'recommendedStatus.confirmedDomains.map' "$PAGE"
+# Exercise the real helper's atomic status writer with an isolated temp dir.
+sed -n '/^write_recommended_sync_status() {/,/^}/p' "$DEVICE" > "$TMP/status-function.sh"
+(
+  . "$TMP/status-function.sh"
+  RUNTIME_DIR="$TMP/status-runtime"
+  RECOMMENDED_SYNC_STATUS="$RUNTIME_DIR/recommended-rules.sync.json"
+  now_epoch() { printf '12345'; }
+  write_recommended_sync_status failed
+  grep -Fq '"status":"failed","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
+  write_recommended_sync_status confirmed
+  grep -Fq '"status":"confirmed","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
+  [ ! -e "$RECOMMENDED_SYNC_STATUS.tmp.$$" ]
+)
 # The UI must not allow manual deletion of entries owned by the cloud.
 grep -Fq 'device_recommended_rules_status' "$RPC"
 # A missing semicolon after an exported ucode function prevents the whole

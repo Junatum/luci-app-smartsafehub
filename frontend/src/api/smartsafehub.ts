@@ -42,6 +42,7 @@ import type {
   WanSettingsInput,
   WanUpdateResult,
 } from '../types/wan';
+import type { RecommendedRulesStatus } from '../types/rules';
 import { callApi } from './rpc';
 
 const API_OBJECT = 'smartsafehub';
@@ -88,13 +89,12 @@ export interface DeviceRegistrationStatus {
   lastSuccessAt: number;
 }
 
-export interface RecommendedRulesStatus {
-  revision: string | null;
-  domains: string[];
-}
-
 export function fetchRecommendedRulesStatus(): Promise<RecommendedRulesStatus> {
   return callApi(API_OBJECT, 'device_recommended_rules_status', {}, { timeoutMs: 5000 });
+}
+
+export function refreshRecommendedRulesStatus(): Promise<RecommendedRulesStatus> {
+  return callApi(API_OBJECT, 'device_recommended_rules_refresh', {}, { timeoutMs: 30000 });
 }
 
 export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
