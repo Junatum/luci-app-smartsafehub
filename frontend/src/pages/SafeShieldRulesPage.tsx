@@ -1,6 +1,8 @@
 import type { TargetedEvent, TargetedSubmitEvent } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
+import { RelativeTimestamp } from '../components/RelativeTimestamp';
+
 import {
   AlertIcon,
   CheckCircleIcon,
@@ -419,7 +421,7 @@ export function SafeShieldRulesPage({
                 <span>허용 확인 <strong class="text-emerald-800">{recommendedStatus.confirmedDomains.length}개</strong></span>
               ) : null}
               {recommendedStatus?.lastCheckedAt ? (
-                <span>최근 확인: {new Date(recommendedStatus.lastCheckedAt * 1000).toLocaleString('ko-KR')}</span>
+                <span>최근 확인: <RelativeTimestamp timestamp={recommendedStatus.lastCheckedAt} /></span>
               ) : null}
             </div>
           </div>

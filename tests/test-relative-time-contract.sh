@@ -8,9 +8,10 @@ FORMAT="$ROOT/frontend/src/app/format.ts"
 FIRMWARE="$ROOT/frontend/src/components/FirmwareUpdatesCard.tsx"
 SOFTWARE="$ROOT/frontend/src/components/SoftwareUpdatesCard.tsx"
 SAFE="$ROOT/frontend/src/pages/SafeShieldPage.tsx"
+RULES="$ROOT/frontend/src/pages/SafeShieldRulesPage.tsx"
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
-for file in "$COMPONENT" "$FORMAT" "$FIRMWARE" "$SOFTWARE" "$SAFE" "$ROOT/tests/runtime/relative-time.test.mjs"; do
+for file in "$COMPONENT" "$FORMAT" "$FIRMWARE" "$SOFTWARE" "$SAFE" "$RULES" "$ROOT/tests/runtime/relative-time.test.mjs"; do
   [ -f "$file" ] || fail "상대 시간 소스가 없습니다: $file"
 done
 
@@ -28,5 +29,9 @@ grep -Fq '<SummaryFact label="Last refresh" value={<RelativeTimestamp timestamp=
 grep -Fq 'parseArtifactVersionTimestamp(version)' "$SAFE" || fail '보호 데이터 버전의 UTC 시각을 파싱해야 합니다'
 grep -Fq '<RelativeTimestamp timestamp={timestamp} />' "$SAFE" || fail '보호 데이터 마지막 업데이트를 경과 시간으로 표시해야 합니다'
 grep -Fq 'label="다음 갱신" value={formatTimestamp(data.timestamps.nextRefreshAt)}' "$SAFE" || fail '다음 갱신 예정 시각은 절대 시간으로 유지해야 합니다'
+grep -Fq '<RelativeTimestamp timestamp={recommendedStatus.lastCheckedAt} />' "$RULES" || fail '추천 규칙의 최근 확인은 상대 시간으로 표시해야 합니다'
+if grep -Fq 'new Date(recommendedStatus.lastCheckedAt * 1000).toLocaleString' "$RULES"; then
+  fail '추천 규칙 최근 확인에 절대 시각을 직접 표시해서는 안 됩니다'
+fi
 
 printf 'PASS: relative time presentation contract\n'

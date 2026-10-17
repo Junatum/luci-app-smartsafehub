@@ -27,10 +27,23 @@ grep -Fq 'eyebrow="Protection details"' "$PAGE" || \
 	fail 'SafeShield page must provide a dedicated protection details section'
 grep -Fq 'title="보호 구성"' "$PAGE" || \
 	fail 'SafeShield page must group runtime, blocklist, refresh and health details'
-grep -Fq 'eyebrow="Settings"' "$PAGE" || \
-	fail 'SafeShield page must provide a dedicated settings section'
-grep -Fq 'title="SafeShield 설정"' "$PAGE" || \
-	fail 'SafeShield settings section must be clearly labeled'
+grep -Fq 'aria-label="보호 데이터 요약"' "$PAGE" || \
+	fail 'SafeShield summary must include the moved protection-data information'
+# 보호 데이터 배경과 보호 구성 카드 밀도는 다른 상단 요약/대시보드 카드와 통일합니다.
+grep -Fq 'class="min-w-0 rounded-xl border border-slate-200 bg-white p-4"' "$PAGE" || \
+  fail '보호 데이터 요약은 다른 흰색 카드와 동일한 배경을 사용해야 합니다'
+if grep -Fq 'class="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-4"' "$PAGE"; then
+  fail '보호 데이터 요약에 기존 회색 배경이 남아 있으면 안 됩니다'
+fi
+grep -Fq 'class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"' "$PAGE" || \
+  fail '보호 구성은 모바일 한 열, 태블릿 두 열, 데스크톱 네 열이어야 합니다'
+grep -Fq 'xl:p-4 2xl:p-5' "$PAGE" || \
+  fail '보호 구성 네 열에서는 카드 여백을 줄여야 합니다'
+grep -Fq 'xl:text-base 2xl:text-lg' "$PAGE" || \
+  fail '네 열 레이아웃에서 카드 제목이 잘리지 않도록 크기를 조절해야 합니다'
+if grep -Fq 'title="SafeShield 설정"' "$PAGE" || grep -Fq 'href="#rules"' "$PAGE"; then
+	fail 'SafeShield overview must not duplicate the dedicated user rules page'
+fi
 if grep -Fq 'SmartSafeHub 계정' "$PAGE"; then fail 'SafeShield page must not own SmartSafeHub account connection UI'; fi
 if grep -Fq '계정 연결 코드' "$PAGE"; then fail 'SafeShield page must not render pairing codes'; fi
 if grep -Fq 'requestDevicePairingCode' "$PAGE"; then fail 'SafeShield page must not call device pairing APIs'; fi
@@ -46,8 +59,6 @@ fi
 if grep -Fq '라이선스를 확인하고 이 기기에 적용하고 있습니다…' "$PAGE"; then
 	fail 'SafeShield settings must not expose the legacy license activation flow'
 fi
-grep -Fq 'Custom rules' "$PAGE" || fail 'SafeShield settings must expose product-facing custom rules'
-grep -Fq 'href="#rules"' "$PAGE" || fail 'SafeShield settings must link to the user rules page'
 if grep -Fq 'data.localOverrides.allowlistPath' "$PAGE" || grep -Fq 'data.localOverrides.blocklistPath' "$PAGE"; then
 	fail 'SafeShield product UI must not expose internal local rule file paths'
 fi
@@ -56,8 +67,6 @@ grep -Fq 'px-5 pb-5 sm:px-6 sm:pb-6' "$PAGE" || \
 	fail 'SafeShield summary facts must remain visually inside the protection card'
 grep -Fq 'class="bg-white px-5 py-4 sm:px-6"' "$PAGE" || \
 	fail 'SafeShield summary fact cells must use the protection card surface color'
-grep -Fq 'border border-teal-700 bg-teal-700' "$PAGE" || \
-	fail 'SafeShield custom rules action must remain recognizable as a primary button'
 
 grep -Fq 'Protection data' "$PAGE" || \
 	fail 'SafeShield protection data card must use a user-facing eyebrow instead of Artifact'
@@ -98,8 +107,13 @@ if grep -Fq '<DetailRow label="Tier"' "$PAGE" || \
 	grep -Fq '<DetailRow label="Unique domains"' "$PAGE"; then
 	fail 'SafeShield protection data card must not expose raw English artifact fields in the default view'
 fi
-grep -Fq '현재 적용 중인 보호 데이터와 사용자 규칙을 관리합니다.' "$PAGE" || \
-	fail 'SafeShield settings description must focus on protection data and custom rules'
+# The protection-data summary must precede the activity panel and appear only once.
+protection_line=$(grep -n 'aria-label="보호 데이터 요약"' "$PAGE" | head -n 1 | cut -d: -f1)
+activity_line=$(grep -n '<SafeShieldStatisticsPanel' "$PAGE" | head -n 1 | cut -d: -f1)
+[ -n "$protection_line" ] && [ -n "$activity_line" ] && [ "$protection_line" -lt "$activity_line" ] || \
+	fail 'SafeShield protection data should appear above the activity section'
+[ "$(grep -Fc 'aria-label="보호 데이터 요약"' "$PAGE")" -eq 1 ] || \
+	fail 'SafeShield should render the protection-data panel only once'
 
 grep -Fq 'const DISPLAY_HOURS = 24;' "$PANEL" || \
 	fail 'SafeShield activity must continue to use 24 hourly buckets'
