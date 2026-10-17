@@ -1,5 +1,5 @@
 import type { TargetedEvent, TargetedSubmitEvent } from 'preact';
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { RelativeTimestamp } from '../components/RelativeTimestamp';
 
@@ -339,10 +339,45 @@ export function SafeShieldRulesPage({
   const [syncing, setSyncing] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<RecommendedRuleAssignment | null>(null);
   const [revokeBusy, setRevokeBusy] = useState(false);
+  const [revokeConfirming, setRevokeConfirming] = useState(false);
+  const [revokeConfirmationDelayed, setRevokeConfirmationDelayed] = useState(false);
+  const pendingRevokeId = useRef<number | null>(null);
+  const previousStatusSignature = useRef<string | null>(null);
+  const onRetryRef = useRef(onRetry);
+  onRetryRef.current = onRetry;
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const recommendedDomains = recommendedStatus?.domains ?? [];
   const recommendedRules = recommendedStatus?.rules ?? [];
+
+  // A revoke can reach Hub even if rpcd times out while SafeShield is applying
+  // the new rules. Only a confirmed local read can settle its final outcome.
+  // The local SafeShield list also needs a refresh when a background poll
+  // observes a new recommendation revision, without reloading the whole page.
+  const acceptRecommendedStatus = useCallback((status: RecommendedRulesStatus): void => {
+    setRecommendedStatus(status);
+    setRecommendedKnown(true);
+    const signature = JSON.stringify([
+      status.revision, status.domains, status.rules.map((rule) => rule.id),
+      status.syncStatus,
+    ]);
+    if (previousStatusSignature.current !== null && previousStatusSignature.current !== signature) {
+      onRetryRef.current();
+    }
+    previousStatusSignature.current = signature;
+
+    if (
+      pendingRevokeId.current !== null &&
+      status.syncStatus === 'confirmed' &&
+      !status.rules.some((rule) => rule.id === pendingRevokeId.current)
+    ) {
+      pendingRevokeId.current = null;
+      setRevokeConfirming(false);
+      setRevokeConfirmationDelayed(false);
+      setSyncError(null);
+      setSyncMessage('추천 규칙 적용 해제를 확인했습니다.');
+    }
+  }, []);
 
   useEffect(() => {
     if (!onLoadRecommendedRulesStatus) return;
@@ -356,8 +391,7 @@ export function SafeShieldRulesPage({
       void loadStatus()
         .then((status) => {
           if (!mounted) return;
-          setRecommendedStatus(status);
-          setRecommendedKnown(true);
+          acceptRecommendedStatus(status);
         })
         .catch(() => {
           // Retain the last known result on a transient local RPC failure.
@@ -367,8 +401,25 @@ export function SafeShieldRulesPage({
     }
     updateStatus();
     const timer = window.setInterval(updateStatus, 15_000);
-    return () => { mounted = false; window.clearInterval(timer); };
-  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus, syncing, revokeBusy]);
+    const onFocus = () => updateStatus();
+    const onVisible = () => { if (!document.hidden) updateStatus(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus, syncing, revokeBusy, acceptRecommendedStatus]);
+
+  // An RPC timeout cannot prove whether Hub accepted the removal. After a
+  // minute, explain the delay but continue watching for eventual confirmation.
+  useEffect(() => {
+    if (!revokeConfirming) return;
+    const timer = window.setTimeout(() => setRevokeConfirmationDelayed(true), 60_000);
+    return () => window.clearTimeout(timer);
+  }, [revokeConfirming]);
 
   async function handleSyncRecommended(): Promise<void> {
     if (!onSyncRecommendedRules || syncing) return;
@@ -377,8 +428,7 @@ export function SafeShieldRulesPage({
     setSyncMessage(null);
     try {
       const status = await onSyncRecommendedRules();
-      setRecommendedStatus(status);
-      setRecommendedKnown(true);
+      acceptRecommendedStatus(status);
       setSyncMessage(status.syncStatus === 'confirmed'
         ? '서버에서 규칙을 가져와 SafeShield 허용 목록을 확인했습니다.'
         : status.syncStatus === 'failed'
@@ -394,23 +444,30 @@ export function SafeShieldRulesPage({
 
   async function handleRevokeRecommended(): Promise<void> {
     if (!revokeTarget || revokeBusy || !onRevokeRecommendedRule) return;
+    const ruleId = revokeTarget.id;
+    pendingRevokeId.current = ruleId;
     setRevokeBusy(true);
+    setRevokeConfirming(true);
+    setRevokeConfirmationDelayed(false);
     setSyncError(null);
     setSyncMessage(null);
     try {
-      const status = await onRevokeRecommendedRule(revokeTarget.id);
-      setRecommendedStatus(status);
-      setRecommendedKnown(true);
+      const status = await onRevokeRecommendedRule(ruleId);
+      acceptRecommendedStatus(status);
       setRevokeTarget(null);
-      setSyncMessage('추천 규칙의 적용을 해제하고 SafeShield 허용 목록을 확인했습니다.');
-      onRetry();
+      if (pendingRevokeId.current !== null) {
+        setSyncMessage('적용 해제 요청을 처리했습니다. 공유기의 허용 목록을 확인하고 있습니다.');
+      }
+      onRetryRef.current();
     } catch {
-      setSyncError('추천 규칙을 해제하지 못했습니다. Hub 적용 상태와 연결을 확인한 뒤 동기화해 주세요.');
+      // Hub may have removed the assignment before the local SafeShield apply
+      // timed out. Keep checking instead of permanently displaying a failure.
       setRevokeTarget(null);
+      setSyncError('적용 해제 결과를 아직 확인하지 못했습니다. 공유기의 상태를 자동으로 다시 확인합니다.');
       try {
         const status = await onLoadRecommendedRulesStatus?.();
-        if (status) setRecommendedStatus(status);
-      } catch { /* Keep the previous status until next refresh. */ }
+        if (status) acceptRecommendedStatus(status);
+      } catch { /* The 15-second local poll will retry. */ }
     } finally {
       setRevokeBusy(false);
     }
@@ -437,8 +494,17 @@ export function SafeShieldRulesPage({
             <p class="mt-3 text-sm text-slate-700"><strong>{revokeTarget.title}</strong> 규칙을 이 공유기에서 해제할까요?</p>
             <p class="mt-2 text-xs leading-5 text-slate-600">포함된 도메인 {revokeTarget.domains.length}개를 다시 확인합니다. 직접 추가한 허용 규칙과 다른 추천 규칙에 필요한 도메인은 유지됩니다.</p>
             <div class="mt-5 flex justify-end gap-2">
-              <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700" disabled={revokeBusy} onClick={() => setRevokeTarget(null)} type="button">취소</button>
-              <button class="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={revokeBusy} onClick={() => void handleRevokeRecommended()} type="button">{revokeBusy ? '해제 중…' : '적용 해제'}</button>
+              <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 disabled:cursor-wait disabled:opacity-50" disabled={revokeBusy} onClick={() => setRevokeTarget(null)} type="button">취소</button>
+              <button
+                class="inline-flex min-w-24 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-800 disabled:cursor-progress disabled:bg-red-700 disabled:opacity-80"
+                aria-busy={revokeBusy}
+                disabled={revokeBusy}
+                onClick={() => void handleRevokeRecommended()}
+                type="button"
+              >
+                {revokeBusy ? <svg class="size-4 animate-spin" aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg> : null}
+                <span role="status">{revokeBusy ? '해제 중…' : '적용 해제'}</span>
+              </button>
             </div>
           </section>
         </div>
@@ -513,6 +579,13 @@ export function SafeShieldRulesPage({
             <a class="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 sm:flex-none" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
           </div>
         </div>
+        {revokeConfirming && !revokeBusy ? (
+          <p class="mt-3 mb-0 text-sm font-semibold text-amber-700" role="status">
+            {revokeConfirmationDelayed
+              ? '적용 해제 확인이 지연되고 있습니다. 자동 재확인은 계속되며, 필요하면 지금 동기화를 눌러 확인할 수 있습니다.'
+              : '적용 해제 상태를 확인하고 있습니다. 확인되면 목록과 상태가 자동 갱신됩니다.'}
+          </p>
+        ) : null}
         {syncMessage ? <p class="mt-3 mb-0 text-sm font-semibold text-teal-800" role="status">{syncMessage}</p> : null}
         {syncError ? <p class="mt-3 mb-0 text-sm font-semibold text-red-700" role="alert">{syncError}</p> : null}
         {recommendedStatus?.syncWarning ? (
@@ -593,10 +666,6 @@ export function SafeShieldRulesPage({
           revokeBusy={revokeBusy}
         />
       </section>
-
-      <p class="mt-5 mb-0 text-xs leading-5 text-slate-500">
-        규칙 저장과 유효성 검사는 SafeShield API가 관리합니다. 도메인은 소문자로 정규화되고 중복 항목은 하나로 유지됩니다.
-      </p>
     </>
   );
 }

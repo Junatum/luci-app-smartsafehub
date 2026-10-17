@@ -84,3 +84,33 @@ test('갱신 실패 후에도 추천 규칙의 소유권을 유지하고 확인�
   assert.match(device, /A state revision alone is not proof that SafeShield applied the rules/);
   assert.match(device, /json_value "\$RECOMMENDED_RECEIPT" '@\.revision'/);
 });
+
+test('추천 규칙 해제 중에는 스피너와 진행 커서를 표시한다', () => {
+  assert.match(page, /aria-busy=\{revokeBusy\}/);
+  assert.match(page, /class="size-4 animate-spin"/);
+  assert.match(page, /disabled:cursor-progress/);
+  assert.match(page, /\{revokeBusy \? '해제 중…' : '적용 해제'\}/);
+});
+
+test('해제 요청 시간 초과 후에도 로컬 적용 확인을 반복하고 오래된 오류를 지운다', () => {
+  assert.match(page, /pendingRevokeId\.current = ruleId/);
+  assert.match(page, /status\.syncStatus === 'confirmed'/);
+  assert.match(page, /!status\.rules\.some\(\(rule\) => rule\.id === pendingRevokeId\.current\)/);
+  assert.match(page, /setSyncError\(null\)/);
+  assert.match(page, /적용 해제 결과를 아직 확인하지 못했습니다/);
+  assert.match(page, /acceptRecommendedStatus\(status\)/);
+});
+
+test('백그라운드 규칙 변경을 감지하면 SafeShield 목록을 다시 읽는다', () => {
+  assert.match(page, /previousStatusSignature\.current !== signature/);
+  assert.match(page, /onRetryRef\.current\(\)/);
+  assert.match(page, /window\.setInterval\(updateStatus, 15_000\)/);
+  assert.match(page, /window\.addEventListener\('focus', onFocus\)/);
+  assert.match(page, /document\.addEventListener\('visibilitychange', onVisible\)/);
+});
+
+test('적용 해제 확인이 길어지면 안내하고 확인을 계속한다', () => {
+  assert.match(page, /setRevokeConfirmationDelayed\(true\), 60_000/);
+  assert.match(page, /적용 해제 확인이 지연되고 있습니다/);
+  assert.match(page, /setRevokeConfirmationDelayed\(false\)/);
+});
