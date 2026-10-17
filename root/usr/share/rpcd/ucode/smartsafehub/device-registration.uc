@@ -56,7 +56,7 @@ export function read_recommended_rules_status(request) {
 export function refresh_recommended_rules_status(request) {
  // The blocklist download and the Hub device sync are different operations.
  // Reuse the authenticated device sync, never the SafeShield blocklist refresh.
- if (!run_command([ HELPER, 'status-sync' ], 25000)) return failure('RECOMMENDED_SYNC_UNAVAILABLE', 'SmartSafeHub 서버와 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+ if (!run_command([ HELPER, 'recommended-sync' ], 25000)) return failure('RECOMMENDED_SYNC_UNAVAILABLE', 'SmartSafeHub 서버와 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
  return read_recommended_rules_status(request);
 };
 export function read_device_registration_status(request) { const state = read_state(); return state != null ? success(state) : failure('DEVICE_STATE_INVALID', '기기 등록 상태를 읽지 못했습니다.'); };

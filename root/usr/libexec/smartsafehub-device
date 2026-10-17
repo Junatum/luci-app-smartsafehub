@@ -16,6 +16,7 @@ CREDENTIAL_FILE="${SMARTSAFEHUB_DEVICE_CREDENTIAL_FILE:-/etc/smartsafehub/device
 ACTIVITY_CREDENTIAL_FILE="${SMARTSAFEHUB_ACTIVITY_CREDENTIAL_FILE:-$RUNTIME_DIR/activity-sync-credential.json}"
 RECOMMENDED_HELPER="${SMARTSAFEHUB_RECOMMENDED_HELPER:-/usr/libexec/smartsafehub-recommended-rules}"
 RECOMMENDED_RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-$RUNTIME_DIR/recommended-rules.receipt.json}"
+RECOMMENDED_STATE="${SMARTSAFEHUB_RECOMMENDED_STATE_FILE:-/etc/smartsafehub/recommended-rules.state}"
 RECOMMENDED_SYNC_STATUS="${SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE:-$RUNTIME_DIR/recommended-rules.sync.json}"
 API_BASE_URL="${SMARTSAFEHUB_DEVICE_API_BASE_URL:-https://www.smartsafehub.com/api/v1}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN:-uclient-fetch}"
@@ -27,6 +28,8 @@ HEXDUMP_BIN="${SMARTSAFEHUB_DEVICE_HEXDUMP_BIN:-hexdump}"
 UBUS_BIN="${SMARTSAFEHUB_DEVICE_UBUS_BIN:-ubus}"
 REQUEST_TIMEOUT_S=10
 CHECK_INTERVAL_S=300
+RECOMMENDED_POLL_INTERVAL_S=30
+RECOMMENDED_POLL_MAX_RETRY_S=300
 STARTUP_DELAY_S=35
 MAX_RETRY_S=3600
 STOP_REQUESTED=0
@@ -301,6 +304,57 @@ status_sync() {
  return 0
 }
 
+
+# A lightweight authenticated poll; unlike status-sync it does not resolve
+# artifacts, licenses, or other device services on the Hub.
+recommended_fast_sync() {
+ local token body out revision changed server_revision rc
+ mkdir -p "$RUNTIME_DIR" || return 1
+ [ "$(json_value "$STATE_FILE" '@.accountRegistered')" = true ] || return 0
+ [ -x "$RECOMMENDED_HELPER" ] || return 1
+ token="$(credential_token)" || return 1
+ revision=''
+ if [ -f "$RECOMMENDED_STATE" ] && [ ! -L "$RECOMMENDED_STATE" ]; then
+  revision="$(sed -n '1p' "$RECOMMENDED_STATE")"
+  case "$revision" in
+   *[!0-9a-f]*|'') revision='' ;;
+   *) [ "${#revision}" -eq 64 ] || revision='' ;;
+  esac
+ fi
+ body="$RUNTIME_DIR/recommended-poll-request.$$.json"
+ out="$RUNTIME_DIR/recommended-poll-response.$$.json"
+ printf '{"revision":"%s"}\n' "$revision" > "$body" || return 1
+ if ! post_json "$API_BASE_URL/devices/recommended-rules" "$body" "$out" "$token"; then
+  write_recommended_sync_status failed
+  rm -f "$body" "$out" "${out}.log"
+  return 1
+ fi
+ changed="$(json_value "$out" '@.changed')"
+ case "$changed" in
+  false)
+   server_revision="$(json_value "$out" '@.revision')"
+   if [ -n "$revision" ] && [ "$server_revision" = "$revision" ]; then
+    write_recommended_sync_status confirmed
+    rc=0
+   else
+    rc=1
+   fi
+   ;;
+  true)
+   if "$RECOMMENDED_HELPER" "$out"; then
+    write_recommended_sync_status confirmed
+    rc=0
+   else
+    rc=1
+   fi
+   ;;
+  *) rc=1 ;;
+ esac
+ [ "$rc" -eq 0 ] || write_recommended_sync_status failed
+ rm -f "$body" "$out" "${out}.log"
+ return "$rc"
+}
+
 pairing_session() {
  local token body out code expires registered now plan last_success next protection_refresh_pending
  now="$(now_epoch)"; next=$((now + CHECK_INTERVAL_S))
@@ -333,16 +387,57 @@ retry_delay() {
  printf '%s\n' "$base"
 }
 wait_for() { local seconds="$1"; [ "$STOP_REQUESTED" -eq 1 ] && return 1; "$SLEEP_BIN" "$seconds" & WAIT_PID=$!; wait "$WAIT_PID" 2>/dev/null || true; WAIT_PID=''; [ "$STOP_REQUESTED" -eq 0 ]; }
-daemon() { local failures=0 delay; mkdir -p "$RUNTIME_DIR"; prepare_credential || true; wait_for "$STARTUP_DELAY_S" || return 0; while [ "$STOP_REQUESTED" -eq 0 ]; do if ssh_runtime_execute status-sync status_sync; then failures=0; delay="$CHECK_INTERVAL_S"; else delay="$(retry_delay "$failures")"; [ "$failures" -lt 4 ] && failures=$((failures + 1)); fi; wait_for "$delay" || break; done; }
+daemon() {
+ local failures=0 fast_failures=0 now next_full next_fast delay jitter random_hex fast_delay
+ mkdir -p "$RUNTIME_DIR"
+ prepare_credential || true
+ wait_for "$STARTUP_DELAY_S" || return 0
+ now="$(now_epoch)"
+ next_full="$now"
+ # Stagger first fast poll, avoiding a burst after mass reboot/release.
+ random_hex="$("$HEXDUMP_BIN" -n 1 -v -e '1/1 "%u"' /dev/urandom 2>/dev/null || true)"
+ case "$random_hex" in ''|*[!0-9]*) jitter=15 ;; *) jitter=$((random_hex % 21)) ;; esac
+ next_fast=$((now + RECOMMENDED_POLL_INTERVAL_S + jitter))
+ while [ "$STOP_REQUESTED" -eq 0 ]; do
+  now="$(now_epoch)"
+  if [ "$now" -ge "$next_full" ]; then
+   if ssh_runtime_execute status-sync status_sync; then
+    failures=0; delay="$CHECK_INTERVAL_S"
+   else
+    delay="$(retry_delay "$failures")"
+    [ "$failures" -lt 4 ] && failures=$((failures + 1))
+   fi
+   now="$(now_epoch)"
+   next_full=$((now + delay))
+   # Full sync already handled the recommended payload.
+   next_fast=$((now + RECOMMENDED_POLL_INTERVAL_S))
+  elif [ "$now" -ge "$next_fast" ]; then
+   if recommended_fast_sync; then
+    fast_failures=0; fast_delay="$RECOMMENDED_POLL_INTERVAL_S"
+   else
+    # Network/Hub failures must not turn into a tight retry loop.
+    case "$fast_failures" in 0) fast_delay=60 ;; 1) fast_delay=120 ;; *) fast_delay="$RECOMMENDED_POLL_MAX_RETRY_S" ;; esac
+    [ "$fast_failures" -lt 2 ] && fast_failures=$((fast_failures + 1))
+    log_message "recommended rules quick sync failed; retry in ${fast_delay}s"
+   fi
+   now="$(now_epoch)"; next_fast=$((now + fast_delay))
+  fi
+  now="$(now_epoch)"
+  if [ "$next_fast" -lt "$next_full" ]; then delay=$((next_fast - now)); else delay=$((next_full - now)); fi
+  [ "$delay" -ge 1 ] || delay=1
+  wait_for "$delay" || break
+ done
+}
 # Existing commands retain their behaviour; runtime-status is read-only.
 ssh_runtime_debug_arg "${1:-daemon}" "${2:-}" || { echo 'invalid argument' >&2; exit 2; }
 case "${1:-daemon}" in
  prepare-credential) prepare_credential ;;
  bootstrap) bootstrap ;;
  status-sync|run-once) ssh_runtime_execute status-sync status_sync ;;
+ recommended-sync) recommended_fast_sync ;;
  pairing-session) pairing_session ;;
  status) [ -s "$STATE_FILE" ] && cat "$STATE_FILE" || printf '{}\n' ;;
  runtime-status) ssh_runtime_status ;;
  daemon) daemon ;;
- *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|run-once|pairing-session|status|runtime-status} [--debug]" >&2; exit 2 ;;
+ *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|recommended-sync|run-once|pairing-session|status|runtime-status} [--debug]" >&2; exit 2 ;;
 esac

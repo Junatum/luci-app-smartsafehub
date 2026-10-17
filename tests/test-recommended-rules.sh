@@ -211,4 +211,61 @@ grep -Fq 'https://www.smartsafehub.com/dashboard/recommended-rules/' "$PAGE"
 grep -Fq 'RECOMMENDED_HELPER' "$DEVICE"
 grep -Fq 'recommended_rules_ack' "$DEVICE"
 grep -Fq '/etc/smartsafehub/recommended-rules.state' "$ROOT/root/lib/upgrade/keep.d/smartsafehub-device"
+# The short-poll path must not use full device sync or reapply unchanged
+# rules. Exercise the real function with a fake authenticated Hub response.
+sed -n '/^recommended_fast_sync() {/,/^}/p' "$DEVICE" > "$TMP/fast-function.sh"
+(
+  . "$TMP/fast-function.sh"
+  RUNTIME_DIR="$TMP/run"
+  API_BASE_URL="https://example.test/api/v1"
+  STATE_FILE="$TMP/device.json"
+  RECOMMENDED_STATE="$TMP/etc/state"
+  RECOMMENDED_HELPER="$HELPER"
+  RECOMMENDED_RECEIPT="$TMP/etc/receipt.json"
+  printf '{"accountRegistered":true}\n' > "$STATE_FILE"
+  printf '[]\n' > "$TMP/rules.json"
+  rm -f "$RECOMMENDED_STATE" "$TMP/calls.log"
+  credential_token() { printf 'ssh_dev_test'; }
+  json_value() { "$TMP/bin/jsonfilter" -i "$1" -e "$2" 2>/dev/null | head -n 1 || true; }
+  write_recommended_sync_status() { printf '%s\n' "$1" > "$TMP/fast-status"; }
+  post_json() {
+    printf '%s\n' "$1" > "$TMP/fast-url"
+    cp "$TMP/hub-poll.json" "$3"
+  }
+  python3 - "$TMP/hub-poll.json" <<'PY_FAST'
+import hashlib,json,sys
+items=['tv.example.org']; revision=hashlib.sha256('\n'.join(items).encode()).hexdigest()
+json.dump({'changed':True,'recommended_rules':{'revision':revision,'domains':items}},open(sys.argv[1],'w'))
+PY_FAST
+  recommended_fast_sync
+  grep -Fqx 'confirmed' "$TMP/fast-status"
+  grep -Fq '/devices/recommended-rules' "$TMP/fast-url"
+  grep -Fqx 'tv.example.org' "$RECOMMENDED_STATE"
+  grep -Fq 'tv.example.org' "$TMP/rules.json"
+  [ -f "$RECOMMENDED_RECEIPT" ]
+  old_count="$(wc -l < "$TMP/calls.log")"
+  revision="$(sed -n '1p' "$RECOMMENDED_STATE")"
+  printf '{"changed":false,"revision":"%s"}\n' "$revision" > "$TMP/hub-poll.json"
+  recommended_fast_sync
+  [ "$old_count" -eq "$(wc -l < "$TMP/calls.log")" ] || exit 1
+  # Removing an assigned rule must remove only the Hub-owned rule.
+  python3 - "$TMP/hub-poll.json" <<'PY_EMPTY'
+import hashlib,json,sys
+json.dump({'changed':True,'recommended_rules':{'revision':hashlib.sha256(b'').hexdigest(),'domains':[]}},open(sys.argv[1],'w'))
+PY_EMPTY
+  recommended_fast_sync
+  [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
+  # Never accept an invalid changed flag or an unverified no-change revision.
+  printf '{"changed":false,"revision":"invalid"}\n' > "$TMP/hub-poll.json"
+  if recommended_fast_sync; then exit 1; fi
+  grep -Fqx 'failed' "$TMP/fast-status"
+  printf '{"changed":true,"recommended_rules":{"revision":"bad","domains":[]}}\n' > "$TMP/hub-poll.json"
+  if recommended_fast_sync; then exit 1; fi
+  [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
+)
+grep -Fq 'RECOMMENDED_POLL_INTERVAL_S=30' "$DEVICE"
+grep -Fq 'next_fast=' "$DEVICE"
+grep -Fq 'next_full=' "$DEVICE"
+grep -Fq "recommended-sync) recommended_fast_sync" "$DEVICE"
+grep -Fq "[ HELPER, 'recommended-sync' ]" "$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
 echo '추천 사용자 규칙 동기화 및 UI 계약: PASS'
