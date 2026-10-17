@@ -49,6 +49,7 @@ interface RuleListCardProps {
   ) => Promise<boolean>;
   rules: string[];
   recommendedDomains: string[];
+  recommendedKnown: boolean;
 }
 
 function normalizeDomain(value: string): string {
@@ -79,6 +80,7 @@ function RuleListCard({
   onDeleteRule,
   rules,
   recommendedDomains,
+  recommendedKnown,
 }: RuleListCardProps) {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -223,7 +225,13 @@ function RuleListCard({
           {filteredRules.length > 0 ? (
             <ul class="m-0 list-none divide-y divide-slate-200 p-0">
               {filteredRules.map((domain) => {
+                // Only domains created by the local recommender are managed.
+                // A previously manual allow entry stays manual even when the
+                // same domain appears in an assigned recommendation.
                 const cloudManaged = isAllow && recommendedDomains.includes(domain);
+                const ruleOrigin = !isAllow || recommendedKnown
+                  ? (cloudManaged ? '추천 규칙' : '직접 추가')
+                  : null;
                 const deleting =
                   action?.operation === 'delete' &&
                   action.action === kind &&
@@ -231,12 +239,21 @@ function RuleListCard({
 
                 return (
                   <li class="flex min-w-0 items-center justify-between gap-3 px-3.5 py-3" key={domain}>
-                    <code class="min-w-0 break-all font-mono text-sm font-semibold text-slate-800">
-                      {domain}
-                    </code>
-                    {cloudManaged ? (
-                      <span class="shrink-0 rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800" title="웹사이트에서 적용한 규칙입니다. 웹사이트에서 적용 해제해 주세요.">웹사이트 추천</span>
-                    ) : null}
+                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+                      <code class="min-w-0 break-all font-mono text-sm font-semibold text-slate-800">
+                        {domain}
+                      </code>
+                      {ruleOrigin ? (
+                        <span
+                          class={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${cloudManaged ? 'bg-teal-50 text-teal-800' : 'bg-slate-100 text-slate-600'}`}
+                          title={cloudManaged
+                            ? '추천 규칙 동기화로 추가된 도메인입니다. 웹사이트에서 적용을 해제해 주세요.'
+                            : '공유기에 직접 등록되어 유지되는 규칙입니다.'}
+                        >
+                          {ruleOrigin}
+                        </span>
+                      ) : null}
+                    </div>
                     <button
                       aria-label={`${domain} ${theme.label}에서 삭제`}
                       class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
@@ -354,10 +371,14 @@ export function SafeShieldRulesPage({
               <span class="grid size-8 place-items-center rounded-lg bg-teal-50 text-teal-700"><CheckCircleIcon class="size-4" /></span>
               <h2 class="m-0 text-base font-extrabold text-slate-950">추천 사용자 규칙</h2>
               {recommendedKnown && recommendedDomains.length > 0 ? (
-                <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">적용 중 {recommendedDomains.length}개 도메인</span>
+                <span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">추천으로 추가 {recommendedDomains.length}개</span>
               ) : null}
             </div>
-            <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">다른 사용자가 공유한 검증된 허용 규칙을 찾아보고, 이 공유기에 적용하거나 해제할 수 있습니다.</p>
+            <div class="mt-2 flex flex-wrap items-center gap-2" aria-label="추천 규칙 분류">
+              <span class="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-800">공식 추천</span>
+              <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">커뮤니티</span>
+            </div>
+            <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">SmartSafeHub의 공식 추천과 관리자가 검토한 커뮤니티 허용 규칙을 확인하고, 필요한 규칙을 적용해 보세요.</p>
             <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기 선택과 적용 관리는 SmartSafeHub 웹사이트에서 진행합니다. 적용 결과는 다음 기기 동기화 후 반영되며, 연결된 모든 기기에 영향을 줍니다.</p>
           </div>
           <a class="inline-flex min-h-10 w-full shrink-0 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 sm:w-auto" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
@@ -419,6 +440,7 @@ export function SafeShieldRulesPage({
           onDeleteRule={onDeleteRule}
           rules={data.allow}
           recommendedDomains={recommendedDomains}
+          recommendedKnown={recommendedKnown}
         />
         <RuleListCard
           action={action}
@@ -427,6 +449,7 @@ export function SafeShieldRulesPage({
           onDeleteRule={onDeleteRule}
           rules={data.block}
           recommendedDomains={recommendedDomains}
+          recommendedKnown={recommendedKnown}
         />
       </section>
 
