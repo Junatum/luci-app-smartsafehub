@@ -35,6 +35,18 @@ trap 'exit 1' HUP INT TERM
 
 field() { "$JSONFILTER" -i "$1" -e "$2" 2>/dev/null || true; }
 valid_hash() { [ "${#1}" -eq 64 ] && ! printf '%s' "$1" | LC_ALL=C grep -q '[^0-9a-f]'; }
+# jsonfilter returns 1 when [*] matches no elements, even for a valid empty
+# array. Verify the array itself before treating that specific result as empty.
+extract_array() {
+  local file="$1" path="$2" output="$3" status
+  [ "$("$JSONFILTER" -i "$file" -t "$path" 2>/dev/null)" = array ] || return 1
+  if "$JSONFILTER" -i "$file" -e "${path}[*]" > "$output"; then
+    return 0
+  else
+    status=$?
+    [ "$status" -eq 1 ] && [ ! -s "$output" ]
+  fi
+}
 valid_domain() {
   [ -n "$1" ] && [ "${#1}" -le 253 ] || return 1
   printf '%s\n' "$1" | LC_ALL=C grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' || return 1
@@ -53,7 +65,7 @@ revision="$(field "$RESPONSE" '@.recommended_rules.revision')"
 # Never resend a stale confirmation if reconciliation fails midway.
 rm -f "$RECEIPT"
 valid_hash "$revision" || exit 1
-"$JSONFILTER" -i "$RESPONSE" -e '@.recommended_rules.domains[*]' > "$DESIRED" || exit 1
+extract_array "$RESPONSE" '@.recommended_rules.domains' "$DESIRED" || exit 1
 [ "$(wc -l < "$DESIRED")" -le 100 ] || exit 1
 while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$DESIRED"
 sort -u "$DESIRED" -o "$DESIRED"
@@ -79,7 +91,7 @@ persist() {
 [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
 # A broken or truncated rules_list must never be mistaken for an empty list.
 LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
-"$JSONFILTER" -i "$REPLY" -e '@.allow[*]' > "$ALLOW" || exit 1
+extract_array "$REPLY" '@.allow' "$ALLOW" || exit 1
 while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$ALLOW"
 sort -u "$ALLOW" -o "$ALLOW"
 
@@ -127,7 +139,7 @@ fi
 "$UBUS" call safeshield rules_list '{}' > "$REPLY" || exit 1
 [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
 LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
-"$JSONFILTER" -i "$REPLY" -e '@.allow[*]' > "$VERIFY" || exit 1
+extract_array "$REPLY" '@.allow' "$VERIFY" || exit 1
 while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$VERIFY"
 sort -u "$VERIFY" -o "$VERIFY"
 while IFS= read -r domain; do

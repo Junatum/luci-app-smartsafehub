@@ -13,10 +13,19 @@ cat > "$TMP/bin/jsonfilter" <<'JS'
 #!/usr/bin/env node
 const fs=require('fs'), args=process.argv.slice(2);
 let obj=JSON.parse(fs.readFileSync(args[args.indexOf('-i')+1]));
-const expr=args[args.indexOf('-e')+1].replace(/^@\./,'').replace(/\[\*\]$/,'');
+const typeMode=args.includes('-t');
+const expression=args[args.indexOf(typeMode ? '-t' : '-e')+1];
+const expr=expression.replace(/^@\./,'').replace(/\[\*\]$/,'');
 for (const key of expr.split('.')) obj=obj && !Array.isArray(obj) ? obj[key] : undefined;
-if (Array.isArray(obj)) for (const item of obj) console.log(item);
-else if (obj !== undefined && obj !== null) console.log(obj);
+if (obj === undefined || obj === null) process.exit(1);
+if (typeMode) {
+  console.log(Array.isArray(obj) ? 'array' : typeof obj);
+} else if (Array.isArray(obj)) {
+  if (!obj.length) process.exit(1); // OpenWrt jsonfilter: [*] has no match
+  for (const item of obj) console.log(item);
+} else {
+  console.log(obj);
+}
 JS
 cat > "$TMP/bin/ubus" <<'JS'
 #!/usr/bin/env node
@@ -41,7 +50,7 @@ fs.appendFileSync(path.join(dir,'calls.log'),method+' '+domain+'\n');
 console.log('{"ok":true}');
 JS
 chmod +x "$TMP/bin/ubus" "$TMP/bin/jsonfilter"
-printf '["manual.example.org"]' > "$TMP/rules.json"
+printf '[]' > "$TMP/rules.json"
 export MOCK_RECOMMENDED_DIR="$TMP"
 export SMARTSAFEHUB_RECOMMENDED_STATE_FILE="$TMP/etc/state"
 export SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE="$TMP/etc/receipt.json"
@@ -61,6 +70,22 @@ import json,sys
 assert sorted(json.load(open(sys.argv[1])))==sorted(json.loads(sys.argv[2]))
 PY
 }
+# An empty SafeShield allow list is normal on a newly configured router.
+# OpenWrt jsonfilter returns 1 for @.allow[*] when there are no entries.
+response '["tv.example.org"]'
+"$HELPER" "$TMP/response.json"
+assert_rules '["tv.example.org"]'
+[ -f "$TMP/etc/state" ]
+# A valid empty recommended_rules.domains array must also be accepted.
+response '[]'
+"$HELPER" "$TMP/response.json"
+assert_rules '[]'
+# An empty allow list on both the initial read and verification is valid.
+"$HELPER" "$TMP/response.json"
+assert_rules '[]'
+# Continue existing scenarios with pre-existing manual rules.
+rm -f "$TMP/etc/state" "$TMP/etc/receipt.json" "$TMP/calls.log"
+printf '["manual.example.org"]' > "$TMP/rules.json"
 # Existing manual entries are never claimed even if the cloud recommends them.
 response '["tv.example.org","manual.example.org"]'
 "$HELPER" "$TMP/response.json"
@@ -105,6 +130,16 @@ if FAIL_METHOD=refresh "$HELPER" "$TMP/response.json"; then exit 1; fi
 "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
 [ "$(sed -n '1p' "$TMP/etc/state")" = "$expected" ] && exit 1
+# A missing or incorrectly typed array is NOT the same as an empty one.
+revision="$(python3 - "$TMP/response.json" <<'PYREV'
+import hashlib
+print(hashlib.sha256(b'').hexdigest())
+PYREV
+)"
+printf '{"recommended_rules":{"revision":"%s","domains":null}}\n' "$revision" > "$TMP/response.json"
+if "$HELPER" "$TMP/response.json"; then exit 1; fi
+printf '{"recommended_rules":{"revision":"%s","domains":{}}}\n' "$revision" > "$TMP/response.json"
+if "$HELPER" "$TMP/response.json"; then exit 1; fi
 # Bad domain or malformed hash must never mutate SafeShield.
 response '["evil.example.org;reboot"]'
 if "$HELPER" "$TMP/response.json"; then exit 1; fi
