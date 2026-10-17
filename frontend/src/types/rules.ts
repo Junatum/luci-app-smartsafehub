@@ -50,6 +50,7 @@ export interface RecommendedRulesStatus {
   rules: RecommendedRuleAssignment[];
   confirmedDomains: Array<{ domain: string; source: 'managed' | 'manual' }>;
   syncStatus: 'pending' | 'confirmed' | 'failed';
+  syncWarning: boolean;
   lastCheckedAt: number;
   lastDeviceSyncAt: number;
   nextDeviceSyncAt: number;

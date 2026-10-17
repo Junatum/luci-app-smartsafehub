@@ -346,20 +346,29 @@ export function SafeShieldRulesPage({
 
   useEffect(() => {
     if (!onLoadRecommendedRulesStatus) return;
+    const loadStatus = onLoadRecommendedRulesStatus;
     let mounted = true;
-    void onLoadRecommendedRulesStatus()
-      .then((status) => {
-        if (mounted) {
+    let inFlight = false;
+    // Read only the local rpcd state. Hub's 30-second poll runs separately.
+    function updateStatus(): void {
+      if (inFlight || syncing || revokeBusy) return;
+      inFlight = true;
+      void loadStatus()
+        .then((status) => {
+          if (!mounted) return;
           setRecommendedStatus(status);
           setRecommendedKnown(true);
-        }
-      })
-      .catch(() => {
-        // Older firmware/API errors must not hide or break manual rules.
-        if (mounted) setRecommendedKnown(false);
-      });
-    return () => { mounted = false; };
-  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus]);
+        })
+        .catch(() => {
+          // Retain the last known result on a transient local RPC failure.
+          // Do not mislabel a known recommendation as a manually added rule.
+        })
+        .finally(() => { inFlight = false; });
+    }
+    updateStatus();
+    const timer = window.setInterval(updateStatus, 15_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus, syncing, revokeBusy]);
 
   async function handleSyncRecommended(): Promise<void> {
     if (!onSyncRecommendedRules || syncing) return;
@@ -488,7 +497,7 @@ export function SafeShieldRulesPage({
                 <span>허용 확인 <strong class="text-emerald-800">{recommendedStatus.confirmedDomains.length}개</strong></span>
               ) : null}
               {recommendedStatus?.lastCheckedAt ? (
-                <span>최근 확인: <RelativeTimestamp timestamp={recommendedStatus.lastCheckedAt} /></span>
+                <span>{recommendedStatus.syncWarning ? '최근 재확인 시도' : '최근 확인'}: <RelativeTimestamp timestamp={recommendedStatus.lastCheckedAt} /></span>
               ) : null}
             </div>
           </div>
@@ -506,6 +515,9 @@ export function SafeShieldRulesPage({
         </div>
         {syncMessage ? <p class="mt-3 mb-0 text-sm font-semibold text-teal-800" role="status">{syncMessage}</p> : null}
         {syncError ? <p class="mt-3 mb-0 text-sm font-semibold text-red-700" role="alert">{syncError}</p> : null}
+        {recommendedStatus?.syncWarning ? (
+          <p class="mt-3 mb-0 text-xs font-semibold text-amber-700" role="status">최근 서버 재확인이 지연되고 있습니다. 이미 확인한 허용 규칙은 유지되며 자동으로 다시 시도합니다.</p>
+        ) : null}
         <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">추천 규칙 동기화는 SafeShield 차단 목록 갱신과 별개입니다. 허용 목록 확인은 DNS 처리나 서비스 재생 성공을 보장하지 않습니다.</p>
       </section>
 

@@ -42,8 +42,11 @@ export function read_recommended_rules_status(request) {
  const rules = catalog?.revision == revision && type(catalog?.rules) == 'array' ? catalog.rules : [];
  const device = read_state();
  const confirmed = revision != null && receipt?.status == 'confirmed' && receipt?.revision == revision;
- // A previous receipt must never mask a newer reconciliation failure.
- const syncStatus = device?.lastResult == 'failed' || sync?.status == 'failed' ? 'failed' : confirmed ? 'confirmed' : 'pending';
+ // The receipt records SafeShield's verified allow list. A transient Hub poll
+ // failure does not undo that local confirmation, nor does an unrelated 5-minute
+ // device/account sync failure. Failed reconciliation removes the receipt.
+ const syncStatus = confirmed ? 'confirmed' : sync?.status == 'failed' ? 'failed' : 'pending';
+ const syncWarning = confirmed && sync?.status == 'failed';
  const confirmedDomains = confirmed && type(receipt?.domains) == 'array' ? receipt.domains : [];
  return success({
   revision: revision,
@@ -51,6 +54,7 @@ export function read_recommended_rules_status(request) {
   rules: rules,
   confirmedDomains: confirmedDomains,
   syncStatus: syncStatus,
+  syncWarning: syncWarning,
   lastCheckedAt: sync?.checkedAt ?? 0,
   lastDeviceSyncAt: device?.lastSuccessAt ?? 0,
   nextDeviceSyncAt: device?.nextSyncAt ?? 0,

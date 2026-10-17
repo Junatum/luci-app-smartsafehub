@@ -50,7 +50,27 @@ test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 �
   assert.match(acl, /"device_recommended_rules_refresh"/);
   assert.match(device, /write_recommended_sync_status failed/);
   assert.match(device, /write_recommended_sync_status confirmed/);
-  assert.match(rpc, /device\?\.lastResult == 'failed' \|\| sync\?\.status == 'failed'/);
+  assert.match(rpc, /const syncStatus = confirmed \? 'confirmed' : sync\?\.status == 'failed'/);
+  assert.match(rpc, /const syncWarning = confirmed && sync\?\.status == 'failed'/);
   assert.match(rpc, /const confirmed = revision != null && receipt\?\.status == 'confirmed'/);
+  assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
+});
+
+
+test('추천 규칙의 로컬 적용 확인과 일시적 서버 동기화 실패를 구분한다', () => {
+  const type = readFileSync(resolve(root, 'frontend/src/types/rules.ts'), 'utf8');
+  assert.match(rpc, /const syncStatus = confirmed \? 'confirmed'/);
+  assert.doesNotMatch(rpc, /device\?\.lastResult == 'failed' \|\| sync\?\.status == 'failed'/);
+  assert.match(rpc, /syncWarning: syncWarning/);
+  assert.match(type, /syncWarning: boolean/);
+  assert.match(page, /recommendedStatus\?\.syncWarning/);
+  assert.match(page, /이미 확인한 허용 규칙은 유지되며 자동으로 다시 시도합니다/);
+});
+
+test('추천 규칙 상태는 화면을 새로고침하지 않아도 주기적으로 다시 조회한다', () => {
+  assert.match(page, /window\.setInterval\(updateStatus, 15_000\)/);
+  assert.match(page, /window\.clearInterval\(timer\)/);
+  assert.match(page, /if \(inFlight \|\| syncing \|\| revokeBusy\) return;/);
+  assert.match(page, /const loadStatus = onLoadRecommendedRulesStatus;/);
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
 });
