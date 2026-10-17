@@ -44,6 +44,7 @@ chmod +x "$TMP/bin/ubus" "$TMP/bin/jsonfilter"
 printf '["manual.example.org"]' > "$TMP/rules.json"
 export MOCK_RECOMMENDED_DIR="$TMP"
 export SMARTSAFEHUB_RECOMMENDED_STATE_FILE="$TMP/etc/state"
+export SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE="$TMP/etc/receipt.json"
 export SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$TMP/bin/jsonfilter"
 export SMARTSAFEHUB_DEVICE_UBUS_BIN="$TMP/bin/ubus"
 export SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$TMP/run"
@@ -66,6 +67,13 @@ response '["tv.example.org","manual.example.org"]'
 assert_rules '["manual.example.org","tv.example.org"]'
 grep -Fqx 'tv.example.org' "$TMP/etc/state"
 ! grep -Fqx 'manual.example.org' "$TMP/etc/state"
+# A pre-existing allow entry is confirmed but never attributed to Hub.
+python3 - "$TMP/etc/receipt.json" <<'PY_CHECK'
+import json,sys
+receipt=json.load(open(sys.argv[1]))
+assert receipt['status']=='confirmed'
+assert {d['domain']:d['source'] for d in receipt['domains']} == {'manual.example.org':'manual','tv.example.org':'managed'}
+PY_CHECK
 # Stable revisions must not call refresh again.
 count="$(wc -l < "$TMP/calls.log")"
 "$HELPER" "$TMP/response.json"
@@ -76,9 +84,11 @@ assert_rules '["manual.example.org"]'
 # Broken responses must not be interpreted as an empty rules list.
 response '["tv.example.org"]'
 if BROKEN_LIST=1 "$HELPER" "$TMP/response.json"; then exit 1; fi
+[ ! -f "$TMP/etc/receipt.json" ]
 assert_rules '["manual.example.org"]'
 # Rule mutation failures must not acknowledge a newer revision.
 if FAIL_METHOD=rule_add "$HELPER" "$TMP/response.json"; then exit 1; fi
+[ ! -f "$TMP/etc/receipt.json" ]
 expected="$(python3 - "$TMP/response.json" <<'PY'
 import sys,json
 print(json.load(open(sys.argv[1]))['recommended_rules']['revision'])
@@ -90,6 +100,7 @@ assert_rules '["manual.example.org","tv.example.org"]'
 # Failed refresh retries without deleting or duplicating recommendations.
 response '[]'
 if FAIL_METHOD=refresh "$HELPER" "$TMP/response.json"; then exit 1; fi
+[ ! -f "$TMP/etc/receipt.json" ]
 [ "$(sed -n '1p' "$TMP/etc/state")" = '-' ]
 "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
@@ -131,5 +142,6 @@ grep -Fq 'onLoadRecommendedRulesStatus={fetchRecommendedRulesStatus}' "$ROOT/fro
 grep -Fq 'disabled={busy || cloudManaged}' "$PAGE"
 grep -Fq 'https://www.smartsafehub.com/dashboard/recommended-rules/' "$PAGE"
 grep -Fq 'RECOMMENDED_HELPER' "$DEVICE"
+grep -Fq 'recommended_rules_ack' "$DEVICE"
 grep -Fq '/etc/smartsafehub/recommended-rules.state' "$ROOT/root/lib/upgrade/keep.d/smartsafehub-device"
 echo '추천 사용자 규칙 동기화 및 UI 계약: PASS'

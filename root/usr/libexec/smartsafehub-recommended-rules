@@ -10,6 +10,7 @@ STATE="${SMARTSAFEHUB_RECOMMENDED_STATE_FILE:-/etc/smartsafehub/recommended-rule
 JSONFILTER="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
 UBUS="${SMARTSAFEHUB_DEVICE_UBUS_BIN:-ubus}"
 RUNTIME="${SMARTSAFEHUB_DEVICE_RUNTIME_DIR:-/tmp/smartsafehub}"
+RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-${RUNTIME}/recommended-rules.receipt.json}"
 mkdir -p "$RUNTIME" "${STATE%/*}"
 LOCK="$RUNTIME/recommended-rules.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -27,7 +28,8 @@ OWNED="$RUNTIME/recommended-owned.$$"
 SNAPSHOT="$RUNTIME/recommended-snapshot.$$"
 REPLY="$RUNTIME/recommended-reply.$$"
 ALLOW="$RUNTIME/recommended-allow.$$"
-cleanup() { rm -f "$DESIRED" "$OWNED" "$SNAPSHOT" "$REPLY" "$ALLOW" "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null || true; }
+VERIFY="$RUNTIME/recommended-verify.$$"
+cleanup() { rm -f "$DESIRED" "$OWNED" "$SNAPSHOT" "$REPLY" "$ALLOW" "$VERIFY" "$LOCK/pid"; rmdir "$LOCK" 2>/dev/null || true; }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
@@ -48,6 +50,8 @@ valid_domain() {
 revision="$(field "$RESPONSE" '@.recommended_rules.revision')"
 # Do not erase cloud-managed rules if the server is not yet sending this feature.
 [ -n "$revision" ] || exit 0
+# Never resend a stale confirmation if reconciliation fails midway.
+rm -f "$RECEIPT"
 valid_hash "$revision" || exit 1
 "$JSONFILTER" -i "$RESPONSE" -e '@.recommended_rules.domains[*]' > "$DESIRED" || exit 1
 [ "$(wc -l < "$DESIRED")" -le 100 ] || exit 1
@@ -119,4 +123,32 @@ if [ "$need_refresh" -eq 1 ]; then
   [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
   [ "$(field "$REPLY" '@.accepted')" != false ] || exit 1
 fi
+# Read the actual SafeShield rule list again rather than trusting rule_add results.
+"$UBUS" call safeshield rules_list '{}' > "$REPLY" || exit 1
+[ "$(field "$REPLY" '@.ok')" != false ] || exit 1
+LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
+"$JSONFILTER" -i "$REPLY" -e '@.allow[*]' > "$VERIFY" || exit 1
+while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$VERIFY"
+sort -u "$VERIFY" -o "$VERIFY"
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  grep -Fxq "$domain" "$VERIFY" || exit 1
+done < "$DESIRED"
+# The receipt describes *allow-list presence*, not proven DNS query results.
+# Domains not in OWNED existed before this recommendation (manual configuration).
+receipt_tmp="${RECEIPT}.tmp.$$"
+{
+  printf '{"revision":"%s","status":"confirmed","domains":[' "$revision"
+  first=1
+  while IFS= read -r domain; do
+    [ -n "$domain" ] || continue
+    if grep -Fxq "$domain" "$OWNED"; then source=managed; else source=manual; fi
+    [ "$first" -eq 1 ] || printf ','
+    printf '{"domain":"%s","source":"%s"}' "$domain" "$source"
+    first=0
+  done < "$DESIRED"
+  printf ']}\n'
+} > "$receipt_tmp"
+chmod 600 "$receipt_tmp"
 persist "$revision"
+mv -f "$receipt_tmp" "$RECEIPT"
