@@ -475,6 +475,35 @@
   }
 }
 
+/* Domain-rule group headers are theme-aware even when hovered. */
+.ssh-app .ssh-rule-group-toggle:hover {
+  background-color: #f1f5f9;
+}
+
+.ssh-app[data-theme='dark'] .ssh-rule-group-toggle:hover {
+  background-color: #1e293b;
+}
+
+/* WebKit's credential autofill can otherwise leave a bright yellow password
+ * field inside the dark settings panel. Keep saved-password support enabled. */
+.ssh-app[data-theme='dark'] .ssh-password-input:-webkit-autofill,
+.ssh-app[data-theme='dark'] .ssh-password-input:-webkit-autofill:hover,
+.ssh-app[data-theme='dark'] .ssh-password-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc;
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset;
+  box-shadow: 0 0 0 1000px #0f172a inset;
+  caret-color: #f8fafc;
+}
+
+.ssh-app[data-theme='light'] .ssh-password-input:-webkit-autofill,
+.ssh-app[data-theme='light'] .ssh-password-input:-webkit-autofill:hover,
+.ssh-app[data-theme='light'] .ssh-password-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  caret-color: #0f172a;
+}
+
 /* Authenticated product color theme. The application lives inside a shadow
  * root, so these overrides can safely remap the existing utility palette
  * without affecting LuCI itself. */

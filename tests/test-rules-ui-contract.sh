@@ -61,4 +61,12 @@ grep -Fq 'DNS 적용 상태를 확인하지 못했습니다.' "$HOOK" || \
 grep -Fq 'onDeleteRule(kind, domain)' "$PAGE" || \
   fail 'delete action must continue to work independently of form clearing'
 
+# Theme-aware group headers must not leak a light teal background in dark mode.
+grep -Fq 'ssh-rule-group-toggle bg-slate-50' "$PAGE" || fail 'both rule groups must use the theme-aware slate surface'
+if grep -Fq 'bg-teal-50/60' "$PAGE"; then
+  fail 'semi-transparent light rule group background bypasses the dark theme mapping'
+fi
+grep -Fq ".ssh-app[data-theme='dark'] .ssh-rule-group-toggle:hover" "$ROOT_DIR/frontend/src/styles/app.css" || \
+  fail 'hovered rule headers must remain dark in the dark theme'
+
 echo 'PASS: SafeShield rules input, persistence and DNS apply contracts are present'

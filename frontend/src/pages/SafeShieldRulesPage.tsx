@@ -239,7 +239,7 @@ function RuleListCard({
               <button
                 aria-controls="allow-manual-domains"
                 aria-expanded={showManual}
-                class="flex min-h-14 w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-teal-500"
+                class="flex min-h-14 w-full items-center justify-between gap-3 ssh-rule-group-toggle bg-slate-50 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-teal-500"
                 onClick={() => setManualExpanded(!showManual)}
                 type="button"
               >
@@ -258,7 +258,7 @@ function RuleListCard({
               <button
                 aria-controls="allow-recommended-domains"
                 aria-expanded={showRecommended}
-                class="flex min-h-14 w-full items-center justify-between gap-3 bg-teal-50/60 px-4 py-3 text-left hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-500"
+                class="flex min-h-14 w-full items-center justify-between gap-3 ssh-rule-group-toggle bg-slate-50 px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-teal-500"
                 onClick={() => setRecommendedExpanded(!showRecommended)}
                 type="button"
               >

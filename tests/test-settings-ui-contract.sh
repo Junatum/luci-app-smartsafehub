@@ -64,8 +64,8 @@ grep -Fq 'title="시간 및 시간대"' "$SETTINGS_PAGE" || \
 	fail 'settings page must expose time and timezone controls'
 grep -Fq "'지금 동기화'" "$SETTINGS_PAGE" || \
 	fail 'settings page must expose immediate NTP synchronization'
-grep -Fq 'title="진단 및 지원"' "$SETTINGS_PAGE" || \
-	fail 'diagnostic download must be grouped as diagnostic and support functionality'
+grep -Fq 'title="장치 진단"' "$SETTINGS_PAGE" || \
+	fail 'diagnostic download must remain in its own card'
 grep -Fq '원격 상태 보고' "$SETTINGS_PAGE" || \
 	fail 'settings diagnostics must expose paid/trial remote health reporting'
 grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || \
@@ -212,5 +212,19 @@ grep -Fq 'await requestConfigurationBackupValidation(file.name);' "$BACKUP_HOOK"
 	fail 'uploaded backups must be validated by the backend before restore is enabled'
 grep -Fq 'if (!validated)' "$BACKUP_HOOK" || \
 	fail 'restore hook must reject attempts without a validated archive'
+
+# Consistent, responsive three-tab UI (the health and time cards share the existing grid geometry).
+grep -Fq 'title="장치 진단"' "$SETTINGS_PAGE" || fail 'local diagnostics must have their own card'
+grep -Fq 'title="원격 상태 보고"' "$SETTINGS_PAGE" || fail 'remote health reporting must have its own card'
+grep -Fq 'title="개인정보 보호"' "$SETTINGS_PAGE" || fail 'privacy policy must have its own card'
+grep -Fq 'className="lg:col-span-2"' "$SETTINGS_PAGE" || fail 'privacy policy must use full width beneath health cards'
+if grep -Fq 'max-w-4xl' "$SETTINGS_PAGE"; then
+  fail 'settings time tab must use the common content width'
+fi
+[ "$(grep -Fc 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2' "$SETTINGS_PAGE")" -ge 3 ] || \
+  fail 'diagnostics, time and management must use the same responsive two-column grid'
+grep -Fq 'ssh-password-input' "$SETTINGS_PAGE" || fail 'password fields must include dedicated autofill styling'
+grep -Fq ".ssh-app[data-theme='dark'] .ssh-password-input:-webkit-autofill" "$APP_STYLES" || \
+  fail 'dark theme must normalize browser password autofill background'
 
 echo 'PASS: settings page keeps backup/restore, timezone and device management with safe system controls'
