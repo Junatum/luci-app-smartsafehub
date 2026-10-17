@@ -290,6 +290,19 @@ PY_EMPTY
   if recommended_fast_sync; then exit 1; fi
   [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
 )
+# Exercise the real CLI argument gate. Previous code treated a numeric rule ID
+# as an invalid `--debug` flag, so the Hub request was never attempted.
+# With an unregistered mock device, a valid ID reaches recommended_revoke()
+# and fails with rc=1; an invalid ID is rejected at the CLI with rc=2.
+export SMARTSAFEHUB_COMMON_LIB="$ROOT/root/usr/lib/smartsafehub/common.sh"
+export SMARTSAFEHUB_RUNTIME_LIB="$ROOT/root/usr/lib/smartsafehub/runtime.sh"
+export SMARTSAFEHUB_DEVICE_STATE_FILE="$TMP/nonexistent-device-state.json"
+rc=0
+"$DEVICE" recommended-revoke 42 > "$TMP/revoke-cli.out" 2>&1 || rc=$?
+[ "$rc" -eq 1 ] || { echo 'FAIL: valid rule ID did not reach the revoke handler' >&2; cat "$TMP/revoke-cli.out" >&2; exit 1; }
+rc=0
+"$DEVICE" recommended-revoke invalid > "$TMP/revoke-cli.out" 2>&1 || rc=$?
+[ "$rc" -eq 2 ] || { echo 'FAIL: invalid rule ID was accepted' >&2; exit 1; }
 # Revocation must call the device-authenticated Hub endpoint before touching
 # SafeShield and must immediately reconcile the Hub's authoritative new list.
 sed -n '/^recommended_revoke() {/,/^}/p' "$DEVICE" > "$TMP/revoke-function.sh"

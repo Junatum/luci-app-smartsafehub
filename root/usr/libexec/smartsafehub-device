@@ -459,8 +459,16 @@ daemon() {
   wait_for "$delay" || break
  done
 }
-# Existing commands retain their behaviour; runtime-status is read-only.
-ssh_runtime_debug_arg "${1:-daemon}" "${2:-}" || { echo 'invalid argument' >&2; exit 2; }
+# Runtime diagnostics use an optional second `--debug` argument, except for
+# recommended-revoke, which takes a required numeric rule ID in that position.
+# Validate that ID here so the command reaches recommended_revoke(), where it
+# is checked again before any authenticated Hub request.
+if [ "${1:-daemon}" = recommended-revoke ]; then
+ case "${2:-}" in ''|0|*[!0-9]*) echo 'invalid rule ID' >&2; exit 2 ;; esac
+ [ "${#2}" -le 10 ] && [ "$#" -eq 2 ] || { echo 'invalid rule ID' >&2; exit 2; }
+else
+ ssh_runtime_debug_arg "${1:-daemon}" "${2:-}" || { echo 'invalid argument' >&2; exit 2; }
+fi
 case "${1:-daemon}" in
  prepare-credential) prepare_credential ;;
  bootstrap) bootstrap ;;
