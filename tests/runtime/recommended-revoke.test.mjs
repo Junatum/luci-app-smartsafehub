@@ -31,3 +31,14 @@ test('인증된 공유기에서만 적용 해제 RPC가 호출되고 공개 데�
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
   assert.doesNotMatch(read('frontend/src/demo/main.tsx'), /onRevokeRecommendedRule=/);
 });
+
+// rpcd-mod-ucode handlers receive named arguments in request.args.
+// Calling `ubus call smartsafehub device_recommended_rules_revoke '{"rule_id":1}'`
+// must not be rejected because the handler looked for request.rule_id.
+test('추천 규칙 해제 RPC는 request.args에서 ID를 읽는다', () => {
+  const rpc = read('root/usr/share/rpcd/ucode/smartsafehub.uc');
+  const handler = read('root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc');
+  assert.match(rpc, /device_recommended_rules_revoke:\s*\{\s*args:\s*\{\s*rule_id:\s*0/);
+  assert.match(handler, /const rule_id = request\?\.args\?\.rule_id;/);
+  assert.doesNotMatch(handler, /const rule_id = request\?\.rule_id;/);
+});

@@ -64,7 +64,7 @@ export function refresh_recommended_rules_status(request) {
  return read_recommended_rules_status(request);
 };
 export function revoke_recommended_rule(request) {
- const rule_id = request?.rule_id;
+ const rule_id = request?.args?.rule_id;
  if (rule_id == null || match(sprintf('%s', rule_id), /^[1-9][0-9]{0,9}$/) == null)
   return failure('INVALID_RULE_ID', '적용 해제할 추천 규칙을 선택해 주세요.');
  if (!run_command([ HELPER, 'recommended-revoke', sprintf('%s', rule_id) ], 25000))
