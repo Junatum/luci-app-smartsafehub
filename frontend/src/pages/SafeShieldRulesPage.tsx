@@ -14,7 +14,7 @@ import {
 } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { SafeShieldRulesAction } from '../hooks/useSafeShieldRules';
-import type { RecommendedRulesStatus, SafeShieldRuleAction, SafeShieldRules } from '../types/rules';
+import type { RecommendedRuleAssignment, RecommendedRulesStatus, SafeShieldRuleAction, SafeShieldRules } from '../types/rules';
 
 interface SafeShieldRulesPageProps {
   action: SafeShieldRulesAction | null;
@@ -36,6 +36,7 @@ interface SafeShieldRulesPageProps {
   // Injected only by the authenticated router app; the public demo has no RPC.
   onLoadRecommendedRulesStatus?: () => Promise<RecommendedRulesStatus>;
   onSyncRecommendedRules?: () => Promise<RecommendedRulesStatus>;
+  onRevokeRecommendedRule?: (ruleId: number) => Promise<RecommendedRulesStatus>;
 }
 
 interface RuleListCardProps {
@@ -53,6 +54,9 @@ interface RuleListCardProps {
   rules: string[];
   recommendedDomains: string[];
   recommendedKnown: boolean;
+  recommendedRules: RecommendedRuleAssignment[];
+  onRequestRevoke?: (rule: RecommendedRuleAssignment) => void;
+  revokeBusy: boolean;
 }
 
 function normalizeDomain(value: string): string {
@@ -84,6 +88,9 @@ function RuleListCard({
   rules,
   recommendedDomains,
   recommendedKnown,
+  recommendedRules,
+  onRequestRevoke,
+  revokeBusy,
 }: RuleListCardProps) {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -99,15 +106,18 @@ function RuleListCard({
     return query ? rules.filter((domain) => domain.includes(query)) : rules;
   }, [rules, search]);
   const searching = search.trim().length > 0;
-  // The router only knows which allow entries the reconciler owns. It does
-  // not receive the Hub rule titles, so do not invent per-service group names.
+  // Reconciler-owned domains remain separate from user-managed manual entries.
   const managedRules = isAllow && recommendedKnown
     ? filteredRules.filter((domain) => recommendedDomains.includes(domain))
     : [];
   const manualRules = isAllow && recommendedKnown
     ? filteredRules.filter((domain) => !recommendedDomains.includes(domain))
     : filteredRules;
-  const showRecommended = searching || (recommendedExpanded ?? managedRules.length <= 3);
+  const visibleRecommendedRules = isAllow ? recommendedRules.filter((rule) =>
+    !searching || rule.title.toLowerCase().includes(search.trim().toLowerCase()) ||
+    rule.domains.some((domain) => domain.includes(search.trim().toLowerCase()))
+  ) : [];
+  const showRecommended = searching || (recommendedExpanded ?? (recommendedRules.length || managedRules.length) <= 3);
   const showManual = searching || manualExpanded;
 
   async function handleSubmit(event: TargetedSubmitEvent<HTMLFormElement>): Promise<void> {
@@ -262,17 +272,33 @@ function RuleListCard({
                 onClick={() => setRecommendedExpanded(!showRecommended)}
                 type="button"
               >
-                <span class="min-w-0 text-sm font-extrabold text-slate-800">추천 규칙 <span class="ml-1 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-teal-800">{managedRules.length}{searching ? '개 검색됨' : '개'}</span></span>
+                <span class="min-w-0 text-sm font-extrabold text-slate-800">추천 규칙 <span class="ml-1 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-teal-800">{!searching && recommendedRules.length ? recommendedRules.length : managedRules.length}{searching ? '개 검색됨' : '개'}</span></span>
                 <span aria-hidden="true" class="shrink-0 text-sm font-bold text-slate-500">{showRecommended ? '접기 −' : '펼치기 +'}</span>
               </button>
               <div hidden={!showRecommended} id="allow-recommended-domains">
-                {managedRules.length ? (
+                {visibleRecommendedRules.length ? (
+                  <ul class="m-0 max-h-[22rem] list-none divide-y divide-slate-200 overflow-y-auto p-0">
+                    {visibleRecommendedRules.map((rule) => (
+                      <li class="flex min-w-0 flex-wrap items-center justify-between gap-3 px-3.5 py-3" key={rule.id}>
+                        <div class="min-w-0 flex-1">
+                          <strong class="block break-words text-sm text-slate-900">{rule.title}</strong>
+                          <div class="mt-1 flex flex-wrap gap-1.5">
+                            {rule.domains.map((domain) => <code class="break-all text-xs text-slate-600" key={domain}>{domain}</code>)}
+                          </div>
+                        </div>
+                        {onRequestRevoke ? (
+                          <button class="shrink-0 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50" disabled={revokeBusy || busy} onClick={() => onRequestRevoke(rule)} type="button">적용 해제</button>
+                        ) : <span class="text-xs text-slate-500">웹사이트 관리</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : managedRules.length ? (
                   <ul class="m-0 max-h-[20rem] list-none divide-y divide-slate-200 overflow-y-auto p-0">{managedRules.map(renderRule)}</ul>
                 ) : (
                   <p class="m-0 px-4 py-5 text-sm text-slate-500">{searching ? '검색 결과가 없습니다.' : '추천으로 추가된 허용 도메인이 없습니다.'}</p>
                 )}
                 {!searching ? (
-                  <p class="m-0 border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-500">추천 규칙은 웹사이트에서 적용하거나 해제할 수 있습니다. 서비스별 상세 정보도 웹사이트에서 확인해 주세요.</p>
+                  <p class="m-0 border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-500">추천 규칙은 이 공유기에서 적용 해제할 수 있습니다. 새 규칙의 적용은 SmartSafeHub 웹사이트에서 관리해 주세요.</p>
                 ) : null}
               </div>
             </section>
@@ -306,13 +332,17 @@ export function SafeShieldRulesPage({
   onRetry,
   onLoadRecommendedRulesStatus,
   onSyncRecommendedRules,
+  onRevokeRecommendedRule,
 }: SafeShieldRulesPageProps) {
   const [recommendedStatus, setRecommendedStatus] = useState<RecommendedRulesStatus | null>(null);
   const [recommendedKnown, setRecommendedKnown] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<RecommendedRuleAssignment | null>(null);
+  const [revokeBusy, setRevokeBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const recommendedDomains = recommendedStatus?.domains ?? [];
+  const recommendedRules = recommendedStatus?.rules ?? [];
 
   useEffect(() => {
     if (!onLoadRecommendedRulesStatus) return;
@@ -353,6 +383,30 @@ export function SafeShieldRulesPage({
     }
   }
 
+  async function handleRevokeRecommended(): Promise<void> {
+    if (!revokeTarget || revokeBusy || !onRevokeRecommendedRule) return;
+    setRevokeBusy(true);
+    setSyncError(null);
+    setSyncMessage(null);
+    try {
+      const status = await onRevokeRecommendedRule(revokeTarget.id);
+      setRecommendedStatus(status);
+      setRecommendedKnown(true);
+      setRevokeTarget(null);
+      setSyncMessage('추천 규칙의 적용을 해제하고 SafeShield 허용 목록을 확인했습니다.');
+      onRetry();
+    } catch {
+      setSyncError('추천 규칙을 해제하지 못했습니다. Hub 적용 상태와 연결을 확인한 뒤 동기화해 주세요.');
+      setRevokeTarget(null);
+      try {
+        const status = await onLoadRecommendedRulesStatus?.();
+        if (status) setRecommendedStatus(status);
+      } catch { /* Keep the previous status until next refresh. */ }
+    } finally {
+      setRevokeBusy(false);
+    }
+  }
+
   if (loading && !data) {
     return <LoadingPanel />;
   }
@@ -367,6 +421,19 @@ export function SafeShieldRulesPage({
 
   return (
     <>
+      {revokeTarget ? (
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4" role="presentation" onClick={() => { if (!revokeBusy) setRevokeTarget(null); }}>
+          <section aria-labelledby="recommended-revoke-title" aria-modal="true" class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()} role="dialog">
+            <h2 class="m-0 text-lg font-extrabold text-slate-950" id="recommended-revoke-title">추천 규칙 적용 해제</h2>
+            <p class="mt-3 text-sm text-slate-700"><strong>{revokeTarget.title}</strong> 규칙을 이 공유기에서 해제할까요?</p>
+            <p class="mt-2 text-xs leading-5 text-slate-600">포함된 도메인 {revokeTarget.domains.length}개를 다시 확인합니다. 직접 추가한 허용 규칙과 다른 추천 규칙에 필요한 도메인은 유지됩니다.</p>
+            <div class="mt-5 flex justify-end gap-2">
+              <button class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700" disabled={revokeBusy} onClick={() => setRevokeTarget(null)} type="button">취소</button>
+              <button class="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50" disabled={revokeBusy} onClick={() => void handleRevokeRecommended()} type="button">{revokeBusy ? '해제 중…' : '적용 해제'}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex min-w-0 items-start gap-3 sm:gap-4">
@@ -414,7 +481,7 @@ export function SafeShieldRulesPage({
                 </span>
               ) : null}
             </div>
-            <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">웹사이트에서 선택한 허용 규칙을 약 30초마다 확인합니다. 적용과 해제는 웹사이트에서 관리하세요.</p>
+            <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">웹사이트에서 선택한 허용 규칙을 약 30초마다 확인합니다. 적용 해제는 이 공유기에서도 할 수 있습니다.</p>
             <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-slate-600">
               <span>추천으로 추가 <strong class="text-teal-800">{recommendedKnown ? recommendedDomains.length : '—'}개 도메인</strong></span>
               {recommendedStatus?.syncStatus === 'confirmed' ? (
@@ -498,6 +565,9 @@ export function SafeShieldRulesPage({
           rules={data.allow}
           recommendedDomains={recommendedDomains}
           recommendedKnown={recommendedKnown}
+          recommendedRules={recommendedRules}
+          {...(onRevokeRecommendedRule ? { onRequestRevoke: setRevokeTarget } : {})}
+          revokeBusy={revokeBusy}
         />
         <RuleListCard
           action={action}
@@ -507,6 +577,8 @@ export function SafeShieldRulesPage({
           rules={data.block}
           recommendedDomains={recommendedDomains}
           recommendedKnown={recommendedKnown}
+          recommendedRules={recommendedRules}
+          revokeBusy={revokeBusy}
         />
       </section>
 

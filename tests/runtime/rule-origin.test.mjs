@@ -9,19 +9,17 @@ const page = readFileSync(resolve(root, 'frontend/src/pages/SafeShieldRulesPage.
 const rpc = readFileSync(resolve(root, 'root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc'), 'utf8');
 const helper = readFileSync(resolve(root, 'root/usr/libexec/smartsafehub-recommended-rules'), 'utf8');
 
-test('추천 규칙 영역은 공식 추천과 커뮤니티를 구분하여 안내한다', () => {
-  assert.match(page, /aria-label="추천 규칙 분류"/);
-  assert.match(page, /공식 추천<\/span>/);
-  assert.match(page, /커뮤니티<\/span>/);
-  assert.match(page, /관리자가 검토한 커뮤니티 허용 규칙/);
-  assert.doesNotMatch(page, /다른 사용자가 공유한 검증된 허용 규칙/);
+test('추천 규칙 영역에서 웹사이트의 추천 목록으로 이동할 수 있다', () => {
+  assert.match(page, /aria-label="추천 사용자 규칙"/);
+  assert.match(page, /추천 규칙 보기/);
+  assert.match(page, /https:\/\/www\.smartsafehub\.com\/dashboard\/recommended-rules\//);
 });
 
 test('허용 목록의 수동 규칙과 추천 규칙을 로컬 소유 정보로 구분한다', () => {
   assert.match(rpc, /recommended-rules\.state/);
   assert.match(rpc, /domains: domains/);
   assert.match(helper, /grep -Fxq "\$domain" "\$OWNED"/);
-  assert.match(page, /const cloudManaged = isAllow && recommendedDomains\.includes\(domain\);/);
+  assert.match(page, /const cloudManaged = isAllow && recommendedKnown && recommendedDomains\.includes\(domain\);/);
   assert.match(page, /cloudManaged \? '추천 규칙' : '직접 추가'/);
   assert.match(page, /disabled=\{busy \|\| cloudManaged\}/);
 });
@@ -43,9 +41,9 @@ test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 �
   const device = readFileSync(resolve(root, 'root/usr/libexec/smartsafehub-device'), 'utf8');
   assert.match(page, /onSyncRecommendedRules\?: \(\) => Promise<RecommendedRulesStatus>/);
   assert.match(page, /지금 동기화/);
-  assert.match(page, /SafeShield 차단 목록 다운로드와 별개의 작업/);
+  assert.match(page, /SafeShield 차단 목록 갱신과 별개/);
   assert.match(page, /status\.syncStatus === 'confirmed'/);
-  assert.match(page, /recommendedStatus\.confirmedDomains\.map/);
+  assert.match(page, /recommendedStatus\.confirmedDomains\.length/);
   assert.match(app, /onSyncRecommendedRules=\{refreshRecommendedRulesStatus\}/);
   assert.match(api, /callApi\(API_OBJECT, 'device_recommended_rules_refresh'/);
   assert.match(main, /device_recommended_rules_refresh/);

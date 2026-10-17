@@ -97,6 +97,10 @@ export function refreshRecommendedRulesStatus(): Promise<RecommendedRulesStatus>
   return callApi(API_OBJECT, 'device_recommended_rules_refresh', {}, { timeoutMs: 30000 });
 }
 
+export function revokeRecommendedRule(ruleId: number): Promise<RecommendedRulesStatus> {
+  return callApi(API_OBJECT, 'device_recommended_rules_revoke', { rule_id: ruleId }, { timeoutMs: 30000 });
+}
+
 export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
   return callApi(API_OBJECT, 'device_registration_status', {}, { timeoutMs: 5000 });
 }

@@ -18,6 +18,7 @@ RECOMMENDED_HELPER="${SMARTSAFEHUB_RECOMMENDED_HELPER:-/usr/libexec/smartsafehub
 RECOMMENDED_RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-$RUNTIME_DIR/recommended-rules.receipt.json}"
 RECOMMENDED_STATE="${SMARTSAFEHUB_RECOMMENDED_STATE_FILE:-/etc/smartsafehub/recommended-rules.state}"
 RECOMMENDED_SYNC_STATUS="${SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE:-$RUNTIME_DIR/recommended-rules.sync.json}"
+RECOMMENDED_CATALOG="${SMARTSAFEHUB_RECOMMENDED_CATALOG_FILE:-$RUNTIME_DIR/recommended-rules.catalog.json}"
 API_BASE_URL="${SMARTSAFEHUB_DEVICE_API_BASE_URL:-https://www.smartsafehub.com/api/v1}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 JSONFILTER_BIN="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
@@ -305,10 +306,38 @@ status_sync() {
 }
 
 
+
+# The Hub removes the assignment first and returns the new authoritative
+# allow-list state. If local reconciliation fails, the next poll still repairs
+# the router without recreating the removed assignment.
+recommended_revoke() {
+ local rule_id="${1:-}" token body out rc
+ case "$rule_id" in ''|0|*[!0-9]*) return 2 ;; esac
+ [ "${#rule_id}" -le 10 ] || return 2
+ [ "$(json_value "$STATE_FILE" '@.accountRegistered')" = true ] || return 1
+ token="$(credential_token)" || return 1
+ body="$RUNTIME_DIR/recommended-revoke-request.$$.json"
+ out="$RUNTIME_DIR/recommended-revoke-response.$$.json"
+ printf '{}\n' > "$body" || return 1
+ if ! post_json "$API_BASE_URL/devices/recommended-rules/$rule_id/revoke" "$body" "$out" "$token"; then
+  rm -f "$body" "$out" "${out}.log"
+  return 1
+ fi
+ rc=1
+ if [ "$(json_value "$out" '@.changed')" = true ] && "$RECOMMENDED_HELPER" "$out"; then
+  write_recommended_sync_status confirmed
+  rc=0
+ else
+  write_recommended_sync_status failed
+ fi
+ rm -f "$body" "$out" "${out}.log"
+ return "$rc"
+}
+
 # A lightweight authenticated poll; unlike status-sync it does not resolve
 # artifacts, licenses, or other device services on the Hub.
 recommended_fast_sync() {
- local token body out revision changed server_revision rc
+ local token body out revision changed server_revision rc rules_revision
  mkdir -p "$RUNTIME_DIR" || return 1
  [ "$(json_value "$STATE_FILE" '@.accountRegistered')" = true ] || return 0
  [ -x "$RECOMMENDED_HELPER" ] || return 1
@@ -321,9 +350,11 @@ recommended_fast_sync() {
    *) [ "${#revision}" -eq 64 ] || revision='' ;;
   esac
  fi
+ rules_revision="$(json_value "${RECOMMENDED_CATALOG:-$RUNTIME_DIR/recommended-rules.catalog.json}" '@.rules_revision')"
+ case "$rules_revision" in *[!0-9a-f]*|'') rules_revision='' ;; *) [ "${#rules_revision}" -eq 64 ] || rules_revision='' ;; esac
  body="$RUNTIME_DIR/recommended-poll-request.$$.json"
  out="$RUNTIME_DIR/recommended-poll-response.$$.json"
- printf '{"revision":"%s"}\n' "$revision" > "$body" || return 1
+ printf '{"revision":"%s","rules_revision":"%s"}\n' "$revision" "$rules_revision" > "$body" || return 1
  if ! post_json "$API_BASE_URL/devices/recommended-rules" "$body" "$out" "$token"; then
   write_recommended_sync_status failed
   rm -f "$body" "$out" "${out}.log"
@@ -435,9 +466,10 @@ case "${1:-daemon}" in
  bootstrap) bootstrap ;;
  status-sync|run-once) ssh_runtime_execute status-sync status_sync ;;
  recommended-sync) recommended_fast_sync ;;
+ recommended-revoke) recommended_revoke "${2:-}" ;;
  pairing-session) pairing_session ;;
  status) [ -s "$STATE_FILE" ] && cat "$STATE_FILE" || printf '{}\n' ;;
  runtime-status) ssh_runtime_status ;;
  daemon) daemon ;;
- *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|recommended-sync|run-once|pairing-session|status|runtime-status} [--debug]" >&2; exit 2 ;;
+ *) echo "usage: $0 {prepare-credential|daemon|bootstrap|status-sync|recommended-sync|recommended-revoke RULE_ID|run-once|pairing-session|status|runtime-status} [--debug]" >&2; exit 2 ;;
 esac

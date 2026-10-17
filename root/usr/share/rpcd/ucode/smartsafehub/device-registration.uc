@@ -13,6 +13,7 @@ function read_state() {
 // the router exposes the domains actually owned by the reconciler.
 const RECOMMENDED_FILE = '/etc/smartsafehub/recommended-rules.state';
 const RECOMMENDED_RECEIPT = '/tmp/smartsafehub/recommended-rules.receipt.json';
+const RECOMMENDED_CATALOG = '/tmp/smartsafehub/recommended-rules.catalog.json';
 const RECOMMENDED_SYNC_STATUS = '/tmp/smartsafehub/recommended-rules.sync.json';
 function read_json_file(path) {
  const raw = fs.readfile(path);
@@ -37,6 +38,8 @@ export function read_recommended_rules_status(request) {
  }
  const receipt = read_json_file(RECOMMENDED_RECEIPT);
  const sync = read_json_file(RECOMMENDED_SYNC_STATUS);
+ const catalog = read_json_file(RECOMMENDED_CATALOG);
+ const rules = catalog?.revision == revision && type(catalog?.rules) == 'array' ? catalog.rules : [];
  const device = read_state();
  const confirmed = revision != null && receipt?.status == 'confirmed' && receipt?.revision == revision;
  // A previous receipt must never mask a newer reconciliation failure.
@@ -45,6 +48,7 @@ export function read_recommended_rules_status(request) {
  return success({
   revision: revision,
   domains: domains,
+  rules: rules,
   confirmedDomains: confirmedDomains,
   syncStatus: syncStatus,
   lastCheckedAt: sync?.checkedAt ?? 0,
@@ -57,6 +61,14 @@ export function refresh_recommended_rules_status(request) {
  // The blocklist download and the Hub device sync are different operations.
  // Reuse the authenticated device sync, never the SafeShield blocklist refresh.
  if (!run_command([ HELPER, 'recommended-sync' ], 25000)) return failure('RECOMMENDED_SYNC_UNAVAILABLE', 'SmartSafeHub 서버와 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+ return read_recommended_rules_status(request);
+};
+export function revoke_recommended_rule(request) {
+ const rule_id = request?.rule_id;
+ if (rule_id == null || match(sprintf('%s', rule_id), /^[1-9][0-9]{0,9}$/) == null)
+  return failure('INVALID_RULE_ID', '적용 해제할 추천 규칙을 선택해 주세요.');
+ if (!run_command([ HELPER, 'recommended-revoke', sprintf('%s', rule_id) ], 25000))
+  return failure('RECOMMENDED_REVOKE_FAILED', '규칙 해제 또는 SafeShield 반영에 실패했습니다. 서버 변경은 다음 동기화에서 반영될 수 있습니다.');
  return read_recommended_rules_status(request);
 };
 export function read_device_registration_status(request) { const state = read_state(); return state != null ? success(state) : failure('DEVICE_STATE_INVALID', '기기 등록 상태를 읽지 못했습니다.'); };

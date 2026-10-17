@@ -11,6 +11,7 @@ JSONFILTER="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
 UBUS="${SMARTSAFEHUB_DEVICE_UBUS_BIN:-ubus}"
 RUNTIME="${SMARTSAFEHUB_DEVICE_RUNTIME_DIR:-/tmp/smartsafehub}"
 RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-${RUNTIME}/recommended-rules.receipt.json}"
+CATALOG="${SMARTSAFEHUB_RECOMMENDED_CATALOG_FILE:-${RUNTIME}/recommended-rules.catalog.json}"
 mkdir -p "$RUNTIME" "${STATE%/*}"
 LOCK="$RUNTIME/recommended-rules.lock"
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -164,3 +165,20 @@ receipt_tmp="${RECEIPT}.tmp.$$"
 chmod 600 "$receipt_tmp"
 persist "$revision"
 mv -f "$receipt_tmp" "$RECEIPT"
+
+# Keep rule IDs and titles on tmpfs only. If the server still uses the old
+# domain-only contract, never keep metadata from a previous assignment.
+catalog_tmp="${CATALOG}.tmp.$$"
+rules_revision="$(field "$RESPONSE" '@.recommended_rules.rules_revision')"
+if valid_hash "$rules_revision" && [ "$("$JSONFILTER" -i "$RESPONSE" -t '@.recommended_rules.rules' 2>/dev/null)" = array ]; then
+  if "$JSONFILTER" -i "$RESPONSE" -e '@.recommended_rules' > "$catalog_tmp" \
+    && [ "$("$JSONFILTER" -i "$catalog_tmp" -e '@.revision' 2>/dev/null)" = "$revision" ] \
+    && [ "$("$JSONFILTER" -i "$catalog_tmp" -t '@.rules' 2>/dev/null)" = array ]; then
+    chmod 600 "$catalog_tmp"
+    mv -f "$catalog_tmp" "$CATALOG"
+  else
+    rm -f "$catalog_tmp" "$CATALOG"
+  fi
+else
+  rm -f "$catalog_tmp" "$CATALOG"
+fi

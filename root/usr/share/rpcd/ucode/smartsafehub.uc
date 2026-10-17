@@ -52,6 +52,7 @@ import {
 	read_device_registration_status,
 	read_recommended_rules_status,
 	refresh_recommended_rules_status,
+	revoke_recommended_rule,
 	refresh_device_registration_status,
 	refresh_device_pairing
 } from './smartsafehub/device-registration.uc';
@@ -325,6 +326,12 @@ const methods = {
 			return read_recommended_rules_status(request);
 		}),
 	},
+	device_recommended_rules_revoke: {
+        args: { rule_id: 0 },
+        call: require_root_password(function(request) {
+            return revoke_recommended_rule(request);
+        }),
+    },
 	device_recommended_rules_refresh: {
 		call: require_root_password(function(request) {
 			return refresh_recommended_rules_status(request);

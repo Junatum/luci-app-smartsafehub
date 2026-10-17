@@ -24,7 +24,7 @@ if (typeMode) {
   if (!obj.length) process.exit(1); // OpenWrt jsonfilter: [*] has no match
   for (const item of obj) console.log(item);
 } else {
-  console.log(obj);
+  console.log(typeof obj === 'object' ? JSON.stringify(obj) : obj);
 }
 JS
 cat > "$TMP/bin/ubus" <<'JS'
@@ -76,6 +76,22 @@ response '["tv.example.org"]'
 "$HELPER" "$TMP/response.json"
 assert_rules '["tv.example.org"]'
 [ -f "$TMP/etc/state" ]
+# Server-assigned IDs and titles are stored only after SafeShield confirms the rules.
+python3 - "$TMP/response.json" <<'PY_RULES'
+import hashlib,json,sys
+path=sys.argv[1]
+entry={'id':42,'title':'TV 테스트 규칙','domains':['tv.example.org']}
+obj=json.load(open(path))
+obj['recommended_rules'].update(rules=[entry],rules_revision=hashlib.sha256(b'test-rule-metadata').hexdigest())
+json.dump(obj,open(path,'w'))
+PY_RULES
+"$HELPER" "$TMP/response.json"
+python3 - "$TMP/run/recommended-rules.catalog.json" <<'PY_CATALOG'
+import json,sys
+obj=json.load(open(sys.argv[1]))
+assert obj['rules'][0]['id'] == 42
+assert obj['rules'][0]['domains'] == ['tv.example.org']
+PY_CATALOG
 # A valid empty recommended_rules.domains array must also be accepted.
 response '[]'
 "$HELPER" "$TMP/response.json"
@@ -274,9 +290,58 @@ PY_EMPTY
   if recommended_fast_sync; then exit 1; fi
   [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
 )
+# Revocation must call the device-authenticated Hub endpoint before touching
+# SafeShield and must immediately reconcile the Hub's authoritative new list.
+sed -n '/^recommended_revoke() {/,/^}/p' "$DEVICE" > "$TMP/revoke-function.sh"
+(
+  . "$TMP/revoke-function.sh"
+  API_BASE_URL="https://example.test/api/v1"
+  RUNTIME_DIR="$TMP/run"
+  STATE_FILE="$TMP/device.json"
+  RECOMMENDED_HELPER="$HELPER"
+  printf '{"accountRegistered":true}\n' > "$STATE_FILE"
+  printf '[]\n' > "$TMP/rules.json"
+  rm -f "$SMARTSAFEHUB_RECOMMENDED_STATE_FILE"
+  response '["tv.example.org"]'
+  "$HELPER" "$TMP/response.json"
+  python3 - "$TMP/revoke-hub.json" <<'PY_REVOKE'
+import json,hashlib,sys
+json.dump({'changed':True,'recommended_rules':{
+ 'revision':hashlib.sha256(b'').hexdigest(),'domains':[],
+ 'rules':[], 'rules_revision':hashlib.sha256(b'[]').hexdigest()
+}},open(sys.argv[1],'w'))
+PY_REVOKE
+  credential_token() { printf 'ssh_dev_test'; }
+  json_value() { "$TMP/bin/jsonfilter" -i "$1" -e "$2" 2>/dev/null | head -n 1 || true; }
+  write_recommended_sync_status() { printf '%s\n' "$1" > "$TMP/revoke-status"; }
+  post_json() { printf '%s\n' "$1" > "$TMP/revoke-url"; cp "$TMP/revoke-hub.json" "$3"; }
+  if recommended_revoke invalid; then exit 1; fi
+  recommended_revoke 42
+  grep -Fq '/devices/recommended-rules/42/revoke' "$TMP/revoke-url"
+  grep -Fxq confirmed "$TMP/revoke-status"
+  [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
+  python3 - "$TMP/run/recommended-rules.catalog.json" <<'PY_EMPTY_RULES'
+import json,sys
+assert json.load(open(sys.argv[1]))['rules'] == []
+PY_EMPTY_RULES
+)
 grep -Fq 'RECOMMENDED_POLL_INTERVAL_S=30' "$DEVICE"
 grep -Fq 'next_fast=' "$DEVICE"
 grep -Fq 'next_full=' "$DEVICE"
 grep -Fq "recommended-sync) recommended_fast_sync" "$DEVICE"
 grep -Fq "[ HELPER, 'recommended-sync' ]" "$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
+# With exactOptionalPropertyTypes, omit an optional callback rather than pass undefined.
+# The block card does not need a revoke callback; only recommended allow rules do.
+if grep -Fq 'onRequestRevoke={onRevokeRecommendedRule ? setRevokeTarget : undefined}' "$PAGE"; then
+  echo 'FAIL: optional revoke callbacks must be omitted when unavailable' >&2
+  exit 1
+fi
+grep -Fq '{...(onRevokeRecommendedRule ? { onRequestRevoke: setRevokeTarget } : {})}' "$PAGE" || {
+  echo 'FAIL: the allow card must conditionally pass the revoke callback' >&2
+  exit 1
+}
+[ "$(grep -Fc 'onRequestRevoke: setRevokeTarget' "$PAGE")" -eq 1 ] || {
+  echo 'FAIL: only the allow card may request recommended rule revocation' >&2
+  exit 1
+}
 echo '추천 사용자 규칙 동기화 및 UI 계약: PASS'
