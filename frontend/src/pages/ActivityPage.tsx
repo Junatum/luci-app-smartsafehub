@@ -1,3 +1,5 @@
+import { useState } from 'preact/hooks';
+
 import { SectionHeading } from '../components/SectionHeading';
 import { formatNumber, formatRelativeTime } from '../app/format';
 import { ActivityLoadState, ActivityTimeline } from '../components/ActivityTimeline';
@@ -93,19 +95,18 @@ function CloudActivitySyncCard({
   const canToggle = cloud.enabled || canEnable;
 
   return (
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="min-w-0">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-            Cloud history
-          </p>
-          <h2 class="mt-2 mb-0 text-base font-black text-slate-950">Cloud 활동 기록</h2>
-          <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">{status.description}</p>
+    <section aria-label="Cloud 활동 기록 설정" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ring-inset ${status.tone}`}>
+              {saving ? '설정 중' : status.label}
+            </span>
+          </div>
+          <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">{status.description}</p>
         </div>
-        <div class="flex shrink-0 items-center gap-3">
-          <span class={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ring-inset ${status.tone}`}>
-            {saving ? '설정 중' : status.label}
-          </span>
+        <div class="flex shrink-0 items-center justify-end gap-3 sm:justify-start">
+          <span class="text-xs font-bold text-slate-600">Cloud 전송 {cloud.enabled ? '켜짐' : '꺼짐'}</span>
           <button
             aria-checked={cloud.enabled}
             aria-label="Cloud 활동 기록 전송 사용"
@@ -149,37 +150,52 @@ function CloudActivitySyncCard({
         </div>
       )}
 
-      <dl class="mt-5 grid gap-3 sm:grid-cols-4">
-        <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
-          <dt class="text-xs font-bold text-slate-500">멤버십</dt>
-          <dd class="mt-1 text-sm font-black text-slate-900">{plan ?? (cloud.eligible === false ? 'Free' : '확인 중')}</dd>
-        </div>
-        <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
-          <dt class="text-xs font-bold text-slate-500">전송 대기</dt>
-          <dd class="mt-1 text-sm font-black text-slate-900">{formatNumber(cloud.pendingEvents)}건</dd>
-        </div>
-        <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
-          <dt class="text-xs font-bold text-slate-500">마지막 동기화</dt>
-          <dd class="mt-1 text-sm font-black text-slate-900">
-            {cloud.lastSuccessAt > 0 ? formatRelativeTime(cloud.lastSuccessAt) : '아직 없음'}
-          </dd>
-        </div>
-        <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
-          <dt class="text-xs font-bold text-slate-500">Cloud 보관</dt>
-          <dd class="mt-1 text-sm font-black text-slate-900">
-            {retentionLabel(cloud)}
-          </dd>
-        </div>
-      </dl>
+      {cloud.enabled ? (
+        <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+          Cloud 전송을 끄면 아직 전송하지 않은 대기 기록이 삭제됩니다. 공유기의 로컬 기록은 유지됩니다.
+        </p>
+      ) : null}
+
+      <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-200 pt-3 text-xs font-semibold text-slate-500">
+        <span>마지막 동기화: {cloud.lastSuccessAt > 0 ? formatRelativeTime(cloud.lastSuccessAt) : '아직 없음'}</span>
+        <span>Cloud 보관: {retentionLabel(cloud)}</span>
+        {cloud.pendingEvents > 0 ? <span>전송 대기: {formatNumber(cloud.pendingEvents)}건</span> : null}
+      </div>
 
       {cloud.enabled && cloud.phase === 'error' && cloud.lastErrorCode ? (
         <p class="mt-3 mb-0 text-xs font-semibold text-amber-700">
           오류 코드: <code>{cloud.lastErrorCode}</code>
         </p>
       ) : null}
-      <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
-        SmartSafeHub 계정에 연결된 Free는 최근 7일, Pro와 Ultimate는 최근 90일 동안 Cloud 활동 기록을 보관합니다. 끄면 전송 대기 데이터와 임시 인증 정보를 삭제하며, 다시 켠 뒤 새로 발생한 활동부터 Cloud에 전송합니다. 로컬 최근 활동은 항상 유지됩니다.
-      </p>
+
+      <details class="mt-3 border-t border-slate-200 pt-3">
+        <summary class="cursor-pointer text-xs font-extrabold text-teal-700 hover:text-teal-800 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500">
+          Cloud 동기화 상세 정보
+        </summary>
+        <dl class="mt-3 grid gap-3 sm:grid-cols-4">
+          <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+            <dt class="text-xs font-bold text-slate-500">멤버십</dt>
+            <dd class="mt-1 text-sm font-black text-slate-900">{plan ?? (cloud.eligible === false ? 'Free' : '확인 중')}</dd>
+          </div>
+          <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+            <dt class="text-xs font-bold text-slate-500">전송 대기</dt>
+            <dd class="mt-1 text-sm font-black text-slate-900">{formatNumber(cloud.pendingEvents)}건</dd>
+          </div>
+          <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+            <dt class="text-xs font-bold text-slate-500">마지막 동기화</dt>
+            <dd class="mt-1 text-sm font-black text-slate-900">
+              {cloud.lastSuccessAt > 0 ? formatRelativeTime(cloud.lastSuccessAt) : '아직 없음'}
+            </dd>
+          </div>
+          <div class="rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-inset ring-slate-200">
+            <dt class="text-xs font-bold text-slate-500">Cloud 보관</dt>
+            <dd class="mt-1 text-sm font-black text-slate-900">{retentionLabel(cloud)}</dd>
+          </div>
+        </dl>
+        <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">
+          SmartSafeHub 계정에 연결된 Free는 최근 7일, Pro와 Ultimate는 최근 90일 동안 Cloud 활동 기록을 보관합니다. 끄면 전송 대기 데이터와 임시 인증 정보를 삭제하며, 다시 켠 뒤 새로 발생한 활동부터 Cloud에 전송합니다. 로컬 최근 활동은 항상 유지됩니다.
+        </p>
+      </details>
     </section>
   );
 }
@@ -205,8 +221,44 @@ export function ActivityPage({
   onSetCloudSync: (enabled: boolean) => void;
   savingCloudSync: boolean;
 }) {
+  const [visibleCount, setVisibleCount] = useState(20);
+  const events = data?.events ?? [];
+  const visibleEvents = events.slice(0, visibleCount);
+  const remainingCount = events.length - visibleEvents.length;
+
   return (
-    <div class="min-w-0 space-y-5">
+    <div class="min-w-0 space-y-6">
+      <section aria-labelledby="activity-cloud-title" class="min-w-0">
+        <SectionHeading
+          id="activity-cloud-title"
+          eyebrow="Cloud history"
+          title="Cloud 활동 기록"
+          description="활동 기록을 Cloud에 자동으로 전송할지 설정합니다. 공유기 내 최근 활동은 항상 기록됩니다."
+        />
+        <CloudActivitySyncCard
+          actionError={actionError}
+          actionMessage={actionMessage}
+          cloud={
+            data?.cloud ?? {
+              enabled: false,
+              phase: 'preparing',
+              eligible: null,
+              plan: null,
+              retentionDays: 0,
+              pendingEvents: 0,
+              lastAttemptAt: 0,
+              lastSuccessAt: 0,
+              lastUploadedCount: 0,
+              lastErrorCode: null,
+              nextSyncAt: 0,
+            }
+          }
+          onDismissFeedback={onDismissActionFeedback}
+          onSetEnabled={onSetCloudSync}
+          saving={savingCloudSync}
+        />
+      </section>
+
       <section aria-labelledby="activity-history-title" class="min-w-0">
         <SectionHeading
           id="activity-history-title"
@@ -216,38 +268,42 @@ export function ActivityPage({
           action={<span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-inset ring-slate-200">최대 {data?.maxEvents ?? 128}건</span>}
         />
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-          <div>
           {loading || (error && !data) ? (
             <ActivityLoadState error={error} loading={loading} onRetry={onRetry} />
           ) : (
-            <ActivityTimeline events={data?.events ?? []} />
+            <>
+              <ActivityTimeline events={visibleEvents} />
+              {events.length > 20 ? (
+                <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                  <p class="m-0 text-xs font-semibold text-slate-500">
+                    {formatNumber(visibleEvents.length)} / {formatNumber(events.length)}건 표시 중
+                  </p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    {visibleCount > 20 ? (
+                      <button
+                        class="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500"
+                        onClick={() => setVisibleCount(20)}
+                        type="button"
+                      >
+                        최신 20건만 보기
+                      </button>
+                    ) : null}
+                    {remainingCount > 0 ? (
+                      <button
+                        class="inline-flex min-h-10 items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-xs font-extrabold text-teal-800 transition hover:bg-teal-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-500"
+                        onClick={() => setVisibleCount((current) => Math.min(current + 20, events.length))}
+                        type="button"
+                      >
+                        이전 활동 더 보기 ({formatNumber(Math.min(20, remainingCount))}건)
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
-        </div>
       </section>
-
-      <CloudActivitySyncCard
-        actionError={actionError}
-        actionMessage={actionMessage}
-        cloud={
-          data?.cloud ?? {
-            enabled: false,
-            phase: 'preparing',
-            eligible: null,
-            plan: null,
-            retentionDays: 0,
-            pendingEvents: 0,
-            lastAttemptAt: 0,
-            lastSuccessAt: 0,
-            lastUploadedCount: 0,
-            lastErrorCode: null,
-            nextSyncAt: 0,
-          }
-        }
-        onDismissFeedback={onDismissActionFeedback}
-        onSetEnabled={onSetCloudSync}
-        saving={savingCloudSync}
-      />
 
       <aside class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
         <p class="m-0 text-sm font-extrabold text-slate-800">로컬 활동 기록 안내</p>

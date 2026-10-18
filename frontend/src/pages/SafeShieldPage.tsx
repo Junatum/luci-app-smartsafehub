@@ -640,7 +640,7 @@ export function SafeShieldPage({
         description="DNS 보호 상태와 적용 중인 차단 목록을 확인합니다."
       />
       <section class="mb-8 grid min-w-0 gap-4 xl:grid-cols-2 xl:items-stretch">
-        <article aria-label="보호 상태 요약" class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+        <article aria-label="보호 상태 요약" class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between xl:flex-col 2xl:flex-row">
             <div class="flex min-w-0 items-start gap-3">
               <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
@@ -700,7 +700,7 @@ export function SafeShieldPage({
         </article>
         <section
           aria-label="보호 데이터 요약"
-          class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
+          class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full"
         >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-2">

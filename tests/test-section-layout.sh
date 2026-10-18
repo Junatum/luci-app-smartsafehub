@@ -41,6 +41,13 @@ grep -Fq 'gap-5 xl:items-stretch xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8f
 grep -Fq 'gap-4 xl:grid-cols-2 xl:items-stretch' "$PAGE/SafeShieldPage.tsx" || \
   fail 'SafeShield protection summary and protection data cards must stretch to equal height'
 
+# Explicitly fill the stretched row for both cards, even as status text
+# changes asynchronously. Only use this at desktop widths.
+[ "$(grep -Fc 'bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full' "$PAGE/SafeShieldPage.tsx")" -ge 2 ] || \
+  fail 'Both SafeShield summary cards must fill their desktop grid row'
+[ "$(grep -Fc 'bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full' "$PAGE/SmartSafeHubAccountPage.tsx")" -eq 2 ] || \
+  fail 'Account connection and status cards must fill their desktop grid row'
+
 # Protection controls and their current status must stay together in a functional card.
 grep -Fq 'SafeShield 보호 상태' "$PAGE/SafeShieldPage.tsx" || fail 'Protection card heading removed'
 grep -Fq 'aria-label={targetEnabled ?' "$COMP/SafeShieldStatisticsPanel.tsx" || fail 'Statistics collection switch removed'

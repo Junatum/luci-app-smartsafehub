@@ -113,8 +113,8 @@ grep -Fq '외부 상태를 확인해야 하는 항목은 실제 상태 변화가
 	fail 'full page must explain observer-owned transition recording'
 grep -Fq '업데이트, 계정 권한과 주요 설정' "$PAGE" || \
 	fail 'activity page must use account entitlement wording instead of license wording'
-grep -Fq '<ActivityTimeline events={data?.events ?? []} />' "$PAGE" || \
-	fail 'full page must render the complete local activity response'
+grep -Fq '<ActivityTimeline events={visibleEvents} />' "$PAGE" || \
+	fail 'full page must render the visible slice of the current-boot activity history'
 
 for event_type in \
 	system.booted \

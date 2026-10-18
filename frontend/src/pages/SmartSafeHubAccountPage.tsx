@@ -142,7 +142,7 @@ export function SmartSafeHubAccountPage({
         description="계정에 연결하면 웹사이트에서 기기를 관리하고 Cloud 기능과 구독 권한을 사용할 수 있습니다."
       />
       <div class="grid items-start gap-5 xl:items-stretch xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full">
         {connected ? (
           <div>
             <div class="flex items-center gap-3">
@@ -217,7 +217,7 @@ export function SmartSafeHubAccountPage({
         )}
       </section>
 
-      <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+      <aside class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 xl:h-full">
         <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-slate-400">Device status</p>
         <h2 class="mt-2 mb-0 text-lg font-black tracking-tight text-slate-950">연결 상태</h2>
         <dl class="mt-5 mb-0 grid gap-4">
