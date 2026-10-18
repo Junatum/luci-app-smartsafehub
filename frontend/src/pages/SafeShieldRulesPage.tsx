@@ -366,6 +366,9 @@ export function SafeShieldRulesPage({
     }
     previousStatusSignature.current = signature;
 
+    if (status.syncStatus === 'confirmed' && pendingRevokeId.current === null) {
+      setSyncError(null);
+    }
     if (
       pendingRevokeId.current !== null &&
       status.syncStatus === 'confirmed' &&
@@ -422,7 +425,7 @@ export function SafeShieldRulesPage({
   }, [revokeConfirming]);
 
   async function handleSyncRecommended(): Promise<void> {
-    if (!onSyncRecommendedRules || syncing) return;
+    if (!onSyncRecommendedRules || syncing || revokeBusy) return;
     setSyncing(true);
     setSyncError(null);
     setSyncMessage(null);
@@ -431,9 +434,7 @@ export function SafeShieldRulesPage({
       acceptRecommendedStatus(status);
       setSyncMessage(status.syncStatus === 'confirmed'
         ? '서버에서 규칙을 가져와 SafeShield 허용 목록을 확인했습니다.'
-        : status.syncStatus === 'failed'
-          ? '기기 연결은 확인했지만 추천 규칙 반영에 실패했습니다. 다음 자동 동기화에서 다시 시도합니다.'
-          : '동기화를 요청했습니다. 아직 확인된 추천 규칙이 없습니다.');
+        : '추천 규칙 상태를 확인 중입니다. 진행 결과는 자동으로 갱신됩니다.');
       onRetry(); // Reload the actual SafeShield allow list after reconciliation.
     } catch {
       setSyncError('추천 규칙을 동기화하지 못했습니다. 서버 연결 및 기기 등록 상태를 확인해 주세요.');
@@ -472,6 +473,50 @@ export function SafeShieldRulesPage({
       setRevokeBusy(false);
     }
   }
+
+  // Only one live notice is rendered. In-progress SafeShield refreshes are
+  // not failures; the 15-second local poll advances the visible stage.
+  const syncStage = recommendedStatus?.syncStage;
+  const syncPending = recommendedStatus?.syncStatus === 'pending';
+  const syncDelayed = recommendedStatus?.syncStatus === 'delayed';
+  const syncFailed = recommendedStatus?.syncStatus === 'failed';
+  const stageLabel = syncStage === 'server_sync' ? '서버 동기화 중'
+    : syncStage === 'safeshield_refreshing' ? 'SafeShield 갱신 중'
+    : syncStage === 'applying' ? '추천 규칙 적용 중'
+    : syncStage === 'verifying' ? '허용 목록 확인 중'
+    : syncDelayed ? '재확인 지연' : syncFailed ? '동기화 실패' :
+      syncPending ? '동기화 대기' : '허용 목록 확인';
+  const stageDescription = syncStage === 'safeshield_refreshing' && syncPending
+    ? 'SafeShield가 보호 목록을 갱신하고 있습니다. 갱신이 끝나면 추천 규칙을 자동으로 다시 확인합니다.'
+    : syncStage === 'applying' && syncPending
+      ? '추천 규칙을 SafeShield 허용 목록에 반영하고 있습니다.'
+      : syncStage === 'verifying' && syncPending
+        ? 'SafeShield 허용 목록에서 추천 규칙 반영 결과를 확인하고 있습니다.'
+        : syncStage === 'server_sync' && syncPending
+          ? 'SmartSafeHub 서버에서 최신 추천 규칙을 확인하고 있습니다.'
+          : syncDelayed
+            ? '서버 응답이 지연되고 있습니다. 이미 확인한 허용 규칙은 유지되며 자동으로 다시 시도합니다.'
+            : syncFailed
+              ? recommendedStatus?.syncReason === 'auth_rejected'
+                ? 'SmartSafeHub 기기 인증이 거부되었습니다. 공유기 계정 연결 상태를 확인해 주세요.'
+                : recommendedStatus?.syncReason === 'api_rejected'
+                  ? '서버가 추천 규칙 요청을 거부했습니다. Hub API 배포 상태를 확인해 주세요.'
+                  : recommendedStatus?.syncReason === 'invalid_response'
+                ? '서버 응답을 확인할 수 없습니다. 규칙은 유지되며 다음 동기화에서 다시 확인합니다.'
+                : '추천 규칙 반영을 완료하지 못했습니다. 다음 자동 동기화에서 다시 시도합니다.'
+              : syncPending ? '추천 규칙의 적용 결과를 기다리고 있습니다.' : null;
+  const waitingForRevoke = revokeConfirming && pendingRevokeId.current !== null;
+  const currentNotice = waitingForRevoke
+    ? { tone: 'amber', label: revokeConfirmationDelayed ? '적용 해제 처리 지연' : '적용 해제 확인 중',
+        description: revokeConfirmationDelayed
+          ? '적용 해제 확인이 지연되고 있습니다. SafeShield 갱신 중이라면 완료 후 자동으로 재확인합니다.'
+          : stageDescription ?? '적용 해제 상태를 확인하고 있습니다. 확인되면 목록과 상태가 자동 갱신됩니다.' }
+    : syncPending || syncDelayed || syncFailed
+      ? { tone: syncFailed ? 'red' : 'amber', label: stageLabel, description: stageDescription ?? '' }
+      : syncError ? { tone: 'red', label: '상태 확인 필요', description: syncError }
+        : recommendedStatus?.syncWarning
+          ? { tone: 'amber', label: '서버 재확인 지연', description: '이미 확인한 허용 규칙은 유지되며 자동으로 다시 시도합니다.' }
+          : syncMessage ? { tone: 'green', label: '허용 목록 확인', description: syncMessage } : null;
 
   if (loading && !data) {
     return <LoadingPanel />;
@@ -552,7 +597,7 @@ export function SafeShieldRulesPage({
               <h2 class="m-0 text-base font-extrabold text-slate-950">추천 사용자 규칙</h2>
               {onLoadRecommendedRulesStatus ? (
                 <span aria-live="polite" class={`rounded-full px-2.5 py-1 text-xs font-bold ${recommendedStatus?.syncStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : recommendedStatus?.syncStatus === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                  {recommendedStatus?.syncStatus === 'confirmed' ? '허용 목록 확인' : recommendedStatus?.syncStatus === 'failed' ? '동기화 실패' : '동기화 대기'}
+                  {recommendedStatus?.syncStatus === 'confirmed' ? '허용 목록 확인' : stageLabel}
                 </span>
               ) : null}
             </div>
@@ -579,17 +624,11 @@ export function SafeShieldRulesPage({
             <a class="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-teal-700 bg-teal-700 px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-teal-800 sm:flex-none" href="https://www.smartsafehub.com/dashboard/recommended-rules/" target="_blank" rel="noopener noreferrer">추천 규칙 보기 ↗</a>
           </div>
         </div>
-        {revokeConfirming && !revokeBusy ? (
-          <p class="mt-3 mb-0 text-sm font-semibold text-amber-700" role="status">
-            {revokeConfirmationDelayed
-              ? '적용 해제 확인이 지연되고 있습니다. 자동 재확인은 계속되며, 필요하면 지금 동기화를 눌러 확인할 수 있습니다.'
-              : '적용 해제 상태를 확인하고 있습니다. 확인되면 목록과 상태가 자동 갱신됩니다.'}
-          </p>
-        ) : null}
-        {syncMessage ? <p class="mt-3 mb-0 text-sm font-semibold text-teal-800" role="status">{syncMessage}</p> : null}
-        {syncError ? <p class="mt-3 mb-0 text-sm font-semibold text-red-700" role="alert">{syncError}</p> : null}
-        {recommendedStatus?.syncWarning ? (
-          <p class="mt-3 mb-0 text-xs font-semibold text-amber-700" role="status">최근 서버 재확인이 지연되고 있습니다. 이미 확인한 허용 규칙은 유지되며 자동으로 다시 시도합니다.</p>
+        {currentNotice ? (
+          <div aria-live="polite" class={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-sm ${currentNotice.tone === 'red' ? 'bg-red-50 text-red-800' : currentNotice.tone === 'green' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`} role="status">
+            <span aria-hidden="true" class={`mt-1 size-2 shrink-0 rounded-full ${currentNotice.tone === 'red' ? 'bg-red-500' : currentNotice.tone === 'green' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <div class="min-w-0"><strong>{currentNotice.label}</strong><p class="mt-1 mb-0 leading-5">{currentNotice.description}</p></div>
+          </div>
         ) : null}
         <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">추천 규칙 동기화는 SafeShield 차단 목록 갱신과 별개입니다. 허용 목록 확인은 DNS 처리나 서비스 재생 성공을 보장하지 않습니다.</p>
       </section>

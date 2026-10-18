@@ -50,8 +50,8 @@ test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 �
   assert.match(acl, /"device_recommended_rules_refresh"/);
   assert.match(device, /write_recommended_sync_status failed/);
   assert.match(device, /write_recommended_sync_status confirmed/);
-  assert.match(rpc, /const syncStatus = confirmed \? 'confirmed' : sync\?\.status == 'failed'/);
-  assert.match(rpc, /const syncWarning = confirmed && sync\?\.status == 'failed'/);
+  assert.match(rpc, /const syncStatus = sync\?\.status == 'pending'/);
+  assert.match(rpc, /const syncWarning = confirmed &&/);
   assert.match(rpc, /const confirmed = revision != null && receipt\?\.status == 'confirmed'/);
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
 });
@@ -59,7 +59,7 @@ test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 �
 
 test('추천 규칙의 로컬 적용 확인과 일시적 서버 동기화 실패를 구분한다', () => {
   const type = readFileSync(resolve(root, 'frontend/src/types/rules.ts'), 'utf8');
-  assert.match(rpc, /const syncStatus = confirmed \? 'confirmed'/);
+  assert.match(rpc, /confirmed \? 'confirmed' : sync\?\.status == 'delayed'/);
   assert.doesNotMatch(rpc, /device\?\.lastResult == 'failed' \|\| sync\?\.status == 'failed'/);
   assert.match(rpc, /syncWarning: syncWarning/);
   assert.match(type, /syncWarning: boolean/);

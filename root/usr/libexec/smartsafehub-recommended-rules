@@ -18,7 +18,7 @@ if ! mkdir "$LOCK" 2>/dev/null; then
   # A crashed reconciler may have left its lock; a live one must win.
   owner="$(cat "$LOCK/pid" 2>/dev/null || true)"
   case "$owner" in ''|*[!0-9]*) exit 1 ;; esac
-  kill -0 "$owner" 2>/dev/null && exit 1
+  kill -0 "$owner" 2>/dev/null && exit 75
   rm -f "$LOCK/pid"
   rmdir "$LOCK" 2>/dev/null || exit 1
   mkdir "$LOCK" 2>/dev/null || exit 1
@@ -63,8 +63,8 @@ valid_domain() {
 revision="$(field "$RESPONSE" '@.recommended_rules.revision')"
 # Do not erase cloud-managed rules if the server is not yet sending this feature.
 [ -n "$revision" ] || exit 0
-# Never resend a stale confirmation if reconciliation fails midway.
-rm -f "$RECEIPT"
+# A prior receipt is trustworthy for its own revision until a new reconciliation
+# changes the allow list. The RPC compares the receipt's revision to STATE.
 valid_hash "$revision" || exit 1
 extract_array "$RESPONSE" '@.recommended_rules.domains' "$DESIRED" || exit 1
 [ "$(wc -l < "$DESIRED")" -le 100 ] || exit 1
@@ -88,13 +88,67 @@ persist() {
   mv -f "$temp" "$STATE"
 }
 
-"$UBUS" call safeshield rules_list '{}' > "$REPLY" || exit 1
+# Report progress from the worker itself. The parent daemon only commits a
+# final result; a pending phase survives SafeShield refresh deferral.
+phase() {
+  stage="$1"
+  tmp="$RUNTIME/recommended-phase.$$.json"
+  printf '{"status":"pending","stage":"%s","reason":"","checkedAt":%s}\n' \
+    "$stage" "$(date +%s)" > "$tmp"
+  mv -f "$tmp" "${SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE:-$RUNTIME/recommended-rules.sync.json}"
+}
+
+# Only status=running denotes an actual protection-list refresh. The refreshd
+# service can be running permanently, so never use runtime.refreshd_running.
+safeshield_refreshing() {
+  status_file="$RUNTIME/recommended-safeshield-status.$$.json"
+  if "$UBUS" call safeshield status '{}' > "$status_file" 2>/dev/null; then
+    status_value="$(field "$status_file" '@.status')"
+  else
+    status_value=''
+  fi
+  rm -f "$status_file"
+  [ "$status_value" = running ]
+}
+
+# Defer a different desired revision before calling potentially busy SafeShield
+# rules_list, which can itself be delayed during a long refresh.
+if [ "$previous" != "$revision" ] && safeshield_refreshing; then
+  phase safeshield_refreshing
+  exit 75
+fi
+
+# No changes have been made yet, but this attempt needs a fresh verification.
+# Keep the old receipt only when deferring before this point.
+rm -f "$RECEIPT"
+if ! "$UBUS" call safeshield rules_list '{}' > "$REPLY"; then
+  if safeshield_refreshing; then phase safeshield_refreshing; exit 75; fi
+  exit 1
+fi
 [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
 # A broken or truncated rules_list must never be mistaken for an empty list.
 LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
 extract_array "$REPLY" '@.allow' "$ALLOW" || exit 1
 while IFS= read -r domain || [ -n "$domain" ]; do valid_domain "$domain" || exit 1; done < "$ALLOW"
 sort -u "$ALLOW" -o "$ALLOW"
+
+# Do not mutate overrides while a full protection refresh is already running.
+# Retain ownership and let the 30-second poll retry when SafeShield settles.
+changes_needed=0
+[ "$previous" = '-' ] && changes_needed=1
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if ! grep -Fxq "$domain" "$ALLOW"; then changes_needed=1; fi
+done < "$DESIRED"
+while IFS= read -r domain; do
+  [ -n "$domain" ] || continue
+  if ! grep -Fxq "$domain" "$DESIRED" && grep -Fxq "$domain" "$ALLOW"; then changes_needed=1; fi
+done < "$OWNED"
+if [ "$changes_needed" -eq 1 ] && safeshield_refreshing; then
+  phase safeshield_refreshing
+  exit 75
+fi
+if [ "$changes_needed" -eq 1 ]; then phase applying; fi
 
 mutate() {
   method="$1"; domain="$2"
@@ -137,12 +191,22 @@ while IFS= read -r domain; do
 done < "$DESIRED"
 
 if [ "$need_refresh" -eq 1 ]; then
-  "$UBUS" call safeshield refresh '{}' > "$REPLY" || exit 1
-  [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
-  [ "$(field "$REPLY" '@.accepted')" != false ] || exit 1
+  phase safeshield_refreshing
+  if ! "$UBUS" call safeshield refresh '{}' > "$REPLY"; then
+    if safeshield_refreshing; then phase safeshield_refreshing; exit 75; fi
+    exit 1
+  fi
+  if [ "$(field "$REPLY" '@.ok')" = false ] || [ "$(field "$REPLY" '@.accepted')" = false ]; then
+    if safeshield_refreshing; then phase safeshield_refreshing; exit 75; fi
+    exit 1
+  fi
 fi
 # Read the actual SafeShield rule list again rather than trusting rule_add results.
-"$UBUS" call safeshield rules_list '{}' > "$REPLY" || exit 1
+if [ "$changes_needed" -eq 1 ] || [ "$previous" != "$revision" ]; then phase verifying; fi
+if ! "$UBUS" call safeshield rules_list '{}' > "$REPLY"; then
+  if safeshield_refreshing; then phase safeshield_refreshing; exit 75; fi
+  exit 1
+fi
 [ "$(field "$REPLY" '@.ok')" != false ] || exit 1
 LC_ALL=C grep -Eq '"allow"[[:space:]]*:[[:space:]]*\[' "$REPLY" || exit 1
 extract_array "$REPLY" '@.allow' "$VERIFY" || exit 1

@@ -212,16 +212,32 @@ rotate_credential_if_due() {
 
 # Keep the latest reconciliation outcome in tmpfs, not flash. A successful
 # device/account sync does not imply SafeShield accepted the recommended rules.
+# Status is volatile. Keep the most recent confirmed receipt separately so a
+# transient Hub failure never becomes an unverified SafeShield failure.
 write_recommended_sync_status() {
- local result="$1" now tmp
+ local result="$1" stage="${2:-$1}" reason="${3:-}" now tmp
  now="$(now_epoch)"
  mkdir -p "$RUNTIME_DIR" || return 0
  tmp="${RECOMMENDED_SYNC_STATUS}.tmp.$$"
- if printf '{"status":"%s","checkedAt":%s}\n' "$result" "$now" > "$tmp"; then
+ if printf '{"status":"%s","stage":"%s","reason":"%s","checkedAt":%s}\n' \
+   "$result" "$stage" "$reason" "$now" > "$tmp"; then
   mv -f "$tmp" "$RECOMMENDED_SYNC_STATUS" 2>/dev/null || rm -f "$tmp"
  else
   rm -f "$tmp"
  fi
+}
+
+# The reconciler exits 75 when SafeShield is refreshing or another reconcile
+# holds its lock. These are deferred operations, not failed recommendations.
+reconcile_recommended_response() {
+ local response="$1" rc=0
+ [ -x "$RECOMMENDED_HELPER" ] || { write_recommended_sync_status failed helper_missing; return 1; }
+ "$RECOMMENDED_HELPER" "$response" || rc=$?
+ case "$rc" in
+  0) write_recommended_sync_status confirmed; return 0 ;;
+  75) return 0 ;; # helper writes its own progress state (or is already running)
+  *) write_recommended_sync_status failed apply_error; return 1 ;;
+ esac
 }
 
 status_sync() {
@@ -285,10 +301,7 @@ status_sync() {
  # Keep the account state available even when SafeShield cannot be reached;
  # a failed reconciliation is retried on the next device sync.
  if [ -n "$(json_value "$out" '@.recommended_rules.revision')" ]; then
-  if [ -x "$RECOMMENDED_HELPER" ] && "$RECOMMENDED_HELPER" "$out"; then
-   write_recommended_sync_status confirmed
-  else
-   write_recommended_sync_status failed
+  if ! reconcile_recommended_response "$out"; then
    log_message 'recommended rules will retry on next device sync'
   fi
  fi
@@ -316,19 +329,22 @@ recommended_revoke() {
  [ "${#rule_id}" -le 10 ] || return 2
  [ "$(json_value "$STATE_FILE" '@.accountRegistered')" = true ] || return 1
  token="$(credential_token)" || return 1
+ write_recommended_sync_status pending server_sync
  body="$RUNTIME_DIR/recommended-revoke-request.$$.json"
  out="$RUNTIME_DIR/recommended-revoke-response.$$.json"
  printf '{}\n' > "$body" || return 1
  if ! post_json "$API_BASE_URL/devices/recommended-rules/$rule_id/revoke" "$body" "$out" "$token"; then
+  write_recommended_sync_status delayed hub_unavailable
   rm -f "$body" "$out" "${out}.log"
   return 1
  fi
  rc=1
- if [ "$(json_value "$out" '@.changed')" = true ] && "$RECOMMENDED_HELPER" "$out"; then
-  write_recommended_sync_status confirmed
-  rc=0
+ if [ "$(json_value "$out" '@.changed')" = true ]; then
+  if reconcile_recommended_response "$out"; then
+   rc=0
+  fi
  else
-  write_recommended_sync_status failed
+  write_recommended_sync_status failed invalid_response
  fi
  rm -f "$body" "$out" "${out}.log"
  return "$rc"
@@ -363,9 +379,10 @@ recommended_fast_sync() {
  case "$rules_revision" in *[!0-9a-f]*|'') rules_revision='' ;; *) [ "${#rules_revision}" -eq 64 ] || rules_revision='' ;; esac
  body="$RUNTIME_DIR/recommended-poll-request.$$.json"
  out="$RUNTIME_DIR/recommended-poll-response.$$.json"
+ if [ -z "$revision" ]; then write_recommended_sync_status pending server_sync; fi
  printf '{"revision":"%s","rules_revision":"%s"}\n' "$revision" "$rules_revision" > "$body" || return 1
  if ! post_json "$API_BASE_URL/devices/recommended-rules" "$body" "$out" "$token"; then
-  write_recommended_sync_status failed
+  write_recommended_sync_status delayed hub_unavailable
   rm -f "$body" "$out" "${out}.log"
   return 1
  fi
@@ -377,20 +394,21 @@ recommended_fast_sync() {
     write_recommended_sync_status confirmed
     rc=0
    else
+    write_recommended_sync_status failed invalid_response
     rc=1
    fi
    ;;
   true)
-   if "$RECOMMENDED_HELPER" "$out"; then
-    write_recommended_sync_status confirmed
+   if reconcile_recommended_response "$out"; then
     rc=0
    else
     rc=1
    fi
    ;;
-  *) rc=1 ;;
+  *) write_recommended_sync_status failed invalid_response; rc=1 ;;
  esac
- [ "$rc" -eq 0 ] || write_recommended_sync_status failed
+ # Defer transient local reconciler work instead of overwriting its stage.
+ [ "$rc" -eq 0 ] || log_message 'recommended rules reconciliation failed'
  rm -f "$body" "$out" "${out}.log"
  return "$rc"
 }

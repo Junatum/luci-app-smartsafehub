@@ -7,7 +7,22 @@ DEVICE="$ROOT/root/usr/libexec/smartsafehub-device"
 PAGE="$ROOT/frontend/src/pages/SafeShieldRulesPage.tsx"
 RPC="$ROOT/root/usr/share/rpcd/ucode/smartsafehub.uc"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT HUP INT TERM
+# Print the current scenario on assertion failure. ShellSpec otherwise receives
+# only an empty stdout/stderr when `set -e` stops on an unlabelled assertion.
+TEST_STAGE='초기화'
+cleanup() {
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf 'FAIL: 추천 규칙 테스트 단계: %s (exit=%s)\n' "$TEST_STAGE" "$rc" >&2
+    if [ -f "$TMP/run/recommended-rules.sync.json" ]; then
+      printf '  last sync status: ' >&2
+      cat "$TMP/run/recommended-rules.sync.json" >&2
+    fi
+  fi
+  rm -rf "$TMP"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 mkdir -p "$TMP/bin" "$TMP/run" "$TMP/etc"
 cat > "$TMP/bin/jsonfilter" <<'JS'
 #!/usr/bin/env node
@@ -32,6 +47,10 @@ cat > "$TMP/bin/ubus" <<'JS'
 const fs=require('fs'),path=require('path');
 const dir=process.env.MOCK_RECOMMENDED_DIR, method=process.argv[4], file=path.join(dir,'rules.json');
 let rules=JSON.parse(fs.readFileSync(file,'utf8'));
+if (method==='status') {
+  console.log(JSON.stringify({status:process.env.MOCK_SAFE_REFRESHING === '1' ? 'running' : 'ready'}));
+  process.exit(0);
+}
 if (method==='rules_list') {
   console.log(process.env.BROKEN_LIST==='1' ? '{"ok":true}' : JSON.stringify({ok:true,allow:rules,block:[]}));
   process.exit(0);
@@ -57,6 +76,7 @@ export SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE="$TMP/etc/receipt.json"
 export SMARTSAFEHUB_DEVICE_JSONFILTER_BIN="$TMP/bin/jsonfilter"
 export SMARTSAFEHUB_DEVICE_UBUS_BIN="$TMP/bin/ubus"
 export SMARTSAFEHUB_DEVICE_RUNTIME_DIR="$TMP/run"
+export SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE="$TMP/run/recommended-rules.sync.json"
 response() {
   python3 - "$TMP/response.json" "$1" <<'PY'
 import sys,json,hashlib
@@ -70,12 +90,28 @@ import json,sys
 assert sorted(json.load(open(sys.argv[1])))==sorted(json.loads(sys.argv[2]))
 PY
 }
+TEST_STAGE='SafeShield 갱신 중 동기화 보류'
 # An empty SafeShield allow list is normal on a newly configured router.
 # OpenWrt jsonfilter returns 1 for @.allow[*] when there are no entries.
 response '["tv.example.org"]'
+# The SafeShield blocklist refresh can take minutes. Do not report an error,
+# modify rule ownership, or run rule_add while it reports status=running.
+if MOCK_SAFE_REFRESHING=1 "$HELPER" "$TMP/response.json"; then
+  echo 'FAIL: busy SafeShield refresh should defer work' >&2; exit 1
+else
+  [ "$?" -eq 75 ] || { echo 'FAIL: busy refresh should use deferred exit 75' >&2; exit 1; }
+fi
+assert_rules '[]'
+[ ! -f "$TMP/etc/state" ]
+python3 - "$TMP/run/recommended-rules.sync.json" <<'PY_STAGE'
+import json,sys
+s=json.load(open(sys.argv[1]))
+assert s['status']=='pending' and s['stage']=='safeshield_refreshing',s
+PY_STAGE
 "$HELPER" "$TMP/response.json"
 assert_rules '["tv.example.org"]'
 [ -f "$TMP/etc/state" ]
+TEST_STAGE='추천 규칙 메타데이터 저장'
 # Server-assigned IDs and titles are stored only after SafeShield confirms the rules.
 python3 - "$TMP/response.json" <<'PY_RULES'
 import hashlib,json,sys
@@ -92,6 +128,7 @@ obj=json.load(open(sys.argv[1]))
 assert obj['rules'][0]['id'] == 42
 assert obj['rules'][0]['domains'] == ['tv.example.org']
 PY_CATALOG
+TEST_STAGE='SafeShield refresh 실패 후 소유 정보 보존'
 # 회귀: 삭제 후 SafeShield refresh가 실패하면 추천 소유 정보를 잃으면 안 됩니다.
 # 그 사이 허용 목록에 도메인이 남거나 다시 나타나더라도 재할당 시 수동
 # 규칙으로 잘못 분류되어서는 안 됩니다.
@@ -118,6 +155,7 @@ assert_rules '[]'
 # An empty allow list on both the initial read and verification is valid.
 "$HELPER" "$TMP/response.json"
 assert_rules '[]'
+TEST_STAGE='기존 수동 허용 규칙 보존'
 # Continue existing scenarios with pre-existing manual rules.
 rm -f "$TMP/etc/state" "$TMP/etc/receipt.json" "$TMP/calls.log"
 printf '["manual.example.org"]' > "$TMP/rules.json"
@@ -141,11 +179,13 @@ count="$(wc -l < "$TMP/calls.log")"
 # Removing one recommendation must only remove the locally owned entry.
 response '[]'; "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
+TEST_STAGE='잘못된 SafeShield 응답 방어'
 # Broken responses must not be interpreted as an empty rules list.
 response '["tv.example.org"]'
 if BROKEN_LIST=1 "$HELPER" "$TMP/response.json"; then exit 1; fi
 [ ! -f "$TMP/etc/receipt.json" ]
 assert_rules '["manual.example.org"]'
+TEST_STAGE='규칙 변경 실패 후 재시도'
 # Rule mutation failures must not acknowledge a newer revision.
 if FAIL_METHOD=rule_add "$HELPER" "$TMP/response.json"; then exit 1; fi
 [ ! -f "$TMP/etc/receipt.json" ]
@@ -165,6 +205,7 @@ if FAIL_METHOD=refresh "$HELPER" "$TMP/response.json"; then exit 1; fi
 "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
 [ "$(sed -n '1p' "$TMP/etc/state")" = "$expected" ] && exit 1
+TEST_STAGE='잘못된 Hub 응답 및 도메인 검증'
 # A missing or incorrectly typed array is NOT the same as an empty one.
 revision="$(python3 - "$TMP/response.json" <<'PYREV'
 import hashlib
@@ -185,6 +226,7 @@ if "$HELPER" "$TMP/response.json"; then exit 1; fi
 printf '{}\n' > "$TMP/response.json"
 "$HELPER" "$TMP/response.json"
 assert_rules '["manual.example.org"]'
+TEST_STAGE='동기화 상태 JSON 및 RPC 계약'
 # The last reconciliation result must be written to tmpfs and distinguish a
 # SafeShield rule failure from a successful device account synchronization.
 RECOMMENDED_STATUS="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
@@ -210,9 +252,9 @@ sed -n '/^write_recommended_sync_status() {/,/^}/p' "$DEVICE" > "$TMP/status-fun
   RECOMMENDED_SYNC_STATUS="$RUNTIME_DIR/recommended-rules.sync.json"
   now_epoch() { printf '12345'; }
   write_recommended_sync_status failed
-  grep -Fq '"status":"failed","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
+  grep -Fq '"status":"failed","stage":"failed","reason":"","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
   write_recommended_sync_status confirmed
-  grep -Fq '"status":"confirmed","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
+  grep -Fq '"status":"confirmed","stage":"confirmed","reason":"","checkedAt":12345' "$RECOMMENDED_SYNC_STATUS"
   [ ! -e "$RECOMMENDED_SYNC_STATUS.tmp.$$" ]
 )
 # The UI must not allow manual deletion of entries owned by the cloud.
@@ -257,9 +299,11 @@ grep -Fq 'https://www.smartsafehub.com/dashboard/recommended-rules/' "$PAGE"
 grep -Fq 'RECOMMENDED_HELPER' "$DEVICE"
 grep -Fq 'recommended_rules_ack' "$DEVICE"
 grep -Fq '/etc/smartsafehub/recommended-rules.state' "$ROOT/root/lib/upgrade/keep.d/smartsafehub-device"
+TEST_STAGE='30초 경량 동기화 및 갱신 중 대기'
 # The short-poll path must not use full device sync or reapply unchanged
 # rules. Exercise the real function with a fake authenticated Hub response.
-sed -n '/^recommended_fast_sync() {/,/^}/p' "$DEVICE" > "$TMP/fast-function.sh"
+sed -n '/^reconcile_recommended_response() {/,/^}/p' "$DEVICE" > "$TMP/fast-function.sh"
+sed -n '/^recommended_fast_sync() {/,/^}/p' "$DEVICE" >> "$TMP/fast-function.sh"
 (
   . "$TMP/fast-function.sh"
   RUNTIME_DIR="$TMP/run"
@@ -274,6 +318,7 @@ sed -n '/^recommended_fast_sync() {/,/^}/p' "$DEVICE" > "$TMP/fast-function.sh"
   credential_token() { printf 'ssh_dev_test'; }
   json_value() { "$TMP/bin/jsonfilter" -i "$1" -e "$2" 2>/dev/null | head -n 1 || true; }
   write_recommended_sync_status() { printf '%s\n' "$1" > "$TMP/fast-status"; }
+  log_message() { :; }
   post_json() {
     printf '%s\n' "$1" > "$TMP/fast-url"
     cp "$2" "$TMP/fast-request.json"
@@ -284,6 +329,13 @@ import hashlib,json,sys
 items=['tv.example.org']; revision=hashlib.sha256('\n'.join(items).encode()).hexdigest()
 json.dump({'changed':True,'recommended_rules':{'revision':revision,'domains':items}},open(sys.argv[1],'w'))
 PY_FAST
+  # Hub request can succeed while SafeShield is refreshing. Keep the current
+  # rules and do not report an irreversible failure; the next poll repairs it.
+  # A subshell keeps the mock refresh flag isolated on macOS /bin/sh too.
+  # The state and SafeShield mock results are written to files and remain visible.
+  ( MOCK_SAFE_REFRESHING=1 recommended_fast_sync )
+  grep -Fqx 'pending' "$TMP/fast-status"
+  [ ! -f "$RECOMMENDED_STATE" ]
   recommended_fast_sync
   grep -Fqx 'confirmed' "$TMP/fast-status"
   grep -Fq '/devices/recommended-rules' "$TMP/fast-url"
@@ -325,6 +377,7 @@ PY_EMPTY
   if recommended_fast_sync; then exit 1; fi
   [ "$(cat "$TMP/rules.json")" = '[]' ] || exit 1
 )
+TEST_STAGE='추천 규칙 해제 명령행 인자 검증'
 # Exercise the real CLI argument gate. Previous code treated a numeric rule ID
 # as an invalid `--debug` flag, so the Hub request was never attempted.
 # With an unregistered mock device, a valid ID reaches recommended_revoke()
@@ -338,9 +391,11 @@ rc=0
 rc=0
 "$DEVICE" recommended-revoke invalid > "$TMP/revoke-cli.out" 2>&1 || rc=$?
 [ "$rc" -eq 2 ] || { echo 'FAIL: invalid rule ID was accepted' >&2; exit 1; }
+TEST_STAGE='추천 규칙 Hub 해제 및 로컬 적용'
 # Revocation must call the device-authenticated Hub endpoint before touching
 # SafeShield and must immediately reconcile the Hub's authoritative new list.
-sed -n '/^recommended_revoke() {/,/^}/p' "$DEVICE" > "$TMP/revoke-function.sh"
+sed -n '/^reconcile_recommended_response() {/,/^}/p' "$DEVICE" > "$TMP/revoke-function.sh"
+sed -n '/^recommended_revoke() {/,/^}/p' "$DEVICE" >> "$TMP/revoke-function.sh"
 (
   . "$TMP/revoke-function.sh"
   API_BASE_URL="https://example.test/api/v1"
@@ -373,6 +428,7 @@ import json,sys
 assert json.load(open(sys.argv[1]))['rules'] == []
 PY_EMPTY_RULES
 )
+TEST_STAGE='추천 규칙 UI 및 API 계약'
 grep -Fq 'RECOMMENDED_POLL_INTERVAL_S=30' "$DEVICE"
 grep -Fq 'next_fast=' "$DEVICE"
 grep -Fq 'next_full=' "$DEVICE"

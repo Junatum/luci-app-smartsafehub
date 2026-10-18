@@ -45,8 +45,13 @@ export function read_recommended_rules_status(request) {
  // The receipt records SafeShield's verified allow list. A transient Hub poll
  // failure does not undo that local confirmation, nor does an unrelated 5-minute
  // device/account sync failure. Failed reconciliation removes the receipt.
- const syncStatus = confirmed ? 'confirmed' : sync?.status == 'failed' ? 'failed' : 'pending';
- const syncWarning = confirmed && sync?.status == 'failed';
+ // A busy SafeShield refresh is pending work, not an application failure.
+ // Keep an older verified receipt for its revision without treating a newer
+ // in-progress operation as already complete.
+ const syncStatus = sync?.status == 'pending' ? 'pending' :
+  confirmed ? 'confirmed' : sync?.status == 'delayed' ? 'delayed' :
+  sync?.status == 'failed' ? 'failed' : 'pending';
+ const syncWarning = confirmed && (sync?.status == 'failed' || sync?.status == 'delayed');
  const confirmedDomains = confirmed && type(receipt?.domains) == 'array' ? receipt.domains : [];
  return success({
   revision: revision,
@@ -55,6 +60,8 @@ export function read_recommended_rules_status(request) {
   confirmedDomains: confirmedDomains,
   syncStatus: syncStatus,
   syncWarning: syncWarning,
+  syncStage: sync?.stage ?? null,
+  syncReason: sync?.reason ?? null,
   lastCheckedAt: sync?.checkedAt ?? 0,
   lastDeviceSyncAt: device?.lastSuccessAt ?? 0,
   nextDeviceSyncAt: device?.nextSyncAt ?? 0,
@@ -64,7 +71,11 @@ export function read_recommended_rules_status(request) {
 export function refresh_recommended_rules_status(request) {
  // The blocklist download and the Hub device sync are different operations.
  // Reuse the authenticated device sync, never the SafeShield blocklist refresh.
- if (!run_command([ HELPER, 'recommended-sync' ], 25000)) return failure('RECOMMENDED_SYNC_UNAVAILABLE', 'SmartSafeHub 서버와 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+ if (!run_command([ HELPER, 'recommended-sync' ], 25000)) {
+  const latest = read_json_file(RECOMMENDED_SYNC_STATUS);
+  if (latest?.status != 'pending' && latest?.status != 'delayed')
+   return failure('RECOMMENDED_SYNC_UNAVAILABLE', 'SmartSafeHub 서버와 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+ }
  return read_recommended_rules_status(request);
 };
 export function revoke_recommended_rule(request) {

@@ -11,7 +11,7 @@ test('추천 규칙은 도메인이 아니라 할당된 규칙 ID로 해제한�
   const script = read('root/usr/libexec/smartsafehub-device');
   const page = read('frontend/src/pages/SafeShieldRulesPage.tsx');
   assert.match(script, /devices\/recommended-rules\/\$rule_id\/revoke/);
-  assert.match(script, /"\$RECOMMENDED_HELPER" "\$out"/);
+  assert.match(script, /reconcile_recommended_response "\$out"/);
   assert.match(page, /onRevokeRecommendedRule\?\:/);
   assert.match(page, /revokeTarget\.id/);
   assert.match(page, /aria-modal="true"/);
