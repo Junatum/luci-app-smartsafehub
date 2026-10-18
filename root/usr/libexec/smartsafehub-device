@@ -19,6 +19,7 @@ RECOMMENDED_RECEIPT="${SMARTSAFEHUB_RECOMMENDED_RECEIPT_FILE:-$RUNTIME_DIR/recom
 RECOMMENDED_STATE="${SMARTSAFEHUB_RECOMMENDED_STATE_FILE:-/etc/smartsafehub/recommended-rules.state}"
 RECOMMENDED_SYNC_STATUS="${SMARTSAFEHUB_RECOMMENDED_SYNC_STATUS_FILE:-$RUNTIME_DIR/recommended-rules.sync.json}"
 RECOMMENDED_CATALOG="${SMARTSAFEHUB_RECOMMENDED_CATALOG_FILE:-$RUNTIME_DIR/recommended-rules.catalog.json}"
+RECOMMENDED_ACK_STATE="${SMARTSAFEHUB_RECOMMENDED_ACK_STATE_FILE:-$RUNTIME_DIR/recommended-rules.reported}"
 API_BASE_URL="${SMARTSAFEHUB_DEVICE_API_BASE_URL:-https://www.smartsafehub.com/api/v1}"
 UCLIENT_FETCH_BIN="${SMARTSAFEHUB_DEVICE_UCLIENT_FETCH_BIN:-uclient-fetch}"
 JSONFILTER_BIN="${SMARTSAFEHUB_DEVICE_JSONFILTER_BIN:-jsonfilter}"
@@ -380,11 +381,42 @@ recommended_fast_sync() {
  body="$RUNTIME_DIR/recommended-poll-request.$$.json"
  out="$RUNTIME_DIR/recommended-poll-response.$$.json"
  if [ -z "$revision" ]; then write_recommended_sync_status pending server_sync; fi
- printf '{"revision":"%s","rules_revision":"%s"}\n' "$revision" "$rules_revision" > "$body" || return 1
+ # Only report after the local reconciler wrote a matching SafeShield
+ # receipt. Refresh confirmation every ten minutes, rather than writing to
+ # Hub's database on every 30-second revision check.
+ local report_due=0 report_revision='' report_rules='' report_at=0 now ack_state
+ ack_state="${RECOMMENDED_ACK_STATE:-$RUNTIME_DIR/recommended-rules.reported}"
+ if command -v now_epoch >/dev/null 2>&1; then now="$(now_epoch)"; else now="$(date +%s)"; fi
+ if [ -n "$revision" ] && [ "$(json_value "$RECOMMENDED_RECEIPT" '@.revision')" = "$revision" ] \
+    && [ "$(json_value "$RECOMMENDED_RECEIPT" '@.status')" = confirmed ]; then
+  if [ -f "$ack_state" ]; then
+   read -r report_revision report_rules report_at < "$ack_state" || true
+  fi
+  case "$report_at" in ''|*[!0-9]*) report_at=0 ;; esac
+  [ -n "$rules_revision" ] || rules_revision='-'
+  if [ "$report_revision" != "$revision" ] || [ "$report_rules" != "$rules_revision" ] \
+    || [ "$now" -lt "$report_at" ] || [ "$((now - report_at))" -ge 600 ]; then
+   report_due=1
+  fi
+  [ "$rules_revision" = '-' ] && rules_revision=''
+ fi
+ if [ "$report_due" -eq 1 ]; then
+  printf '{"revision":"%s","rules_revision":"%s","recommended_rules_ack":' "$revision" "$rules_revision" > "$body" || return 1
+  cat "$RECOMMENDED_RECEIPT" >> "$body" || return 1
+  printf '}\n' >> "$body" || return 1
+ else
+  printf '{"revision":"%s","rules_revision":"%s"}\n' "$revision" "$rules_revision" > "$body" || return 1
+ fi
  if ! post_json "$API_BASE_URL/devices/recommended-rules" "$body" "$out" "$token"; then
   write_recommended_sync_status delayed hub_unavailable
   rm -f "$body" "$out" "${out}.log"
   return 1
+ fi
+ # Mark the receipt reported only when Hub explicitly accepted it. If a
+ # newer assignment raced with this request, retain the receipt for retry.
+ if [ "$report_due" -eq 1 ] && [ "$(json_value "$out" '@.acknowledged')" = true ]; then
+  printf '%s %s %s\n' "$revision" "${rules_revision:--}" "$now" > "${ack_state}.tmp.$$" && \
+    mv -f "${ack_state}.tmp.$$" "$ack_state"
  fi
  changed="$(json_value "$out" '@.changed')"
  case "$changed" in
@@ -400,6 +432,7 @@ recommended_fast_sync() {
    ;;
   true)
    if reconcile_recommended_response "$out"; then
+    rm -f "$ack_state"
     rc=0
    else
     rc=1
