@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { TargetedSubmitEvent } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 
@@ -393,6 +394,7 @@ export function WifiPage({
         </p>
       </section>
 
+      <SectionHeading eyebrow="Wireless" title="기본 Wi-Fi" description="무선 네트워크의 이름, 비밀번호, 보안 방식과 QR 코드를 관리합니다." />
       {data.networks.length ? (
         <section aria-label="기본 Wi-Fi 설정" class="grid gap-5 xl:grid-cols-2">
           {data.networks.map((network) => (
@@ -420,6 +422,9 @@ export function WifiPage({
       {data.guest && (
         <>
           <div role="separator" aria-label="기본 Wi-Fi와 게스트 Wi-Fi 구분" class="mt-5 w-full border-t border-slate-200" />
+          <div class="mt-5">
+            <SectionHeading eyebrow="Guest network" title="방문자용 네트워크" description="기본 네트워크와 분리된 게스트 Wi-Fi를 관리합니다." />
+          </div>
           <GuestWifiCard
             guest={data.guest}
             busy={updatingSection !== null}

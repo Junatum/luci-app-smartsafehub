@@ -8,6 +8,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '공유기 각 메뉴의 카드 밖 섹션 제목과 기능 버튼 보존을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-section-layout.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'Preact 11 의존성과 JSX 타입 호환성을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-preact11-contract.sh"
     The status should be success

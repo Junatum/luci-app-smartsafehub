@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 
@@ -451,30 +452,6 @@ function FreePlanUpgrade() {
   );
 }
 
-function SectionHeading({
-  description,
-  eyebrow,
-  title,
-}: {
-  description: string;
-  eyebrow: string;
-  title: string;
-}) {
-  return (
-    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.18em] text-teal-700">
-          {eyebrow}
-        </p>
-        <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950">
-          {title}
-        </h2>
-        <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">{description}</p>
-      </div>
-    </div>
-  );
-}
-
 function DetailCard({
   children,
   eyebrow,
@@ -657,143 +634,133 @@ export function SafeShieldPage({
 
   return (
     <>
-      <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/5">
-        <div class="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
-          <div class="flex min-w-0 items-start gap-3 sm:gap-4">
-            <span class="grid size-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700">
-              <ShieldIcon class="size-7" />
-            </span>
-            <div class="min-w-0">
-              <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.18em] text-teal-700">
-                Protection
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-3">
-                <h2 class="m-0 break-words text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                  SafeShield 보호 상태
-                </h2>
-                <SummaryBadge data={data} />
+      <SectionHeading
+        eyebrow="Protection"
+        title="SafeShield 보호 상태"
+        description="DNS 보호 상태와 적용 중인 차단 목록을 확인합니다."
+      />
+      <section class="mb-8 grid min-w-0 gap-4 xl:grid-cols-2 xl:items-stretch">
+        <article aria-label="보호 상태 요약" class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between xl:flex-col 2xl:flex-row">
+            <div class="flex min-w-0 items-start gap-3">
+              <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
+                <ShieldIcon class="size-5" />
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="m-0 text-base font-black text-slate-950">현재 보호 상태</h3>
+                  <SummaryBadge data={data} />
+                </div>
+                <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">{getSummaryMessage(data)}</p>
               </div>
-              <p class="mt-3 mb-0 max-w-3xl text-sm leading-6 text-slate-600">
-                {getSummaryMessage(data)}
-              </p>
-              <RefreshProgress data={data} />
+            </div>
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap xl:justify-end">
+              <button
+                class={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-extrabold transition focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  data.enabled
+                    ? 'border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50 focus-visible:ring-red-100'
+                    : 'border-teal-700 bg-teal-700 text-white hover:border-teal-800 hover:bg-teal-800 focus-visible:ring-teal-100'
+                }`}
+                disabled={actionBusy || refreshing}
+                onClick={handleToggle}
+                type="button"
+              >
+                <PowerIcon
+                  class={`size-4 ${action === 'enable' || action === 'disable' ? 'animate-pulse' : ''}`}
+                />
+                {toggleLabel}
+              </button>
+              <button
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!data.enabled || actionBusy || refreshing}
+                onClick={onRefreshBlocklist}
+                type="button"
+              >
+                <DownloadIcon
+                  class={`size-4 ${action === 'refresh' || refreshing ? 'animate-bounce' : ''}`}
+                />
+                {action === 'refresh'
+                  ? '시작 중…'
+                  : refreshing
+                    ? '갱신 중…'
+                    : data.status === 'error'
+                      ? '다시 갱신'
+                      : '지금 갱신'}
+              </button>
             </div>
           </div>
-
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <button
-              class={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-extrabold transition focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-50 ${
-                data.enabled
-                  ? 'border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50 focus-visible:ring-red-100'
-                  : 'border-teal-700 bg-teal-700 text-white hover:border-teal-800 hover:bg-teal-800 focus-visible:ring-teal-100'
-              }`}
-              disabled={actionBusy || refreshing}
-              onClick={handleToggle}
-              type="button"
-            >
-              <PowerIcon
-                class={`size-4 ${action === 'enable' || action === 'disable' ? 'animate-pulse' : ''}`}
-              />
-              {toggleLabel}
-            </button>
-            <button
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!data.enabled || actionBusy || refreshing}
-              onClick={onRefreshBlocklist}
-              type="button"
-            >
-              <DownloadIcon
-                class={`size-4 ${action === 'refresh' || refreshing ? 'animate-bounce' : ''}`}
-              />
-              {action === 'refresh'
-                ? '시작 중…'
-                : refreshing
-                  ? '갱신 중…'
-                  : data.status === 'error'
-                    ? '다시 갱신'
-                    : '지금 갱신'}
-            </button>
-          </div>
-        </div>
-
-        <div class="px-5 pb-5 sm:px-6 sm:pb-6">
-          <div class="grid gap-4 xl:grid-cols-2 xl:items-stretch">
-            <dl class="m-0 grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-200">
-              <SummaryFact label="SafeShield" value={data.version ?? '확인되지 않음'} />
-              <SummaryFact
-                label="Blocklist"
-                value={`${formatNumber(displayedBlocklistCount)}개 도메인`}
-              />
-              <SummaryFact label="Last refresh" value={<RelativeTimestamp timestamp={data.timestamps.lastSuccess} />} />
-              <PlanSummary plan={planName} />
-            </dl>
-
-            <section
-              aria-label="보호 데이터 요약"
-              class="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
-            >
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex min-w-0 items-center gap-2">
-                  <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-slate-600">
-                    <DatabaseIcon class="size-4" />
-                  </span>
-                  <div>
-                    <p class="m-0 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-400">
-                      Protection data
-                    </p>
-                    <h3 class="mt-1 mb-0 text-sm font-black text-slate-950">보호 데이터</h3>
-                  </div>
-                </div>
-                <span
-                  aria-label={`보호 데이터 상태: ${
-                    data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                      ? '최신'
-                      : '확인 필요'
-                  }`}
-                  class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
-                    data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-amber-50 text-amber-700'
-                  }`}
-                >
-                  {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk ? (
-                    <CheckCircleIcon class="size-3.5 shrink-0" />
-                  ) : (
-                    <AlertIcon class="size-3.5 shrink-0" />
-                  )}
-                  {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
-                    ? '최신'
-                    : '확인 필요'}
-                </span>
-              </div>
-              <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
-                SafeShield가 기기 성능에 맞춰 사용하는 보호 목록의 구성과 최신 상태를 확인합니다.
-              </p>
-              <dl class="mt-3 mb-0 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div class="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <dt class="text-xs font-bold text-slate-500">기기 최적화</dt>
-                  <dd class="mt-1 mb-0 text-sm font-extrabold text-slate-950">
-                    {getArtifactOptimizationLabel(data.artifact.tier)}
-                  </dd>
-                </div>
-                <div class="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <dt class="text-xs font-bold text-slate-500">마지막 업데이트</dt>
-                  <dd class="mt-1 mb-0 text-sm font-extrabold leading-5 text-slate-950">
-                    {formatArtifactUpdatedAt(data.artifact.version)}
-                  </dd>
-                </div>
-              </dl>
-              <details class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                <summary class="cursor-pointer text-xs font-extrabold text-slate-600">세부 정보</summary>
-                <dl class="mt-3 mb-0 grid gap-2 border-t border-slate-200 pt-3">
-                  <DetailRow label="데이터 프로필" value={data.artifact.tier || '확인되지 않음'} />
-                  <DetailRow label="데이터 버전" value={data.artifact.version || '확인되지 않음'} />
-                </dl>
-              </details>
-            </section>
-          </div>
+          <RefreshProgress data={data} />
+          <dl class="mt-5 mb-0 grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-200">
+            <SummaryFact label="SafeShield" value={data.version ?? '확인되지 않음'} />
+            <SummaryFact label="Blocklist" value={`${formatNumber(displayedBlocklistCount)}개 도메인`} />
+            <SummaryFact label="Last refresh" value={<RelativeTimestamp timestamp={data.timestamps.lastSuccess} />} />
+            <PlanSummary plan={planName} />
+          </dl>
           {planName === 'FREE' ? <FreePlanUpgrade /> : null}
-        </div>
+        </article>
+        <section
+          aria-label="보호 데이터 요약"
+          class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
+        >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-slate-600">
+                  <DatabaseIcon class="size-4" />
+                </span>
+                <div>
+                  <p class="m-0 text-[0.65rem] font-black uppercase tracking-[0.16em] text-slate-400">
+                    Protection data
+                  </p>
+                  <h3 class="mt-1 mb-0 text-sm font-black text-slate-950">보호 데이터</h3>
+                </div>
+              </div>
+              <span
+                aria-label={`보호 데이터 상태: ${
+                  data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                    ? '최신'
+                    : '확인 필요'
+                }`}
+                class={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-extrabold ${
+                  data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}
+              >
+                {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk ? (
+                  <CheckCircleIcon class="size-3.5 shrink-0" />
+                ) : (
+                  <AlertIcon class="size-3.5 shrink-0" />
+                )}
+                {data.artifact.resolved && data.blocklist.installed && data.blocklist.verificationOk
+                  ? '최신'
+                  : '확인 필요'}
+              </span>
+            </div>
+            <p class="mt-2 mb-0 text-xs leading-5 text-slate-500">
+              SafeShield가 기기 성능에 맞춰 사용하는 보호 목록의 구성과 최신 상태를 확인합니다.
+            </p>
+            <dl class="mt-3 mb-0 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div class="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <dt class="text-xs font-bold text-slate-500">기기 최적화</dt>
+                <dd class="mt-1 mb-0 text-sm font-extrabold text-slate-950">
+                  {getArtifactOptimizationLabel(data.artifact.tier)}
+                </dd>
+              </div>
+              <div class="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <dt class="text-xs font-bold text-slate-500">마지막 업데이트</dt>
+                <dd class="mt-1 mb-0 text-sm font-extrabold leading-5 text-slate-950">
+                  {formatArtifactUpdatedAt(data.artifact.version)}
+                </dd>
+              </div>
+            </dl>
+            <details class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <summary class="cursor-pointer text-xs font-extrabold text-slate-600">세부 정보</summary>
+              <dl class="mt-3 mb-0 grid gap-2 border-t border-slate-200 pt-3">
+                <DetailRow label="데이터 프로필" value={data.artifact.tier || '확인되지 않음'} />
+                <DetailRow label="데이터 버전" value={data.artifact.version || '확인되지 않음'} />
+              </dl>
+            </details>
+        </section>
       </section>
 
       <ActionFeedback

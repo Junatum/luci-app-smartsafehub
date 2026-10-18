@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
@@ -1649,11 +1650,7 @@ export function SettingsPage({
         ) : loading && !data ? (
           <p class="mb-4 text-sm font-semibold text-slate-500" role="status">진단 파일에 필요한 시스템 정보를 확인하고 있습니다.</p>
         ) : null}
-        <div class="mb-4">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Device health</p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">진단 및 지원</h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">장치 진단과 원격 상태 보고를 확인하고 개인정보 보호 정책을 관리합니다.</p>
-        </div>
+        <SectionHeading eyebrow="Device health" title="진단 및 지원" description="장치 진단과 원격 상태 보고를 확인하고 개인정보 보호 정책을 관리합니다." />
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <HealthDiagnosticCard
             actionError={healthActionError}
@@ -1680,11 +1677,7 @@ export function SettingsPage({
         id="time-panel"
         role="tabpanel"
       >
-        <div class="mb-4">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">Device settings</p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시간 및 예약</h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">시간 기준과 예약 재부팅을 SmartSafeHub에서 직접 관리합니다.</p>
-        </div>
+        <SectionHeading eyebrow="Device settings" title="시간 및 예약" description="시간 기준과 예약 재부팅을 SmartSafeHub에서 직접 관리합니다." />
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <TimeSettingsCard
             data={timeData}
@@ -1717,15 +1710,7 @@ export function SettingsPage({
         id="management-panel"
         role="tabpanel"
       >
-        <div class="mb-4">
-          <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-            System management
-          </p>
-          <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">시스템 관리</h2>
-          <p class="mt-2 mb-0 text-sm leading-6 text-slate-500">
-            관리자 비밀번호, 설정 백업·복원과 공유기 시스템 도구를 한곳에서 관리합니다.
-          </p>
-        </div>
+        <SectionHeading eyebrow="System management" title="시스템 관리" description="관리자 비밀번호, 설정 백업·복원과 공유기 시스템 도구를 한곳에서 관리합니다." />
         <div class="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <AdministratorPasswordCard onChanged={onAdministratorPasswordChanged} />
 

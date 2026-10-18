@@ -1,7 +1,8 @@
+import { SectionHeading } from '../components/SectionHeading';
 import { useEffect, useState } from 'preact/hooks';
 
 import { formatRelativeTime } from '../app/format';
-import { CheckCircleIcon, ClockIcon, CopyIcon, KeyIcon, ReloadIcon } from '../components/Icons';
+import { CheckCircleIcon, ClockIcon, CopyIcon, ReloadIcon } from '../components/Icons';
 import { ErrorPanel, LoadingPanel } from '../components/StatePanels';
 import type { DeviceRegistrationStatus } from '../api/smartsafehub';
 
@@ -134,30 +135,23 @@ export function SmartSafeHubAccountPage({
   }
 
   return (
-    <div class="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
-      <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="m-0 text-[0.68rem] font-black uppercase tracking-[0.16em] text-teal-700">Account connection</p>
-            <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950">기기 계정 연결</h2>
-            <p class="mt-2 mb-0 max-w-2xl text-sm leading-6 text-slate-500">
-              계정에 연결하면 웹사이트에서 기기를 관리하고 Cloud 기능과 구독 권한을 사용할 수 있습니다.
-            </p>
-          </div>
-          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
-            <KeyIcon class="size-5" />
-          </span>
-        </div>
-
+    <div class="min-w-0">
+      <SectionHeading
+        eyebrow="Account connection"
+        title="기기 계정 연결"
+        description="계정에 연결하면 웹사이트에서 기기를 관리하고 Cloud 기능과 구독 권한을 사용할 수 있습니다."
+      />
+      <div class="grid items-start gap-5 xl:items-stretch xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
         {connected ? (
-          <div class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+          <div>
             <div class="flex items-center gap-3">
               <span class="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700">
                 <CheckCircleIcon class="size-5" />
               </span>
               <div>
-                <p class="m-0 text-sm font-black text-emerald-900">SmartSafeHub 계정에 연결됨</p>
-                <p class="mt-1 mb-0 text-sm leading-5 text-emerald-800">연결 코드는 더 이상 필요하지 않으며 새 코드도 발급하지 않습니다.</p>
+                <p class="m-0 text-base font-black text-slate-950">SmartSafeHub 계정에 연결됨</p>
+                <p class="mt-1 mb-0 text-sm leading-6 text-slate-600">이 기기가 계정과 정상적으로 연결되어 있습니다. 연결 코드는 더 이상 필요하지 않습니다.</p>
               </div>
             </div>
             <a
@@ -168,12 +162,12 @@ export function SmartSafeHubAccountPage({
             >
               웹사이트에서 기기 관리
             </a>
-            <p class="mt-3 mb-0 text-xs font-semibold leading-5 text-emerald-800">
+            <p class="mt-4 mb-0 border-t border-slate-100 pt-4 text-xs font-semibold leading-5 text-slate-500">
               웹사이트에서 기기 등록을 해제하면 공유기도 다음 계정 상태 동기화에서 자동으로 연결 해제를 반영합니다.
             </p>
           </div>
         ) : (
-          <div class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+          <div>
             <div>
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="m-0 text-sm font-black text-slate-900">계정 연결 코드</p>
@@ -256,6 +250,7 @@ export function SmartSafeHubAccountPage({
           )
         ) : null}
       </aside>
+    </div>
     </div>
   );
 }

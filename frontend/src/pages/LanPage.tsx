@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
@@ -11,7 +12,6 @@ import type { LanFeedback } from '../hooks/useLan';
 import type { LanSettings, LanSettingsInput } from '../types/lan';
 import {
   AlertIcon,
-  CableIcon,
   CheckCircleIcon,
   GlobeIcon,
   RouterIcon,
@@ -442,6 +442,7 @@ export function LanPage({
         <FeedbackPanel feedback={feedback} onDismiss={onDismissFeedback} />
       ) : null}
 
+      <SectionHeading eyebrow="Overview" title="내부 네트워크 상태" description="LAN 주소와 DHCP 할당 상태를 확인합니다." />
       <NetworkStatus data={data} />
 
       {data.conflict.detected ? (
@@ -473,26 +474,15 @@ export function LanPage({
         </section>
       ) : null}
 
+      <div class="mt-7">
+        <SectionHeading eyebrow="Local network" title="LAN 및 DHCP 설정" description="상위 공유기와 다른 주소 대역을 사용해야 안정적으로 라우팅할 수 있습니다." />
+      </div>
       <form
-        class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
+        class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
         onSubmit={(event) => void submit(event)}
       >
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div class="flex min-w-0 items-start gap-3">
-            <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
-              <CableIcon class="size-6" />
-            </span>
-            <div class="min-w-0">
-              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                내부 네트워크
-              </p>
-              <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">LAN 및 DHCP 설정</h2>
-              <p class="mt-2 mb-0 text-sm font-semibold leading-6 text-slate-600">
-                상위 공유기와 다른 주소 대역을 사용해야 안정적으로 라우팅할 수 있습니다.
-              </p>
-            </div>
-          </div>
-          {settingsDirty ? (
+        {settingsDirty ? (
+          <div class="mb-5 flex justify-end">
             <span
               aria-live="polite"
               class="inline-flex shrink-0 self-start items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
@@ -501,10 +491,10 @@ export function LanPage({
               <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
               저장되지 않음
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        <div class="mt-6 grid gap-5 lg:grid-cols-2">
+        <div class="grid gap-5 lg:grid-cols-2">
           <div class="block">
             <span class="text-sm font-extrabold text-slate-800">공유기 IP 주소</span>
             <Ipv4OctetInput

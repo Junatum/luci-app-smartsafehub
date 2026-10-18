@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { TargetedEvent, TargetedSubmitEvent } from 'preact';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
@@ -554,47 +555,36 @@ export function SafeShieldRulesPage({
           </section>
         </div>
       ) : null}
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex min-w-0 items-start gap-3 sm:gap-4">
-            <span class="grid size-12 shrink-0 place-items-center rounded-2xl bg-teal-50 text-teal-700">
-              <ListIcon class="size-7" />
-            </span>
-            <div class="min-w-0">
-              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-                Local overrides
-              </p>
-              <h2 class="mt-2 mb-0 break-words text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                사용자 도메인 규칙
-              </h2>
-              <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-600">
-                허용 목록은 오탐을 해제하고, 차단 목록은 원하는 도메인을 SafeShield 보호 목록에 추가합니다.
-              </p>
-            </div>
+      <SectionHeading eyebrow="Local overrides" title="사용자 도메인 규칙" description="허용 목록은 오탐을 해제하고, 차단 목록은 원하는 도메인을 SafeShield 보호 목록에 추가합니다." />
+      <section aria-label="규칙 개수 요약" class="min-w-0">
+        <dl class="m-0 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div class="min-w-0 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-900/5">
+            <dt class="text-sm font-extrabold text-emerald-700">허용 도메인</dt>
+            <dd class="mt-2 mb-0 ml-0 text-2xl font-black tracking-tight text-slate-950">{data.counts.allow}<span class="ml-1 text-sm font-bold text-slate-500">개</span></dd>
+            <p class="mt-1 mb-0 text-xs text-slate-500">차단하지 않도록 등록한 도메인</p>
           </div>
-          <dl class="m-0 grid grid-cols-3 gap-2 sm:min-w-80">
-            <div class="rounded-xl bg-emerald-50 px-3 py-3 text-center">
-              <dt class="text-[0.68rem] font-extrabold uppercase tracking-wide text-emerald-700">허용</dt>
-              <dd class="mt-1 mb-0 ml-0 text-lg font-black text-emerald-950">{data.counts.allow}</dd>
-            </div>
-            <div class="rounded-xl bg-red-50 px-3 py-3 text-center">
-              <dt class="text-[0.68rem] font-extrabold uppercase tracking-wide text-red-700">차단</dt>
-              <dd class="mt-1 mb-0 ml-0 text-lg font-black text-red-950">{data.counts.block}</dd>
-            </div>
-            <div class="rounded-xl bg-slate-100 px-3 py-3 text-center">
-              <dt class="text-[0.68rem] font-extrabold uppercase tracking-wide text-slate-600">전체</dt>
-              <dd class="mt-1 mb-0 ml-0 text-lg font-black text-slate-950">{data.counts.total}</dd>
-            </div>
-          </dl>
-        </div>
+          <div class="min-w-0 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-900/5">
+            <dt class="text-sm font-extrabold text-red-700">차단 도메인</dt>
+            <dd class="mt-2 mb-0 ml-0 text-2xl font-black tracking-tight text-slate-950">{data.counts.block}<span class="ml-1 text-sm font-bold text-slate-500">개</span></dd>
+            <p class="mt-1 mb-0 text-xs text-slate-500">추가로 차단하도록 등록한 도메인</p>
+          </div>
+          <div class="min-w-0 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-900/5">
+            <dt class="text-sm font-extrabold text-slate-600">전체 등록 규칙</dt>
+            <dd class="mt-2 mb-0 ml-0 text-2xl font-black tracking-tight text-slate-950">{data.counts.total}<span class="ml-1 text-sm font-bold text-slate-500">개</span></dd>
+            <p class="mt-1 mb-0 text-xs text-slate-500">허용 및 차단 규칙의 합계</p>
+          </div>
+        </dl>
       </section>
 
-      <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5" aria-label="추천 사용자 규칙">
+      <div class="mt-7">
+        <SectionHeading eyebrow="Recommendations" title="추천 사용자 규칙" description="웹사이트에서 선택한 권장 허용 규칙의 동기화 상태를 확인하고 관리합니다." />
+      </div>
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5" aria-label="추천 사용자 규칙">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <span class="grid size-8 place-items-center rounded-lg bg-teal-50 text-teal-700"><CheckCircleIcon class="size-4" /></span>
-              <h2 class="m-0 text-base font-extrabold text-slate-950">추천 사용자 규칙</h2>
+              <h3 class="m-0 text-base font-extrabold text-slate-950">동기화 상태</h3>
               {onLoadRecommendedRulesStatus ? (
                 <span aria-live="polite" class={`rounded-full px-2.5 py-1 text-xs font-bold ${recommendedStatus?.syncStatus === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : recommendedStatus?.syncStatus === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
                   {recommendedStatus?.syncStatus === 'confirmed' ? '허용 목록 확인' : stageLabel}

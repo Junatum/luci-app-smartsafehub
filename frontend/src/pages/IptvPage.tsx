@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import { useEffect, useState } from 'preact/hooks';
 
 import { CustomSelect } from '../components/CustomSelect';
@@ -127,6 +128,7 @@ export function IptvPage({
         </section>
       ) : null}
 
+      <SectionHeading eyebrow="IPTV" title="IPTV 설정" description="통신사 환경에 맞는 멀티캐스트 중계 기능을 관리합니다." />
       <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
         <div class="flex min-w-0 items-start gap-3">
           <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
@@ -239,12 +241,9 @@ export function IptvPage({
         </div>
       </section>
 
+      <SectionHeading eyebrow="Runtime" title="IPTV 동작 상태" description="마지막으로 적용한 IPTV 설정과 중계 서비스의 실행 상태를 확인합니다." />
       <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <p class="m-0 text-xs font-black uppercase tracking-[0.14em] text-teal-700">Runtime</p>
-            <h2 class="mt-1 mb-0 text-lg font-black text-slate-950">IPTV 동작 상태</h2>
-          </div>
+        <div class="flex justify-end">
           <span
             class={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
               runtimeHealthy

@@ -70,6 +70,7 @@ for script in \
 	tests/test-relative-time-contract.sh \
 	tests/test-reload-safety.sh \
 	tests/test-settings-ui-contract.sh \
+	tests/test-section-layout.sh \
 	tests/test-system-time-contract.sh \
 	tests/test-scheduled-reboot.sh \
 	tests/test-health.sh \

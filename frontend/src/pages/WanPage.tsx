@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { TargetedSubmitEvent } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
@@ -419,6 +420,7 @@ export function WanPage({
     <>
       {feedback ? <FeedbackPanel feedback={feedback} onDismiss={onDismissFeedback} /> : null}
 
+      <SectionHeading eyebrow="Overview" title="인터넷 연결 상태" description="WAN 연결 상태와 네트워크 정보를 확인합니다." />
       <WanStatusCards data={data} busy={busy} onReconnect={reconnect} />
 
       {!data.configuration.supported ? (
@@ -435,26 +437,15 @@ export function WanPage({
         </section>
       ) : null}
 
+      <div class="mt-7">
+        <SectionHeading eyebrow="Internet" title="인터넷 연결 설정" description="통신사 또는 상위 네트워크 환경에 맞는 WAN 연결 방식을 선택합니다." />
+      </div>
       <form
-        class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
+        class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
         onSubmit={(event) => void submit(event)}
       >
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div class="flex min-w-0 items-start gap-3">
-            <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700">
-              <GlobeIcon class="size-6" />
-            </span>
-            <div class="min-w-0">
-              <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                Internet
-              </p>
-              <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">인터넷 연결 설정</h2>
-              <p class="mt-2 mb-0 text-sm font-semibold leading-6 text-slate-600">
-                통신사 또는 상위 네트워크 환경에 맞는 WAN 연결 방식을 선택합니다.
-              </p>
-            </div>
-          </div>
-          {settingsDirty ? (
+        {settingsDirty ? (
+          <div class="mb-5 flex justify-end">
             <span
               aria-live="polite"
               class="inline-flex shrink-0 self-start items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-extrabold text-amber-800"
@@ -463,10 +454,10 @@ export function WanPage({
               <AlertIcon aria-hidden="true" class="size-3.5 shrink-0" />
               저장되지 않음
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        <div class="mt-6">
+        <div>
           <span class="text-sm font-extrabold text-slate-800">연결 방식</span>
           <CustomSelect
             ariaLabel="WAN 연결 방식"

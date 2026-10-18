@@ -30,7 +30,7 @@ grep -Fq 'title="보호 구성"' "$PAGE" || \
 grep -Fq 'aria-label="보호 데이터 요약"' "$PAGE" || \
 	fail 'SafeShield summary must include the moved protection-data information'
 # 보호 데이터 배경과 보호 구성 카드 밀도는 다른 상단 요약/대시보드 카드와 통일합니다.
-grep -Fq 'class="min-w-0 rounded-xl border border-slate-200 bg-white p-4"' "$PAGE" || \
+grep -Fq 'class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"' "$PAGE" || \
   fail '보호 데이터 요약은 다른 흰색 카드와 동일한 배경을 사용해야 합니다'
 if grep -Fq 'class="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-4"' "$PAGE"; then
   fail '보호 데이터 요약에 기존 회색 배경이 남아 있으면 안 됩니다'
@@ -63,7 +63,7 @@ if grep -Fq 'data.localOverrides.allowlistPath' "$PAGE" || grep -Fq 'data.localO
 	fail 'SafeShield product UI must not expose internal local rule file paths'
 fi
 
-grep -Fq 'px-5 pb-5 sm:px-6 sm:pb-6' "$PAGE" || \
+grep -Fq 'aria-label="보호 상태 요약"' "$PAGE" || \
 	fail 'SafeShield summary facts must remain visually inside the protection card'
 grep -Fq 'class="bg-white px-5 py-4 sm:px-6"' "$PAGE" || \
 	fail 'SafeShield summary fact cells must use the protection card surface color'

@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import type { ComponentChildren, TargetedEvent } from 'preact';
 import { useMemo, useState } from 'preact/hooks';
 
@@ -265,6 +266,7 @@ export function ConnectedDevicesPage({
 
   return (
     <>
+      <SectionHeading eyebrow="Overview" title="연결 기기 현황" description="네트워크에 연결되었거나 최근 확인된 기기를 요약합니다." />
       <section aria-label="연결 기기 요약" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           description={`${data.totals.offline}대는 최근 DHCP 임대에서 확인`}
@@ -292,17 +294,11 @@ export function ConnectedDevicesPage({
         />
       </section>
 
-      <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p class="m-0 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
-              Device inventory
-            </p>
-            <h2 class="mt-2 mb-0 text-xl font-extrabold text-slate-950">
-              기기 목록
-            </h2>
-          </div>
-          <label class="relative block w-full lg:max-w-sm">
+      <section class="mt-7" aria-label="기기 목록 및 필터">
+        <SectionHeading eyebrow="Device inventory" title="기기 목록" description="연결된 기기를 검색하고 무선·유선 상태별로 확인합니다." />
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+            <label class="relative block w-full lg:max-w-sm">
             <span class="sr-only">기기 검색</span>
             <span class="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-slate-400">
               <SearchIcon class="size-5" />
@@ -316,10 +312,10 @@ export function ConnectedDevicesPage({
               type="search"
               value={query}
             />
-          </label>
-        </div>
+            </label>
+          </div>
 
-        <div class="ssh-touch-scroll mt-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="기기 필터">
+          <div class="ssh-touch-scroll mt-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="기기 필터">
           {FILTERS.map((item) => (
             <button
               aria-pressed={filter === item.value}
@@ -335,6 +331,7 @@ export function ConnectedDevicesPage({
               {item.label}
             </button>
           ))}
+          </div>
         </div>
       </section>
 

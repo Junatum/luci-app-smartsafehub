@@ -1,3 +1,4 @@
+import { SectionHeading } from '../components/SectionHeading';
 import { formatNumber, formatRelativeTime } from '../app/format';
 import { ActivityLoadState, ActivityTimeline } from '../components/ActivityTimeline';
 import type { ActivityCloudSync, ActivityHistory } from '../types/activity';
@@ -206,33 +207,22 @@ export function ActivityPage({
 }) {
   return (
     <div class="min-w-0 space-y-5">
-      <section
-        aria-labelledby="activity-history-title"
-        class="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6"
-      >
-        <div class="flex flex-wrap items-start justify-between gap-4">
+      <section aria-labelledby="activity-history-title" class="min-w-0">
+        <SectionHeading
+          id="activity-history-title"
+          eyebrow="Local history"
+          title="현재 부팅 이후의 최근 활동"
+          description="인터넷, SafeShield, 업데이트, 계정 권한과 주요 설정에서 실제 상태가 변경된 시점만 기록합니다."
+          action={<span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-inset ring-slate-200">최대 {data?.maxEvents ?? 128}건</span>}
+        />
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
           <div>
-            <p class="m-0 text-xs font-extrabold uppercase tracking-[0.16em] text-teal-700">
-              Local history
-            </p>
-            <h2 class="mt-2 mb-0 text-xl font-black tracking-tight text-slate-950" id="activity-history-title">
-              현재 부팅 이후의 최근 활동
-            </h2>
-            <p class="mt-2 mb-0 max-w-3xl text-sm leading-6 text-slate-500">
-              인터넷, SafeShield, 업데이트, 계정 권한과 주요 설정에서 실제 상태가 변경된 시점만 기록합니다.
-            </p>
-          </div>
-          <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-600 ring-1 ring-inset ring-slate-200">
-            최대 {data?.maxEvents ?? 128}건
-          </span>
-        </div>
-
-        <div class="mt-5">
           {loading || (error && !data) ? (
             <ActivityLoadState error={error} loading={loading} onRetry={onRetry} />
           ) : (
             <ActivityTimeline events={data?.events ?? []} />
           )}
+        </div>
         </div>
       </section>
 
