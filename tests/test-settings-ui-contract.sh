@@ -68,8 +68,12 @@ grep -Fq 'title="장치 진단"' "$SETTINGS_PAGE" || \
 	fail 'diagnostic download must remain in its own card'
 grep -Fq '원격 상태 보고' "$SETTINGS_PAGE" || \
 	fail 'settings diagnostics must expose paid/trial remote health reporting'
-grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || \
-	fail 'remote health reporting must be explicit opt-in with opt-out copy'
+grep -Fq '장치의 최소 상태 정보와 이상 코드만 서버로 전송합니다.' "$SETTINGS_PAGE" || \
+	fail 'remote health reporting must explain the information transmitted'
+grep -Fq '직접 켜고 언제든지 끌 수 있습니다.' "$SETTINGS_PAGE" || \
+	fail 'remote health reporting must explain explicit opt-in and opt-out without default-state copy'
+! grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || \
+	fail 'remote health reporting must not repeat unnecessary default-state copy'
 grep -Fq '개인정보 보호' "$SETTINGS_PAGE" || \
 	fail 'remote health reporting must expose a recognizable privacy section'
 grep -Fq '진단에 필요한 최소한의 상태 정보만 전송하며, 네트워크 식별 정보와 이용 내용은 보내지 않습니다.' "$SETTINGS_PAGE" || \
@@ -216,8 +220,19 @@ grep -Fq 'if (!validated)' "$BACKUP_HOOK" || \
 # Consistent, responsive three-tab UI (the health and time cards share the existing grid geometry).
 grep -Fq 'title="장치 진단"' "$SETTINGS_PAGE" || fail 'local diagnostics must have their own card'
 grep -Fq 'title="원격 상태 보고"' "$SETTINGS_PAGE" || fail 'remote health reporting must have its own card'
+grep -Fq 'headerActions?: ComponentChildren;' "$SETTINGS_PAGE" || \
+  fail 'ActionCard must offer an independent right-aligned header control slot'
+grep -Fq 'justify-between gap-3' "$SETTINGS_PAGE" || \
+  fail 'ActionCard header must push the remote-report switch to the right edge'
+grep -Fq '{props.headerActions ? <div class="shrink-0">{props.headerActions}</div> : null}' "$SETTINGS_PAGE" || \
+  fail 'Remote reporting switch must use a right-aligned action area'
+# Membership remains attached to the title, but the switch is a separate header action.
+reporter_header=$(sed -n '/title="원격 상태 보고"/,/^    >/p' "$SETTINGS_PAGE")
+printf '%s\n' "$reporter_header" | grep -Fq 'titleActions={' || fail 'Remote-report PRO badge must remain adjacent to its title'
+printf '%s\n' "$reporter_header" | grep -Fq 'headerActions={' || fail 'Remote-report switch must use a distinct header action slot'
+printf '%s\n' "$reporter_header" | grep -Fq 'aria-label="원격 상태 보고 사용"' || fail 'Remote-report switch semantics must remain intact'
 grep -Fq 'title="개인정보 보호"' "$SETTINGS_PAGE" || fail 'privacy policy must have its own card'
-grep -Fq 'className="lg:col-span-2"' "$SETTINGS_PAGE" || fail 'privacy policy must use full width beneath health cards'
+grep -Fq 'class="grid min-w-0 content-start gap-4"' "$SETTINGS_PAGE" || fail 'privacy policy must sit directly below remote health reporting'
 if grep -Fq 'max-w-4xl' "$SETTINGS_PAGE"; then
   fail 'settings time tab must use the common content width'
 fi

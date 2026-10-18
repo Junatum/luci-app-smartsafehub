@@ -649,9 +649,6 @@ export function SoftwareUpdatesCard({
                 <div class="flex min-w-0 items-start justify-between gap-4">
                   <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">자동으로 업데이트 확인</strong>
-                    <span class="mt-1 block text-xs leading-5 text-slate-500">
-                      선택한 주기에 새 관리 소프트웨어 버전을 확인합니다.
-                    </span>
                   </div>
                   <SettingSwitch
                     checked={checkEnabled}
@@ -691,9 +688,6 @@ export function SoftwareUpdatesCard({
                 <div class="flex min-w-0 items-start justify-between gap-4">
                   <div class="min-w-0">
                     <strong class="block text-sm font-black text-slate-950">자동으로 업데이트 설치</strong>
-                    <span class="mt-1 block text-xs leading-5 text-slate-500">
-                      새 버전이 있으면 지정한 시각에 자동으로 설치합니다.
-                    </span>
                   </div>
                   <SettingSwitch
                     checked={autoInstall}

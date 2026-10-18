@@ -412,6 +412,16 @@ grep -Fq '빌드 ID {data.release.buildId}' "$FIRMWARE_CARD" || \
 	fail 'available firmware version must keep build_id as secondary diagnostic identity'
 grep -Fq "펌웨어 {data.release.version || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)}" "$FIRMWARE_CARD" || \
 	fail 'available firmware details must show product firmware version and image size without OpenWrt base metadata'
+grep -Fq 'data-section="firmware-bundled-software-chip"' "$FIRMWARE_CARD" || \
+	fail 'available firmware summary must expose the bundled management-software version near the release badge'
+grep -Fq '관리 SW' "$FIRMWARE_CARD" || \
+	fail 'firmware bundled management-software chip must use a compact Korean label'
+if grep -Fq '선택한 주기에 새 관리 소프트웨어 버전을 확인합니다.' "$UPDATES_CARD"; then
+	fail 'automatic update check card must not keep the redundant helper sentence'
+fi
+if grep -Fq '새 버전이 있으면 지정한 시각에 자동으로 설치합니다.' "$UPDATES_CARD"; then
+	fail 'automatic update install card must not keep the redundant helper sentence'
+fi
 if grep -Fq "펌웨어 {data.release.version || '미확인'} · OpenWrt" "$FIRMWARE_CARD"; then
 	fail 'available firmware summary must not expose the OpenWrt base version'
 fi

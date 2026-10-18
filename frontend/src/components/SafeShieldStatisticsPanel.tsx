@@ -171,6 +171,50 @@ export function SafeShieldStatisticsPanel({
   return (
     <>
       <SectionHeading
+        action={
+          <div class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500">
+              <DatabaseIcon class="size-5" />
+            </span>
+            <div class="text-right">
+              <p class="m-0 text-[0.68rem] font-bold text-slate-400">통계 수집</p>
+              <p
+                class={`mt-1 mb-0 text-xs font-extrabold ${
+                  statisticsActionBusy || targetEnabled
+                    ? 'text-emerald-700'
+                    : 'text-slate-500'
+                }`}
+                role="status"
+              >
+                {collectionStatus}
+              </p>
+            </div>
+            <button
+              aria-checked={targetEnabled}
+              aria-label={targetEnabled ? '차단 통계 수집 끄기' : '차단 통계 수집 켜기'}
+              class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
+                statisticsActionBusy
+                  ? 'cursor-wait opacity-80'
+                  : 'disabled:cursor-not-allowed disabled:opacity-50'
+              } ${targetEnabled ? 'bg-teal-600' : 'bg-slate-300'}`}
+              disabled={action !== null}
+              onClick={() => onSetEnabled(!data.enabled)}
+              role="switch"
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                class={`ssh-switch-thumb absolute top-1 grid place-items-center shadow-sm transition-all ${
+                  targetEnabled ? 'left-6' : 'left-1'
+                }`}
+              >
+                {statisticsActionBusy ? (
+                  <ReloadIcon aria-hidden="true" class="size-3 animate-spin text-teal-600" />
+                ) : null}
+              </span>
+            </button>
+          </div>
+        }
         eyebrow="Activity"
         title="최근 24시간 보호 활동"
         description="DNS 요청 원본은 저장하지 않고 숫자만 로컬 메모리에 집계합니다."
@@ -181,58 +225,13 @@ export function SafeShieldStatisticsPanel({
         statisticsActionBusy ? 'cursor-wait' : ''
       }`}
     >
-      <div class="flex justify-end">
-        <div class="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-          <span class="grid size-9 place-items-center rounded-lg bg-slate-100 text-slate-500">
-            <DatabaseIcon class="size-5" />
-          </span>
-          <div class="text-right">
-            <p class="m-0 text-[0.68rem] font-bold text-slate-400">통계 수집</p>
-            <p
-              class={`mt-1 mb-0 text-xs font-extrabold ${
-                statisticsActionBusy || targetEnabled
-                  ? 'text-emerald-700'
-                  : 'text-slate-500'
-              }`}
-              role="status"
-            >
-              {collectionStatus}
-            </p>
-          </div>
-          <button
-            aria-checked={targetEnabled}
-            aria-label={targetEnabled ? '차단 통계 수집 끄기' : '차단 통계 수집 켜기'}
-            class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 ${
-              statisticsActionBusy
-                ? 'cursor-wait opacity-80'
-                : 'disabled:cursor-not-allowed disabled:opacity-50'
-            } ${targetEnabled ? 'bg-teal-600' : 'bg-slate-300'}`}
-            disabled={action !== null}
-            onClick={() => onSetEnabled(!data.enabled)}
-            role="switch"
-            type="button"
-          >
-            <span
-              aria-hidden="true"
-              class={`ssh-switch-thumb absolute top-1 grid place-items-center shadow-sm transition-all ${
-                targetEnabled ? 'left-6' : 'left-1'
-              }`}
-            >
-              {statisticsActionBusy ? (
-                <ReloadIcon aria-hidden="true" class="size-3 animate-spin text-teal-600" />
-              ) : null}
-            </span>
-          </button>
-        </div>
-      </div>
-
       {!data.enabled ? (
-        <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+        <div class="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
           통계 수집이 꺼져 있습니다. 활성화하면 DNS 요청 원본은 저장하지 않고 요청 수와 차단 수만 로컬 메모리에 집계합니다.
         </div>
       ) : null}
 
-      <dl class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <dl class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="최근 24시간 DNS 요청" value={formatNumber(recentTotals.queries)} />
         <Metric
           emphasized

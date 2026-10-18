@@ -90,8 +90,15 @@ grep -Fq '마지막 업데이트' "$PAGE" || \
 	fail 'SafeShield protection data card must expose the last update time'
 grep -Fq 'formatArtifactUpdatedAt' "$PAGE" || \
 	fail 'SafeShield protection data version must be converted into a readable update time'
-grep -Fq '<details class=' "$PAGE" || \
-	fail 'SafeShield technical artifact metadata must be collapsed into details'
+grep -Fq 'aria-label="보호 데이터 세부 정보"' "$PAGE" || \
+	fail 'SafeShield technical metadata must always be visible below the protection summary'
+if grep -Fq '<details class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2">' "$PAGE"; then
+	fail 'SafeShield protection data must not hide technical metadata behind an expand control'
+fi
+grep -Fq 'grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500' "$PAGE" || \
+	fail 'SafeShield protection-data icon must match the shared detail-card icon surface and size'
+grep -Fq 'grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-500' "$PANEL" || \
+	fail 'SafeShield statistics toggle icon must match the shared detail-card icon surface and size'
 grep -Fq '데이터 프로필' "$PAGE" || \
 	fail 'SafeShield protection data details must retain the raw artifact tier as a technical data profile'
 grep -Fq 'value={data.artifact.tier' "$PAGE" || \

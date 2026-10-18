@@ -105,25 +105,33 @@ function ActionCard(props: {
   icon: ComponentChildren;
   children?: ComponentChildren;
   className?: string;
+  titleActions?: ComponentChildren;
+  headerActions?: ComponentChildren;
 }) {
   return (
     <article
       class={`h-full min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6 ${props.className ?? ''}`}
     >
-      <div class="flex min-w-0 items-start gap-4">
-        <div
-          class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"
-        >
-          {props.icon}
+      <div class="flex min-w-0 items-start justify-between gap-3">
+        <div class="flex min-w-0 items-start gap-4">
+          <div
+            class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600"
+          >
+            {props.icon}
+          </div>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="m-0 text-lg font-black text-slate-950">
+                {props.title}
+              </h2>
+              {props.titleActions}
+            </div>
+            <p class="mt-1.5 mb-0 text-sm leading-6 text-slate-500">
+              {props.description}
+            </p>
+          </div>
         </div>
-        <div class="min-w-0">
-          <h2 class="m-0 text-lg font-black text-slate-950">
-            {props.title}
-          </h2>
-          <p class="mt-1.5 mb-0 text-sm leading-6 text-slate-500">
-            {props.description}
-          </p>
-        </div>
+        {props.headerActions ? <div class="shrink-0">{props.headerActions}</div> : null}
       </div>
       <div class="mt-5">{props.children}</div>
     </article>
@@ -587,42 +595,42 @@ function HealthDiagnosticCard(props: {
         </>
       )}
     </ActionCard>
+    <div class="grid min-w-0 content-start gap-4">
     <ActionCard
-      description="장치의 최소 상태 정보와 이상 코드만 서버로 전송합니다. 기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다."
+      description="장치의 최소 상태 정보와 이상 코드만 서버로 전송합니다. 직접 켜고 언제든지 끌 수 있습니다."
       icon={<ShieldIcon class="size-5" />}
       title="원격 상태 보고"
+      titleActions={
+        <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
+          {reporterMembershipLabel(reporter)}
+        </span>
+      }
+      headerActions={
+        <button
+          aria-checked={reporter?.enabled === true}
+          aria-label="원격 상태 보고 사용"
+          class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+            reporter?.enabled
+              ? 'border-teal-600 bg-teal-600'
+              : 'border-slate-300 bg-slate-200'
+          }`}
+          disabled={!data || props.savingReporter || !canToggleReporter}
+          onClick={() => props.onSetReporter(!(reporter?.enabled ?? false))}
+          role="switch"
+          type="button"
+        >
+          <span
+            aria-hidden="true"
+            class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
+              reporter?.enabled ? 'left-6' : 'left-1'
+            }`}
+          />
+        </button>
+      }
     >
-          <div class="min-w-0">
-            <div class="flex min-w-0 items-start justify-between gap-4">
-              <div class="min-w-0">
-                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-600">
-                  {reporterMembershipLabel(reporter)}
-                </span>
-              </div>
-              <button
-                aria-checked={reporter?.enabled === true}
-                aria-label="원격 상태 보고 사용"
-                class={`ssh-switch-control relative inline-flex shrink-0 rounded-full border transition focus:outline-none focus-visible:ring-4 focus-visible:ring-teal-100 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  reporter?.enabled
-                    ? 'border-teal-600 bg-teal-600'
-                    : 'border-slate-300 bg-slate-200'
-                }`}
-                disabled={!data || props.savingReporter || !canToggleReporter}
-                onClick={() => props.onSetReporter(!(reporter?.enabled ?? false))}
-                role="switch"
-                type="button"
-              >
-                <span
-                  aria-hidden="true"
-                  class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${
-                    reporter?.enabled ? 'left-6' : 'left-1'
-                  }`}
-                />
-              </button>
-            </div>
-
+      <div class="min-w-0">
             {reporter?.eligible ? (
-              <div class="mt-4 rounded-xl bg-slate-50 p-4">
+              <div class="rounded-xl bg-slate-50 p-4">
                 <div
                   class={`mb-4 flex items-start gap-3 rounded-xl border p-3 ${
                     reporterEnabled
@@ -679,7 +687,7 @@ function HealthDiagnosticCard(props: {
                 )}
               </div>
             ) : (
-              <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p class="m-0 text-sm font-extrabold text-slate-900">
                   원격 상태 보고는 유료 멤버십 또는 체험 기간에 사용할 수 있습니다.
                 </p>
@@ -697,12 +705,11 @@ function HealthDiagnosticCard(props: {
           </div>
     </ActionCard>
     <ActionCard
-      className="lg:col-span-2"
       description="진단에 필요한 최소한의 상태 정보만 전송하며, 네트워크 식별 정보와 이용 내용은 보내지 않습니다."
       icon={<ShieldIcon class="size-5" />}
       title="개인정보 보호"
     >
-              <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
                   <div class="flex items-center gap-2">
                     <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-600">
@@ -742,6 +749,7 @@ function HealthDiagnosticCard(props: {
                 </div>
               </div>
     </ActionCard>
+    </div>
     </>
   );
 }

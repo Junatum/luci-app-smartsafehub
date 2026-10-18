@@ -522,7 +522,11 @@ grep -Fq '원격 상태 보고가 켜져 있습니다.' "$SETTINGS_PAGE" || fail
 grep -Fq "return '첫 보고 준비 중';" "$SETTINGS_PAGE" || fail '활성화 직후 stale disabled/never 상태를 꺼짐이 아니라 첫 보고 준비 중으로 표시해야 합니다.'
 grep -Fq "return reporter.enabled ? '첫 보고 대기 중' : '보고 기록 없음';" "$SETTINGS_PAGE" || fail 'Reporter UI가 첫 서버 보고 전 상태를 명확하게 구분해야 합니다.'
 grep -Fq '최근 전송 상태' "$SETTINGS_PAGE" || fail 'Reporter 결과는 토글 상태와 혼동되지 않도록 최근 전송 상태로 표시해야 합니다.'
-grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE" || fail '설정 UI가 Reporter opt-in과 opt-out을 설명해야 합니다.'
+grep -Fq '직접 켜고 언제든지 끌 수 있습니다.' "$SETTINGS_PAGE" || fail '설정 UI가 Reporter opt-in과 opt-out을 설명해야 합니다.'
+grep -Fq 'aria-label="원격 상태 보고 사용"' "$SETTINGS_PAGE" || fail 'Reporter opt-in 스위치의 접근성 라벨이 유지되어야 합니다.'
+if grep -Fq '기본값은 꺼짐이며 언제든지 다시 끌 수 있습니다.' "$SETTINGS_PAGE"; then
+	fail '원격 상태 보고 안내에 불필요한 기본값 문구가 남아 있으면 안 됩니다.'
+fi
 grep -Fq '개인정보 보호' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 개인정보 보호 영역을 명확하게 표시해야 합니다.'
 grep -Fq '전송되는 정보' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 전송 항목을 구분해서 안내해야 합니다.'
 grep -Fq '전송하지 않는 정보' "$SETTINGS_PAGE" || fail '설정 UI가 Health Reporter의 개인정보 제외 항목을 안내해야 합니다.'

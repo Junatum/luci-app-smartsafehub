@@ -394,9 +394,20 @@ export function FirmwareUpdatesCard({
                   펌웨어 {data.release.version || '미확인'} · {formatBytes(data.release.sysupgrade.sizeBytes)} · {(data.release.channel || data.settings.channel) === 'beta' ? 'Beta' : 'Stable'}
                 </p>
               </div>
-              <span class="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">
-                {data.release.version || 'Latest'}
-              </span>
+              <div class="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
+                <span class="rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">
+                  {data.release.version || 'Latest'}
+                </span>
+                {bundledVersion ? (
+                  <span
+                    class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 ring-1 ring-inset ring-sky-200"
+                    data-section="firmware-bundled-software-chip"
+                  >
+                    <span class="text-[11px] uppercase tracking-[0.12em] text-slate-500">관리 SW</span>
+                    <span class="text-slate-950">{bundledVersion}</span>
+                  </span>
+                ) : null}
+              </div>
             </div>
             {bundledVersion ? (
               <div

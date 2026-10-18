@@ -38,7 +38,7 @@ done
 # fixed height on mobile or while asynchronous status text changes.
 grep -Fq 'gap-5 xl:items-stretch xl:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]' "$PAGE/SmartSafeHubAccountPage.tsx" || \
   fail 'Account connection and status cards must stretch to equal height at desktop widths'
-grep -Fq 'gap-4 xl:grid-cols-2 xl:items-stretch' "$PAGE/SafeShieldPage.tsx" || \
+grep -Fq 'gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:items-stretch' "$PAGE/SafeShieldPage.tsx" || \
   fail 'SafeShield protection summary and protection data cards must stretch to equal height'
 
 # Explicitly fill the stretched row for both cards, even as status text

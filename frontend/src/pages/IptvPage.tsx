@@ -243,7 +243,8 @@ export function IptvPage({
 
       <SectionHeading eyebrow="Runtime" title="IPTV 동작 상태" description="마지막으로 적용한 IPTV 설정과 중계 서비스의 실행 상태를 확인합니다." />
       <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
-        <div class="flex justify-end">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="m-0 text-xs leading-5 text-slate-500">적용된 IPTV 중계 서비스와 멀티캐스트 전달 상태입니다.</p>
           <span
             class={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-black ${
               runtimeHealthy
