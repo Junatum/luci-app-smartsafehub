@@ -32,6 +32,22 @@ grep -Fq 'require_root_password(function(request)' "$RPC" || fail 'RPC password 
 grep -Fq '"apps_catalog"' "$ACL" || fail 'read permission missing'
 grep -Fq "'apps_catalog'" "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'frontend RPC missing'
 grep -Fq "active: route === 'apps'" "$ROOT/frontend/src/app/App.tsx" || fail 'catalog must be loaded only on Apps route'
+# Apps must follow the existing Recent Activity section spacing contract.
+# A tall refresh action next to the title pushes the entire heading and card
+# down on desktop; keep that control inside the card instead.
+python3 - "$ROOT/frontend/src/pages/AppsPage.tsx" "$ROOT/frontend/src/pages/ActivityPage.tsx" <<'PY' || fail 'Apps layout differs from shared section design'
+from pathlib import Path
+import sys
+apps, activity = (Path(path).read_text() for path in sys.argv[1:])
+assert '<div class="min-w-0 space-y-6">' in activity
+assert '<section class="min-w-0 space-y-6">' in apps
+heading = apps.split('<SectionHeading', 1)[1].split('/>', 1)[0]
+assert 'action=' not in heading, 'refresh action changes heading height'
+card = apps.split('/>', 1)[1].split('{error ?', 1)[0]
+assert 'p-4 shadow-sm shadow-slate-900/5 sm:p-5' in card, 'card padding differs from Activity'
+assert '목록 새로고침' in card, 'refresh action must be within card'
+assert 'disabled={loading || refreshing}' in card, 'refresh loading guard missing'
+PY
 grep -Fq "item.runtime != 'router' || item.installer != 'apk'" "$UCODE" || fail 'unknown runtimes must stay hidden'
 if grep -E 'apps_(install|remove)|apk add|apk del' "$RPC" "$UCODE" "$HELPER" "$ROOT/frontend/src/pages/AppsPage.tsx" >/dev/null; then
  fail 'read-only initial Apps delivery must not contain installation operations'
