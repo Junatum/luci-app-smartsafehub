@@ -2,6 +2,7 @@
 'use strict';
 
 import { failure } from './smartsafehub/core.uc';
+import { read_apps_catalog } from './smartsafehub/apps.uc';
 import { read_connected_devices } from './smartsafehub/devices.uc';
 import {
 	discard_uploaded_backup,
@@ -171,6 +172,11 @@ const methods = {
 		},
 		call: require_root_password(function(request) {
 			return update_update_settings(request);
+		}),
+	},
+	apps_catalog: {
+		call: require_root_password(function(request) {
+			return read_apps_catalog(request);
 		}),
 	},
 	firmware_status: {

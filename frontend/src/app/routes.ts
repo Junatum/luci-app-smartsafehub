@@ -8,6 +8,7 @@ export type AppRoute =
   | 'safeshield'
   | 'rules'
   | 'account'
+  | 'apps'
   | 'system'
   | 'settings';
 
@@ -82,6 +83,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: 'SmartSafeHub 계정',
     title: 'SmartSafeHub 계정',
     description: '이 기기의 SmartSafeHub 계정 연결 상태와 구독 플랜을 확인합니다.',
+  },
+  {
+    route: 'apps',
+    hash: '#apps',
+    label: 'Apps',
+    title: 'SmartSafeHub Apps',
+    description: 'SmartSafeHub에서 검증한 앱과 확장 기능을 살펴봅니다.',
   },
   {
     route: 'system',

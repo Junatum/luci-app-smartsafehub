@@ -10,6 +10,7 @@
           "wifi_summary",
           "updates_status",
           "firmware_status",
+          "apps_catalog",
           "system_time_settings",
           "system_scheduled_reboot_settings",
           "health_status",

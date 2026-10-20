@@ -1,4 +1,5 @@
 import type { ActivityHistory } from '../types/activity';
+import type { AppsCatalog } from '../types/apps';
 import type {
   ConfigurationBackupDiscardResult,
   ConfigurationBackupRestoreResult,
@@ -123,6 +124,10 @@ export function requestHealthRun(): Promise<HealthAccepted> {
 
 export function updateHealthReporter(enabled: boolean): Promise<HealthStatus> {
   return callApi(API_OBJECT, 'health_reporter_update', { enabled });
+}
+
+export function fetchAppsCatalog(): Promise<AppsCatalog> {
+  return callApi(API_OBJECT, 'apps_catalog', {}, { timeoutMs: 15000 });
 }
 
 export function fetchSoftwareUpdates(): Promise<SoftwareUpdateStatus> {

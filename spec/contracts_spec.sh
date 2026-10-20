@@ -273,6 +273,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'SmartSafeHub Apps 메뉴와 승인된 앱 카탈로그를 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-contract.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '모든 rpcd ucode 진입점과 모듈의 실제 컴파일을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-ucode-syntax.sh"
     The status should be success

@@ -1,12 +1,14 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchAppsCatalog, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
 import { PageTabs } from '../components/PageTabs';
 import { useActivityHistory } from '../hooks/useActivityHistory';
+import { useAsyncResource } from '../hooks/useAsyncResource';
+import type { AppsCatalog } from '../types/apps';
 import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
@@ -29,6 +31,7 @@ import { useDeviceRegistration } from '../hooks/useDeviceRegistration';
 import { useDashboardAccountStatus } from '../hooks/useDashboardAccountStatus';
 import { useWifi } from '../hooks/useWifi';
 import { ActivityPage } from '../pages/ActivityPage';
+import { AppsPage } from '../pages/AppsPage';
 import { ConnectedDevicesPage } from '../pages/ConnectedDevicesPage';
 import { HomePage } from '../pages/HomePage';
 import { IptvPage } from '../pages/IptvPage';
@@ -51,6 +54,12 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const tabs = usePageTabs();
   const configurationBackup = useConfigurationBackup();
   const activity = useActivityHistory(route === 'activity');
+  const apps = useAsyncResource<AppsCatalog>({
+    active: route === 'apps',
+    fallbackError: '검증된 앱 목록을 불러오지 못했습니다.',
+    loader: fetchAppsCatalog,
+    staleTimeMs: 60_000,
+  });
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
   const firmware = useFirmwareUpdates(true);
@@ -117,13 +126,27 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
                   ? rules
                   : route === 'account'
                     ? deviceRegistration
-                    : route === 'system'
-                      ? updates
-                      : status;
+                    : route === 'apps'
+                      ? apps
+                      : route === 'system'
+                        ? updates
+                        : status;
 
   let content: ComponentChildren;
 
   switch (route) {
+    case 'apps':
+      content = (
+        <AppsPage
+          data={apps.data}
+          error={apps.error}
+          loading={apps.loading}
+          refreshing={apps.refreshing}
+          onRetry={() => void apps.refresh()}
+        />
+      );
+      break;
+
     case 'network':
       content = (
         <div class="min-w-0">

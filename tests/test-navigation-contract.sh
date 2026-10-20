@@ -146,8 +146,8 @@ grep -Fq "'#wan': 'network'" "$HASH_ROUTE" || \
 	fail 'legacy #wan hash must resolve to combined network settings'
 grep -Fq "'#lan': 'network'" "$HASH_ROUTE" || \
 	fail 'legacy #lan hash must resolve to combined network settings'
-grep -Fq "{ label: 'System', routes: ['account', 'system', 'settings'] }" "$NAVIGATION" || \
-	fail 'System navigation group must expose SmartSafeHub account before updates and settings'
+grep -Fq "{ label: 'System', routes: ['account', 'apps', 'system', 'settings'] }" "$NAVIGATION" || \
+	fail 'System navigation group must expose Apps immediately before updates'
 grep -Fq "route: 'account'" "$ROUTES" || \
 	fail 'SmartSafeHub account route must be registered'
 grep -Fq "hash: '#account'" "$ROUTES" || \
