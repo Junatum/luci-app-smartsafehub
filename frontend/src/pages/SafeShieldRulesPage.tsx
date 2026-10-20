@@ -344,6 +344,7 @@ export function SafeShieldRulesPage({
   const [revokeConfirmationDelayed, setRevokeConfirmationDelayed] = useState(false);
   const pendingRevokeId = useRef<number | null>(null);
   const previousStatusSignature = useRef<string | null>(null);
+  const lastConfirmedSignature = useRef<string | null>(null);
   const onRetryRef = useRef(onRetry);
   onRetryRef.current = onRetry;
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -355,15 +356,21 @@ export function SafeShieldRulesPage({
   // the new rules. Only a confirmed local read can settle its final outcome.
   // The local SafeShield list also needs a refresh when a background poll
   // observes a new recommendation revision, without reloading the whole page.
-  const acceptRecommendedStatus = useCallback((status: RecommendedRulesStatus): void => {
+  const acceptRecommendedStatus = useCallback((status: RecommendedRulesStatus): boolean => {
     setRecommendedStatus(status);
     setRecommendedKnown(true);
-    const signature = JSON.stringify([
-      status.revision, status.domains, status.rules.map((rule) => rule.id),
-      status.syncStatus,
-    ]);
-    if (previousStatusSignature.current !== null && previousStatusSignature.current !== signature) {
-      onRetryRef.current();
+    // Progress/status/metadata changes must not re-read the whole SafeShield
+    // rules list. After a completed reconcile, reload only once per actual
+    // recommendation revision/ownership change. The first pending -> confirmed
+    // transition also refreshes a list fetched while SafeShield was applying.
+    const signature = JSON.stringify([status.revision, status.domains]);
+    let reloaded = false;
+    if (status.syncStatus === 'confirmed' && lastConfirmedSignature.current !== signature) {
+      if (previousStatusSignature.current !== null) {
+        onRetryRef.current();
+        reloaded = true;
+      }
+      lastConfirmedSignature.current = signature;
     }
     previousStatusSignature.current = signature;
 
@@ -381,6 +388,7 @@ export function SafeShieldRulesPage({
       setSyncError(null);
       setSyncMessage('추천 규칙 적용 해제를 확인했습니다.');
     }
+    return reloaded;
   }, []);
 
   useEffect(() => {
@@ -415,7 +423,7 @@ export function SafeShieldRulesPage({
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [data?.allow.join('\n'), onLoadRecommendedRulesStatus, syncing, revokeBusy, acceptRecommendedStatus]);
+  }, [onLoadRecommendedRulesStatus, syncing, revokeBusy, acceptRecommendedStatus]);
 
   // An RPC timeout cannot prove whether Hub accepted the removal. After a
   // minute, explain the delay but continue watching for eventual confirmation.
@@ -432,11 +440,13 @@ export function SafeShieldRulesPage({
     setSyncMessage(null);
     try {
       const status = await onSyncRecommendedRules();
-      acceptRecommendedStatus(status);
+      const reloaded = acceptRecommendedStatus(status);
       setSyncMessage(status.syncStatus === 'confirmed'
         ? '서버에서 규칙을 가져와 SafeShield 허용 목록을 확인했습니다.'
         : '추천 규칙 상태를 확인 중입니다. 진행 결과는 자동으로 갱신됩니다.');
-      onRetry(); // Reload the actual SafeShield allow list after reconciliation.
+      // The user explicitly requested synchronization, so allow one manual
+      // refresh after confirmation but never queue a duplicate full RPC.
+      if (status.syncStatus === 'confirmed' && !reloaded) onRetry();
     } catch {
       setSyncError('추천 규칙을 동기화하지 못했습니다. 서버 연결 및 기기 등록 상태를 확인해 주세요.');
     } finally {
@@ -460,7 +470,8 @@ export function SafeShieldRulesPage({
       if (pendingRevokeId.current !== null) {
         setSyncMessage('적용 해제 요청을 처리했습니다. 공유기의 허용 목록을 확인하고 있습니다.');
       }
-      onRetryRef.current();
+      // A pending revoke is not yet a changed SafeShield rule list. The
+      // confirmed status poll refreshes once the local apply is complete.
     } catch {
       // Hub may have removed the assignment before the local SafeShield apply
       // timed out. Keep checking instead of permanently displaying a failure.
