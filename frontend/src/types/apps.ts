@@ -15,3 +15,24 @@ export interface AppsCatalog {
   channel: string;
   apps: VerifiedApp[];
 }
+
+/** Local APK adapter state, independent from the future IoT / AI runtimes. */
+export interface AppsInstallStatus {
+  job: {
+    phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
+    action: 'install' | 'remove' | '';
+    appId: string;
+    code: string;
+  };
+  installed: Record<string, {
+    installed: boolean;
+    partial: boolean;
+    managed: boolean;
+  }>;
+}
+
+export interface AppsOperationAccepted {
+  accepted: boolean;
+  appId: string;
+  action: 'install' | 'remove';
+}

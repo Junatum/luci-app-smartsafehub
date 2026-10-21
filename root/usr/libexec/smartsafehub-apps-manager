@@ -1,0 +1,254 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Privileged, opt-in APK adapter for SmartSafeHub Apps schema 1.
+# No caller-supplied package, URL, shell command or repository is accepted.
+set -eu
+
+SELF="${SMARTSAFEHUB_APPS_MANAGER_BIN:-/usr/libexec/smartsafehub-apps-manager}"
+CATALOG_HELPER="${SMARTSAFEHUB_APPS_HELPER_BIN:-/usr/libexec/smartsafehub-apps}"
+RUNTIME="${SMARTSAFEHUB_APPS_RUNTIME_DIR:-/tmp/smartsafehub}"
+OWNED="${SMARTSAFEHUB_APPS_OWNED_DIR:-/etc/smartsafehub/apps-installed}"
+REPO_INDEX="${SMARTSAFEHUB_APPS_REPO_INDEX:-/usr/share/smartsafehub/apps-packages.adb}"
+OVERLAY="${SMARTSAFEHUB_APPS_OVERLAY_PATH:-/overlay}"
+# OpenWrt uses /proc/meminfo; tests on non-Linux hosts supply a fixture.
+MEMINFO="${SMARTSAFEHUB_APPS_MEMINFO_PATH:-/proc/meminfo}"
+JSONFILTER="${SMARTSAFEHUB_APPS_JSONFILTER_BIN:-jsonfilter}"
+APK="${SMARTSAFEHUB_APPS_APK_BIN:-apk}"
+SHA256="${SMARTSAFEHUB_APPS_SHA256_BIN:-sha256sum}"
+DAEMON="${SMARTSAFEHUB_APPS_DAEMON_BIN:-start-stop-daemon}"
+LOCK="$RUNTIME/apps-operation.lock"
+STATE="$RUNTIME/apps-operation.state"
+CATALOG="$RUNTIME/apps-catalog.json"
+
+field() { "$JSONFILTER" -i "$1" -e "$2" 2>/dev/null | head -n 1; }
+valid_id() { case "$1" in ''|*[!a-z0-9-]*|-*|*-) return 1;; esac; [ "${#1}" -le 80 ]; }
+valid_package() {
+ case "$1" in ''|*[!a-zA-Z0-9_.+-]*|[-.+]*|*[-.+]) return 1;; esac
+ [ "${#1}" -le 100 ]
+}
+valid_version() {
+ case "$1" in ''|*[!a-zA-Z0-9._+~-]*|[-.+~]*|*[-.+~]) return 1;; esac
+ [ "${#1}" -le 100 ]
+}
+valid_sha() {
+ case "$1" in *[!a-f0-9]*|'') return 1;; esac
+ [ "${#1}" -eq 64 ]
+}
+protected_package() {
+ case "$1" in
+  base-files|busybox|apk|procd|netifd|dnsmasq*|firewall*|odhcp*|dropbear|ubus*|rpcd*|uhttpd*|safeshield*|luci-app-smartsafehub|kernel|kmod-*) return 0;;
+ esac
+ return 1
+}
+write_state() {
+ phase="$1"; action="$2"; app="$3"; code="$4"
+ tmp="$(mktemp "$RUNTIME/apps-state.XXXXXXXX")" || return 1
+ printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\n' "$phase" "$action" "$app" "$code" > "$tmp"
+ mv -f "$tmp" "$STATE"
+}
+# Persist *ownership*, not merely an installed flag, so removal never deletes
+# unrelated packages installed through LuCI, ssh or another app.
+owned_manifest() { printf '%s/%s' "$OWNED" "$1"; }
+
+# Dump only simple validated package pins. Indexed JSON filter expressions are
+# created exclusively from a numeric index resolved from the approved catalog.
+app_index() {
+ id="$1"; n=0
+ for candidate in $(field "$CATALOG" '@.apps[*].id'); do
+  if [ "$candidate" = "$id" ]; then printf '%s\n' "$n"; return 0; fi
+  n=$((n + 1))
+  [ "$n" -le 100 ] || break
+ done
+ return 1
+}
+extract_pins() {
+ index="$1"; out="$2"
+ : > "$out"; n=0
+ while :; do
+  name="$(field "$CATALOG" "@.apps[$index].packages[$n].name")"
+  [ -n "$name" ] || break
+  version="$(field "$CATALOG" "@.apps[$index].packages[$n].version")"
+  hash="$(field "$CATALOG" "@.apps[$index].packages[$n].sha256")"
+  valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 1
+  protected_package "$name" && return 1
+  grep -Fq "$(printf '%s\t' "$name")" "$out" && return 1
+  printf '%s\t%s\t%s\n' "$name" "$version" "$hash" >> "$out"
+  n=$((n + 1))
+  [ "$n" -le 32 ] || return 1
+ done
+ [ "$n" -gt 0 ]
+}
+installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
+
+status() {
+ tmp="$(mktemp "$RUNTIME/apps-status.XXXXXXXX")" || return 1
+ {
+ # A disconnected device can still report its local installation state.
+ if [ ! -r "$CATALOG" ]; then : > "$tmp"; mv -f "$tmp" "$RUNTIME/apps-status.tsv"; return 0; fi
+ n=0
+ for id in $(field "$CATALOG" '@.apps[*].id'); do
+  valid_id "$id" || continue
+  idx="$n"; n=$((n + 1))
+  [ "$n" -le 100 ] || break
+  total=0; present=0; p=0
+  while :; do
+   name="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
+   [ -n "$name" ] || break
+   valid_package "$name" || break
+   total=$((total + 1)); installed "$name" && present=$((present + 1))
+   p=$((p + 1)); [ "$p" -le 32 ] || break
+  done
+  managed=0
+  [ -f "$(owned_manifest "$id")" ] && managed=1
+  # id, fully installed, at least one package installed, SmartSafeHub-owned
+  if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
+  if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
+  printf '%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed"
+ done
+ # Include withdrawn apps, so a device can uninstall owned packages after
+ # the Hub review is revoked (without granting new installation rights).
+ for manifest in "$OWNED"/*; do
+  [ -f "$manifest" ] || continue
+  id="${manifest##*/}"
+  valid_id "$id" || continue
+  if app_index "$id" >/dev/null 2>&1; then continue; fi
+  printf '%s\t0\t1\t1\n' "$id"
+ done
+ } > "$tmp"
+ mv -f "$tmp" "$RUNTIME/apps-status.tsv"
+}
+
+# Release names from the Hub have zero command authority. We cross-check the
+# fresh exact-build approval, locally trusted immutable index, architecture and
+# resource requirements before invoking the fixed APK binary.
+preflight_install() {
+ "$CATALOG_HELPER" || return 21
+ index="$(app_index "$app")" || return 22
+ [ "$(field "$CATALOG" "@.apps[$index].runtime")" = router ] || return 23
+ [ "$(field "$CATALOG" "@.apps[$index].installer")" = apk ] || return 23
+ arch="$(field "$CATALOG" "@.apps[$index].package_arch")"
+ [ -n "$arch" ] && [ "$arch" = "$("$APK" --print-arch)" ] || return 24
+ approved_hash="$(field "$CATALOG" "@.apps[$index].repository_index_sha256")"
+ valid_sha "$approved_hash" || return 25
+ # Index is provisioned by the firmware/repository operator, never by the UI.
+ # An ordinary mutable OpenWrt mirror does not satisfy this check.
+ [ -s "$REPO_INDEX" ] || return 25
+ actual_hash="$("$SHA256" "$REPO_INDEX" | cut -d ' ' -f 1)"
+ [ "$approved_hash" = "$actual_hash" ] || return 25
+ memory="$(field "$CATALOG" "@.apps[$index].requirements.min_memory_mb")"
+ storage="$(field "$CATALOG" "@.apps[$index].requirements.min_storage_mb")"
+ case "$memory" in ''|*[!0-9]*) return 26;; esac
+ case "$storage" in ''|*[!0-9]*) return 26;; esac
+ [ "$memory" -le 131072 ] && [ "$storage" -le 131072 ] || return 26
+ available_memory="$(awk '/^MemTotal:/ {print int($2/1024); exit}' "$MEMINFO" 2>/dev/null)"
+ available_storage="$(df -Pk "$OVERLAY" 2>/dev/null | awk 'END {print int($4/1024)}')"
+ [ -n "$available_memory" ] && [ "$available_memory" -ge "$memory" ] || return 26
+ [ -n "$available_storage" ] && [ "$available_storage" -ge "$storage" ] || return 26
+ extract_pins "$index" "$pins" || return 27
+ return 0
+}
+
+install_app() {
+ preflight_install || return $?
+ manifest="$(owned_manifest "$app")"
+ # Missing packages after sysupgrade may be reinstalled against a NEW approval.
+ # Refuse mixed partially installed sets to avoid taking ownership accidentally.
+ if [ -e "$manifest" ]; then
+  awk -F '\t' '{print $1}' "$manifest" > "$stage/old-names"
+  awk -F '\t' '{print $1}' "$pins" > "$stage/new-names"
+  cmp -s "$stage/old-names" "$stage/new-names" || return 28
+  while IFS="$(printf '\t')" read -r name version hash; do
+   installed "$name" && return 28
+  done < "$pins"
+ fi
+ while IFS="$(printf '\t')" read -r name version hash; do
+  installed "$name" && return 29
+ done < "$pins"
+ # Download into private RAM-backed storage; no arbitrary URLs or --allow-untrusted.
+ # Each directly requested archive is verified against the Hub reviewer pin.
+ mkdir -p "$stage/packages" || return 30
+ set --
+ while IFS="$(printf '\t')" read -r name version hash; do
+  "$APK" fetch --output "$stage/packages" "$name=$version" > "$stage/fetch.log" 2>&1 || return 31
+  count=0; selected=''
+  for file in "$stage/packages/$name-$version.apk"; do
+   [ -f "$file" ] || continue
+   count=$((count + 1)); selected="$file"
+  done
+  [ "$count" -eq 1 ] || return 32
+  [ "$("$SHA256" "$selected" | cut -d ' ' -f 1)" = "$hash" ] || return 33
+  set -- "$@" "$selected"
+ done < "$pins"
+ # APK resolves dependencies only from the system's already signed repositories.
+ # Do not pass a generic APK upgrade or install software outside the pins.
+ "$APK" add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
+ # Reject any transaction that proposes replacing/removing a protected core.
+ if grep -Ei '(Installing|Upgrading|Downgrading|Purging|Removing) (base-files|busybox|apk|procd|netifd|dnsmasq[^ ]*|firewall[^ ]*|odhcp[^ ]*|dropbear|ubus[^ ]*|rpcd[^ ]*|uhttpd[^ ]*|safeshield[^ ]*|luci-app-smartsafehub|kernel|kmod-[^ ]*) ' "$stage/plan.log" >/dev/null; then
+  return 34
+ fi
+ "$APK" add "$@" > "$stage/install.log" 2>&1 || return 35
+ mkdir -p "$OWNED" || return 36
+ cp "$pins" "$(owned_manifest "$app").new" || return 36
+ mv -f "$(owned_manifest "$app").new" "$(owned_manifest "$app")" || return 36
+ return 0
+}
+
+remove_app() {
+ manifest="$(owned_manifest "$app")"
+ [ -f "$manifest" ] || return 41
+ set --; count=0
+ while IFS="$(printf '\t')" read -r name version hash; do
+  valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 42
+  protected_package "$name" && return 42
+  # Reject packages owned by any other Apps installation.
+  for other in "$OWNED"/*; do
+   [ -f "$other" ] || continue
+   [ "$other" = "$manifest" ] && continue
+   grep -Fq "${name}$(printf '\t')" "$other" && return 43
+  done
+  set -- "$@" "$name"
+  count=$((count + 1)); [ "$count" -le 32 ] || return 42
+ done < "$manifest"
+ [ "$count" -gt 0 ] || return 42
+ any_installed=0
+ for name in "$@"; do installed "$name" && any_installed=1; done
+ if [ "$any_installed" -eq 1 ]; then
+  "$APK" del --simulate "$@" > "$stage/plan.log" 2>&1 || return 44
+  "$APK" del "$@" > "$stage/remove.log" 2>&1 || return 45
+ fi
+ rm -f "$manifest"
+ return 0
+}
+
+worker() {
+ action="$1"; app="$2"
+ trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
+ stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
+ pins="$stage/pins"
+ write_state running "$action" "$app" NONE
+ rc=0
+ if [ "$action" = install ]; then install_app || rc=$?; else remove_app || rc=$?; fi
+ if [ "$rc" -eq 0 ]; then write_state success "$action" "$app" NONE
+ else write_state failed "$action" "$app" "E$rc"; fi
+}
+
+start() {
+ action="$1"; app="$2"
+ case "$action" in install|remove) ;; *) exit 2;; esac
+ valid_id "$app" || exit 2
+ mkdir -p "$RUNTIME" || exit 1
+ mkdir "$LOCK" 2>/dev/null || exit 3
+ write_state starting "$action" "$app" NONE
+ if ! "$DAEMON" -S -b -x "$SELF" -- worker "$action" "$app" >/dev/null 2>&1; then
+  write_state failed "$action" "$app" LAUNCH
+  rmdir "$LOCK" 2>/dev/null || true
+  exit 1
+ fi
+}
+
+case "${1:-}" in
+ status) mkdir -p "$RUNTIME"; status;;
+ start) [ "$#" -eq 3 ] || exit 2; start "$2" "$3";;
+ worker) [ "$#" -eq 3 ] || exit 2; worker "$2" "$3";;
+ *) exit 2;;
+esac

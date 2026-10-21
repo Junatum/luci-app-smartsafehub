@@ -49,9 +49,19 @@ assert '목록 새로고침' in card, 'refresh action must be within card'
 assert 'disabled={loading || refreshing}' in card, 'refresh loading guard missing'
 PY
 grep -Fq "item.runtime != 'router' || item.installer != 'apk'" "$UCODE" || fail 'unknown runtimes must stay hidden'
-if grep -E 'apps_(install|remove)|apk add|apk del' "$RPC" "$UCODE" "$HELPER" "$ROOT/frontend/src/pages/AppsPage.tsx" >/dev/null; then
- fail 'read-only initial Apps delivery must not contain installation operations'
-fi
+# Separate the privileged APK adapter from display-only Hub catalog parsing.
+MANAGER="$ROOT/root/usr/libexec/smartsafehub-apps-manager"
+MODULE="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc"
+[ -x "$MANAGER" ] || fail 'APK manager missing or not executable'
+[ -f "$MODULE" ] || fail 'APK RPC adapter missing'
+sh -n "$MANAGER" || fail 'APK manager shell syntax invalid'
+grep -Fq 'apps_install: {' "$RPC" || fail 'Apps install RPC missing'
+grep -Fq 'apps_remove: {' "$RPC" || fail 'Apps remove RPC missing'
+grep -Fq 'apps_status: {' "$RPC" || fail 'Apps status RPC missing'
+grep -Fq '"apps_install"' "$ACL" || fail 'Apps install ACL missing'
+grep -Fq '"apps_remove"' "$ACL" || fail 'Apps remove ACL missing'
+grep -Fq '"apps_status"' "$ACL" || fail 'Apps status ACL missing'
+grep -Fq 'installVerifiedApp' "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'Apps frontend installation call missing'
 
 # Fake only the HTTP/JSON filter utilities: no external calls or OpenWrt runtime
 # are needed to verify identity pinning and mismatch/failure handling.
@@ -105,4 +115,4 @@ cat > "$TMP/firmware.json" <<'EOF'
 {"device_code":"iptime-ax3000sm","build_id":"../../bad","channel":"stable"}
 EOF
 if "$HELPER"; then fail 'invalid firmware identity accepted'; fi
-printf 'PASS: Apps navigation, read-only catalog and firmware pinning\n'
+printf 'PASS: Apps navigation, catalog pinning and APK RPC contracts\n'

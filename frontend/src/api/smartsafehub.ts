@@ -1,5 +1,5 @@
 import type { ActivityHistory } from '../types/activity';
-import type { AppsCatalog } from '../types/apps';
+import type { AppsCatalog, AppsInstallStatus, AppsOperationAccepted } from '../types/apps';
 import type {
   ConfigurationBackupDiscardResult,
   ConfigurationBackupRestoreResult,
@@ -128,6 +128,18 @@ export function updateHealthReporter(enabled: boolean): Promise<HealthStatus> {
 
 export function fetchAppsCatalog(): Promise<AppsCatalog> {
   return callApi(API_OBJECT, 'apps_catalog', {}, { timeoutMs: 15000 });
+}
+
+export function fetchAppsStatus(): Promise<AppsInstallStatus> {
+  return callApi(API_OBJECT, 'apps_status', {}, { timeoutMs: 18000 });
+}
+
+export function installVerifiedApp(appId: string): Promise<AppsOperationAccepted> {
+  return callApi(API_OBJECT, 'apps_install', { app_id: appId }, { timeoutMs: 8000 });
+}
+
+export function removeVerifiedApp(appId: string): Promise<AppsOperationAccepted> {
+  return callApi(API_OBJECT, 'apps_remove', { app_id: appId }, { timeoutMs: 8000 });
 }
 
 export function fetchSoftwareUpdates(): Promise<SoftwareUpdateStatus> {

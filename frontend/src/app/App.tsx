@@ -1,14 +1,14 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { fetchAppsCatalog, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchAppsCatalog, fetchAppsStatus, installVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
 import { PageTabs } from '../components/PageTabs';
 import { useActivityHistory } from '../hooks/useActivityHistory';
 import { useAsyncResource } from '../hooks/useAsyncResource';
-import type { AppsCatalog } from '../types/apps';
+import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
 import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
@@ -59,6 +59,13 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     fallbackError: '검증된 앱 목록을 불러오지 못했습니다.',
     loader: fetchAppsCatalog,
     staleTimeMs: 60_000,
+  });
+  const appsStatus = useAsyncResource<AppsInstallStatus>({
+    active: route === 'apps',
+    fallbackError: '앱 설치 상태를 불러오지 못했습니다.',
+    loader: fetchAppsStatus,
+    pollInterval: (data) => data?.job.phase === 'running' || data?.job.phase === 'starting' ? 3000 : 12000,
+    staleTimeMs: 3000,
   });
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
@@ -142,7 +149,18 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           error={apps.error}
           loading={apps.loading}
           refreshing={apps.refreshing}
-          onRetry={() => void apps.refresh()}
+          onRetry={() => void Promise.all([apps.refresh(), appsStatus.refresh()])}
+          installStatus={appsStatus.data}
+          statusError={appsStatus.error}
+          onRefreshStatus={() => void appsStatus.refresh()}
+          onInstall={async (id) => {
+            await installVerifiedApp(id);
+            await appsStatus.refresh();
+          }}
+          onRemove={async (id) => {
+            await removeVerifiedApp(id);
+            await appsStatus.refresh();
+          }}
         />
       );
       break;
