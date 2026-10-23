@@ -70,6 +70,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '사용자 규칙 렌더링 최적화와 RPC 진단 개인정보 보호 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-rules-performance.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '추천 사용자 규칙의 적용과 해제 및 수동 규칙 보존을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-recommended-rules.sh"
     The status should be success

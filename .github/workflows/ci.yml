@@ -89,6 +89,9 @@ jobs:
       - name: Test relative timestamp formatting
         run: node --experimental-strip-types --test ../tests/runtime/relative-time.test.mjs
 
+      - name: Test rule rendering and RPC diagnostics
+        run: node --experimental-strip-types --test ../tests/runtime/rules-performance.test.mjs
+
       - name: Build
         run: npm run build
 

@@ -348,7 +348,7 @@ grep -Fq "cloudManaged ? '추천 규칙' : '직접 추가'" "$PAGE"
 # Group allow entries by who controls them without repeating the domains.
 grep -Fq 'aria-label="직접 추가한 허용 규칙"' "$PAGE"
 grep -Fq 'aria-label="웹사이트 추천 규칙"' "$PAGE"
-grep -Fq 'recommendedDomains.includes(domain)' "$PAGE"
+grep -Fq 'recommendedDomainSet.has(domain)' "$PAGE"
 grep -Fq 'aria-expanded={showRecommended}' "$PAGE"
 grep -Fq 'const showRecommended = searching ||' "$PAGE"
 grep -Fq 'max-h-[20rem]' "$PAGE"

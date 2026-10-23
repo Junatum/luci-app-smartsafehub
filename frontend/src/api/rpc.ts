@@ -4,6 +4,7 @@ import {
 } from '../auth/sessionEvents';
 import type { SmartSafeHubBootstrap } from '../types/bootstrap';
 import type { ApiResponse } from '../types/status';
+import { ensureRpcDiagnostics, recordRpcTiming } from './rpcDiagnostics';
 
 const UBUS_STATUS_TEXT: Readonly<Record<number, string>> = {
   1: '잘못된 명령입니다.',
@@ -258,7 +259,11 @@ export async function callRpc<T>(
   options: RpcCallOptions = {},
 ): Promise<T> {
   const bootstrap = getBootstrap();
+  ensureRpcDiagnostics();
   const startedAt = performance.now();
+  let responseMs: number | null = null;
+  let decodeMs: number | null = null;
+  let resultCode = 'ok';
   const id = requestId++;
   const controller = new AbortController();
   const timeout = window.setTimeout(
@@ -281,6 +286,7 @@ export async function callRpc<T>(
       }),
       signal: controller.signal,
     });
+    responseMs = performance.now() - startedAt;
 
     if (!response.ok) {
       throw new RpcError(
@@ -293,6 +299,7 @@ export async function callRpc<T>(
 
     try {
       payload = await response.json();
+      decodeMs = performance.now() - startedAt - (responseMs ?? 0);
     } catch {
       throw invalidResponse();
     }
@@ -300,6 +307,7 @@ export async function callRpc<T>(
     return parseJsonRpcResponse<T>(payload, id);
   } catch (error) {
     if (controller.signal.aborted) {
+      resultCode = 'RPC_TIMEOUT';
       throw new RpcError(
         'RPC_TIMEOUT',
         '장치 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
@@ -307,9 +315,12 @@ export async function callRpc<T>(
     }
 
     if (error instanceof RpcError) {
-      throw await sessionExpiryError(error, bootstrap);
+      const resolved = await sessionExpiryError(error, bootstrap);
+      resultCode = resolved.code;
+      throw resolved;
     }
 
+    resultCode = 'NETWORK_ERROR';
     throw new RpcError(
       'NETWORK_ERROR',
       '공유기와 통신할 수 없습니다. 네트워크 연결을 확인해 주세요.',
@@ -317,9 +328,13 @@ export async function callRpc<T>(
   } finally {
     window.clearTimeout(timeout);
     const elapsedMs = Math.round(performance.now() - startedAt);
-    // Development diagnostics only: never record parameters, tokens, or responses.
-    if (import.meta.env.DEV && elapsedMs >= 1000) {
-      console.warn(`[RPC slow] ${object}.${method}: ${elapsedMs}ms`);
+    const slow = recordRpcTiming({
+      object, method, elapsedMs, responseMs, decodeMs, result: resultCode,
+    });
+    // One concise warning only for a slow call or a timeout; full bounded
+    // timings are available in DevTools even on a production router.
+    if (slow || resultCode === 'RPC_TIMEOUT') {
+      console.warn(`[SmartSafeHub RPC] ${object}.${method}: ${elapsedMs}ms (${resultCode})`);
     }
   }
 }
