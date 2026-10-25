@@ -209,17 +209,21 @@ install_app() {
   archive_bytes="$(wc -c < "$selected" | tr -d ' ')"
   [ "$archive_bytes" -le 33554432 ] || return 32
   [ "$("$SHA256" "$selected" | cut -d ' ' -f 1)" = "$hash" ] || return 33
-  set -- "$@" "$selected"
+  # The archive is downloaded only for an independent Hub approval checksum
+  # check. Installation below uses the signed REMOTE repository, not this file.
+  set -- "$@" "$name=$version"
  done < "$pins"
- # APK still validates repository signatures using configured trusted keys;
- # never use --allow-untrusted or a whole-system upgrade. Dependencies retain
- # OpenWrt's normal package resolution and must be tested with each firmware.
- "$APK" -X "$index_url" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
+ # -X alone ADDS a feed alongside OpenWrt's default repositories. Since an
+ # identically named/versioned package can exist in the official feeds, restrict
+ # this transaction to the approved, signed SmartSafeHub feed. Dependencies must
+ # already be installed or come from that same trusted feed. Never fall back to
+ # a different vendor's archive or --allow-untrusted.
+ "$APK" --repositories-file /dev/null -X "$index_url" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
  # Reject any transaction that proposes replacing/removing a protected core.
  if grep -Ei '(Installing|Upgrading|Downgrading|Purging|Removing) (base-files|busybox|apk|procd|netifd|dnsmasq[^ ]*|firewall[^ ]*|odhcp[^ ]*|dropbear|ubus[^ ]*|rpcd[^ ]*|uhttpd[^ ]*|safeshield[^ ]*|luci-app-smartsafehub|kernel|kmod-[^ ]*) ' "$stage/plan.log" >/dev/null; then
   return 34
  fi
- "$APK" -X "$index_url" -U add "$@" > "$stage/install.log" 2>&1 || return 35
+ "$APK" --repositories-file /dev/null -X "$index_url" -U add "$@" > "$stage/install.log" 2>&1 || return 35
  mkdir -p "$OWNED" || return 36
  cp "$pins" "$(owned_manifest "$app").new" || return 36
  mv -f "$(owned_manifest "$app").new" "$(owned_manifest "$app")" || return 36
@@ -263,11 +267,23 @@ worker() {
  trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
  stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
  pins="$stage/pins"
+ # Never expose error text from a previous install as the current result.
+ rm -f "$RUNTIME/apps-last-error.log"
  write_state running "$action" "$app" NONE
  rc=0
  if [ "$action" = install ]; then install_app || rc=$?; else remove_app || rc=$?; fi
- if [ "$rc" -eq 0 ]; then write_state success "$action" "$app" NONE
- else write_state failed "$action" "$app" "E$rc"; fi
+ if [ "$rc" -eq 0 ]; then
+  write_state success "$action" "$app" NONE
+ else
+  # Keep only the latest package-manager diagnostic after the workspace is
+  # removed. Never record an auth token, catalog JSON, or package contents.
+  for log in "$stage/plan.log" "$stage/install.log" "$stage/remove.log"; do
+   if [ -s "$log" ]; then
+    tail -c 4096 "$log" > "$RUNTIME/apps-last-error.log" 2>/dev/null || :
+   fi
+  done
+  write_state failed "$action" "$app" "E$rc"
+ fi
 }
 
 start() {

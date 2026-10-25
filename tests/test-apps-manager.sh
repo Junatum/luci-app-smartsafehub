@@ -17,8 +17,29 @@ ARCHIVE_SHA="$(sha256sum "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk" | cut -d
 cat > "$TMP/catalog.json" <<EOF
 {"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
-cat > "$TMP/bin/jsonfilter" <<'PY'
-#!/usr/bin/env python3
+# Use jq when available for faster field lookups; the Python fallback is portable.
+cat > "$TMP/bin/jsonfilter" <<'SH2'
+#!/bin/sh
+if command -v jq >/dev/null 2>&1; then
+ file=''; expr=''
+ while [ "$#" -gt 0 ]; do
+  case "$1" in
+   -i) file="$2"; shift 2;;
+   -e) expr="$2"; shift 2;;
+   *) exit 2;;
+  esac
+ done
+ case "$expr" in
+  '@.apps[*].id') jq_expr='.apps[].id';;
+  @.*) jq_expr="${expr#@}";;
+  *) exit 2;;
+ esac
+ jq -r "($jq_expr) | select(. != null)" "$file" 2>/dev/null
+else
+ exec python3 "$0.py" "$@"
+fi
+SH2
+cat > "$TMP/bin/jsonfilter.py" <<'PY'
 import json, re, sys
 args=sys.argv
 obj=json.load(open(args[args.index('-i')+1]))
@@ -56,15 +77,20 @@ printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
 SH2
 cat > "$TMP/bin/apk" <<'SH2'
 #!/bin/sh
+printf '%s\n' "$*" >> "$APPS_TEST_APK_LOG"
 case "$1" in
  --print-arch) [ "${APPS_TEST_ARCH_CLI_FAIL:-0}" = 0 ] || exit 1; echo "${APPS_TEST_ARCH_CLI:-aarch64_cortex-a53}"; exit 0;;
  info)
    [ "$2" = -e ] || exit 2
    grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null; exit $?;;
- -X)
-   [ "$2" = 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb' ] || exit 2
-   [ "$3" = -U ] && [ "$4" = add ] || exit 2
-   shift 4;;
+ --repositories-file)
+   # Selecting only the signed REMOTE Hub repository guarantees that a
+   # same-version package on an official feed cannot be substituted.
+   [ "$2" = /dev/null ] || exit 2
+   [ "$3" = -X ] || exit 2
+   [ "$4" = 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb' ] || exit 2
+   [ "$5" = -U ] && [ "$6" = add ] || exit 2
+   shift 6;;
  del)
    if [ "$2" = --simulate ]; then
      [ "${APPS_TEST_DEL_CORE:-0}" = 1 ] && echo 'Purging kmod-nf-conntrack-netlink (mock)'
@@ -75,12 +101,14 @@ case "$1" in
    exit 0;;
  *) exit 2;;
 esac
-[ "${1:-}" = --simulate ] && exit 0
-for file in "$@"; do
- item="${file##*/}"
- [ "$item" = 'nlbwmon-2025.06.02~29236be6-r1.apk' ] || exit 2
- printf '%s\n' nlbwmon >> "$APPS_TEST_INSTALLED"
-done
+if [ "${1:-}" = --simulate ]; then
+ [ "${APPS_TEST_MISSING_DEP:-0}" = 1 ] && { echo 'ERROR: unable to select packages: missing dependency' >&2; exit 1; }
+ shift
+ [ "$#" -eq 1 ] && [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
+ exit 0
+fi
+[ "$#" -eq 1 ] && [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
+printf '%s\n' nlbwmon >> "$APPS_TEST_INSTALLED"
 SH2
 cat > "$TMP/bin/start-stop-daemon" <<'SH2'
 #!/bin/sh
@@ -103,6 +131,7 @@ export SMARTSAFEHUB_APPS_DAEMON_BIN="$TMP/bin/start-stop-daemon"
 export APPS_TEST_CATALOG="$TMP/catalog.json"
 export APPS_TEST_REPO="$TMP/repo"
 export APPS_TEST_INSTALLED="$TMP/installed"
+export APPS_TEST_APK_LOG="$TMP/apk-commands"
 : > "$APPS_TEST_INSTALLED"
 # Invalid and unapproved input is never interpreted as an APK command.
 if "$MANAGER" start install '../../../../etc/passwd' >/dev/null 2>&1; then fail 'path traversal accepted'; fi
@@ -146,6 +175,9 @@ if ! grep -q 'phase.*success' "$TMP/runtime/apps-operation.state"; then
   fail "approved package not installed (worker code: ${code:-unknown})"
 fi
 grep -qxF nlbwmon "$APPS_TEST_INSTALLED" || fail 'apk add did not run'
+grep -Fqx -- '--repositories-file /dev/null -X https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb -U add --simulate nlbwmon=2025.06.02~29236be6-r1' "$APPS_TEST_APK_LOG" || fail 'signed remote repository preflight not isolated'
+grep -Fqx -- '--repositories-file /dev/null -X https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb -U add nlbwmon=2025.06.02~29236be6-r1' "$APPS_TEST_APK_LOG" || fail 'signed remote repository installation not isolated'
+! grep -E '^.* -U add( --simulate)? /tmp/' "$APPS_TEST_APK_LOG" >/dev/null || fail 'local APK path used for install'
 [ -f "$TMP/owned/network-usage-monitor" ] || fail 'ownership not recorded'
 grep -Fqx 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb' "$APPS_TEST_URL_LOG" || fail 'approved index URL not fetched'
 grep -Fqx 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/nlbwmon-2025.06.02~29236be6-r1.apk' "$APPS_TEST_URL_LOG" || fail 'pinned APK URL not fetched'
@@ -168,6 +200,14 @@ printf 'nlbwmon\n' > "$APPS_TEST_INSTALLED"
 "$MANAGER" start remove network-usage-monitor || :
 grep -q 'E41' "$TMP/runtime/apps-operation.state" || fail 'external APK ownership was ignored'
 : > "$APPS_TEST_INSTALLED"
+# Fail closed when the signed Hub repository cannot satisfy dependencies;
+# never silently select a same-name APK from a different repository.
+export APPS_TEST_MISSING_DEP=1
+"$MANAGER" start install network-usage-monitor || fail 'missing dependency request not started'
+grep -Fqx "$(printf 'code\tE34')" "$TMP/runtime/apps-operation.state" || fail 'missing dependency not rejected'
+grep -Fq 'missing dependency' "$TMP/runtime/apps-last-error.log" || fail 'dependency error not retained'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'dependency failure installed app'
+unset APPS_TEST_MISSING_DEP
 # Digest mismatch denies an otherwise approved install.
 printf 'tampered index' > "$TMP/repo/packages.adb"
 "$MANAGER" start install network-usage-monitor || :
