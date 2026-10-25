@@ -50,7 +50,8 @@ export function read_apps_status() {
 };
 
 function start_apps_operation(request, action) {
-	const app_id = request?.app_id;
+	// rpcd passes declared method parameters in request.args, not request itself.
+	const app_id = request?.args?.app_id;
 	if (type(app_id) != 'string' || match(app_id, /^[a-z0-9][a-z0-9-]{0,79}$/) == null)
 		return failure('APPS_INVALID_ID', '올바르지 않은 앱입니다.');
 	if (!run_command([ MANAGER, 'start', action, app_id ], 5000))

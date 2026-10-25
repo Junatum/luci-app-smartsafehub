@@ -62,6 +62,23 @@ grep -Fq '"apps_install"' "$ACL" || fail 'Apps install ACL missing'
 grep -Fq '"apps_remove"' "$ACL" || fail 'Apps remove ACL missing'
 grep -Fq '"apps_status"' "$ACL" || fail 'Apps status ACL missing'
 grep -Fq 'installVerifiedApp' "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'Apps frontend installation call missing'
+# Apps RPC 인자가 rpcd의 request.args 아래로 전달되는지 검사한다.
+# request.app_id는 항상 빈 값이어서 패키지 작업 시작 전에 APPS_INVALID_ID가 발생한다.
+python3 - "$RPC" "$MODULE" "$ROOT/frontend/src/api/smartsafehub.ts" <<'PY_RPC' || fail 'Apps RPC 인자 전달 계약이 올바르지 않습니다'
+from pathlib import Path
+import re
+import sys
+
+rpc, adapter, frontend = (Path(path).read_text() for path in sys.argv[1:])
+for action in ('install', 'remove'):
+    method = f'apps_{action}'
+    assert re.search(rf'{method}:\s*\{{\s*args:\s*\{{\s*app_id:\s*', rpc), method
+    assert f"'{method}', {{ app_id: appId }}" in frontend, method
+assert 'const app_id = request?.args?.app_id;' in adapter
+assert 'const app_id = request?.app_id;' not in adapter
+assert 'match(app_id, /^[a-z0-9][a-z0-9-]{0,79}$/)' in adapter
+assert "run_command([ MANAGER, 'start', action, app_id ], 5000)" in adapter
+PY_RPC
 
 # Fake only the HTTP/JSON filter utilities: no external calls or OpenWrt runtime
 # are needed to verify identity pinning and mismatch/failure handling.
