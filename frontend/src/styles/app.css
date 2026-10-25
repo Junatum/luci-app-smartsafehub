@@ -606,6 +606,7 @@
 
 .ssh-app[data-theme='dark'] [class~='text-teal-700'],
 .ssh-app[data-theme='dark'] [class~='text-teal-800'],
+.ssh-app[data-theme='dark'] [class~='text-teal-900'],
 .ssh-app[data-theme='dark'] [class~='text-teal-950'] {
   color: #5eead4;
 }

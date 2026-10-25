@@ -17,6 +17,7 @@ OVERLAY="${SMARTSAFEHUB_APPS_OVERLAY_PATH:-/overlay}"
 MEMINFO="${SMARTSAFEHUB_APPS_MEMINFO_PATH:-/proc/meminfo}"
 JSONFILTER="${SMARTSAFEHUB_APPS_JSONFILTER_BIN:-jsonfilter}"
 APK="${SMARTSAFEHUB_APPS_APK_BIN:-apk}"
+ARCH_FILE="${SMARTSAFEHUB_APPS_ARCH_FILE:-/etc/apk/arch}"
 SHA256="${SMARTSAFEHUB_APPS_SHA256_BIN:-sha256sum}"
 DAEMON="${SMARTSAFEHUB_APPS_DAEMON_BIN:-start-stop-daemon}"
 LOCK="$RUNTIME/apps-operation.lock"
@@ -82,6 +83,19 @@ extract_pins() {
  [ "$n" -gt 0 ]
 }
 installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
+# Prefer OpenWrt's configured apk architecture. Some package-manager builds
+# do not support --print-arch consistently. Never guess based on the CPU type,
+# device name, or the channel: the Hub approval must match an exact native arch.
+local_package_arch() {
+ native=''
+ if [ -r "$ARCH_FILE" ]; then
+  native="$(awk '$1 ~ /^(aarch64_cortex-a53|mipsel_24kc|x86_64)$/ {print $1; exit}' "$ARCH_FILE" 2>/dev/null)"
+ fi
+ if [ -z "$native" ]; then
+  native="$("$APK" --print-arch 2>/dev/null || :)"
+ fi
+ case "$native" in aarch64_cortex-a53|mipsel_24kc|x86_64) printf '%s\n' "$native";; esac
+}
 
 status() {
  tmp="$(mktemp "$RUNTIME/apps-status.XXXXXXXX")" || return 1
@@ -130,7 +144,13 @@ preflight_install() {
  [ "$(field "$CATALOG" "@.apps[$index].runtime")" = router ] || return 23
  [ "$(field "$CATALOG" "@.apps[$index].installer")" = apk ] || return 23
  arch="$(field "$CATALOG" "@.apps[$index].package_arch")"
- [ -n "$arch" ] && [ "$arch" = "$("$APK" --print-arch)" ] || return 24
+ native_arch="$(local_package_arch)"
+ if [ -z "$arch" ] || [ "$arch" != "$native_arch" ]; then
+  # E24 is an approval mismatch, not a generic download failure. Keep a
+  # non-sensitive diagnostic for devices with different apk CLI behaviors.
+  command -v logger >/dev/null 2>&1 && logger -t smartsafehub-apps "E24: approved=${arch:-missing} local=${native_arch:-unknown}" || :
+  return 24
+ fi
  approved_hash="$(field "$CATALOG" "@.apps[$index].repository_index_sha256")"
  valid_sha "$approved_hash" || return 25
  # Build an allowlisted repository URL from immutable local firmware identity

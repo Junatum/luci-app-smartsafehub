@@ -9,6 +9,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 mkdir -p "$TMP/bin" "$TMP/runtime" "$TMP/owned" "$TMP/repo" "$TMP/overlay"
 # Linux /proc is unavailable on macOS. A fixture keeps the production check enabled.
 printf 'MemTotal:       262144 kB\n' > "$TMP/meminfo"
+printf 'all\naarch64_cortex-a53\n' > "$TMP/apk-arch"
 printf 'signed immutable package-index test fixture\n' > "$TMP/repo/packages.adb"
 printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk"
 INDEX_SHA="$(sha256sum "$TMP/repo/packages.adb" | cut -d ' ' -f 1)"
@@ -56,7 +57,7 @@ SH2
 cat > "$TMP/bin/apk" <<'SH2'
 #!/bin/sh
 case "$1" in
- --print-arch) echo aarch64_cortex-a53; exit 0;;
+ --print-arch) [ "${APPS_TEST_ARCH_CLI_FAIL:-0}" = 0 ] || exit 1; echo "${APPS_TEST_ARCH_CLI:-aarch64_cortex-a53}"; exit 0;;
  info)
    [ "$2" = -e ] || exit 2
    grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null; exit $?;;
@@ -97,6 +98,7 @@ export SMARTSAFEHUB_APPS_OVERLAY_PATH="$TMP/overlay"
 export SMARTSAFEHUB_APPS_MEMINFO_PATH="$TMP/meminfo"
 export SMARTSAFEHUB_APPS_JSONFILTER_BIN="$TMP/bin/jsonfilter"
 export SMARTSAFEHUB_APPS_APK_BIN="$TMP/bin/apk"
+export SMARTSAFEHUB_APPS_ARCH_FILE="$TMP/apk-arch"
 export SMARTSAFEHUB_APPS_DAEMON_BIN="$TMP/bin/start-stop-daemon"
 export APPS_TEST_CATALOG="$TMP/catalog.json"
 export APPS_TEST_REPO="$TMP/repo"
@@ -119,6 +121,24 @@ rm -f "$TMP/meminfo"
 "$MANAGER" start install network-usage-monitor || fail 'missing-memory request was not queued'
 grep -Fqx "$(printf 'code\tE26')" "$TMP/runtime/apps-operation.state" || fail 'missing memory information was not rejected'
 printf 'MemTotal:       262144 kB\n' > "$TMP/meminfo"
+# apk CLI compatibility: installed config is authoritative, even when
+# --print-arch is unavailable or supplies a different value.
+export APPS_TEST_ARCH_CLI_FAIL=1
+"$MANAGER" start install network-usage-monitor || fail 'configured architecture not accepted without CLI support'
+grep -q 'phase.*success' "$TMP/runtime/apps-operation.state" || fail 'configured architecture rejected with E24'
+"$MANAGER" start remove network-usage-monitor || fail 'architecture test cleanup failed'
+unset APPS_TEST_ARCH_CLI_FAIL
+# Unapproved architecture must fail closed, even when the CLI claims it matches.
+printf 'all\nmipsel_24kc\n' > "$TMP/apk-arch"
+"$MANAGER" start install network-usage-monitor || fail 'mismatched architecture job was not queued'
+grep -Fqx "$(printf 'code\tE24')" "$TMP/runtime/apps-operation.state" || fail 'mismatched native architecture accepted'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'mismatched native architecture installed packages'
+# Older builds without an arch config can still use the apk CLI.
+rm -f "$TMP/apk-arch"
+"$MANAGER" start install network-usage-monitor || fail 'missing arch config fallback job was not queued'
+grep -q 'phase.*success' "$TMP/runtime/apps-operation.state" || fail 'apk CLI architecture fallback rejected'
+"$MANAGER" start remove network-usage-monitor || fail 'arch fallback cleanup failed'
+printf 'all\naarch64_cortex-a53\n' > "$TMP/apk-arch"
 # Signed/index-pinned happy path, local ownership, status and uninstall.
 "$MANAGER" start install network-usage-monitor || fail 'installation start failed'
 if ! grep -q 'phase.*success' "$TMP/runtime/apps-operation.state"; then

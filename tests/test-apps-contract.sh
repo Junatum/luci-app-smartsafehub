@@ -62,6 +62,17 @@ grep -Fq '"apps_install"' "$ACL" || fail 'Apps install ACL missing'
 grep -Fq '"apps_remove"' "$ACL" || fail 'Apps remove ACL missing'
 grep -Fq '"apps_status"' "$ACL" || fail 'Apps status ACL missing'
 grep -Fq 'installVerifiedApp' "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'Apps frontend installation call missing'
+# 다크 모드에서 앱 작업 상태 텍스트가 어둡게 남지 않도록 색상 매핑을 확인한다.
+python3 - "$ROOT/frontend/src/pages/AppsPage.tsx" "$ROOT/frontend/src/styles/app.css" <<'PY_APPS_THEME' || fail 'Apps 작업 상태 다크 모드 계약이 올바르지 않습니다'
+from pathlib import Path
+import sys
+
+page, styles = (Path(file).read_text() for file in sys.argv[1:])
+assert "'border-teal-200 bg-teal-50 text-teal-900'" in page
+assert "'border-rose-200 bg-rose-50 text-rose-800'" in page
+assert "[class~='text-teal-900']" in styles
+assert "[class~='text-rose-800']" in styles
+PY_APPS_THEME
 # Apps RPC 인자가 rpcd의 request.args 아래로 전달되는지 검사한다.
 # request.app_id는 항상 빈 값이어서 패키지 작업 시작 전에 APPS_INVALID_ID가 발생한다.
 python3 - "$RPC" "$MODULE" "$ROOT/frontend/src/api/smartsafehub.ts" <<'PY_RPC' || fail 'Apps RPC 인자 전달 계약이 올바르지 않습니다'
