@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { SectionHeading } from '../components/SectionHeading';
@@ -57,27 +57,72 @@ const TABS: readonly { id: Category; label: string }[] = [
   { id: 'other', label: '기타' },
 ];
 
+type AppAction = 'install' | 'remove';
+
+function OperationIndicator({ action }: { action: AppAction }) {
+  const removing = action === 'remove';
+  return (
+    <span aria-live="polite" class={`inline-flex items-center gap-1.5 text-xs font-bold ${removing ? 'text-red-700' : 'text-teal-700'}`} role="status">
+      <svg aria-hidden="true" class="size-4 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25" />
+        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      </svg>
+      {removing ? '제거 중…' : '설치 중…'}
+    </span>
+  );
+}
+
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, statusError,
   onRefreshStatus, onInstall, onRemove }: AppsPageProps) {
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery] = useState('');
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<VerifiedApp | null>(null);
+  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const currentData = error ? null : data;
   const apps = currentData?.apps ?? [];
   const orphans = Object.entries(installStatus?.installed ?? {}).filter(([id, state]) => state.managed && !apps.some((app) => app.id === id));
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
+  const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'remove' ? job.action : null;
   const filtered = useMemo(() => apps.filter((app) =>
     (category === 'all' || categoryOf(app) === category) &&
     `${app.name} ${app.summary}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   ), [apps, category, query]);
 
-  const requestOperation = async (app: VerifiedApp, action: 'install' | 'remove') => {
-    const verb = action === 'install' ? '설치' : '제거';
-    if (!window.confirm(`${app.name} 앱을 ${verb}하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
+  useEffect(() => {
+    if (!removeTarget) return;
+    cancelRemoveRef.current?.focus();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setRemoveTarget(null);
+        removeTriggerRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [removeTarget]);
+
+  const closeRemoveDialog = () => {
+    setRemoveTarget(null);
+    removeTriggerRef.current?.focus();
+  };
+
+  const openRemoveDialog = (app: VerifiedApp, trigger: HTMLButtonElement) => {
+    if (!installStatus || statusError || pending !== null || running) return;
+    removeTriggerRef.current = trigger;
+    setRemoveTarget(app);
+  };
+
+  const requestOperation = async (app: VerifiedApp, action: AppAction) => {
+    if (!installStatus || statusError || pending !== null || running) return;
+    if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
+    if (action === 'remove') closeRemoveDialog();
     setActionError(null);
-    setPending(app.id);
+    setPending({ appId: app.id, action });
     try {
       if (action === 'install') await onInstall(app.id);
       else await onRemove(app.id);
@@ -91,6 +136,56 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
 
   return (
     <section class="min-w-0 space-y-6">
+      {removeTarget ? (
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+          onClick={(event) => { if (event.target === event.currentTarget) closeRemoveDialog(); }}
+          role="presentation"
+        >
+          <div
+            aria-describedby="apps-remove-description"
+            aria-labelledby="apps-remove-title"
+            aria-modal="true"
+            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return;
+              // Keep keyboard focus inside the confirmation dialog.
+              if (event.shiftKey && event.target === cancelRemoveRef.current) {
+                event.preventDefault();
+                const confirmButton = event.currentTarget.querySelector<HTMLButtonElement>('[data-confirm-remove]');
+                confirmButton?.focus();
+              } else if (!event.shiftKey && event.target instanceof HTMLButtonElement && event.target.hasAttribute('data-confirm-remove')) {
+                event.preventDefault();
+                cancelRemoveRef.current?.focus();
+              }
+            }}
+            role="dialog"
+          >
+            <h2 class="m-0 text-lg font-extrabold text-slate-950" id="apps-remove-title">앱 제거 확인</h2>
+            <p class="mt-3 break-words text-sm text-slate-700" id="apps-remove-description">
+              <strong>{removeTarget.name}</strong> 앱을 이 공유기에서 제거하시겠습니까?
+            </p>
+            <p class="mt-2 text-xs leading-5 text-slate-600">
+              앱에서 제공하던 기능을 더 이상 사용할 수 없습니다. 제거하는 동안 공유기를 재부팅하지 마세요.
+            </p>
+            <div class="mt-5 flex justify-end gap-2">
+              <button
+                class="min-h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                onClick={closeRemoveDialog}
+                ref={cancelRemoveRef}
+                type="button"
+              >취소</button>
+              <button
+                class="min-h-10 rounded-lg bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-100 disabled:opacity-50"
+                data-confirm-remove
+                disabled={!installStatus || Boolean(statusError) || pending !== null || running}
+                onClick={() => void requestOperation(removeTarget, 'remove')}
+                type="button"
+              >앱 제거</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div class="min-w-0">
         <SectionHeading
           eyebrow="SmartSafeHub Apps"
@@ -130,13 +225,13 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
       </div>
 
       {job && job.phase !== 'idle' ? (
-        <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
-          {running ? '앱 작업 진행 중' : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
+        <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800' : running && job.action === 'remove' ? 'border-red-200 bg-red-50 text-red-800' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
+          {running ? (job.action === 'remove' ? '앱 제거 중' : '앱 설치 중') : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
           {job.appId ? ` · ${job.appId}` : ''}
           {job.code && job.code !== 'NONE' ? ` · 오류 코드 ${job.code}` : ''}
           {job.phase === 'failed' && job.code && OPERATION_MESSAGES[job.code]
             ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
-          {running ? <p class="mb-0 mt-1 text-xs">설치 확인과 패키지 처리가 진행 중입니다. 화면을 닫아도 작업은 계속됩니다.</p> : null}
+          {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
         </div>
       ) : null}
       {actionError ? <p class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{actionError}</p> : null}
@@ -180,29 +275,33 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const state = installStatus?.installed[app.id];
                   const installed = state?.installed ?? false;
                   const managed = state?.managed ?? false;
-                  const working = running && job?.appId === app.id;
+                  const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running;
+                  const removable = managed && (installed || Boolean(state?.partial));
                   return (
                     <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
                       <div class="flex min-w-0 items-start gap-3">
                         <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsIcon class="size-5" /></span>
                         <div class="min-w-0 flex-1">
                           <h3 class="m-0 break-words text-sm font-black text-slate-950">{app.name}</h3>
-                          <p class="mt-1 mb-0 text-xs text-slate-500">v{app.version}</p>
+                          <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <span class="text-xs text-slate-500">v{app.version}</span>
+                            {installed && managed ? <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">✓ 설치됨</span> : null}
+                          </div>
                         </div>
                       </div>
                       <p class="mt-4 mb-4 min-h-10 break-words text-sm leading-5 text-slate-600">{app.summary}</p>
                       <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                         <span class="text-xs font-bold text-teal-700">✓ 검증된 앱</span>
-                        {working ? <span class="text-xs font-semibold text-teal-700">작업 중…</span>
+                        {activeAction ? <OperationIndicator action={activeAction} />
                           : installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
                           : state?.partial && !managed ? <span class="text-xs text-amber-700">일부 패키지 설치됨</span>
                           : <button
-                              class="min-h-9 rounded-lg border border-teal-300 px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              class={`min-h-9 rounded-lg border bg-white px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${removable ? 'border-red-300 text-red-700 hover:bg-red-50 focus-visible:ring-red-100' : 'border-teal-300 text-teal-800 hover:bg-teal-50 focus-visible:ring-teal-200'}`}
                               disabled={disabled || (Boolean(state?.partial) && !managed)}
-                              onClick={() => void requestOperation(app, managed && (installed || state?.partial) ? 'remove' : 'install')}
+                              onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget) : void requestOperation(app, 'install')}
                               type="button"
-                            >{managed ? (installed || state?.partial ? '제거' : '재설치') : '설치'}</button>}
+                            >{removable ? '제거' : managed ? '재설치' : '설치'}</button>}
                       </div>
                     </article>
                   );
@@ -225,17 +324,20 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
               <h3 class="m-0 text-sm font-black text-amber-900">제공이 중단된 앱</h3>
               <p class="mb-3 mt-1 text-xs text-amber-800">현재 승인 목록에서 제외되었지만 기기에 남아 있는 앱입니다. 설치는 불가능하며 제거할 수 있습니다.</p>
               <div class="space-y-2">
-                {orphans.map(([id]) => (
-                  <div class="flex flex-wrap items-center justify-between gap-3" key={id}>
-                    <span class="break-all text-sm text-amber-900">{id}</span>
-                    <button
-                      class="min-h-9 rounded-lg border border-amber-400 px-3 text-xs font-bold text-amber-900 disabled:opacity-50"
-                      disabled={running || pending !== null || Boolean(statusError)}
-                      onClick={() => void requestOperation({ id, name: id, summary: '', description: '', category: '', version: '' }, 'remove')}
-                      type="button"
-                    >제거</button>
-                  </div>
-                ))}
+                {orphans.map(([id]) => {
+                  const activeAction = pending?.appId === id ? pending.action : running && job?.appId === id ? jobAction : null;
+                  return (
+                    <div class="flex flex-wrap items-center justify-between gap-3" key={id}>
+                      <span class="break-all text-sm text-amber-900">{id}</span>
+                      {activeAction ? <OperationIndicator action={activeAction} /> : <button
+                        class="min-h-9 rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!installStatus || running || pending !== null || Boolean(statusError)}
+                        onClick={(event) => openRemoveDialog({ id, name: id, summary: '', description: '', category: '', version: '' }, event.currentTarget)}
+                        type="button"
+                      >제거</button>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : null}

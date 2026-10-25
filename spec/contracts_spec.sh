@@ -287,6 +287,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'Apps 설치/제거 색상과 제거 확인 팝업 및 진행 상태를 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-ui.sh"
+    The status should be success
+    The output should start with 'PASS: Apps removal confirmation'
+    The error should be blank
+  End
+
   It 'SmartSafeHub Apps 메뉴와 승인된 앱 카탈로그를 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-contract.sh"
     The status should be success
