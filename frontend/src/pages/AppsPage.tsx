@@ -30,6 +30,25 @@ function categoryOf(app: VerifiedApp): Category {
   }
 }
 
+const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
+  E21: '서버에서 승인 정보를 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.',
+  E22: '이 펌웨어에서 승인되지 않은 앱입니다.',
+  E24: '공유기의 패키지 아키텍처와 앱이 일치하지 않습니다.',
+  E25: '배포 저장소가 승인 당시와 달라졌거나 접근할 수 없습니다. 관리자 확인 후 다시 시도해 주세요.',
+  E26: '앱 설치에 필요한 메모리 또는 저장 공간이 부족합니다.',
+  E27: '승인된 패키지 정보가 올바르지 않습니다.',
+  E28: '이전에 설치한 앱의 구성이 현재 승인 정보와 다릅니다.',
+  E29: '동일한 패키지가 이미 다른 방법으로 설치되어 있습니다.',
+  E31: '앱 파일을 다운로드하지 못했습니다.',
+  E32: '다운로드된 앱 파일이 올바르지 않습니다.',
+  E33: '앱 파일의 검증 값이 일치하지 않습니다.',
+  E34: '패키지 설치 사전 확인에 실패했습니다.',
+  E35: '패키지를 설치하지 못했습니다.',
+  E41: 'SmartSafeHub Apps에서 설치한 앱만 여기서 제거할 수 있습니다.',
+  E44: '기존 시스템에 영향을 줄 수 있어 앱 제거가 차단됐습니다.',
+  E45: '앱 제거에 실패했습니다.',
+};
+
 const TABS: readonly { id: Category; label: string }[] = [
   { id: 'all', label: '전체' },
   { id: 'network', label: '네트워크' },
@@ -115,6 +134,8 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
           {running ? '앱 작업 진행 중' : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
           {job.appId ? ` · ${job.appId}` : ''}
           {job.code && job.code !== 'NONE' ? ` · 오류 코드 ${job.code}` : ''}
+          {job.phase === 'failed' && job.code && OPERATION_MESSAGES[job.code]
+            ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
           {running ? <p class="mb-0 mt-1 text-xs">설치 확인과 패키지 처리가 진행 중입니다. 화면을 닫아도 작업은 계속됩니다.</p> : null}
         </div>
       ) : null}
@@ -174,7 +195,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                         <span class="text-xs font-bold text-teal-700">✓ 검증된 앱</span>
                         {working ? <span class="text-xs font-semibold text-teal-700">작업 중…</span>
-                          : installed && !managed ? <span class="text-xs text-slate-500">기존에 설치됨</span>
+                          : installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
                           : state?.partial && !managed ? <span class="text-xs text-amber-700">일부 패키지 설치됨</span>
                           : <button
                               class="min-h-9 rounded-lg border border-teal-300 px-3 text-xs font-bold text-teal-800 transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"

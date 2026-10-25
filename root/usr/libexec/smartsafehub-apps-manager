@@ -8,7 +8,10 @@ SELF="${SMARTSAFEHUB_APPS_MANAGER_BIN:-/usr/libexec/smartsafehub-apps-manager}"
 CATALOG_HELPER="${SMARTSAFEHUB_APPS_HELPER_BIN:-/usr/libexec/smartsafehub-apps}"
 RUNTIME="${SMARTSAFEHUB_APPS_RUNTIME_DIR:-/tmp/smartsafehub}"
 OWNED="${SMARTSAFEHUB_APPS_OWNED_DIR:-/etc/smartsafehub/apps-installed}"
-REPO_INDEX="${SMARTSAFEHUB_APPS_REPO_INDEX:-/usr/share/smartsafehub/apps-packages.adb}"
+# Fixed first-party host. Only the Hub-approved channel/architecture determine
+# the repository path; callers cannot submit a repository URL.
+REPO_BASE="${SMARTSAFEHUB_APPS_REPO_BASE:-https://repo.smartsafehub.com}"
+UCLIENT="${SMARTSAFEHUB_APPS_UCLIENT_BIN:-uclient-fetch}"
 OVERLAY="${SMARTSAFEHUB_APPS_OVERLAY_PATH:-/overlay}"
 # OpenWrt uses /proc/meminfo; tests on non-Linux hosts supply a fixture.
 MEMINFO="${SMARTSAFEHUB_APPS_MEMINFO_PATH:-/proc/meminfo}"
@@ -130,10 +133,20 @@ preflight_install() {
  [ -n "$arch" ] && [ "$arch" = "$("$APK" --print-arch)" ] || return 24
  approved_hash="$(field "$CATALOG" "@.apps[$index].repository_index_sha256")"
  valid_sha "$approved_hash" || return 25
- # Index is provisioned by the firmware/repository operator, never by the UI.
- # An ordinary mutable OpenWrt mirror does not satisfy this check.
- [ -s "$REPO_INDEX" ] || return 25
- actual_hash="$("$SHA256" "$REPO_INDEX" | cut -d ' ' -f 1)"
+ # Build an allowlisted repository URL from immutable local firmware identity
+ # and the approved catalog response. The Hub pins the exact index digest.
+ channel="$(field "$CATALOG" '@.channel')"
+ case "$channel" in stable|beta) ;; *) return 25;; esac
+ case "$arch" in aarch64_cortex-a53|mipsel_24kc|x86_64) ;; *) return 24;; esac
+ repo_url="$REPO_BASE/$channel/packages/$arch/smartsafehub"
+ index_url="$repo_url/packages.adb"
+ # Always fetch the current published index. If a channel is republished after
+ # review, fail closed until Hub has reviewed the new index hash.
+ "$UCLIENT" -q -T 15 -O "$stage/packages.adb" "$index_url" > "$stage/index-fetch.log" 2>&1 || return 25
+ [ -s "$stage/packages.adb" ] || return 25
+ index_bytes="$(wc -c < "$stage/packages.adb" | tr -d ' ')"
+ [ "$index_bytes" -le 8388608 ] || return 25
+ actual_hash="$("$SHA256" "$stage/packages.adb" | cut -d ' ' -f 1)"
  [ "$approved_hash" = "$actual_hash" ] || return 25
  memory="$(field "$CATALOG" "@.apps[$index].requirements.min_memory_mb")"
  storage="$(field "$CATALOG" "@.apps[$index].requirements.min_storage_mb")"
@@ -164,29 +177,29 @@ install_app() {
  while IFS="$(printf '\t')" read -r name version hash; do
   installed "$name" && return 29
  done < "$pins"
- # Download into private RAM-backed storage; no arbitrary URLs or --allow-untrusted.
- # Each directly requested archive is verified against the Hub reviewer pin.
+ # Download the *specific* archive from SmartSafeHub rather than using apk
+ # fetch's default repository selection. OpenWrt may offer the same name and
+ # version from its own feeds, which is not necessarily the approved binary.
  mkdir -p "$stage/packages" || return 30
  set --
  while IFS="$(printf '\t')" read -r name version hash; do
-  "$APK" fetch --output "$stage/packages" "$name=$version" > "$stage/fetch.log" 2>&1 || return 31
-  count=0; selected=''
-  for file in "$stage/packages/$name-$version.apk"; do
-   [ -f "$file" ] || continue
-   count=$((count + 1)); selected="$file"
-  done
-  [ "$count" -eq 1 ] || return 32
+  selected="$stage/packages/$name-$version.apk"
+  "$UCLIENT" -q -T 30 -O "$selected" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
+  [ -s "$selected" ] && [ ! -L "$selected" ] || return 32
+  archive_bytes="$(wc -c < "$selected" | tr -d ' ')"
+  [ "$archive_bytes" -le 33554432 ] || return 32
   [ "$("$SHA256" "$selected" | cut -d ' ' -f 1)" = "$hash" ] || return 33
   set -- "$@" "$selected"
  done < "$pins"
- # APK resolves dependencies only from the system's already signed repositories.
- # Do not pass a generic APK upgrade or install software outside the pins.
- "$APK" add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
+ # APK still validates repository signatures using configured trusted keys;
+ # never use --allow-untrusted or a whole-system upgrade. Dependencies retain
+ # OpenWrt's normal package resolution and must be tested with each firmware.
+ "$APK" -X "$index_url" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
  # Reject any transaction that proposes replacing/removing a protected core.
  if grep -Ei '(Installing|Upgrading|Downgrading|Purging|Removing) (base-files|busybox|apk|procd|netifd|dnsmasq[^ ]*|firewall[^ ]*|odhcp[^ ]*|dropbear|ubus[^ ]*|rpcd[^ ]*|uhttpd[^ ]*|safeshield[^ ]*|luci-app-smartsafehub|kernel|kmod-[^ ]*) ' "$stage/plan.log" >/dev/null; then
   return 34
  fi
- "$APK" add "$@" > "$stage/install.log" 2>&1 || return 35
+ "$APK" -X "$index_url" -U add "$@" > "$stage/install.log" 2>&1 || return 35
  mkdir -p "$OWNED" || return 36
  cp "$pins" "$(owned_manifest "$app").new" || return 36
  mv -f "$(owned_manifest "$app").new" "$(owned_manifest "$app")" || return 36
@@ -214,6 +227,11 @@ remove_app() {
  for name in "$@"; do installed "$name" && any_installed=1; done
  if [ "$any_installed" -eq 1 ]; then
   "$APK" del --simulate "$@" > "$stage/plan.log" 2>&1 || return 44
+  # Removing an optional app must never implicitly remove system/network,
+  # SafeShield or firmware kernel-module packages.
+  if grep -Ei '(Purging|Removing|Upgrading|Downgrading) (base-files|busybox|apk|procd|netifd|dnsmasq[^ ]*|firewall[^ ]*|odhcp[^ ]*|dropbear|ubus[^ ]*|rpcd[^ ]*|uhttpd[^ ]*|safeshield[^ ]*|luci-app-smartsafehub|kernel|kmod-[^ ]*) ' "$stage/plan.log" >/dev/null; then
+   return 44
+  fi
   "$APK" del "$@" > "$stage/remove.log" 2>&1 || return 45
  fi
  rm -f "$manifest"
