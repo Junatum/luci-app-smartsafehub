@@ -4,6 +4,7 @@ import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
+import { approvedLuciPath } from '../utils/appsWebUi';
 
 type Category = 'all' | 'network' | 'security' | 'smart_home' | 'other';
 
@@ -81,11 +82,19 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const cancelRemoveRef = useRef<HTMLButtonElement>(null);
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissedJob, setDismissedJob] = useState<string | null>(null);
   const currentData = error ? null : data;
   const apps = currentData?.apps ?? [];
   const orphans = Object.entries(installStatus?.installed ?? {}).filter(([id, state]) => state.managed && !apps.some((app) => app.id === id));
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
+  const jobKey = job ? `${job.phase}:${job.action}:${job.appId}:${job.code}` : '';
+  const showJob = job && job.phase !== 'idle' && jobKey !== dismissedJob;
+  useEffect(() => {
+    if (job?.phase !== 'success' || !showJob) return;
+    const timeout = window.setTimeout(() => setDismissedJob(jobKey), 7000);
+    return () => window.clearTimeout(timeout);
+  }, [jobKey, job?.phase, showJob]);
   const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'remove' ? job.action : null;
   const filtered = useMemo(() => apps.filter((app) =>
     (category === 'all' || categoryOf(app) === category) &&
@@ -122,6 +131,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
     setActionError(null);
+    setDismissedJob(null);
     setPending({ appId: app.id, action });
     try {
       if (action === 'install') await onInstall(app.id);
@@ -224,14 +234,19 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
         </div>
       </div>
 
-      {job && job.phase !== 'idle' ? (
+      {showJob && job ? (
         <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800' : running && job.action === 'remove' ? 'border-red-200 bg-red-50 text-red-800' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
-          {running ? (job.action === 'remove' ? '앱 제거 중' : '앱 설치 중') : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
-          {job.appId ? ` · ${job.appId}` : ''}
-          {job.code && job.code !== 'NONE' ? ` · 오류 코드 ${job.code}` : ''}
-          {job.phase === 'failed' && job.code && OPERATION_MESSAGES[job.code]
-            ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
-          {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              {running ? (job.action === 'remove' ? '앱 제거 중' : '앱 설치 중') : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
+              {job.appId ? ` · ${job.appId}` : ''}
+              {job.code && job.code !== 'NONE' ? ` · 오류 코드 ${job.code}` : ''}
+              {job.phase === 'failed' && job.code && OPERATION_MESSAGES[job.code]
+                ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
+              {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
+            </div>
+            {!running ? <button aria-label="앱 작업 알림 닫기" class="shrink-0 rounded-lg px-2 py-1 text-xs font-bold hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2" onClick={() => setDismissedJob(jobKey)} type="button">닫기 ×</button> : null}
+          </div>
         </div>
       ) : null}
       {actionError ? <p class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{actionError}</p> : null}
@@ -278,6 +293,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running;
                   const removable = managed && (installed || Boolean(state?.partial));
+                  const launchPath = installed && state?.webUiReady ? approvedLuciPath(app.webUi) : null;
                   return (
                     <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
                       <div class="flex min-w-0 items-start gap-3">
@@ -293,8 +309,17 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       <p class="mt-4 mb-4 min-h-10 break-words text-sm leading-5 text-slate-600">{app.summary}</p>
                       <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                         <span class="text-xs font-bold text-teal-700">✓ 검증된 앱</span>
-                        {activeAction ? <OperationIndicator action={activeAction} />
-                          : installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
+                        {activeAction ? <OperationIndicator action={activeAction} /> : (
+                          <span class="flex flex-wrap items-center gap-2">
+                            {managed && state?.partial && !installed ? (
+                              <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
+                            ) : null}
+                            {launchPath ? (
+                              <a aria-label={`${app.name} 새 탭에서 열기`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href={launchPath} rel="noopener noreferrer" target="_blank">열기 ↗</a>
+                            ) : installed && app.webUi ? (
+                              <span class="text-xs text-amber-700" title="이 앱의 웹 UI 패키지를 설치해야 열 수 있습니다.">웹 UI 미설치</span>
+                            ) : null}
+                            {installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
                           : state?.partial && !managed ? <span class="text-xs text-amber-700">일부 패키지 설치됨</span>
                           : <button
                               class={`min-h-9 rounded-lg border bg-white px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${removable ? 'border-red-300 text-red-700 hover:bg-red-50 focus-visible:ring-red-100' : 'border-teal-300 text-teal-800 hover:bg-teal-50 focus-visible:ring-teal-200'}`}
@@ -302,6 +327,8 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                               onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget) : void requestOperation(app, 'install')}
                               type="button"
                             >{removable ? '제거' : managed ? '재설치' : '설치'}</button>}
+                          </span>
+                        )}
                       </div>
                     </article>
                   );

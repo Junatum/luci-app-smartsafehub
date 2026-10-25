@@ -18,7 +18,7 @@ def check(ok, message):
 
 
 # No release number bump or backend change is needed for a UI reinforcement.
-check('PKG_VERSION:=0.2.30' in package and 'PKG_RELEASE:=8' in package, 'release must stay r8')
+check('PKG_VERSION:=0.2.30' in package and 'PKG_RELEASE:=9' in package, 'release must be r9')
 check('border-teal-300 text-teal-800 hover:bg-teal-50' in page, 'install should stay teal')
 check('border-red-300 text-red-700 hover:bg-red-50' in page, 'removal must be red outline')
 check('hover\\:bg-red-50:hover' in styles, 'red hover needs an explicit dark-mode style')

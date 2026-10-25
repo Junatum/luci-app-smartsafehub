@@ -11,6 +11,15 @@ function text(value, max_length) {
 	return type(value) == 'string' && length(value) <= max_length ? value : '';
 }
 
+// Only open LuCI pages served by this router. Reject query strings, fragments,
+// percent escapes, scheme-relative URLs and path traversal from catalog data.
+function web_ui_path(value) {
+	if (!text(value, 160) ||
+		match(value, /^\/cgi-bin\/luci\/admin\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/) == null)
+		return '';
+	return value;
+}
+
 // This endpoint is *read-only*. The catalog never supplies executable
 // commands, repository URLs or permissions to a package installer. The
 // separate privileged installer must revalidate every approval in the future.
@@ -48,6 +57,13 @@ export function read_apps_catalog() {
 		if (!length(id) || !length(name) || match(id, /^[a-z0-9][a-z0-9-]{0,79}$/) == null) {
 			continue;
 		}
+		// Backward-compatible route for the already approved nlbwmon catalog.
+		// The page is only launchable if its UI package is actually installed.
+		let path = '';
+		if (item?.web_ui?.type == 'luci')
+			path = web_ui_path(item.web_ui.path);
+		else if (id == 'network-usage-monitor')
+			path = '/cgi-bin/luci/admin/services/nlbw/display';
 		// Only UI copy crosses into the unprivileged browser. All package hashes,
 		// permissions and install descriptors remain server-side until an installer
 		// with independent verification is implemented.
@@ -58,6 +74,7 @@ export function read_apps_catalog() {
 			description: text(item?.description, 2000),
 			category: text(item?.category, 64),
 			version: text(item?.version, 64),
+			webUi: length(path) ? { type: 'luci', path: path } : null,
 		});
 	}
 	return success({

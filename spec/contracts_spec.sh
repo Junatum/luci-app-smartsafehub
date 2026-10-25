@@ -294,6 +294,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'SmartSafeHub Apps 공식 UI 새 탭 실행과 알림 닫기 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-launch.sh"
+    The status should be success
+    The output should start with 'PASS: Apps secure new-tab launch'
+    The error should be blank
+  End
+
   It 'SmartSafeHub Apps 메뉴와 승인된 앱 카탈로그를 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-contract.sh"
     The status should be success

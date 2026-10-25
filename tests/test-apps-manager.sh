@@ -12,8 +12,10 @@ printf 'MemTotal:       262144 kB\n' > "$TMP/meminfo"
 printf 'all\naarch64_cortex-a53\n' > "$TMP/apk-arch"
 printf 'signed immutable package-index test fixture\n' > "$TMP/repo/packages.adb"
 printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk"
+printf 'approved LuCI mock package payload\n' > "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk"
 INDEX_SHA="$(sha256sum "$TMP/repo/packages.adb" | cut -d ' ' -f 1)"
 ARCHIVE_SHA="$(sha256sum "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk" | cut -d ' ' -f 1)"
+LUCISH="$(sha256sum "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF
 {"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
@@ -71,6 +73,8 @@ case "$url" in
    cp "$APPS_TEST_REPO/packages.adb" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/nlbwmon-2025.06.02~29236be6-r1.apk)
    cp "$APPS_TEST_REPO/nlbwmon-2025.06.02~29236be6-r1.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/luci-app-nlbwmon-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_REPO/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
  *) exit 2;;
 esac
 printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
@@ -104,11 +108,18 @@ esac
 if [ "${1:-}" = --simulate ]; then
  [ "${APPS_TEST_MISSING_DEP:-0}" = 1 ] && { echo 'ERROR: unable to select packages: missing dependency' >&2; exit 1; }
  shift
- [ "$#" -eq 1 ] && [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
+ [ "$#" -ge 1 ] && [ "$#" -le 2 ] || exit 2
+ [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
+ [ "$#" -eq 1 ] || [ "$2" = 'luci-app-nlbwmon=26.288.56989~75a306d' ] || exit 2
  exit 0
 fi
-[ "$#" -eq 1 ] && [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
-printf '%s\n' nlbwmon >> "$APPS_TEST_INSTALLED"
+[ "$#" -ge 1 ] && [ "$#" -le 2 ] || exit 2
+[ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
+[ "$#" -eq 1 ] || [ "$2" = 'luci-app-nlbwmon=26.288.56989~75a306d' ] || exit 2
+for pin in "$@"; do
+ name="${pin%%=*}"
+ grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
+done
 SH2
 cat > "$TMP/bin/start-stop-daemon" <<'SH2'
 #!/bin/sh
@@ -221,6 +232,7 @@ grep -q 'E33' "$TMP/runtime/apps-operation.state" || fail 'archive mismatch allo
 # Revocation must not trap SmartSafeHub-owned packages on the device.
 printf 'nlbwmon\n' > "$APPS_TEST_INSTALLED"
 printf 'nlbwmon\t2025.06.02~29236be6-r1\t%s\n' "$ARCHIVE_SHA" > "$TMP/owned/network-usage-monitor"
+cp "$TMP/catalog.json" "$TMP/catalog-approved.json"
 python3 - "$TMP/catalog.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d['apps']=[]; open(p,'w').write(json.dumps(d))
@@ -230,4 +242,49 @@ PY
 grep -Fq "$(printf 'network-usage-monitor\t0\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'revoked app missing from local inventory'
 "$MANAGER" start remove network-usage-monitor || fail 'recalled app removal failed'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'revoked app could not be removed'
-printf 'PASS: Apps install/remove allowlist, pins, ownership, status, revocation\n'
+# Additive approval: existing Apps-owned daemon receives an approved LuCI package.
+cp "$TMP/catalog-approved.json" "$TMP/catalog.json"
+"$TMP/bin/fetch-catalog"
+printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk"
+"$MANAGER" start install network-usage-monitor || fail 'daemon reinstall was not queued'
+[ -f "$TMP/owned/network-usage-monitor" ] || fail 'daemon ownership missing before extension'
+python3 - "$TMP/catalog.json" "$LUCISH" <<'PY'
+import json,sys
+p=sys.argv[1]
+d=json.load(open(p)); app=d['apps'][0]
+app['packages'].append({'name':'luci-app-nlbwmon','version':'26.288.56989~75a306d','sha256':sys.argv[2]})
+app['web_ui']={'type':'luci','path':'/cgi-bin/luci/admin/services/nlbw/display','package':'luci-app-nlbwmon'}
+open(p,'w').write(json.dumps(d))
+PY
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fq "$(printf 'network-usage-monitor\t0\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'partial app must not expose missing web UI'
+# An externally installed LuCI package may never be adopted into ownership.
+printf 'luci-app-nlbwmon\n' >> "$APPS_TEST_INSTALLED"
+"$MANAGER" start install network-usage-monitor || fail 'external UI rejection did not queue'
+grep -Fqx "$(printf 'code\tE29')" "$TMP/runtime/apps-operation.state" || fail 'external LuCI ownership incorrectly adopted'
+[ "$(wc -l < "$TMP/owned/network-usage-monitor")" -eq 1 ] || fail 'old owned manifest changed on rejection'
+grep -vxF 'luci-app-nlbwmon' "$APPS_TEST_INSTALLED" > "$APPS_TEST_INSTALLED.tmp" || :
+mv "$APPS_TEST_INSTALLED.tmp" "$APPS_TEST_INSTALLED"
+# A change to an existing owned pin is not an additive approval.
+cp "$TMP/catalog.json" "$TMP/catalog-extended.json"
+python3 - "$TMP/catalog.json" <<'PY'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p)); d['apps'][0]['packages'][0]['sha256']='0'*64
+open(p,'w').write(json.dumps(d))
+PY
+"$TMP/bin/fetch-catalog"
+"$MANAGER" start install network-usage-monitor || fail 'changed old pin did not queue'
+grep -Fqx "$(printf 'code\tE28')" "$TMP/runtime/apps-operation.state" || fail 'changed previously owned pin accepted'
+cp "$TMP/catalog-extended.json" "$TMP/catalog.json"
+"$TMP/bin/fetch-catalog"
+"$MANAGER" start install network-usage-monitor || fail 'approved UI extension did not queue'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'approved UI extension failed'
+grep -qxF luci-app-nlbwmon "$APPS_TEST_INSTALLED" || fail 'approved UI was not installed'
+grep -Fqx "$(printf 'luci-app-nlbwmon\t26.288.56989~75a306d\t%s' "$LUCISH")" "$TMP/owned/network-usage-monitor" || fail 'new UI package not owned'
+"$MANAGER" status
+grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'approved UI ready state incorrect'
+"$MANAGER" start remove network-usage-monitor || fail 'complete app removal did not queue'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'complete app removal left verified packages behind'
+[ ! -f "$TMP/owned/network-usage-monitor" ] || fail 'complete app ownership not removed'
+printf 'PASS: Apps install/remove allowlist, pins, ownership, status, revocation, additive UI\n'

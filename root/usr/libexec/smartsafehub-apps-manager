@@ -97,6 +97,29 @@ local_package_arch() {
  case "$native" in aarch64_cortex-a53|mipsel_24kc|x86_64) printf '%s\n' "$native";; esac
 }
 
+# Web UI is never considered ready based only on the daemon package.
+# Network usage is explicitly known to require a separate LuCI package.
+# Other apps opt in via an approved web_ui.package that is also in their
+# approved package list, preventing an unrelated local app from being opened.
+web_ui_package() {
+ id="$1"; idx="$2"
+ if [ "$id" = network-usage-monitor ]; then
+  printf '%s\n' luci-app-nlbwmon
+  return 0
+ fi
+ [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
+ name="$(field "$CATALOG" "@.apps[$idx].web_ui.package")"
+ valid_package "$name" || return 1
+ p=0
+ while [ "$p" -le 32 ]; do
+  candidate="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
+  [ -n "$candidate" ] || break
+  if [ "$candidate" = "$name" ]; then printf '%s\n' "$name"; return 0; fi
+  p=$((p + 1))
+ done
+ return 1
+}
+
 status() {
  tmp="$(mktemp "$RUNTIME/apps-status.XXXXXXXX")" || return 1
  {
@@ -117,10 +140,13 @@ status() {
   done
   managed=0
   [ -f "$(owned_manifest "$id")" ] && managed=1
+  ui_ready=0
+  ui_package="$(web_ui_package "$id" "$idx" || :)"
+  [ -n "$ui_package" ] && installed "$ui_package" && ui_ready=1
   # id, fully installed, at least one package installed, SmartSafeHub-owned
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
-  printf '%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready"
  done
  # Include withdrawn apps, so a device can uninstall owned packages after
  # the Hub review is revoked (without granting new installation rights).
@@ -129,7 +155,7 @@ status() {
   id="${manifest##*/}"
   valid_id "$id" || continue
   if app_index "$id" >/dev/null 2>&1; then continue; fi
-  printf '%s\t0\t1\t1\n' "$id"
+  printf '%s\t0\t1\t1\t0\n' "$id"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"
@@ -184,19 +210,28 @@ preflight_install() {
 install_app() {
  preflight_install || return $?
  manifest="$(owned_manifest "$app")"
- # Missing packages after sysupgrade may be reinstalled against a NEW approval.
- # Refuse mixed partially installed sets to avoid taking ownership accidentally.
+ # Existing Apps-owned pins must remain identical. The Hub can approve a
+ # strictly additive set (e.g. nlbwmon -> nlbwmon + luci-app-nlbwmon), but
+ # it cannot take ownership of a package installed by a different method.
  if [ -e "$manifest" ]; then
-  awk -F '\t' '{print $1}' "$manifest" > "$stage/old-names"
-  awk -F '\t' '{print $1}' "$pins" > "$stage/new-names"
-  cmp -s "$stage/old-names" "$stage/new-names" || return 28
+  [ -s "$manifest" ] || return 28
   while IFS="$(printf '\t')" read -r name version hash; do
-   installed "$name" && return 28
-  done < "$pins"
+   valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 28
+   grep -Fqx "$(printf '%s\t%s\t%s' "$name" "$version" "$hash")" "$pins" || return 28
+  done < "$manifest"
  fi
+ need_install=0
  while IFS="$(printf '\t')" read -r name version hash; do
-  installed "$name" && return 29
+  if [ -e "$manifest" ] && grep -Fqx "$(printf '%s\t%s\t%s' "$name" "$version" "$hash")" "$manifest"; then
+   # Already owned, no second owner can be adopted.
+   if ! installed "$name"; then need_install=1; fi
+  elif installed "$name"; then
+   return 29
+  else
+   need_install=1
+  fi
  done < "$pins"
+ [ "$need_install" -eq 1 ] || return 28
  # Download the *specific* archive from SmartSafeHub rather than using apk
  # fetch's default repository selection. OpenWrt may offer the same name and
  # version from its own feeds, which is not necessarily the approved binary.

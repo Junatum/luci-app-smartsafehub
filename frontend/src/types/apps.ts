@@ -6,6 +6,8 @@ export interface VerifiedApp {
   description: string;
   category: string;
   version: string;
+  /** Approved same-origin LuCI page; never an external URL or executable code. */
+  webUi?: { type: 'luci'; path: string } | null;
 }
 
 export interface AppsCatalog {
@@ -28,6 +30,7 @@ export interface AppsInstallStatus {
     installed: boolean;
     partial: boolean;
     managed: boolean;
+    webUiReady?: boolean;
   }>;
 }
 

@@ -25,6 +25,15 @@
 
 OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 이전의 `APKINDEX.tar.gz` 형식이라고 가정하면 안 됩니다.
 
+## 설치된 앱 열기 (0.2.30-r9)
+
+- 웹 화면을 제공하는 앱은 설치 후 `열기`로 **새 탭**에서 공식 LuCI UI를 표시합니다. SmartSafeHub 탭은 그대로 유지합니다.
+- 웹 UI는 `web_ui: {"type":"luci","path":"/cgi-bin/luci/admin/…","package":"…"}`로 승인된 카탈로그에서 선언할 수 있습니다. 경로는 **같은 공유기의 LuCI 관리자 화면**으로 제한됩니다. 외부 사이트, 임의 포트, 실행 명령은 허용되지 않습니다.
+- `network-usage-monitor`는 기존 카탈로그에도 `admin/services/nlbw/display` 경로를 사용할 수 있지만, **`luci-app-nlbwmon`이 설치되어 있어야만** 열기 버튼이 표시됩니다. `nlbwmon`만 설치된 공유기에는 `웹 UI 미설치`가 표시됩니다.
+- 한 앱에 필요한 `nlbwmon`과 `luci-app-nlbwmon`을 **모두** 관리하려면 Hub 승인 카탈로그의 `packages` 배열에 두 APK의 정확한 버전과 SHA-256을 등록하고, SmartSafeHub 서명 저장소에도 해당 APK·의존성을 게시해야 합니다. 공유기만 수정해 승인 없이 `apk add`하지 않습니다.
+- 기존 Apps 소유의 `nlbwmon`만 설치된 기기는 동일 버전/해시의 `nlbwmon`을 유지한 채 신규 승인된 `luci-app-nlbwmon` 핀을 **추가**할 수 있습니다. 새 승인 목록에서 기존 패키지가 바뀌거나 빠진 경우 변경을 거부합니다.
+- `luci-app-nlbwmon`은 OpenWrt LuCI 인증을 다시 요구할 수 있습니다.
+
 ## 동작과 제한
 
 - 설치 시작 시 **Hub에서 승인 목록을 다시 조회**합니다. 인터넷이 끊겼거나 승인이 취소된 앱은 신규 설치가 불가능합니다.
