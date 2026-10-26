@@ -17,8 +17,8 @@ def check(ok, message):
         raise AssertionError(message)
 
 
-# The verified official dependency installer requires the next package revision.
-check('PKG_VERSION:=0.2.30' in package and 'PKG_RELEASE:=10' in package, 'release must be r10')
+# Version/revision validity is covered by test-package-contract.sh.
+check('PKG_VERSION:=0.2.30' in package, 'unexpected Apps package version')
 check('border-teal-300 text-teal-800 hover:bg-teal-50' in page, 'install should stay teal')
 check('border-red-300 text-red-700 hover:bg-red-50' in page, 'removal must be red outline')
 check('hover\\:bg-red-50:hover' in styles, 'red hover needs an explicit dark-mode style')
@@ -41,7 +41,7 @@ check("if (event.key === 'Escape')" in page and "event.key !== 'Tab'" in page,
       'dialog must support escape and focus containment')
 check("if (action === 'remove') closeRemoveDialog()" in page,
       'confirmed operation should close the modal before starting')
-check("if (!installStatus || statusError || pending !== null || running) return;" in page,
+check("if (!installStatus || statusError || pending !== null || running || restoring) return;" in page,
       'operation must preserve status and concurrency guards')
 
 # Installing still uses the existing confirmation and neither action bypasses RPC guards.

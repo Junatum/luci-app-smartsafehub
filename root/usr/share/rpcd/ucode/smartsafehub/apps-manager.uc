@@ -7,6 +7,7 @@ import { failure, run_command, success } from './core.uc';
 const MANAGER = '/usr/libexec/smartsafehub-apps-manager';
 const STATE = '/tmp/smartsafehub/apps-operation.state';
 const STATUS = '/tmp/smartsafehub/apps-status.tsv';
+const RESTORE_STATE = '/tmp/smartsafehub/apps-restore.state';
 
 function job() {
 	const state = { phase: 'idle', action: '', appId: '', code: '' };
@@ -29,6 +30,23 @@ function job() {
 	return state;
 }
 
+function restore_status() {
+	const result = { phase: 'idle', appId: '', code: '' };
+	const raw = fs.readfile(RESTORE_STATE);
+	if (type(raw) != 'string' || length(raw) > 4096) return result;
+	for (let line in split(raw, /\r?\n/)) {
+		const fields = split(line, /\t/);
+		if (length(fields) != 2) continue;
+		if (fields[0] == 'phase' && match(fields[1], /^(idle|starting|running|success|failed)$/) != null)
+			result.phase = fields[1];
+		else if (fields[0] == 'app_id' && (fields[1] == '' || match(fields[1], /^[a-z0-9][a-z0-9-]{0,79}$/) != null))
+			result.appId = fields[1];
+		else if (fields[0] == 'code' && match(fields[1], /^(NONE|BUSY|TIMEOUT|INCOMPLETE|INVALID_MANIFEST|UNKNOWN|E[0-9]{1,3})$/) != null)
+			result.code = fields[1];
+	}
+	return result;
+}
+
 export function read_apps_status() {
 	if (!run_command([ MANAGER, 'status' ], 15000))
 		return failure('APPS_STATUS_UNAVAILABLE', '설치된 앱 상태를 확인하지 못했습니다.');
@@ -48,7 +66,7 @@ export function read_apps_status() {
 			webUiReady: length(fields) == 5 && fields[4] == '1',
 		};
 	}
-	return success({ job: job(), installed: installed });
+	return success({ job: job(), restore: restore_status(), installed: installed });
 };
 
 function start_apps_operation(request, action) {

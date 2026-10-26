@@ -45,7 +45,7 @@ OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 
 - 핵심 시스템 패키지 및 SafeShield 관련 패키지는 앱 패키지 대상에서 제외합니다. 의존성 해석과 설치 스크립트 실행은 APK가 담당하므로, 앱마다 실제 환경 테스트가 필요합니다.
 - `/etc/smartsafehub/apps-installed/<앱 ID>`에 **Apps가 직접 설치한 패키지 소유권**을 기록합니다. 기존 Software/SSH로 설치된 동일 패키지는 Apps에서 제거하지 않습니다.
 - 승인 철회된 앱도 Apps가 설치한 기록이 있다면 `제공이 중단된 앱` 목록에서 제거할 수 있습니다.
-- 펌웨어 변경으로 앱 바이너리가 사라진 경우 승인된 앱을 재설치할 수 있지만, 펌웨어 업그레이드가 이전 APK를 자동 복원하지는 않습니다.
+- 펌웨어 변경으로 앱 바이너리가 사라진 경우 소유권 기록과 새 펌웨어 승인에 따라 자동 복원하며, 조건이 일치하지 않으면 안전하게 중단합니다.
 - 설치 작업 중 공유기를 재부팅하거나 전원을 끊지 말아야 합니다. APK 실패 후 트랜잭션의 수동 복구가 필요할 수 있으며 **완전한 자동 롤백은 제공하지 않습니다**.
 - 이번 릴리스에서는 승인된 새 앱 설치와 제거까지만 제공하며, 기존 앱의 인플레이스 버전 업데이트는 지원하지 않습니다.
 
@@ -64,7 +64,19 @@ OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 
 ```sh
 sh tests/test-apps-contract.sh
 sh tests/test-apps-manager.sh
+sh tests/test-apps-restore.sh
 sh tests/test-ucode-imports.sh
 # 개발 환경에서 (프론트엔드 빌드 결과는 패치 미포함)
 cd frontend && npm ci && npm run typecheck && npm run build
 ```
+
+
+## 펌웨어 업데이트 후 Apps 복원
+
+- `sysupgrade`는 `/etc/smartsafehub/apps-installed/`의 **소유권 기록**을 보관합니다. APK 바이너리 자체는 새 펌웨어에 포함되지 않으면 사라질 수 있습니다.
+- 기존 `smartsafehub-firmware` daemon이 부팅 시 **일회성 복원 스크립트**를 실행하여 누락된, SmartSafeHub가 관리한 앱만 복원합니다. 별도의 procd/init 서비스나 상시 실행 daemon은 추가하지 않습니다. 기록이 없거나 이미 설치되어 있으면 아무것도 설치하지 않습니다.
+- 복원은 현재 펌웨어의 `device_code`·`build_id`에 일치하는 Hub 카탈로그를 새로 받아 기존 Apps manager의 **서명, SHA-256, 의존성 및 소유권 검사**를 통과해야 합니다. 지난 펌웨어의 승인이나 캐시된 카탈로그로 설치하지 않습니다.
+- 네트워크 오류는 제한적으로 다시 시도합니다. 앱 승인이 철회되거나, APK 해시·공식 SNAPSHOT 인덱스·아키텍처·소유권 기록이 맞지 않으면 중단합니다. 다른 방법으로 설치된 패키지를 인수하지 않습니다.
+- 공유기에서 `/tmp/smartsafehub/apps-restore.state`와 `logread -e smartsafehub-apps-restore`로 결과를 확인할 수 있습니다. 실패 시 Apps 화면의 **설치 마무리**로 다시 검증할 수 있습니다. 수동 재시도는 `/usr/libexec/smartsafehub-apps-restore run`을 사용합니다.
+- 인터넷이 오래 끊겨 재시도 횟수를 넘기면 해당 실행은 종료됩니다. 이후 WAN이 다시 연결되면 hotplug이 네트워크 오류에 한하여 일회성 복원을 재시도하며, 수동 실행이나 다음 부팅으로도 다시 시도할 수 있습니다.
+- 주의: 새로운 펌웨어에서 승인된 패키지 pin이 변경되었으면 이전 manifest를 무단으로 덮어쓰지 않고 중단합니다. 이 경우 호환성 확인과 승인 후 별도 마이그레이션이 필요합니다.

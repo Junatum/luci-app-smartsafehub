@@ -26,6 +26,11 @@ export interface AppsInstallStatus {
     appId: string;
     code: string;
   };
+  restore?: {
+    phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
+    appId: string;
+    code: string;
+  };
   installed: Record<string, {
     installed: boolean;
     partial: boolean;

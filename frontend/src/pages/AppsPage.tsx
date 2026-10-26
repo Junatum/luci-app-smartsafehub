@@ -88,8 +88,10 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const currentData = error ? null : data;
   const apps = currentData?.apps ?? [];
   const orphans = Object.entries(installStatus?.installed ?? {}).filter(([id, state]) => state.managed && !apps.some((app) => app.id === id));
+  const restore = installStatus?.restore;
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
+  const restoring = restore?.phase === 'starting' || restore?.phase === 'running';
   const jobKey = job ? `${job.phase}:${job.action}:${job.appId}:${job.code}` : '';
   const showJob = job && job.phase !== 'idle' && jobKey !== dismissedJob;
   useEffect(() => {
@@ -123,13 +125,13 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   };
 
   const openRemoveDialog = (app: VerifiedApp, trigger: HTMLButtonElement) => {
-    if (!installStatus || statusError || pending !== null || running) return;
+    if (!installStatus || statusError || pending !== null || running || restoring) return;
     removeTriggerRef.current = trigger;
     setRemoveTarget(app);
   };
 
   const requestOperation = async (app: VerifiedApp, action: AppAction) => {
-    if (!installStatus || statusError || pending !== null || running) return;
+    if (!installStatus || statusError || pending !== null || running || restoring) return;
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
     setActionError(null);
@@ -190,7 +192,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
               <button
                 class="min-h-10 rounded-lg bg-red-700 px-4 text-sm font-bold text-white transition hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-100 disabled:opacity-50"
                 data-confirm-remove
-                disabled={!installStatus || Boolean(statusError) || pending !== null || running}
+                disabled={!installStatus || Boolean(statusError) || pending !== null || running || restoring}
                 onClick={() => void requestOperation(removeTarget, 'remove')}
                 type="button"
               >앱 제거</button>
@@ -236,6 +238,13 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
         </div>
       </div>
 
+      {restore && (restore.phase === 'starting' || restore.phase === 'running' || restore.phase === 'failed') ? (
+        <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${restore.phase === 'failed' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
+          <strong>{restore.phase === 'failed' ? 'Apps 자동 복원을 완료하지 못했습니다.' : '펌웨어 업데이트 후 Apps를 복원하는 중입니다.'}</strong>
+          {restore.appId ? <span> · {restore.appId}</span> : null}
+          {restore.phase === 'failed' ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[restore.code] ?? '승인·연결·설치 상태를 확인해 주세요.'} 필요한 경우 앱 카드에서 설치 마무리를 진행할 수 있습니다.</p> : <p class="mb-0 mt-1 text-xs">검증된 패키지만 다시 설치합니다. 완료될 때까지 앱 설치·제거를 시작하지 마세요.</p>}
+        </div>
+      ) : null}
       {showJob && job ? (
         <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800' : running && job.action === 'remove' ? 'border-red-200 bg-red-50 text-red-800' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
           <div class="flex items-start justify-between gap-3">
@@ -293,7 +302,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const installed = state?.installed ?? false;
                   const managed = state?.managed ?? false;
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
-                  const disabled = !installStatus || Boolean(statusError) || pending !== null || running;
+                  const disabled = !installStatus || Boolean(statusError) || pending !== null || running || restoring;
                   const removable = managed && (installed || Boolean(state?.partial));
                   const launchPath = installed && state?.webUiReady ? approvedLuciPath(app.webUi) : null;
                   return (
@@ -360,7 +369,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       <span class="break-all text-sm text-amber-900">{id}</span>
                       {activeAction ? <OperationIndicator action={activeAction} /> : <button
                         class="min-h-9 rounded-lg border border-red-300 bg-white px-3 text-xs font-bold text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!installStatus || running || pending !== null || Boolean(statusError)}
+                        disabled={!installStatus || running || restoring || pending !== null || Boolean(statusError)}
                         onClick={(event) => openRemoveDialog({ id, name: id, summary: '', description: '', category: '', version: '' }, event.currentTarget)}
                         type="button"
                       >제거</button>}

@@ -119,6 +119,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '펌웨어 업데이트 후 검증된 Apps 자동 복원 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-restore.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '내비게이션 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-navigation-contract.sh"
     The status should be success

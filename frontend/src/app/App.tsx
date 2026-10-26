@@ -64,7 +64,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     active: route === 'apps',
     fallbackError: '앱 설치 상태를 불러오지 못했습니다.',
     loader: fetchAppsStatus,
-    pollInterval: (data) => data?.job.phase === 'running' || data?.job.phase === 'starting' ? 3000 : 12000,
+    pollInterval: (data) => data?.job.phase === 'running' || data?.job.phase === 'starting' || data?.restore?.phase === 'running' || data?.restore?.phase === 'starting' ? 3000 : 12000,
     staleTimeMs: 3000,
   });
   const status = useStatus(route === 'home' || route === 'settings');
