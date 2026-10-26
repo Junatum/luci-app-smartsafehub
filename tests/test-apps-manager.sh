@@ -6,16 +6,22 @@ MANAGER="$ROOT/root/usr/libexec/smartsafehub-apps-manager"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 fail() { echo "FAIL: $*" >&2; exit 1; }
-mkdir -p "$TMP/bin" "$TMP/runtime" "$TMP/owned" "$TMP/repo" "$TMP/overlay"
+mkdir -p "$TMP/bin" "$TMP/runtime" "$TMP/owned" "$TMP/repo" "$TMP/official" "$TMP/overlay"
 # Linux /proc is unavailable on macOS. A fixture keeps the production check enabled.
 printf 'MemTotal:       262144 kB\n' > "$TMP/meminfo"
 printf 'all\naarch64_cortex-a53\n' > "$TMP/apk-arch"
 printf 'signed immutable package-index test fixture\n' > "$TMP/repo/packages.adb"
 printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk"
 printf 'approved LuCI mock package payload\n' > "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk"
+printf 'approved LuCI mock package payload\n' > "$TMP/official/luci-app-nlbwmon-26.288.56989~75a306d.apk"
+printf 'approved chart mock package payload\n' > "$TMP/official/luci-lib-chartjs-26.288.56989~75a306d.apk"
+printf 'signed OpenWrt LuCI index mock\n' > "$TMP/official/packages.adb"
+printf 'https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb\n' > "$TMP/distfeeds.list"
 INDEX_SHA="$(sha256sum "$TMP/repo/packages.adb" | cut -d ' ' -f 1)"
 ARCHIVE_SHA="$(sha256sum "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk" | cut -d ' ' -f 1)"
 LUCISH="$(sha256sum "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
+CHARTSHA="$(sha256sum "$TMP/official/luci-lib-chartjs-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
+OFFICIAL_INDEX_SHA="$(sha256sum "$TMP/official/packages.adb" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF
 {"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
@@ -75,6 +81,12 @@ case "$url" in
    cp "$APPS_TEST_REPO/nlbwmon-2025.06.02~29236be6-r1.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/luci-app-nlbwmon-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
+ https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb)
+   cp "$APPS_TEST_OFFICIAL/packages.adb" "$dest";;
+ https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/luci-app-nlbwmon-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_OFFICIAL/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
+ https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/luci-lib-chartjs-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_OFFICIAL/luci-lib-chartjs-26.288.56989~75a306d.apk" "$dest";;
  *) exit 2;;
 esac
 printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
@@ -87,17 +99,25 @@ case "$1" in
  info)
    [ "$2" = -e ] || exit 2
    grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null; exit $?;;
+ list)
+   [ "$2" = -I ] || exit 2
+   grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 0
+   echo "$3-${APPS_TEST_SHARED_VERSION:-26.288.56989~75a306d} aarch64_cortex-a53 [installed]"
+   exit 0;;
  --repositories-file)
-   # Selecting only the signed REMOTE Hub repository guarantees that a
-   # same-version package on an official feed cannot be substituted.
    [ "$2" = /dev/null ] || exit 2
    [ "$3" = -X ] || exit 2
-   [ "$4" = 'https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb' ] || exit 2
+   case "$4" in
+    https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb) repo=hub;;
+    https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb) repo=official;;
+    *) exit 2;;
+   esac
    [ "$5" = -U ] && [ "$6" = add ] || exit 2
    shift 6;;
  del)
    if [ "$2" = --simulate ]; then
      [ "${APPS_TEST_DEL_CORE:-0}" = 1 ] && echo 'Purging kmod-nf-conntrack-netlink (mock)'
+     [ "${APPS_TEST_DEL_SHARED:-0}" = 1 ] && echo 'Purging luci-lib-chartjs (mock)'
      exit 0
    fi
    shift
@@ -108,16 +128,26 @@ esac
 if [ "${1:-}" = --simulate ]; then
  [ "${APPS_TEST_MISSING_DEP:-0}" = 1 ] && { echo 'ERROR: unable to select packages: missing dependency' >&2; exit 1; }
  shift
- [ "$#" -ge 1 ] && [ "$#" -le 2 ] || exit 2
- [ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
- [ "$#" -eq 1 ] || [ "$2" = 'luci-app-nlbwmon=26.288.56989~75a306d' ] || exit 2
+ for pin in "$@"; do
+  name="${pin%%=*}"
+  case "$repo:$name" in
+   hub:nlbwmon|hub:luci-app-nlbwmon|official:luci-app-nlbwmon|official:luci-lib-chartjs) ;;
+   *) exit 2;;
+  esac
+  if [ "${APPS_TEST_UPGRADE:-0}" = 1 ] && [ "$repo" = official ]; then
+    echo '(1/3) Upgrading luci-base (mock)'
+  else
+    echo "(1/2) Installing $name (mock)"
+  fi
+ done
  exit 0
 fi
-[ "$#" -ge 1 ] && [ "$#" -le 2 ] || exit 2
-[ "$1" = 'nlbwmon=2025.06.02~29236be6-r1' ] || exit 2
-[ "$#" -eq 1 ] || [ "$2" = 'luci-app-nlbwmon=26.288.56989~75a306d' ] || exit 2
 for pin in "$@"; do
  name="${pin%%=*}"
+ case "$repo:$name" in
+  hub:nlbwmon|hub:luci-app-nlbwmon|official:luci-app-nlbwmon|official:luci-lib-chartjs) ;;
+  *) exit 2;;
+ esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
 done
 SH2
@@ -141,6 +171,8 @@ export SMARTSAFEHUB_APPS_ARCH_FILE="$TMP/apk-arch"
 export SMARTSAFEHUB_APPS_DAEMON_BIN="$TMP/bin/start-stop-daemon"
 export APPS_TEST_CATALOG="$TMP/catalog.json"
 export APPS_TEST_REPO="$TMP/repo"
+export APPS_TEST_OFFICIAL="$TMP/official"
+export SMARTSAFEHUB_APPS_DISTFEEDS_FILE="$TMP/distfeeds.list"
 export APPS_TEST_INSTALLED="$TMP/installed"
 export APPS_TEST_APK_LOG="$TMP/apk-commands"
 : > "$APPS_TEST_INSTALLED"
@@ -287,4 +319,78 @@ grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-stat
 "$MANAGER" start remove network-usage-monitor || fail 'complete app removal did not queue'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'complete app removal left verified packages behind'
 [ ! -f "$TMP/owned/network-usage-monitor" ] || fail 'complete app ownership not removed'
-printf 'PASS: Apps install/remove allowlist, pins, ownership, status, revocation, additive UI\n'
+# New Hub approval format: SmartSafeHub core package plus OpenWrt-signed UI
+# and Chart.js dependency, both pinned to the official LuCI index.
+cp "$TMP/catalog-approved.json" "$TMP/catalog.json"
+"$MANAGER" start install network-usage-monitor || fail 'fresh core for official extension failed'
+python3 - "$TMP/catalog.json" "$LUCISH" "$CHARTSHA" "$OFFICIAL_INDEX_SHA" <<'PY'
+import json,sys
+path=sys.argv[1]
+obj=json.load(open(path)); app=obj['apps'][0]
+app['packages']=app['packages'][:1]
+app['external_packages']=[
+ {'name':'luci-app-nlbwmon','version':'26.288.56989~75a306d','sha256':sys.argv[2],'repository':'luci'},
+ {'name':'luci-lib-chartjs','version':'26.288.56989~75a306d','sha256':sys.argv[3],'repository':'luci'}]
+app['external_repository_index_sha256']=sys.argv[4]
+app['web_ui']={'type':'luci','path':'/cgi-bin/luci/admin/services/nlbw/display','package':'luci-app-nlbwmon'}
+open(path,'w').write(json.dumps(obj))
+PY
+cp "$TMP/catalog.json" "$TMP/catalog-official.json"
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fq "$(printf 'network-usage-monitor	0	1	1	0')" "$TMP/runtime/apps-status.tsv" || fail 'official pair not detected as incomplete'
+"$MANAGER" start install network-usage-monitor || fail 'official packages install did not queue'
+grep -Fqx "$(printf 'phase	success')" "$TMP/runtime/apps-operation.state" || fail 'official UI install failed'
+grep -qxF luci-app-nlbwmon "$APPS_TEST_INSTALLED" || fail 'official UI package missing'
+grep -qxF luci-lib-chartjs "$APPS_TEST_INSTALLED" || fail 'official chart dependency missing'
+grep -Fqx -- '--repositories-file /dev/null -X https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb -U add --simulate luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d' "$APPS_TEST_APK_LOG" || fail 'official signed feed was not isolated'
+grep -Fqx -- '--repositories-file /dev/null -X https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb -U add luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d' "$APPS_TEST_APK_LOG" || fail 'approved official packages not installed'
+"$MANAGER" status
+grep -Fq "$(printf 'network-usage-monitor	1	1	1	1')" "$TMP/runtime/apps-status.tsv" || fail 'complete official app not marked launchable'
+"$MANAGER" start remove network-usage-monitor || fail 'official owned packages cleanup failed'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'owned official UI remains after cleanup'
+printf 'luci-lib-chartjs\n' > "$APPS_TEST_INSTALLED"
+"$MANAGER" start install network-usage-monitor || fail 'preinstalled shared library install did not queue'
+grep -Fqx "$(printf 'phase	success')" "$TMP/runtime/apps-operation.state" || fail 'compatible preinstalled library rejected'
+! grep -q '^luci-lib-chartjs' "$TMP/owned/network-usage-monitor" || fail 'shared library ownership was stolen'
+export APPS_TEST_DEL_SHARED=1
+"$MANAGER" start remove network-usage-monitor || fail 'unsafe dependency removal not queued'
+grep -Fqx "$(printf 'code	E44')" "$TMP/runtime/apps-operation.state" || fail 'shared dependency removal not blocked'
+unset APPS_TEST_DEL_SHARED
+"$MANAGER" start remove network-usage-monitor || fail 'owned UI removal was not queued'
+grep -qxF luci-lib-chartjs "$APPS_TEST_INSTALLED" || fail 'shared library was removed'
+[ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 1 ] || fail 'extra package remained after removal'
+export APPS_TEST_SHARED_VERSION='26.287.1'
+"$MANAGER" start install network-usage-monitor || fail 'wrong shared dependency version not queued'
+grep -Fqx "$(printf 'code	E38')" "$TMP/runtime/apps-operation.state" || fail 'shared dependency version mismatch accepted'
+unset APPS_TEST_SHARED_VERSION
+: > "$APPS_TEST_INSTALLED"
+printf 'tampered index\n' > "$TMP/official/packages.adb"
+"$MANAGER" start install network-usage-monitor || fail 'tampered official repository not queued'
+grep -Fqx "$(printf 'code	E37')" "$TMP/runtime/apps-operation.state" || fail 'tampered official index accepted'
+printf 'signed OpenWrt LuCI index mock\n' > "$TMP/official/packages.adb"
+# Validate the hash of each individual official APK as well as the index.
+printf 'substituted unofficial archive\n' > "$TMP/official/luci-app-nlbwmon-26.288.56989~75a306d.apk"
+"$MANAGER" start install network-usage-monitor || fail 'tampered official archive not queued'
+grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'tampered official APK accepted'
+printf 'approved LuCI mock package payload\n' > "$TMP/official/luci-app-nlbwmon-26.288.56989~75a306d.apk"
+# Reject additional packages not on the reviewed allowlist.
+python3 - "$TMP/catalog.json" <<'PY_BAD'
+import json,sys
+path=sys.argv[1]; obj=json.load(open(path))
+obj['apps'][0]['external_packages'][1]['name']='luci-app-commands'
+open(path,'w').write(json.dumps(obj))
+PY_BAD
+"$MANAGER" start install network-usage-monitor || fail 'unapproved package not queued'
+grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'unreviewed official package accepted'
+cp "$TMP/catalog-official.json" "$TMP/catalog.json"
+export APPS_TEST_UPGRADE=1
+"$MANAGER" start install network-usage-monitor || fail 'upgrade simulation not queued'
+grep -Fqx "$(printf 'code	E34')" "$TMP/runtime/apps-operation.state" || fail 'unapproved luci-base upgrade accepted'
+unset APPS_TEST_UPGRADE
+"$MANAGER" start remove network-usage-monitor || fail 'cleanup after official upgrade rejection failed'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'old daemon not cleaned up'
+printf 'https://attacker.invalid/repo/packages.adb\n' > "$TMP/distfeeds.list"
+"$MANAGER" start install network-usage-monitor || fail 'unapproved distfeed request not queued'
+grep -Fqx "$(printf 'code	E37')" "$TMP/runtime/apps-operation.state" || fail 'untrusted official repository accepted'
+printf 'PASS: Apps install/remove allowlist, pins, ownership, status, revocation, official LuCI\n'

@@ -21,7 +21,7 @@
 
 **주의:** Stable/Beta 저장소는 게시 때 변경됩니다. 다른 패키지를 갱신해서 `packages.adb` 해시가 변경되면 기존 승인 정보가 갱신되기 전까지 설치를 **차단**합니다. Hub에서 새 인덱스를 검토·승인해야 하며 이는 의도한 안전 동작입니다.
 
-**의존성 주의:** 현재 설치 요청은 SmartSafeHub 저장소로 격리되므로 기존에 설치된 의존성 또는 SmartSafeHub 저장소에서 제공하는 의존성만 사용할 수 있습니다. 새로운 커널 모듈이나 라이브러리가 필요하면 펌웨어에 포함시키거나 별도 검증된 배포 방법을 마련해야 합니다. 공유기별 커널 ABI·의존성·서명 키를 테스트해야 합니다.
+**의존성 주의:** 기본 앱 패키지는 SmartSafeHub 저장소에서만 설치하며, 별도로 승인된 두 LuCI 패키지는 공식 OpenWrt 저장소에서만 설치합니다. 그 밖의 임의 의존성을 자동으로 가져오지 않으며, 새로운 커널 모듈이나 라이브러리는 별도의 호환성·서명 검증이 필요합니다.
 
 OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 이전의 `APKINDEX.tar.gz` 형식이라고 가정하면 안 됩니다.
 
@@ -30,16 +30,17 @@ OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 
 - 웹 화면을 제공하는 앱은 설치 후 `열기`로 **새 탭**에서 공식 LuCI UI를 표시합니다. SmartSafeHub 탭은 그대로 유지합니다.
 - 웹 UI는 `web_ui: {"type":"luci","path":"/cgi-bin/luci/admin/…","package":"…"}`로 승인된 카탈로그에서 선언할 수 있습니다. 경로는 **같은 공유기의 LuCI 관리자 화면**으로 제한됩니다. 외부 사이트, 임의 포트, 실행 명령은 허용되지 않습니다.
 - `network-usage-monitor`는 기존 카탈로그에도 `admin/services/nlbw/display` 경로를 사용할 수 있지만, **`luci-app-nlbwmon`이 설치되어 있어야만** 열기 버튼이 표시됩니다. `nlbwmon`만 설치된 공유기에는 `웹 UI 미설치`가 표시됩니다.
-- 한 앱에 필요한 `nlbwmon`과 `luci-app-nlbwmon`을 **모두** 관리하려면 Hub 승인 카탈로그의 `packages` 배열에 두 APK의 정확한 버전과 SHA-256을 등록하고, SmartSafeHub 서명 저장소에도 해당 APK·의존성을 게시해야 합니다. 공유기만 수정해 승인 없이 `apk add`하지 않습니다.
-- 기존 Apps 소유의 `nlbwmon`만 설치된 기기는 동일 버전/해시의 `nlbwmon`을 유지한 채 신규 승인된 `luci-app-nlbwmon` 핀을 **추가**할 수 있습니다. 새 승인 목록에서 기존 패키지가 바뀌거나 빠진 경우 변경을 거부합니다.
+- `nlbwmon`은 SmartSafeHub 서명 저장소에서 설치합니다. 검토한 `luci-app-nlbwmon`과 `luci-lib-chartjs`는 별도 `external_packages`/`external_repository_index_sha256` 승인 정보가 있어야 공식 OpenWrt LuCI 저장소에서 설치합니다. 공식 패키지의 버전·APK SHA-256과 서명된 인덱스 SHA-256을 모두 검증합니다.
+- 기존 Apps 소유의 `nlbwmon`만 설치된 기기는 동일한 기본 패키지를 유지한 채 `설치 마무리`로 공식 LuCI 패키지를 추가합니다. 기존 설치 패키지를 변경하는 승인은 차단합니다. 공유기에 이미 설치된 동일 버전의 `luci-lib-chartjs`는 공통 의존성으로 사용할 수 있지만 소유권을 가져오거나 제거하지 않습니다.
 - `luci-app-nlbwmon`은 OpenWrt LuCI 인증을 다시 요구할 수 있습니다.
 
 ## 동작과 제한
 
 - 설치 시작 시 **Hub에서 승인 목록을 다시 조회**합니다. 인터넷이 끊겼거나 승인이 취소된 앱은 신규 설치가 불가능합니다.
 - SmartSafeHub 저장소에서 승인된 인덱스와 APK를 내려받아 SHA-256을 확인하지만, 내려받은 APK 파일을 로컬 패키지로 설치하지는 않습니다.
-- `apk --repositories-file /dev/null -X <승인된 원격 packages.adb> -U add <패키지=버전>`으로 SmartSafeHub 원격 **서명 저장소만** 패키지 후보로 사용합니다. 공식 저장소에 동일한 이름/버전이 있어도 다른 APK로 대체하지 않습니다. 실제 설치 전 동일 명령으로 `--simulate` 검증을 합니다.
-- 이 격리된 설치 작업에서는 의존성이 기존 공유기에 설치되어 있거나 SmartSafeHub 저장소에 있어야 합니다. 부족한 의존성이 있으면 다른 저장소의 앱으로 자동 대체하지 않고 설치를 차단하며, `/tmp/smartsafehub/apps-last-error.log`에 APK의 실패 사유를 남깁니다.
+- SmartSafeHub 앱 패키지는 기존과 같이 **SmartSafeHub 서명 저장소만**, 승인된 공식 LuCI 패키지는 **OpenWrt 공식 LuCI 저장소만** 사용하는 서로 다른 `apk --repositories-file /dev/null -X ... -U add` 트랜잭션으로 설치합니다. 외부 저장소가 임의 패키지나 시스템 업그레이드를 요구하면 차단합니다. 실제 설치 전에 `--simulate`로 검사합니다.
+- 현재 공식 LuCI 저장소는 공유기에 등록된 `25.12-SNAPSHOT`/해당 아키텍처의 배포 서버만 허용합니다. 이동하는 SNAPSHOT 인덱스가 승인 SHA와 달라지면 안전하게 설치를 중단합니다. Stable 정식 배포 전에는 공식 APK 스냅샷을 별도로 보관해야 합니다.
+- 공식 LuCI 설치에는 `luci-base`와 `nlbwmon`이 이미 설치되어 있어야 합니다. 해당 패키지의 변경이 필요하거나 승인되지 않은 추가 의존성이 등장하면 설치를 차단하며, `/tmp/smartsafehub/apps-last-error.log`에 APK의 실패 사유를 남깁니다.
 - `--allow-untrusted`, 전체 `apk upgrade`, 사용자 입력 셸 명령, 로컬 저장소 구성은 사용하지 않습니다.
 - 핵심 시스템 패키지 및 SafeShield 관련 패키지는 앱 패키지 대상에서 제외합니다. 의존성 해석과 설치 스크립트 실행은 APK가 담당하므로, 앱마다 실제 환경 테스트가 필요합니다.
 - `/etc/smartsafehub/apps-installed/<앱 ID>`에 **Apps가 직접 설치한 패키지 소유권**을 기록합니다. 기존 Software/SSH로 설치된 동일 패키지는 Apps에서 제거하지 않습니다.
@@ -52,7 +53,7 @@ OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 
 
 - `E21`: 서버에서 새 카탈로그를 조회하지 못함 / `E22`: 승인 앱 없음 / `E23`, `E24`: 런타임 또는 기기 아키텍처 불일치.
 - `E25`: SmartSafeHub 배포 인덱스 다운로드 실패 또는 SHA 불일치 / `E26`: 리소스 부족 / `E27`: 승인 패키지 정보 검증 실패.
-- `E29`: 설치된 외부 패키지와 충돌 / `E31`~`E34`: APK 내려받기, 파일 검증 또는 시뮬레이션 실패 / `E35`: 실제 APK 설치 실패.
+- `E29`: 기존 외부 설치 패키지 충돌 / `E31`~`E34`: 다운로드·해시·설치 시뮬레이션 실패 / `E35`: 설치 실패 / `E37`: 공식 저장소 또는 승인 인덱스 불일치 / `E38`: 이미 설치된 공유 라이브러리의 버전 불일치.
 - `E41`: Apps가 설치한 앱이 아니라서 제거 불가 / `E44`, `E45`: 제거 시뮬레이션·실행 실패.
 - `/tmp/smartsafehub/apps-operation.state`: 최근 작업 상태 및 코드 (재부팅 시 초기화).
 - `/etc/smartsafehub/apps-installed/`: Apps가 설치한 패키지 소유권 기록 (설치 바이너리는 포함하지 않음).
