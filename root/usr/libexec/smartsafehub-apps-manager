@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Privileged, opt-in APK adapter for SmartSafeHub Apps schema 1.
+# Privileged, opt-in APK adapter for SmartSafeHub Apps fixed-release protocol.
 # No caller-supplied package, URL, shell command or repository is accepted.
 set -eu
 
@@ -18,7 +18,6 @@ MEMINFO="${SMARTSAFEHUB_APPS_MEMINFO_PATH:-/proc/meminfo}"
 JSONFILTER="${SMARTSAFEHUB_APPS_JSONFILTER_BIN:-jsonfilter}"
 APK="${SMARTSAFEHUB_APPS_APK_BIN:-apk}"
 ARCH_FILE="${SMARTSAFEHUB_APPS_ARCH_FILE:-/etc/apk/arch}"
-DISTFEEDS="${SMARTSAFEHUB_APPS_DISTFEEDS_FILE:-/etc/apk/repositories.d/distfeeds.list}"
 SHA256="${SMARTSAFEHUB_APPS_SHA256_BIN:-sha256sum}"
 DAEMON="${SMARTSAFEHUB_APPS_DAEMON_BIN:-start-stop-daemon}"
 LOCK="$RUNTIME/apps-operation.lock"
@@ -83,59 +82,9 @@ extract_pins() {
  done
  [ "$n" -gt 0 ]
 }
-# Only these two OpenWrt LuCI packages may be installed from the official
-# repository in schema 1. Reject any external URL or additional package name
-# supplied by the catalog, even when the approval server is compromised.
-extract_official_pins() {
- idx="$1"; out="$2"
- : > "$out"; n=0; seen_ui=0; seen_chart=0; common_version=''
- while :; do
-  name="$(field "$CATALOG" "@.apps[$idx].external_packages[$n].name")"
-  [ -n "$name" ] || break
-  version="$(field "$CATALOG" "@.apps[$idx].external_packages[$n].version")"
-  hash="$(field "$CATALOG" "@.apps[$idx].external_packages[$n].sha256")"
-  repository="$(field "$CATALOG" "@.apps[$idx].external_packages[$n].repository")"
-  [ "$app" = network-usage-monitor ] && [ "$repository" = luci ] || return 1
-  valid_version "$version" && valid_sha "$hash" || return 1
-  [ -z "$common_version" ] || [ "$version" = "$common_version" ] || return 1
-  common_version="$version"
-  case "$name" in
-   luci-app-nlbwmon) [ "$seen_ui" -eq 0 ] || return 1; seen_ui=1;;
-   luci-lib-chartjs) [ "$seen_chart" -eq 0 ] || return 1; seen_chart=1;;
-   *) return 1;;
-  esac
-  printf '%s\t%s\t%s\n' "$name" "$version" "$hash" >> "$out"
-  n=$((n + 1)); [ "$n" -le 2 ] || return 1
- done
- # Older approvals without an external UI remain valid; never silently infer
- # or download unreviewed official packages.
- [ "$n" -eq 0 ] && return 0
- [ "$n" -eq 2 ] && [ "$seen_ui" -eq 1 ] && [ "$seen_chart" -eq 1 ] || return 1
- [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
- [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = luci-app-nlbwmon ] || return 1
- [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /cgi-bin/luci/admin/services/nlbw/display ] || return 1
-}
-
-# An existing shared library is a dependency, NOT SmartSafeHub-owned. It can
-# satisfy the approved pin only when its installed version matches exactly.
-installed_version_matches() {
- name="$1"; version="$2"
- "$APK" list -I "$name" 2>/dev/null |
-  awk -v pin="$name-$version" '$1 == pin { found=1 } END { exit !found }'
-}
-
-# The firmware's distribution feed establishes original OpenWrt provenance.
-# An immutable first-party backup may replace the transport URL only after
-# the Hub-pinned original index hash matches. No URL from the catalog is used.
-official_luci_url() {
- expected="https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/$arch/luci/packages.adb"
- [ -r "$DISTFEEDS" ] && grep -Fqx "$expected" "$DISTFEEDS" || return 1
- printf '%s\n' "$expected"
-}
-
 # A dry-run may install only explicitly reviewed packages. Never allow any
-# upgrades, downgrades, removals or automatic dependency additions. Apart from
-# the two pinned LuCI packages, missing prerequisites cause a safe failure.
+# upgrades, downgrades, removals or automatic dependency additions. Missing
+# prerequisites cause a safe failure.
 review_install_plan() {
  plan="$1"; allow="$2"
  awk -v allowed="$allow" '
@@ -172,35 +121,6 @@ review_remove_plan() {
   }
   END { exit bad ? 1 : 0 }
  ' "$plan"
-}
-
-# Prefer a fixed first-party archive path keyed by the *original* approved
-# index SHA. Older routers can still use the original feed if no snapshot has
-# been published yet; a corrupt published snapshot is never silently ignored.
-select_official_index() {
- original_index="$(official_luci_url)" || return 1
- mirror_index="$REPO_BASE/openwrt/25.12-SNAPSHOT/packages/$arch/luci/$external_index_hash/packages.adb"
- if "$UCLIENT" -q -T 15 -O "$stage/official-packages.adb" "$mirror_index" > "$stage/official-mirror-fetch.log" 2>&1; then
-  official_index="$mirror_index"
-  verify_official_index_file || return 1
- else
-  official_index="$original_index"
-  verify_official_index || return 1
- fi
-}
-
-verify_official_index_file() {
- [ -s "$stage/official-packages.adb" ] && [ ! -L "$stage/official-packages.adb" ] || return 1
- bytes="$(wc -c < "$stage/official-packages.adb" | tr -d ' ')"
- [ "$bytes" -le 8388608 ] || return 1
- [ "$("$SHA256" "$stage/official-packages.adb" | cut -d ' ' -f 1)" = "$external_index_hash" ]
-}
-
-# The original signed index is byte-for-byte identical in the mirror; apk
-# still verifies the OpenWrt signature, even when download host differs.
-verify_official_index() {
- "$UCLIENT" -q -T 15 -O "$stage/official-packages.adb" "$official_index" > "$stage/official-index-fetch.log" 2>&1 || return 1
- verify_official_index_file
 }
 
 # Preserve recovery of partial operations: an owned manifest may contain a
@@ -275,14 +195,6 @@ status() {
    total=$((total + 1)); installed "$name" && present=$((present + 1))
    p=$((p + 1)); [ "$p" -le 32 ] || break
   done
-  p=0
-  while [ "$p" -lt 2 ]; do
-   name="$(field "$CATALOG" "@.apps[$idx].external_packages[$p].name")"
-   [ -n "$name" ] || break
-   valid_package "$name" || break
-   total=$((total + 1)); installed "$name" && present=$((present + 1))
-   p=$((p + 1))
-  done
   managed=0
   [ -f "$(owned_manifest "$id")" ] && managed=1
   ui_ready=0
@@ -292,15 +204,6 @@ status() {
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
   printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready"
- done
- # Include withdrawn apps, so a device can uninstall owned packages after
- # the Hub review is revoked (without granting new installation rights).
- for manifest in "$OWNED"/*; do
-  [ -f "$manifest" ] || continue
-  id="${manifest##*/}"
-  valid_id "$id" || continue
-  if app_index "$id" >/dev/null 2>&1; then continue; fi
-  printf '%s\t0\t1\t1\t0\n' "$id"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"
@@ -329,7 +232,9 @@ preflight_install() {
  channel="$(field "$CATALOG" '@.channel')"
  case "$channel" in stable|beta) ;; *) return 25;; esac
  case "$arch" in aarch64_cortex-a53|mipsel_24kc|x86_64) ;; *) return 24;; esac
- repo_url="$REPO_BASE/$channel/packages/$arch/smartsafehub"
+ publication="$(field "$CATALOG" "@.apps[$index].repository_release_id")"
+ printf '%s\n' "$publication" | grep -Eq '^[0-9]{8}T[0-9]{6}([0-9]{1,6})?$' || return 25
+ repo_url="$REPO_BASE/releases/$channel/$publication/packages/$arch/smartsafehub"
  index_url="$repo_url/packages.adb"
  # Always fetch the current published index. If a channel is republished after
  # review, fail closed until Hub has reviewed the new index hash.
@@ -349,71 +254,53 @@ preflight_install() {
  [ -n "$available_memory" ] && [ "$available_memory" -ge "$memory" ] || return 26
  [ -n "$available_storage" ] && [ "$available_storage" -ge "$storage" ] || return 26
  extract_pins "$index" "$pins" || return 27
- extract_official_pins "$index" "$official_pins" || return 27
- if [ -s "$official_pins" ]; then
-  external_index_hash="$(field "$CATALOG" "@.apps[$index].external_repository_index_sha256")"
-  valid_sha "$external_index_hash" || return 37
-  select_official_index || return 37
- elif [ -n "$(field "$CATALOG" "@.apps[$index].external_repository_index_sha256")" ]; then
-  return 37
+ if [ "$app" = network-usage-monitor ]; then
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 3 ] || return 27
+  for required in nlbwmon luci-app-nlbwmon luci-lib-chartjs; do
+   grep -q "^${required}$(printf '\t')" "$pins" || return 27
+  done
  fi
  return 0
 }
 
-# Preserve the original first-party provenance. The LuCI pair comes from a
-# separate, independently pinned official index, never from a mixed resolver.
+# All packages come from one SmartSafeHub-signed immutable release.
 install_app() {
  preflight_install || return $?
  manifest="$(owned_manifest "$app")"
- # A previously managed package must have the same immutable pin in one of
- # the two approved sets, regardless of whether its source was official.
+ # Existing app ownership must match the reviewed pins.
  if [ -e "$manifest" ]; then
   [ -s "$manifest" ] || return 28
   while IFS="$(printf '\t')" read -r name version hash; do
    valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 28
    pin="$(printf '%s\t%s\t%s' "$name" "$version" "$hash")"
-   grep -Fqx "$pin" "$pins" || grep -Fqx "$pin" "$official_pins" || return 28
+   grep -Fqx "$pin" "$pins" || return 28
   done < "$manifest"
  fi
  need_install=0
- # Check ownership before running any APK command. In particular, the LuCI
- # UI can never be adopted from a manual install.
- for source in "$pins" "$official_pins"; do
-  while IFS="$(printf '\t')" read -r name version hash; do
-   [ -n "$name" ] || continue
-   pin="$(printf '%s\t%s\t%s' "$name" "$version" "$hash")"
-   if [ -e "$manifest" ] && grep -Fqx "$pin" "$manifest"; then
-    installed "$name" || need_install=1
-   elif installed "$name"; then
-    # A compatible pre-existing chart library is a shared dependency, not
-    # owned by Apps; leave it in place on eventual app removal.
-    if [ "$source" = "$official_pins" ] && [ "$name" = luci-lib-chartjs ]; then
-     installed_version_matches "$name" "$version" || return 38
-    else
-     return 29
-    fi
-   else
-    need_install=1
-   fi
-  done < "$source"
- done
+ # Never adopt a package previously installed outside SmartSafeHub Apps.
+ while IFS="$(printf '\t')" read -r name version hash; do
+  pin="$(printf '%s\t%s\t%s' "$name" "$version" "$hash")"
+  if [ -e "$manifest" ] && grep -Fqx "$pin" "$manifest"; then
+   installed "$name" || need_install=1
+  elif installed "$name"; then
+   return 29
+  else
+   need_install=1
+  fi
+ done < "$pins"
  [ "$need_install" -eq 1 ] || return 28
  mkdir -p "$stage/packages" || return 30
  # Independently check every approved archive, even for existing packages.
  # Package-manager signatures are still validated during the remote install.
- for source in "$pins" "$official_pins"; do
-  while IFS="$(printf '\t')" read -r name version hash; do
-   [ -n "$name" ] || continue
-   if [ "$source" = "$pins" ]; then archive_base="$repo_url"; else archive_base="${official_index%/packages.adb}"; fi
-   archive="$stage/packages/$name-$version.apk"
-   "$UCLIENT" -q -T 30 -O "$archive" "$archive_base/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
-   [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
-   archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
-   [ "$archive_bytes" -le 33554432 ] || return 32
-   [ "$("$SHA256" "$archive" | cut -d ' ' -f 1)" = "$hash" ] || return 33
-  done < "$source"
- done
- # Only missing first-party packages enter the signed SmartSafeHub add call.
+ while IFS="$(printf '\t')" read -r name version hash; do
+  archive="$stage/packages/$name-$version.apk"
+  "$UCLIENT" -q -T 30 -O "$archive" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
+  [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
+  archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
+  [ "$archive_bytes" -le 33554432 ] || return 32
+  [ "$("$SHA256" "$archive" | cut -d ' ' -f 1)" = "$hash" ] || return 33
+ done < "$pins"
+ # Only missing packages enter the single signed repository transaction.
  set --; base_names=''
  while IFS="$(printf '\t')" read -r name version hash; do
   if ! installed "$name"; then set -- "$@" "$name=$version"; base_names="${base_names:+$base_names }$name"; fi
@@ -422,38 +309,16 @@ install_app() {
   "$APK" --repositories-file /dev/null -X "$index_url" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
   review_install_plan "$stage/plan.log" "$base_names" || return 34
   # Write ownership immediately before modifying packages. If APK partially
-  # succeeds, the UI offers repair/removal without adopting external packages.
+  # succeeds, the UI offers repair/removal without adopting unrelated packages.
   while IFS="$(printf '\t')" read -r name version hash; do
    if ! installed "$name"; then append_owned_pin "$name" "$version" "$hash" || return 36; fi
   done < "$pins"
   "$APK" --repositories-file /dev/null -X "$index_url" -U add "$@" > "$stage/install.log" 2>&1 || return 35
  fi
- # The verified official LuCI repository is used in an independent resolver
- # transaction, so it cannot replace a SmartSafeHub-signed nlbwmon build.
- if [ -s "$official_pins" ]; then
-  set --; external_names=''
-  while IFS="$(printf '\t')" read -r name version hash; do
-   if ! installed "$name"; then set -- "$@" "$name=$version"; external_names="${external_names:+$external_names }$name"; fi
-  done < "$official_pins"
-  if [ "$#" -gt 0 ]; then
-   # Fail if the mutable official SNAPSHOT index changed after the initial
-   # check. No --allow-untrusted and no default repositories are used.
-   verify_official_index || return 37
-   "$APK" --repositories-file /dev/null -X "$official_index" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
-   review_install_plan "$stage/plan.log" "$external_names" || return 34
-   while IFS="$(printf '\t')" read -r name version hash; do
-    if ! installed "$name"; then append_owned_pin "$name" "$version" "$hash" || return 36; fi
-   done < "$official_pins"
-   "$APK" --repositories-file /dev/null -X "$official_index" -U add "$@" > "$stage/install.log" 2>&1 || return 35
-  fi
- fi
  # A failed or incomplete add never counts as a successful application.
  while IFS="$(printf '\t')" read -r name version hash; do
   installed "$name" || return 35
  done < "$pins"
- while IFS="$(printf '\t')" read -r name version hash; do
-  installed "$name" || return 35
- done < "$official_pins"
  return 0
 }
 
@@ -498,7 +363,6 @@ worker() {
  trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
  stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
  pins="$stage/pins"
- official_pins="$stage/official-pins"
  # Never expose error text from a previous install as the current result.
  rm -f "$RUNTIME/apps-last-error.log"
  write_state running "$action" "$app" NONE
