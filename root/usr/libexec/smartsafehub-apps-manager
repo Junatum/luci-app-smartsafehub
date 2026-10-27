@@ -234,7 +234,7 @@ preflight_install() {
  case "$arch" in aarch64_cortex-a53|mipsel_24kc|x86_64) ;; *) return 24;; esac
  publication="$(field "$CATALOG" "@.apps[$index].repository_release_id")"
  printf '%s\n' "$publication" | grep -Eq '^[0-9]{8}T[0-9]{6}([0-9]{1,6})?$' || return 25
- repo_url="$REPO_BASE/releases/$channel/$publication/packages/$arch/smartsafehub"
+ repo_url="$REPO_BASE/$channel/packages/$arch/smartsafehub/$publication"
  index_url="$repo_url/packages.adb"
  # Always fetch the current published index. If a channel is republished after
  # review, fail closed until Hub has reviewed the new index hash.

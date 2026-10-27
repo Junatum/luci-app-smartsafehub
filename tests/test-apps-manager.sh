@@ -71,13 +71,13 @@ while [ "$#" -gt 0 ]; do
  esac
 done
 case "$url" in
- https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/packages.adb)
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb)
    cp "$APPS_TEST_REPO/packages.adb" "$dest";;
- https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/nlbwmon-2025.06.02~29236be6-r1.apk)
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/nlbwmon-2025.06.02~29236be6-r1.apk)
    cp "$APPS_TEST_REPO/nlbwmon-2025.06.02~29236be6-r1.apk" "$dest";;
- https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/luci-app-nlbwmon-26.288.56989~75a306d.apk)
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-app-nlbwmon-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
- https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/luci-lib-chartjs-26.288.56989~75a306d.apk)
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-lib-chartjs-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-lib-chartjs-26.288.56989~75a306d.apk" "$dest";;
  *) exit 2;;
 esac
@@ -100,7 +100,7 @@ case "$1" in
    [ "$2" = /dev/null ] || exit 2
    [ "$3" = -X ] || exit 2
    case "$4" in
-    https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/packages.adb) repo=hub;;
+    https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb) repo=hub;;
     *) exit 2;;
    esac
    [ "$5" = -U ] && [ "$6" = add ] || exit 2
@@ -172,7 +172,7 @@ grep -Fqx "$(printf 'code\tE22')" "$TMP/runtime/apps-operation.state" || fail 'u
 "$MANAGER" start install network-usage-monitor || fail 'install did not queue'
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'three APK installation failed'
 [ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 3 ] || fail 'all three APKs were not installed'
-grep -Fqx -- '--repositories-file /dev/null -X https://repo.smartsafehub.com/releases/stable/20261027T123000/packages/aarch64_cortex-a53/smartsafehub/packages.adb -U add --simulate nlbwmon=2025.06.02~29236be6-r1 luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d' "$APPS_TEST_APK_LOG" || fail 'single signed repository not used'
+grep -Fqx -- '--repositories-file /dev/null -X https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb -U add --simulate nlbwmon=2025.06.02~29236be6-r1 luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d' "$APPS_TEST_APK_LOG" || fail 'single signed repository not used'
 "$MANAGER" status
 grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'ready state missing'
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'
@@ -200,7 +200,7 @@ grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'm
 printf 'PASS: Apps install/remove signed immutable release, three APKs, ownership and hash checks\n'
 
 # Self-built App publications must install from immutable signed releases.
-if ! grep -Fq 'repo_url="$REPO_BASE/releases/$channel/$publication/packages/$arch/smartsafehub"' "$MANAGER"; then
+if ! grep -Fq 'repo_url="$REPO_BASE/$channel/packages/$arch/smartsafehub/$publication"' "$MANAGER"; then
     echo 'FAIL: signed immutable Apps package publication is missing' >&2
     exit 1
 fi
