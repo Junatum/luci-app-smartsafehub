@@ -124,9 +124,9 @@ installed_version_matches() {
   awk -v pin="$name-$version" '$1 == pin { found=1 } END { exit !found }'
 }
 
-# The distribution's configured LuCI feed must be the official HTTPS feed
-# for this exact OpenWrt 25.12 SNAPSHOT architecture. No arbitrary mirror,
-# other release, or caller/catalog-provided repository can be substituted.
+# The firmware's distribution feed establishes original OpenWrt provenance.
+# An immutable first-party backup may replace the transport URL only after
+# the Hub-pinned original index hash matches. No URL from the catalog is used.
 official_luci_url() {
  expected="https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/$arch/luci/packages.adb"
  [ -r "$DISTFEEDS" ] && grep -Fqx "$expected" "$DISTFEEDS" || return 1
@@ -174,14 +174,33 @@ review_remove_plan() {
  ' "$plan"
 }
 
-# The approved external feed can change during a SNAPSHOT release. Fail
-# before installation unless it still matches the reviewed index digest.
-verify_official_index() {
- "$UCLIENT" -q -T 15 -O "$stage/official-packages.adb" "$official_index" > "$stage/official-index-fetch.log" 2>&1 || return 1
+# Prefer a fixed first-party archive path keyed by the *original* approved
+# index SHA. Older routers can still use the original feed if no snapshot has
+# been published yet; a corrupt published snapshot is never silently ignored.
+select_official_index() {
+ original_index="$(official_luci_url)" || return 1
+ mirror_index="$REPO_BASE/openwrt/25.12-SNAPSHOT/packages/$arch/luci/$external_index_hash/packages.adb"
+ if "$UCLIENT" -q -T 15 -O "$stage/official-packages.adb" "$mirror_index" > "$stage/official-mirror-fetch.log" 2>&1; then
+  official_index="$mirror_index"
+  verify_official_index_file || return 1
+ else
+  official_index="$original_index"
+  verify_official_index || return 1
+ fi
+}
+
+verify_official_index_file() {
  [ -s "$stage/official-packages.adb" ] && [ ! -L "$stage/official-packages.adb" ] || return 1
  bytes="$(wc -c < "$stage/official-packages.adb" | tr -d ' ')"
  [ "$bytes" -le 8388608 ] || return 1
  [ "$("$SHA256" "$stage/official-packages.adb" | cut -d ' ' -f 1)" = "$external_index_hash" ]
+}
+
+# The original signed index is byte-for-byte identical in the mirror; apk
+# still verifies the OpenWrt signature, even when download host differs.
+verify_official_index() {
+ "$UCLIENT" -q -T 15 -O "$stage/official-packages.adb" "$official_index" > "$stage/official-index-fetch.log" 2>&1 || return 1
+ verify_official_index_file
 }
 
 # Preserve recovery of partial operations: an owned manifest may contain a
@@ -334,8 +353,7 @@ preflight_install() {
  if [ -s "$official_pins" ]; then
   external_index_hash="$(field "$CATALOG" "@.apps[$index].external_repository_index_sha256")"
   valid_sha "$external_index_hash" || return 37
-  official_index="$(official_luci_url)" || return 37
-  verify_official_index || return 37
+  select_official_index || return 37
  elif [ -n "$(field "$CATALOG" "@.apps[$index].external_repository_index_sha256")" ]; then
   return 37
  fi

@@ -81,6 +81,16 @@ case "$url" in
    cp "$APPS_TEST_REPO/nlbwmon-2025.06.02~29236be6-r1.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/luci-app-nlbwmon-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
+ https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/*/packages.adb)
+   case "${APPS_TEST_MIRROR_MODE:-missing}" in
+    good) cp "$APPS_TEST_OFFICIAL/packages.adb" "$dest";;
+    corrupt) printf 'changed index' > "$dest";;
+    *) exit 2;;
+   esac;;
+ https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/*/luci-app-nlbwmon-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_OFFICIAL/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
+ https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/*/luci-lib-chartjs-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_OFFICIAL/luci-lib-chartjs-26.288.56989~75a306d.apk" "$dest";;
  https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb)
    cp "$APPS_TEST_OFFICIAL/packages.adb" "$dest";;
  https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/luci-app-nlbwmon-26.288.56989~75a306d.apk)
@@ -109,6 +119,7 @@ case "$1" in
    [ "$3" = -X ] || exit 2
    case "$4" in
     https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/packages.adb) repo=hub;;
+    https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/*/packages.adb) repo=official;;
     https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb) repo=official;;
     *) exit 2;;
    esac
@@ -393,4 +404,19 @@ unset APPS_TEST_UPGRADE
 printf 'https://attacker.invalid/repo/packages.adb\n' > "$TMP/distfeeds.list"
 "$MANAGER" start install network-usage-monitor || fail 'unapproved distfeed request not queued'
 grep -Fqx "$(printf 'code	E37')" "$TMP/runtime/apps-operation.state" || fail 'untrusted official repository accepted'
+# An immutable SmartSafeHub snapshot is preferred over the moving upstream.
+printf 'https://downloads.openwrt.org/releases/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/packages.adb\n' > "$TMP/distfeeds.list"
+export APPS_TEST_MIRROR_MODE=good
+: > "$APPS_TEST_INSTALLED"
+"$MANAGER" start install network-usage-monitor || fail 'mirror installation not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'verified mirror installation failed'
+MIRROR_URL="https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/aarch64_cortex-a53/luci/$OFFICIAL_INDEX_SHA/packages.adb"
+grep -Fqx -- "--repositories-file /dev/null -X $MIRROR_URL -U add luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d" "$APPS_TEST_APK_LOG" || fail 'mirror was not used in the isolated signed transaction'
+"$MANAGER" start remove network-usage-monitor || fail 'mirror cleanup failed'
+# A downloaded mirror index with the wrong hash must not fall back to upstream.
+export APPS_TEST_MIRROR_MODE=corrupt
+"$MANAGER" start install network-usage-monitor || fail 'corrupt mirror job not queued'
+grep -Fqx "$(printf 'code\tE37')" "$TMP/runtime/apps-operation.state" || fail 'corrupt mirror incorrectly fell back to OpenWrt'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'corrupt mirror installed packages'
+unset APPS_TEST_MIRROR_MODE
 printf 'PASS: Apps install/remove allowlist, pins, ownership, status, revocation, official LuCI\n'

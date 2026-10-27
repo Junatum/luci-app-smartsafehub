@@ -21,7 +21,7 @@
 
 **주의:** Stable/Beta 저장소는 게시 때 변경됩니다. 다른 패키지를 갱신해서 `packages.adb` 해시가 변경되면 기존 승인 정보가 갱신되기 전까지 설치를 **차단**합니다. Hub에서 새 인덱스를 검토·승인해야 하며 이는 의도한 안전 동작입니다.
 
-**의존성 주의:** 기본 앱 패키지는 SmartSafeHub 저장소에서만 설치하며, 별도로 승인된 두 LuCI 패키지는 공식 OpenWrt 저장소에서만 설치합니다. 그 밖의 임의 의존성을 자동으로 가져오지 않으며, 새로운 커널 모듈이나 라이브러리는 별도의 호환성·서명 검증이 필요합니다.
+**의존성 주의:** 기본 앱 패키지는 SmartSafeHub 저장소에서만 설치하며, 별도로 승인된 두 LuCI 패키지는 OpenWrt의 원본 서명 인덱스를 보관한 SmartSafeHub 저장소 또는 공식 OpenWrt 저장소에서 설치합니다. 그 밖의 임의 의존성을 자동으로 가져오지 않으며, 새로운 커널 모듈이나 라이브러리는 별도의 호환성·서명 검증이 필요합니다.
 
 OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 이전의 `APKINDEX.tar.gz` 형식이라고 가정하면 안 됩니다.
 
@@ -33,13 +33,14 @@ OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 
 - `nlbwmon`은 SmartSafeHub 서명 저장소에서 설치합니다. 검토한 `luci-app-nlbwmon`과 `luci-lib-chartjs`는 별도 `external_packages`/`external_repository_index_sha256` 승인 정보가 있어야 공식 OpenWrt LuCI 저장소에서 설치합니다. 공식 패키지의 버전·APK SHA-256과 서명된 인덱스 SHA-256을 모두 검증합니다.
 - 기존 Apps 소유의 `nlbwmon`만 설치된 기기는 동일한 기본 패키지를 유지한 채 `설치 마무리`로 공식 LuCI 패키지를 추가합니다. 기존 설치 패키지를 변경하는 승인은 차단합니다. 공유기에 이미 설치된 동일 버전의 `luci-lib-chartjs`는 공통 의존성으로 사용할 수 있지만 소유권을 가져오거나 제거하지 않습니다.
 - `luci-app-nlbwmon`은 OpenWrt LuCI 인증을 다시 요구할 수 있습니다.
+- Airflow의 `backup_openwrt_app_packages`가 승인된 LuCI APK와 원본 `packages.adb`를 Storage에 별도로 보관합니다. 공유기는 `https://repo.smartsafehub.com/openwrt/25.12-SNAPSHOT/packages/<arch>/luci/<approved-index-sha256>/packages.adb` 보관본을 먼저 검사하고, 보관본이 없으면 공식 OpenWrt 저장소를 사용합니다. 보관본이 변조되면 원본으로 조용히 우회하지 않고 실패합니다. 보관본은 새로 서명하지 않으며 원래 OpenWrt 서명을 유지합니다.
 
 ## 동작과 제한
 
 - 설치 시작 시 **Hub에서 승인 목록을 다시 조회**합니다. 인터넷이 끊겼거나 승인이 취소된 앱은 신규 설치가 불가능합니다.
 - SmartSafeHub 저장소에서 승인된 인덱스와 APK를 내려받아 SHA-256을 확인하지만, 내려받은 APK 파일을 로컬 패키지로 설치하지는 않습니다.
 - SmartSafeHub 앱 패키지는 기존과 같이 **SmartSafeHub 서명 저장소만**, 승인된 공식 LuCI 패키지는 **OpenWrt 공식 LuCI 저장소만** 사용하는 서로 다른 `apk --repositories-file /dev/null -X ... -U add` 트랜잭션으로 설치합니다. 외부 저장소가 임의 패키지나 시스템 업그레이드를 요구하면 차단합니다. 실제 설치 전에 `--simulate`로 검사합니다.
-- 현재 공식 LuCI 저장소는 공유기에 등록된 `25.12-SNAPSHOT`/해당 아키텍처의 배포 서버만 허용합니다. 이동하는 SNAPSHOT 인덱스가 승인 SHA와 달라지면 안전하게 설치를 중단합니다. Stable 정식 배포 전에는 공식 APK 스냅샷을 별도로 보관해야 합니다.
+- 공유기에 등록된 `25.12-SNAPSHOT` 공식 LuCI 저장소를 원본 출처로 확인합니다. 백업본이 없는 경우 공식 SNAPSHOT 인덱스가 승인 SHA와 달라졌다면 설치를 중단합니다. 새 승인 후에는 OpenWrt 원본 파일이 바뀌기 전에 Airflow 백업 DAG를 실행해야 합니다.
 - 공식 LuCI 설치에는 `luci-base`와 `nlbwmon`이 이미 설치되어 있어야 합니다. 해당 패키지의 변경이 필요하거나 승인되지 않은 추가 의존성이 등장하면 설치를 차단하며, `/tmp/smartsafehub/apps-last-error.log`에 APK의 실패 사유를 남깁니다.
 - `--allow-untrusted`, 전체 `apk upgrade`, 사용자 입력 셸 명령, 로컬 저장소 구성은 사용하지 않습니다.
 - 핵심 시스템 패키지 및 SafeShield 관련 패키지는 앱 패키지 대상에서 제외합니다. 의존성 해석과 설치 스크립트 실행은 APK가 담당하므로, 앱마다 실제 환경 테스트가 필요합니다.
