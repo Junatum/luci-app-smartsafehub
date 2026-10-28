@@ -34,13 +34,22 @@ utils = (root / 'frontend/src/utils/appsStorage.ts').read_text()
 check("fs.statvfs(mount)" in backend and "let mount = '/overlay'" in backend,
       'Apps status must read writable overlay using fs.statvfs')
 check("mount = '/'" in backend, 'ext4 rootfs without /overlay requires a fallback')
-check('stats.bavail' in backend and 'stats.frsize' in backend and 'storage: writable_storage()' in backend,
-      'Apps status must report actual APK-available bytes without spawning df')
+check('stats.bavail' in backend and 'stats.frsize' in backend and 'storage: storage' in backend,
+      'optional Apps metrics must report actual APK-available bytes without spawning df')
+check('read_apps_metrics()' in backend and 'return success({ job: job(), restore: restore_status(), installed: installed });' in backend,
+      'critical Apps status must be separate from optional storage metrics')
+check("run_command([ MANAGER, 'sizes' ], 6000)" in backend and 'try {' in backend,
+      'optional APK size failures must not block status')
+check('apps_metrics:' in (root / 'root/usr/share/rpcd/ucode/smartsafehub.uc').read_text(),
+      'metrics RPC must be independently accessible')
+check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
+      'pollInterval: 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
+      'optional Apps metrics should run separately and less frequently')
 check("'/bin/df'" not in backend, 'storage must not spawn a polling command')
 check('lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]' in page,
       'Apps info and storage must be side by side on desktop and stacked on mobile')
-check('<AppsStorageCard storage={installStatus?.storage} />' in page,
-      'Apps storage must share existing status polling')
+check('<AppsStorageCard storage={metrics?.storage} />' in page,
+      'Apps storage should be read from independent optional metrics')
 check('stroke-dasharray=' in card and 'aria-label="앱 설치 저장 공간"' in card,
       'storage donut must be accessible and use SVG')
 check('용량 정보를 확인할 수 없습니다.' in card and 'summarizeAppsStorage(storage)' in card,
@@ -57,11 +66,16 @@ check('installed_size_bytes() {' in manager and '"$APK" info -s "$@"' in manager
       'Apps installed size should use one APK metadata lookup per app')
 check('du -' not in manager and 'find /' not in manager,
       'installed size must not recursively scan the router filesystem')
-check('installedBytes:' in backend and 'length(fields) >= 7' in backend,
-      'new response must extend old six-field statuses without breaking compatibility')
+check('installedSizes[fields[0]]' in backend and 'length(fields) != 2' in backend and
+      'installedBytes:' not in backend and 'length(fields) != 7' not in backend,
+      'package size data must be parsed separately from the six-column status')
+check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$@"' in manager,
+      'optional sizes command must report app APK totals without modifying status')
+check('app_bytes=' not in manager and 'set --' not in manager.split('sizes() {')[0].split('status() {')[1],
+      'status must not invoke optional size processing')
 check('sizeLabel !== null' in page and '패키지 설치 용량 약 {sizeLabel}' in page,
       'installed app card must show a real size only when known')
-check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in page,
+check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in page and 'metrics?.installedSizes' in page,
       'missing or invalid sizes must not be guessed')
 check('캐시는 포함되지 않습니다' in page,
       'metadata size must not be misrepresented as actual overlay consumption')

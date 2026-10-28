@@ -25,10 +25,14 @@ export interface AppsStorage {
   availableBytes: number;
 }
 
+/** Optional metrics, independent from installation and removal state. */
+export interface AppsMetrics {
+  storage: AppsStorage | null;
+  installedSizes: Record<string, number>;
+}
+
 /** Local APK adapter state, independent from the future IoT / AI runtimes. */
 export interface AppsInstallStatus {
-  /** Optional for compatibility with older router RPC responses. */
-  storage?: AppsStorage | null;
   job: {
     phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
     action: 'install' | 'update' | 'remove' | '';
@@ -47,8 +51,6 @@ export interface AppsInstallStatus {
     managed: boolean;
     updateAvailable?: boolean;
     webUiReady?: boolean;
-    /** Sum of installed APK package metadata sizes; excludes app data and caches. */
-    installedBytes?: number | null;
   }>;
 }
 

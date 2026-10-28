@@ -7,6 +7,7 @@ import { failure, run_command, success } from './core.uc';
 const MANAGER = '/usr/libexec/smartsafehub-apps-manager';
 const STATE = '/tmp/smartsafehub/apps-operation.state';
 const STATUS = '/tmp/smartsafehub/apps-status.tsv';
+const SIZES = '/tmp/smartsafehub/apps-size.tsv';
 const RESTORE_STATE = '/tmp/smartsafehub/apps-restore.state';
 
 // An installed APK consumes the writable root filesystem, not the /rom
@@ -84,7 +85,7 @@ export function read_apps_status() {
 	const installed = {};
 	for (let line in split(raw, /\r?\n/)) {
 		const fields = split(line, /\t/);
-		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6 && length(fields) != 7) ||
+		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6) ||
 			match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null)
 			continue;
 		installed[fields[0]] = {
@@ -93,10 +94,44 @@ export function read_apps_status() {
 			managed: fields[3] == '1',
 			webUiReady: length(fields) >= 5 && fields[4] == '1',
 			updateAvailable: length(fields) >= 6 && fields[5] == '1',
-			installedBytes: length(fields) >= 7 && match(fields[6], /^(0|[1-9][0-9]{0,12})$/) != null ? int(fields[6]) : null,
 		};
 	}
-	return success({ job: job(), restore: restore_status(), installed: installed, storage: writable_storage() });
+	return success({ job: job(), restore: restore_status(), installed: installed });
+};
+
+// Optional data lives behind an independent RPC. A slow APK database lookup
+// or filesystem error must never prevent installation/removal status checks.
+export function read_apps_metrics() {
+	let storage = null;
+	try {
+		storage = writable_storage();
+	}
+	catch (e) {
+		// Older/broken filesystem modules cannot disable core Apps operations.
+		warn('smartsafehub: Apps storage statistics unavailable\n');
+	}
+
+	const installedSizes = {};
+	try {
+		// 6s upper bound. This optional command never runs on the 12s status poll.
+		if (run_command([ MANAGER, 'sizes' ], 6000)) {
+			const raw = fs.readfile(SIZES);
+			if (type(raw) == 'string' && length(raw) <= 8192) {
+				for (let line in split(raw, /\r?\n/)) {
+					const fields = split(line, /\t/);
+					if (length(fields) != 2 ||
+						match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null ||
+						match(fields[1], /^(0|[1-9][0-9]{0,12})$/) == null)
+						continue;
+					installedSizes[fields[0]] = int(fields[1]);
+				}
+			}
+		}
+	}
+	catch (e) {
+		warn('smartsafehub: Apps package size statistics unavailable\n');
+	}
+	return success({ storage: storage, installedSizes: installedSizes });
 };
 
 function start_apps_operation(request, action) {

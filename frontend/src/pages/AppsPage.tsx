@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { AppsStorageCard } from '../components/AppsStorageCard';
 import { SectionHeading } from '../components/SectionHeading';
-import type { AppsCatalog, AppsInstallStatus, VerifiedApp } from '../types/apps';
+import type { AppsCatalog, AppsInstallStatus, AppsMetrics, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
 import { approvedAppPath } from '../utils/appsWebUi';
 import { formatStorageBytes } from '../utils/appsStorage';
@@ -18,6 +18,7 @@ interface AppsPageProps {
   refreshing: boolean;
   onRetry: () => void;
   installStatus: AppsInstallStatus | null;
+  metrics: AppsMetrics | null;
   statusError: string | null;
   onRefreshStatus: () => void;
   onInstall: (id: string) => Promise<void>;
@@ -86,7 +87,7 @@ function OperationIndicator({ action }: { action: AppAction }) {
   );
 }
 
-export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, statusError,
+export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, metrics, statusError,
   onRefreshStatus, onInstall, onUpdate, onRemove }: AppsPageProps) {
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery] = useState('');
@@ -253,7 +254,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
               검증된 APK를 설치·업데이트·제거할 수 있습니다. 작업 중에는 다른 앱 작업을 시작할 수 없습니다.
             </p>
           </div>
-          <AppsStorageCard storage={installStatus?.storage} />
+          <AppsStorageCard storage={metrics?.storage} />
         </div>
       </div>
 
@@ -319,7 +320,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                 {filtered.map((app) => {
                   const state = installStatus?.installed[app.id];
                   const installed = state?.installed ?? false;
-                  const bytes = state?.installedBytes;
+                  const bytes = metrics?.installedSizes?.[app.id];
                   const sizeLabel = installed && typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
                     ? formatStorageBytes(bytes) : null;
                   const managed = state?.managed ?? false;

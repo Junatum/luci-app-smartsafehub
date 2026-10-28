@@ -300,16 +300,21 @@ grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fa
 [ "$(wc -l < "$APPS_TEST_INSTALLED" | tr -d ' ')" -eq 3 ] || fail 'failed entropy read touched installed APKs'
 "$MANAGER" status
 grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'ready state missing'
-grep -Fqx "$(printf 'network-usage-monitor\t1\t1\t1\t1\t0\t2359296')" "$TMP/runtime/apps-status.tsv" || fail 'multi-package installed size not summed'
-# Invalid or missing APK metadata must never produce a made-up size.
+grep -Fqx "$(printf 'network-usage-monitor\t1\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'installed state changed'
+# Optional size lookup must never run on the critical installation-status path.
+[ "$(grep -c '^info -s ' "$APPS_TEST_APK_LOG" || :)" -eq 0 ] || fail 'status unexpectedly queried APK sizes'
+"$MANAGER" sizes
+grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'multi-package installed size not summed'
+# Malformed and missing metadata must not alter the actual installed state.
 export APPS_TEST_SIZE_INVALID=1
+"$MANAGER" sizes
+[ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'invalid APK size reported as bytes'
 "$MANAGER" status
-grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'invalid size changed app state'
-[ "$(awk -F '\t' '$1 == "network-usage-monitor" {print $7}' "$TMP/runtime/apps-status.tsv")" = '' ] || fail 'invalid APK metadata reported as bytes'
+grep -Fqx "$(printf 'network-usage-monitor\t1\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'invalid size changed app state'
 unset APPS_TEST_SIZE_INVALID
 export APPS_TEST_SIZE_MISSING=1
-"$MANAGER" status
-[ "$(awk -F '\t' '$1 == "network-usage-monitor" {print $7}' "$TMP/runtime/apps-status.tsv")" = '' ] || fail 'missing APK size must be omitted'
+"$MANAGER" sizes
+[ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'missing APK size must be omitted'
 unset APPS_TEST_SIZE_MISSING
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'new Apps uninstall did not remove owned packages'
@@ -373,7 +378,9 @@ mkdir -p "$TMP/www/retro-arcade"
 printf 'retro entry\n' > "$TMP/www/retro-arcade/index.html"
 "$MANAGER" status
 grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade entry point is not ready'
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t1\t0\t13107200')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade size missing'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade status missing'
+"$MANAGER" sizes
+grep -Fqx "$(printf 'retro-arcade\t13107200')" "$TMP/runtime/apps-size.tsv" || fail 'Retro Arcade size missing'
 rm "$TMP/www/retro-arcade/index.html"
 "$MANAGER" status
 grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'removed Retro Arcade entry point still launches'
@@ -459,7 +466,7 @@ open(p,'w').write(json.dumps(data))
 PY_UPDATE
 "$TMP/bin/fetch-catalog"
 "$MANAGER" status
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t1\t13107200')" "$TMP/runtime/apps-status.tsv" || fail 'new approved release not offered as update'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t1')" "$TMP/runtime/apps-status.tsv" || fail 'new approved release not offered as update'
 # Prevent core upgrades even if the APK solver proposes them.
 export APPS_TEST_UPGRADE=1
 "$MANAGER" start update retro-arcade || fail 'unrelated package simulation did not queue'
@@ -477,7 +484,7 @@ grep -Fqx "$(printf 'smartsafehub-app-retro-arcade\t1.1.0-r1\t%s' "$NEWRETROSHA"
 [ "$(awk '$1 == "smartsafehub-app-retro-arcade" {print $2}' "$APPS_TEST_VERSION_DB")" = 1.1.0-r1 ] || fail 'mock apk version did not update'
 [ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" = "$receipt_before" ] || fail 'upgrade was counted as an install'
 "$MANAGER" status
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t13107200')" "$TMP/runtime/apps-status.tsv" || fail 'already updated app still advertises update'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'already updated app still advertises update'
 "$MANAGER" start update retro-arcade || fail 'repeated update should report a no-op'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'repeated update was not rejected'
 # Any attempt to downgrade a package must fail closed.
@@ -490,7 +497,7 @@ open(p,'w').write(json.dumps(data))
 PY_DOWNGRADE
 "$TMP/bin/fetch-catalog"
 "$MANAGER" status
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t13107200')" "$TMP/runtime/apps-status.tsv" || fail 'downgrade must not be advertised'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'downgrade must not be advertised'
 "$MANAGER" start update retro-arcade || fail 'downgrade did not queue'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'downgrade was not refused'
 # Installed APK changed outside Apps ownership: never perform another upgrade.

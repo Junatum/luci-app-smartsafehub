@@ -1,14 +1,14 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { fetchAppsCatalog, fetchAppsStatus, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchAppsCatalog, fetchAppsStatus, fetchAppsMetrics, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
 import { PageTabs } from '../components/PageTabs';
 import { useActivityHistory } from '../hooks/useActivityHistory';
 import { useAsyncResource } from '../hooks/useAsyncResource';
-import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
+import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps';
 import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
@@ -67,6 +67,14 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     pollInterval: (data) => data?.job.phase === 'running' || data?.job.phase === 'starting' || data?.restore?.phase === 'running' || data?.restore?.phase === 'starting' ? 3000 : 12000,
     staleTimeMs: 3000,
   });
+  // Optional metrics never participate in the status/error guard for buttons.
+  const appsMetrics = useAsyncResource<AppsMetrics>({
+    active: route === 'apps',
+    fallbackError: '저장 공간 정보를 확인하지 못했습니다.',
+    loader: fetchAppsMetrics,
+    pollInterval: 60000,
+    staleTimeMs: 60000,
+  });
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
   const firmware = useFirmwareUpdates(true);
@@ -111,6 +119,16 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
       });
   }, []);
 
+  // When an operation finishes, refresh space and package sizes promptly.
+  const appsJobId = appsStatus.data?.job.operationId;
+  const appsJobPhase = appsStatus.data?.job.phase;
+  const appsRestorePhase = appsStatus.data?.restore?.phase;
+  useEffect(() => {
+    if (route === 'apps' && (appsJobPhase === 'success' || appsRestorePhase === 'success')) {
+      void appsMetrics.refresh();
+    }
+  }, [route, appsJobId, appsJobPhase, appsRestorePhase]);
+
   const safeshieldActions = useSafeShieldActions(
     safeshield.refresh,
     safeshieldStatistics.refresh,
@@ -149,8 +167,9 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           error={apps.error}
           loading={apps.loading}
           refreshing={apps.refreshing}
-          onRetry={() => void Promise.all([apps.refresh(), appsStatus.refresh()])}
+          onRetry={() => void Promise.all([apps.refresh(), appsStatus.refresh(), appsMetrics.refresh()])}
           installStatus={appsStatus.data}
+          metrics={appsMetrics.data}
           statusError={appsStatus.error}
           onRefreshStatus={() => void appsStatus.refresh()}
           onInstall={async (id) => {

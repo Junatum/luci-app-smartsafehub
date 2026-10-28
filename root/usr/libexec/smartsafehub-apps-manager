@@ -280,16 +280,11 @@ status() {
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break
   total=0; present=0; p=0
-  set --
   while :; do
    name="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
    [ -n "$name" ] || break
    valid_package "$name" || break
-   total=$((total + 1))
-   if installed "$name"; then
-    present=$((present + 1))
-    set -- "$@" "$name"
-   fi
+   total=$((total + 1)); installed "$name" && present=$((present + 1))
    p=$((p + 1)); [ "$p" -le 32 ] || break
   done
   managed=0
@@ -312,20 +307,41 @@ status() {
    fi
    rm -f "$status_pins" "$status_changes"
   fi
-  # Only report complete app package sets, not potentially misleading
-  # partial installs. A missing/unsupported size remains an empty field.
-  app_bytes=''
-  if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then
-   full=1
-   app_bytes="$(installed_size_bytes "$@" || :)"
-  else
-   full=0
-  fi
+  # Installation status remains a cheap, dependency-free lookup.
+  if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready" "$app_bytes"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"
+}
+
+# Optional read-only sizes. Consult the *last known installed* status and
+# the approved catalog. Failures cannot change installation state or buttons.
+sizes() {
+ tmp="$(mktemp "$RUNTIME/apps-size.XXXXXXXX")" || return 1
+ {
+ if [ -r "$CATALOG" ] && [ -r "$RUNTIME/apps-status.tsv" ]; then
+  for id in $(awk -F '\t' '$2 == "1" {print $1}' "$RUNTIME/apps-status.tsv"); do
+   valid_id "$id" || continue
+   idx="$(app_index "$id")" || continue
+   set --
+   p=0
+   while :; do
+    name="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
+    [ -n "$name" ] || break
+    valid_package "$name" || break
+    set -- "$@" "$name"
+    p=$((p + 1)); [ "$p" -le 32 ] || break
+   done
+   [ "$#" -gt 0 ] || continue
+   bytes="$(installed_size_bytes "$@" || :)"
+   case "$bytes" in ''|*[!0-9]*) continue;; esac
+   printf '%s\t%s\n' "$id" "$bytes"
+  done
+ fi
+ } > "$tmp"
+ mv -f "$tmp" "$RUNTIME/apps-size.tsv"
 }
 
 # Release names from the Hub have zero command authority. We cross-check the
@@ -598,6 +614,7 @@ start() {
 
 case "${1:-}" in
  status) mkdir -p "$RUNTIME"; status;;
+ sizes) mkdir -p "$RUNTIME"; sizes;;
  start) [ "$#" -ge 3 ] && [ "$#" -le 4 ] || exit 2; start "$2" "$3" "${4:-user}";;
  worker) [ "$#" -eq 3 ] || exit 2; worker "$2" "$3";;
  *) exit 2;;

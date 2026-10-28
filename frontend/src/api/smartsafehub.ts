@@ -1,5 +1,5 @@
 import type { ActivityHistory } from '../types/activity';
-import type { AppsCatalog, AppsInstallStatus, AppsOperationAccepted } from '../types/apps';
+import type { AppsCatalog, AppsInstallStatus, AppsMetrics, AppsOperationAccepted } from '../types/apps';
 import type {
   ConfigurationBackupDiscardResult,
   ConfigurationBackupRestoreResult,
@@ -132,6 +132,10 @@ export function fetchAppsCatalog(): Promise<AppsCatalog> {
 
 export function fetchAppsStatus(): Promise<AppsInstallStatus> {
   return callApi(API_OBJECT, 'apps_status', {}, { timeoutMs: 18000 });
+}
+
+export function fetchAppsMetrics(): Promise<AppsMetrics> {
+  return callApi(API_OBJECT, 'apps_metrics', {}, { timeoutMs: 10000 });
 }
 
 export function installVerifiedApp(appId: string): Promise<AppsOperationAccepted> {
