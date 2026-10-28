@@ -14,10 +14,12 @@ printf 'signed immutable package-index test fixture\n' > "$TMP/repo/packages.adb
 printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk"
 printf 'approved LuCI mock package payload\n' > "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk"
 printf 'approved chart mock package payload\n' > "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk"
+printf 'approved Retro Arcade mock package payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.0.0-r1.apk"
 INDEX_SHA="$(sha256sum "$TMP/repo/packages.adb" | cut -d ' ' -f 1)"
 ARCHIVE_SHA="$(sha256sum "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk" | cut -d ' ' -f 1)"
 LUCISH="$(sha256sum "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 CHARTSHA="$(sha256sum "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
+RETROSHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.0.0-r1.apk" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF
 {"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
@@ -79,6 +81,8 @@ case "$url" in
    cp "$APPS_TEST_REPO/luci-app-nlbwmon-26.288.56989~75a306d.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-lib-chartjs-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-lib-chartjs-26.288.56989~75a306d.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.0.0-r1.apk)
+   cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.0.0-r1.apk" "$dest";;
  *) exit 2;;
 esac
 printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
@@ -105,11 +109,15 @@ case "$1" in
    esac
    [ -s "$local_index" ] || exit 2
    cmp -s "$local_index" "$APPS_TEST_REPO/packages.adb" || exit 2
-   for name in nlbwmon-2025.06.02~29236be6-r1 \
-       luci-app-nlbwmon-26.288.56989~75a306d \
-       luci-lib-chartjs-26.288.56989~75a306d; do
-     [ -s "${local_index%/*}/$name.apk" ] || exit 2
-   done
+   if [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.0.0-r1.apk" ]; then
+     [ "$(find "${local_index%/*}" -name '*.apk' | wc -l | tr -d ' ')" -eq 1 ] || exit 2
+   else
+     for name in nlbwmon-2025.06.02~29236be6-r1 \
+         luci-app-nlbwmon-26.288.56989~75a306d \
+         luci-lib-chartjs-26.288.56989~75a306d; do
+       [ -s "${local_index%/*}/$name.apk" ] || exit 2
+     done
+   fi
    if [ "$5" = update ]; then
      if [ "${APPS_TEST_REPO_UPDATE_FAIL:-0}" = 1 ]; then
        echo 'ERROR: repository index update rejected' >&2
@@ -141,7 +149,7 @@ if [ "${1:-}" = --simulate ]; then
  for pin in "$@"; do
   name="${pin%%=*}"
   case "$repo:$name" in
-   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs) ;;
+   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade) ;;
    *) exit 2;;
   esac
   if [ "${APPS_TEST_UPGRADE:-0}" = 1 ]; then
@@ -155,7 +163,7 @@ fi
 for pin in "$@"; do
  name="${pin%%=*}"
  case "$repo:$name" in
-  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs) ;;
+  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade) ;;
   *) exit 2;;
  esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
@@ -235,3 +243,38 @@ if ! grep -Fq 'repo_url="$REPO_BASE/$channel/packages/$arch/smartsafehub/$public
     echo 'FAIL: signed immutable Apps package publication is missing' >&2
     exit 1
 fi
+
+# Retro Arcade is a single APK from the same signed feed. Verify readiness of
+# its static entry point independently of the package-manager install state.
+: > "$APPS_TEST_INSTALLED"
+export SMARTSAFEHUB_APPS_WEB_ROOT="$TMP/www"
+cat > "$TMP/catalog.json" <<EOF_RETRO
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_RETRO
+"$MANAGER" start install retro-arcade || fail 'Retro Arcade install did not queue'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'single Retro APK installation failed'
+[ "$(cat "$APPS_TEST_INSTALLED")" = smartsafehub-app-retro-arcade ] || fail 'unexpected Retro APK installation set'
+"$MANAGER" status
+grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade should not launch before its HTML exists'
+mkdir -p "$TMP/www/retro-arcade"
+printf 'retro entry\n' > "$TMP/www/retro-arcade/index.html"
+"$MANAGER" status
+grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade entry point is not ready'
+rm "$TMP/www/retro-arcade/index.html"
+"$MANAGER" status
+grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'removed Retro Arcade entry point still launches'
+# A malformed catalog must not allow more than one approved Retro APK.
+python3 - "$TMP/catalog.json" <<'PY_RETRO_BAD'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p)); data['apps'][0]['packages'].append(data['apps'][0]['packages'][0]); open(p,'w').write(json.dumps(data))
+PY_RETRO_BAD
+"$MANAGER" start install retro-arcade || fail 'invalid multi-APK Retro install should queue'
+grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'multiple Retro packages not rejected'
+# Restore the catalog for safe removal of the original installed APK.
+python3 - "$TMP/catalog.json" <<'PY_RETRO_GOOD'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p)); data['apps'][0]['packages'].pop(); open(p,'w').write(json.dumps(data))
+PY_RETRO_GOOD
+"$MANAGER" start remove retro-arcade || fail 'Retro Arcade removal did not queue'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'Retro Arcade was not uninstalled'
+printf 'PASS: Retro Arcade single APK, static entry point readiness and safe removal\n'

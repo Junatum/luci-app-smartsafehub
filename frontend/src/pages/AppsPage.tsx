@@ -4,9 +4,9 @@ import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
-import { approvedLuciPath } from '../utils/appsWebUi';
+import { approvedAppPath } from '../utils/appsWebUi';
 
-type Category = 'all' | 'network' | 'security' | 'smart_home' | 'other';
+type Category = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'other';
 
 interface AppsPageProps {
   data: AppsCatalog | null;
@@ -25,6 +25,7 @@ function categoryOf(app: VerifiedApp): Category {
   switch (app.category) {
     case 'network': return 'network';
     case 'security': return 'security';
+    case 'entertainment': return 'entertainment';
     case 'smart_home':
     case 'iot': return 'smart_home';
     default: return 'other';
@@ -57,6 +58,7 @@ const TABS: readonly { id: Category; label: string }[] = [
   { id: 'network', label: '네트워크' },
   { id: 'security', label: '보안' },
   { id: 'smart_home', label: '스마트홈' },
+  { id: 'entertainment', label: '엔터테인먼트' },
   { id: 'other', label: '기타' },
 ];
 
@@ -304,7 +306,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running || restoring;
                   const removable = managed && (installed || Boolean(state?.partial));
-                  const launchPath = installed && state?.webUiReady ? approvedLuciPath(app.webUi) : null;
+                  const launchPath = installed && state?.webUiReady ? approvedAppPath(app.webUi) : null;
                   return (
                     <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
                       <div class="flex min-w-0 items-start gap-3">

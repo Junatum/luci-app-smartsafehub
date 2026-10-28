@@ -6,8 +6,8 @@ export interface VerifiedApp {
   description: string;
   category: string;
   version: string;
-  /** Approved same-origin LuCI page; never an external URL or executable code. */
-  webUi?: { type: 'luci'; path: string } | null;
+  /** Approved same-origin LuCI page or first-party static app; never a remote URL. */
+  webUi?: { type: 'luci' | 'static'; path: string } | null;
 }
 
 export interface AppsCatalog {

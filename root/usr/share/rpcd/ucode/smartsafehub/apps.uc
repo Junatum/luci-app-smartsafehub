@@ -13,7 +13,7 @@ function text(value, max_length) {
 
 // Only open LuCI pages served by this router. Reject query strings, fragments,
 // percent escapes, scheme-relative URLs and path traversal from catalog data.
-function web_ui_path(value) {
+function luci_web_ui_path(value) {
 	if (!text(value, 160) ||
 		match(value, /^\/cgi-bin\/luci\/admin\/[a-z0-9_-]+(\/[a-z0-9_-]+)*$/) == null)
 		return '';
@@ -61,7 +61,11 @@ export function read_apps_catalog() {
 		// The page is only launchable if its UI package is actually installed.
 		let path = '';
 		if (item?.web_ui?.type == 'luci')
-			path = web_ui_path(item.web_ui.path);
+			path = luci_web_ui_path(item.web_ui.path);
+		else if (id == 'retro-arcade' && item?.web_ui?.type == 'static' &&
+			item?.web_ui?.path == '/retro-arcade/' &&
+			item?.web_ui?.package == 'smartsafehub-app-retro-arcade')
+			path = '/retro-arcade/';
 		else if (id == 'network-usage-monitor')
 			path = '/cgi-bin/luci/admin/services/nlbw/display';
 		// Only UI copy crosses into the unprivileged browser. All package hashes,
@@ -74,7 +78,7 @@ export function read_apps_catalog() {
 			description: text(item?.description, 2000),
 			category: text(item?.category, 64),
 			version: text(item?.version, 64),
-			webUi: length(path) ? { type: 'luci', path: path } : null,
+			webUi: length(path) ? { type: id == 'retro-arcade' && path == '/retro-arcade/' ? 'static' : 'luci', path: path } : null,
 		});
 	}
 	return success({

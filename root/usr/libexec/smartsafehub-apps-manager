@@ -164,7 +164,13 @@ web_ui_package() {
   printf '%s\n' luci-app-nlbwmon
   return 0
  fi
- [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
+ if [ "$id" = retro-arcade ]; then
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = static ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /retro-arcade/ ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = smartsafehub-app-retro-arcade ] || return 1
+ else
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
+ fi
  name="$(field "$CATALOG" "@.apps[$idx].web_ui.package")"
  valid_package "$name" || return 1
  p=0
@@ -199,7 +205,11 @@ status() {
   [ -f "$(owned_manifest "$id")" ] && managed=1
   ui_ready=0
   ui_package="$(web_ui_package "$id" "$idx" || :)"
-  [ -n "$ui_package" ] && installed "$ui_package" && ui_ready=1
+  if [ -n "$ui_package" ] && installed "$ui_package"; then
+   if [ "$id" != retro-arcade ] || [ -r "${SMARTSAFEHUB_APPS_WEB_ROOT:-/www}/retro-arcade/index.html" ]; then
+    ui_ready=1
+   fi
+  fi
   # id, fully installed, at least one package installed, SmartSafeHub-owned
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
@@ -259,6 +269,11 @@ preflight_install() {
   for required in nlbwmon luci-app-nlbwmon luci-lib-chartjs; do
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
+ elif [ "$app" = retro-arcade ]; then
+  # The approved first-party game app owns exactly one APK. Keep the
+  # package name fixed without freezing its future upgrade versions.
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 1 ] || return 27
+  grep -q "^smartsafehub-app-retro-arcade$(printf '\t')" "$pins" || return 27
  fi
  return 0
 }
