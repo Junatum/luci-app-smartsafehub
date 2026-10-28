@@ -25,6 +25,9 @@ STATE="$RUNTIME/apps-operation.state"
 CATALOG="$RUNTIME/apps-catalog.json"
 
 field() { "$JSONFILTER" -i "$1" -e "$2" 2>/dev/null | head -n 1; }
+# A wildcard expression returns multiple app IDs. Scalar fields above must
+# remain single-valued, but catalog iteration must not truncate the results.
+catalog_ids() { "$JSONFILTER" -i "$CATALOG" -e '@.apps[*].id' 2>/dev/null; }
 valid_id() { case "$1" in ''|*[!a-z0-9-]*|-*|*-) return 1;; esac; [ "${#1}" -le 80 ]; }
 valid_package() {
  case "$1" in ''|*[!a-zA-Z0-9_.+-]*|[-.+]*|*[-.+]) return 1;; esac
@@ -58,7 +61,7 @@ owned_manifest() { printf '%s/%s' "$OWNED" "$1"; }
 # created exclusively from a numeric index resolved from the approved catalog.
 app_index() {
  id="$1"; n=0
- for candidate in $(field "$CATALOG" '@.apps[*].id'); do
+ for candidate in $(catalog_ids); do
   if [ "$candidate" = "$id" ]; then printf '%s\n' "$n"; return 0; fi
   n=$((n + 1))
   [ "$n" -le 100 ] || break
@@ -189,7 +192,7 @@ status() {
  # A disconnected device can still report its local installation state.
  if [ ! -r "$CATALOG" ]; then : > "$tmp"; mv -f "$tmp" "$RUNTIME/apps-status.tsv"; return 0; fi
  n=0
- for id in $(field "$CATALOG" '@.apps[*].id'); do
+ for id in $(catalog_ids); do
   valid_id "$id" || continue
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break

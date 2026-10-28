@@ -278,3 +278,46 @@ PY_RETRO_GOOD
 "$MANAGER" start remove retro-arcade || fail 'Retro Arcade removal did not queue'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'Retro Arcade was not uninstalled'
 printf 'PASS: Retro Arcade single APK, static entry point readiness and safe removal\n'
+
+# Restore the mock file deliberately corrupted by the earlier hash test.
+printf 'approved chart mock package payload\n' > "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk"
+# A catalog may contain multiple apps. Each app must be visible to the
+# installer and status reporter regardless of its position in the list.
+: > "$APPS_TEST_INSTALLED"
+rm -f "$TMP/owned/retro-arcade" "$TMP/owned/network-usage-monitor"
+printf '%s\n' smartsafehub-app-retro-arcade > "$APPS_TEST_INSTALLED"
+cat > "$TMP/catalog.json" <<EOF_BOTH
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}},{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_BOTH
+# Retro Arcade was installed manually; testing the other app must not adopt it.
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+[ "$(wc -l < "$TMP/runtime/apps-status.tsv" | tr -d ' ')" -eq 2 ] || fail 'status lost the second approved app'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'manual Retro Arcade status incorrect'
+grep -Fqx "$(printf 'network-usage-monitor\t0\t0\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'second app omitted from status'
+"$MANAGER" start install network-usage-monitor || fail 'second app installation did not queue'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'second app install unexpectedly failed E22'
+[ "$(wc -l < "$APPS_TEST_INSTALLED" | tr -d ' ')" -eq 4 ] || fail 'install changed unrelated packages'
+grep -Fqx smartsafehub-app-retro-arcade "$APPS_TEST_INSTALLED" || fail 'manual Retro Arcade was modified'
+[ ! -e "$TMP/owned/retro-arcade" ] || fail 'manual Retro Arcade was adopted'
+"$MANAGER" status
+grep -Fqx "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'second app installed state missing'
+"$MANAGER" start remove network-usage-monitor || fail 'second app removal did not queue'
+[ "$(cat "$APPS_TEST_INSTALLED")" = smartsafehub-app-retro-arcade ] || fail 'remove touched manual Retro Arcade'
+# Reverse the catalog to verify lookup and status for the other second app.
+python3 - "$TMP/catalog.json" <<'PY_BOTH_REVERSED'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+data['apps'].reverse()
+path.write_text(json.dumps(data))
+PY_BOTH_REVERSED
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+[ "$(wc -l < "$TMP/runtime/apps-status.tsv" | tr -d ' ')" -eq 2 ] || fail 'reversed catalog lost an app'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'second Retro Arcade status missing'
+"$MANAGER" start install retro-arcade || fail 'second Retro Arcade installation did not queue'
+grep -Fqx "$(printf 'code\tE29')" "$TMP/runtime/apps-operation.state" || fail 'second app did not reach manual ownership check'
+printf 'PASS: multi-app lookup, E22 regression and manual package protection\n'
