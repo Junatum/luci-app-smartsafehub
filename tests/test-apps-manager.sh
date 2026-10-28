@@ -21,7 +21,7 @@ LUCISH="$(sha256sum "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk" | cut 
 CHARTSHA="$(sha256sum "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 RETROSHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.0.0-r1.apk" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF
-{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","version":"2025.06.02-r1","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
 # Use jq when available for faster field lookups; the Python fallback is portable.
 cat > "$TMP/bin/jsonfilter" <<'SH2'
@@ -178,6 +178,15 @@ awk -F '\t' '$1 == "operation_id" { print $2; exit }' \
 "$4" "$6" "$7" "$8"
 SH2
 chmod +x "$TMP/bin/"*
+cat > "$TMP/bin/metrics-hook" <<'METRICS'
+#!/bin/sh
+printf '%s
+' "$*" >> "$APPS_TEST_METRICS_LOG"
+METRICS
+chmod +x "$TMP/bin/metrics-hook"
+export APPS_TEST_METRICS_LOG="$TMP/install-events"
+export SMARTSAFEHUB_APPS_METRICS_BIN="$TMP/bin/metrics-hook"
+: > "$APPS_TEST_METRICS_LOG"
 export SMARTSAFEHUB_APPS_MANAGER_BIN="$MANAGER"
 export SMARTSAFEHUB_APPS_HELPER_BIN="$TMP/bin/fetch-catalog"
 export SMARTSAFEHUB_APPS_RUNTIME_DIR="$TMP/runtime"
@@ -214,6 +223,9 @@ second_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$T
 [ -n "$second_operation_id" ] && [ "$first_operation_id" != "$second_operation_id" ] || fail 'new operation reused old identity'
 [ "$(sed -n '3p' "$APPS_TEST_OPERATION_START_LOG")" = "$second_operation_id" ] || fail 'operation identity changed during success'
 [ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 3 ] || fail 'all three APKs were not installed'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 1 ] || fail 'successful installation not recorded exactly once'
+grep -Eq '^enqueue network-usage-monitor 2025\.06\.02-r1 [0-9]+-[0-9]+-[a-f0-9]{16}$' "$APPS_TEST_METRICS_LOG" || fail 'invalid receipt fields'
+
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb update$' "$APPS_TEST_APK_LOG" || fail 'approved local index not loaded before simulation'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add --simulate nlbwmon=2025\.06\.02~29236be6-r1 luci-app-nlbwmon=26\.288\.56989~75a306d luci-lib-chartjs=26\.288\.56989~75a306d$' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository simulation not used'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add nlbwmon=' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository install not used'
@@ -221,6 +233,8 @@ grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add 
 grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'ready state missing'
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'new Apps uninstall did not remove owned packages'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 1 ] || fail 'removal counted as an installation'
+
 cp "$TMP/catalog.json" "$TMP/catalog-good.json"
 python3 - "$TMP/catalog.json" <<'PY_BAD'
 import json,sys
@@ -250,6 +264,8 @@ cp "$TMP/catalog-good.json" "$TMP/catalog.json"
 printf 'tampered APK\n' > "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk"
 "$MANAGER" start install network-usage-monitor || fail 'tampered APK did not queue'
 grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'modified APK accepted'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 1 ] || fail 'failed installation counted'
+
 printf 'PASS: Apps install/remove signed immutable release, three APKs, ownership and hash checks\n'
 
 # Self-built App publications must install from immutable signed releases.
@@ -263,11 +279,14 @@ fi
 : > "$APPS_TEST_INSTALLED"
 export SMARTSAFEHUB_APPS_WEB_ROOT="$TMP/www"
 cat > "$TMP/catalog.json" <<EOF_RETRO
-{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","version":"1.0.0-r1","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF_RETRO
 "$MANAGER" start install retro-arcade || fail 'Retro Arcade install did not queue'
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'single Retro APK installation failed'
 [ "$(cat "$APPS_TEST_INSTALLED")" = smartsafehub-app-retro-arcade ] || fail 'unexpected Retro APK installation set'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 2 ] || fail 'Retro install not counted'
+grep -Eq '^enqueue retro-arcade 1\.0\.0-r1 [0-9]+-[0-9]+-[a-f0-9]{16}$' "$APPS_TEST_METRICS_LOG" || fail 'Retro receipt incorrect'
+
 "$MANAGER" status
 grep -Fq "$(printf 'retro-arcade\t1\t1\t1\t0')" "$TMP/runtime/apps-status.tsv" || fail 'Retro Arcade should not launch before its HTML exists'
 mkdir -p "$TMP/www/retro-arcade"
@@ -301,7 +320,7 @@ printf 'approved chart mock package payload\n' > "$TMP/repo/luci-lib-chartjs-26.
 rm -f "$TMP/owned/retro-arcade" "$TMP/owned/network-usage-monitor"
 printf '%s\n' smartsafehub-app-retro-arcade > "$APPS_TEST_INSTALLED"
 cat > "$TMP/catalog.json" <<EOF_BOTH
-{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}},{"id":"network-usage-monitor","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","version":"1.0.0-r1","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/retro-arcade/","package":"smartsafehub-app-retro-arcade"},"packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}},{"id":"network-usage-monitor","version":"2025.06.02-r1","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF_BOTH
 # Retro Arcade was installed manually; testing the other app must not adopt it.
 "$TMP/bin/fetch-catalog"

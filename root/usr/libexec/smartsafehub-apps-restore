@@ -61,7 +61,7 @@ job_field() {
 # clicking Install. Never calls apk add directly, never reuses cached catalogs.
 run_job() {
  id="$1"; n=0
- if ! "$MANAGER" start install "$id" >/dev/null 2>&1; then
+ if ! "$MANAGER" start install "$id" restore >/dev/null 2>&1; then
   RESULT=BUSY
   return 1
  fi

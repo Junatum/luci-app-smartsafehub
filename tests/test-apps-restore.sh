@@ -14,7 +14,7 @@ grep -qxF "$3" "$RESTORE_TEST_INSTALLED" 2>/dev/null
 MOCK
 cat > "$TMP/bin/manager" <<'MOCK'
 #!/bin/sh
-[ "$1" = start ] && [ "$2" = install ] && [ "$3" = network-usage-monitor ] || exit 4
+[ "$1" = start ] && [ "$2" = install ] && [ "$3" = network-usage-monitor ] && [ "$4" = restore ] || exit 4
 printf '%s\n' "$3" >> "$RESTORE_TEST_CALLS"
 case "${RESTORE_TEST_MODE:-success}" in
  busy) exit 3;;

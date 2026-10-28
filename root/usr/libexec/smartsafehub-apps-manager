@@ -20,6 +20,7 @@ APK="${SMARTSAFEHUB_APPS_APK_BIN:-apk}"
 ARCH_FILE="${SMARTSAFEHUB_APPS_ARCH_FILE:-/etc/apk/arch}"
 SHA256="${SMARTSAFEHUB_APPS_SHA256_BIN:-sha256sum}"
 DAEMON="${SMARTSAFEHUB_APPS_DAEMON_BIN:-start-stop-daemon}"
+METRICS="${SMARTSAFEHUB_APPS_METRICS_BIN:-/usr/libexec/smartsafehub-apps-metrics}"
 LOCK="$RUNTIME/apps-operation.lock"
 STATE="$RUNTIME/apps-operation.state"
 CATALOG="$RUNTIME/apps-catalog.json"
@@ -48,9 +49,9 @@ protected_package() {
  return 1
 }
 write_state() {
- phase="$1"; action="$2"; app="$3"; code="$4"; operation_id="$5"
+ phase="$1"; action="$2"; app="$3"; code="$4"; operation_id="$5"; source="${6:-user}"
  tmp="$(mktemp "$RUNTIME/apps-state.XXXXXXXX")" || return 1
- printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\noperation_id\t%s\n' "$phase" "$action" "$app" "$code" "$operation_id" > "$tmp"
+ printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\noperation_id\t%s\nsource\t%s\n' "$phase" "$action" "$app" "$code" "$operation_id" "$source" > "$tmp"
  mv -f "$tmp" "$STATE"
 }
 # Persist *ownership*, not merely an installed flag, so removal never deletes
@@ -388,16 +389,24 @@ worker() {
  # Keep the ID from the queued job across running/success/failed states.
  # The browser uses it to distinguish a new failure from a dismissed one.
  operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$STATE" 2>/dev/null || :)"
+ source="$(awk -F '\t' '$1 == "source" { print $2; exit }' "$STATE" 2>/dev/null || :)"
+ case "$source" in user|restore) ;; *) source=user ;; esac
  trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
  stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
  pins="$stage/pins"
  # Never expose error text from a previous install as the current result.
  rm -f "$RUNTIME/apps-last-error.log"
- write_state running "$action" "$app" NONE "$operation_id"
+ write_state running "$action" "$app" NONE "$operation_id" "$source"
  rc=0
  if [ "$action" = install ]; then install_app || rc=$?; else remove_app || rc=$?; fi
  if [ "$rc" -eq 0 ]; then
-  write_state success "$action" "$app" NONE "$operation_id"
+  write_state success "$action" "$app" NONE "$operation_id" "$source"
+  # Count only completed user installs. Restore, removals and failed/no-op
+  # operations never become new download counts; telemetry cannot fail an APK.
+  if [ "$action" = install ] && [ "$source" = user ]; then
+   version="$(field "$CATALOG" "@.apps[$index].version")"
+   "$METRICS" enqueue "$app" "$version" "$operation_id" >/dev/null 2>&1 || :
+  fi
  else
   # Keep only the latest package-manager diagnostic after the workspace is
   # removed. Never record an auth token, catalog JSON, or package contents.
@@ -406,21 +415,25 @@ worker() {
     tail -c 4096 "$log" > "$RUNTIME/apps-last-error.log" 2>/dev/null || :
    fi
   done
-  write_state failed "$action" "$app" "E$rc" "$operation_id"
+  write_state failed "$action" "$app" "E$rc" "$operation_id" "$source"
  fi
 }
 
 start() {
- action="$1"; app="$2"
+ action="$1"; app="$2"; source="${3:-user}"
+ case "$source" in user|restore) ;; *) exit 2;; esac
+ [ "$action" != remove ] || [ "$source" = user ] || exit 2
  case "$action" in install|remove) ;; *) exit 2;; esac
  valid_id "$app" || exit 2
  mkdir -p "$RUNTIME" || exit 1
  mkdir "$LOCK" 2>/dev/null || exit 3
  # The ID is unique to each invocation, even if the same error repeats.
- operation_id="$(date +%s)-$$"
- write_state starting "$action" "$app" NONE "$operation_id"
+ random="$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' || :)"
+ [ "${#random}" -eq 16 ] || { rmdir "$LOCK" 2>/dev/null || :; exit 1; }
+ operation_id="$(date +%s)-$$-$random"
+ write_state starting "$action" "$app" NONE "$operation_id" "$source"
  if ! "$DAEMON" -S -b -x "$SELF" -- worker "$action" "$app" >/dev/null 2>&1; then
-  write_state failed "$action" "$app" LAUNCH "$operation_id"
+  write_state failed "$action" "$app" LAUNCH "$operation_id" "$source"
   rmdir "$LOCK" 2>/dev/null || true
   exit 1
  fi
@@ -428,7 +441,7 @@ start() {
 
 case "${1:-}" in
  status) mkdir -p "$RUNTIME"; status;;
- start) [ "$#" -eq 3 ] || exit 2; start "$2" "$3";;
+ start) [ "$#" -ge 3 ] && [ "$#" -le 4 ] || exit 2; start "$2" "$3" "${4:-user}";;
  worker) [ "$#" -eq 3 ] || exit 2; worker "$2" "$3";;
  *) exit 2;;
 esac

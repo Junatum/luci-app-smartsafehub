@@ -77,3 +77,7 @@ cd frontend && npm ci && npm run typecheck && npm run build
 - 공유기에서 `/tmp/smartsafehub/apps-restore.state`와 `logread -e smartsafehub-apps-restore`로 결과를 확인할 수 있습니다. 실패 시 Apps 화면의 **설치 마무리**로 다시 검증할 수 있습니다. 수동 재시도는 `/usr/libexec/smartsafehub-apps-restore run`을 사용합니다.
 - 인터넷이 오래 끊겨 재시도 횟수를 넘기면 해당 실행은 종료됩니다. 이후 WAN이 다시 연결되면 hotplug이 네트워크 오류에 한하여 일회성 복원을 재시도하며, 수동 실행이나 다음 부팅으로도 다시 시도할 수 있습니다.
 - 주의: 새로운 펌웨어에서 승인된 패키지 pin이 변경되었으면 이전 manifest를 무단으로 덮어쓰지 않고 중단합니다. 이 경우 호환성 확인과 승인 후 별도 마이그레이션이 필요합니다.
+
+## 설치 성공 건수 수집 (2026-10-28)
+
+Apps에서 사용자가 새로 설치에 성공하면, 앱 ID·릴리스 버전·작업 ID만 로컬 outbox에 보관했다가 기존 Device 자격증명으로 Hub에 전송합니다. 실패한 설치, 제거, 펌웨어 업데이트에 따른 자동 복원은 집계하지 않습니다. 최대 500건을 보관하고 네트워크 장애 시 5분 간격으로 최대 3건씩 재시도하며, 해당 전송은 앱 설치의 성공 여부에 영향을 주지 않습니다. 수치는 공개 Apps 화면에 표시하지 않습니다.
