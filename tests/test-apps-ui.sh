@@ -37,6 +37,13 @@ utils = (root / 'frontend/src/utils/appsStorage.ts').read_text()
 check("fs.statvfs(mount)" in backend and "let mount = '/overlay'" in backend,
       'Apps status must read writable overlay using fs.statvfs')
 check("mount = '/'" in backend, 'ext4 rootfs without /overlay requires a fallback')
+# ucode type() returns "integer", never "int". The old check rejected
+# all valid statvfs counters, silently producing storage: null on routers.
+for counter in ('frsize', 'blocks', 'bavail'):
+    check(f"type(stats.{counter}) != 'integer'" in backend and
+          f"type(stats.{counter}) != 'double'" in backend and
+          f"type(stats.{counter}) != 'int'" not in backend,
+          f'Apps storage must accept ucode integer/double statvfs {counter}')
 check('stats.bavail' in backend and 'stats.frsize' in backend and 'storage: storage' in backend,
       'optional Apps metrics must report actual APK-available bytes without spawning df')
 check('read_apps_metrics()' in backend and 'return success({ job: job(), restore: restore_status(), installed: installed });' in backend,

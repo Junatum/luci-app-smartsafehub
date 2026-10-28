@@ -22,9 +22,9 @@ function writable_storage() {
 		stats = fs.statvfs(mount);
 	}
 	if (stats == null ||
-		(type(stats.frsize) != 'int' && type(stats.frsize) != 'double') ||
-		(type(stats.blocks) != 'int' && type(stats.blocks) != 'double') ||
-		(type(stats.bavail) != 'int' && type(stats.bavail) != 'double') ||
+		(type(stats.frsize) != 'integer' && type(stats.frsize) != 'double') ||
+		(type(stats.blocks) != 'integer' && type(stats.blocks) != 'double') ||
+		(type(stats.bavail) != 'integer' && type(stats.bavail) != 'double') ||
 		stats.frsize <= 0 || stats.blocks <= 0 ||
 		stats.bavail < 0 || stats.bavail > stats.blocks)
 		return null;
