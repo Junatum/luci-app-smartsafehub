@@ -18,8 +18,17 @@ export interface AppsCatalog {
   apps: VerifiedApp[];
 }
 
+/** Writable filesystem used for installing APKs (not RAM or squashfs). */
+export interface AppsStorage {
+  mount: '/overlay' | '/';
+  totalBytes: number;
+  availableBytes: number;
+}
+
 /** Local APK adapter state, independent from the future IoT / AI runtimes. */
 export interface AppsInstallStatus {
+  /** Optional for compatibility with older router RPC responses. */
+  storage?: AppsStorage | null;
   job: {
     phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
     action: 'install' | 'update' | 'remove' | '';

@@ -2281,3 +2281,28 @@
   background-color: #fbbf24;
   --ssh-account-dot-ring: #0f172a;
 }
+
+/* Apps storage: a small SVG donut, without Chart.js or expensive redraws. */
+.ssh-apps-storage-track,
+.ssh-apps-storage-free {
+  fill: none;
+  stroke-width: 9;
+}
+
+.ssh-apps-storage-track { stroke: #e2e8f0; }
+.ssh-apps-storage-free {
+  stroke: #0d9488;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+.ssh-apps-storage-ring[data-level='warning'] .ssh-apps-storage-free { stroke: #d97706; }
+.ssh-apps-storage-ring[data-level='critical'] .ssh-apps-storage-free { stroke: #e11d48; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-track { stroke: #334155; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-free { stroke: #2dd4bf; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-ring[data-level='warning'] .ssh-apps-storage-free { stroke: #fbbf24; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-ring[data-level='critical'] .ssh-apps-storage-free { stroke: #fb7185; }
+
+.ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #b45309; }
+.ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #be123c; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #fbbf24; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #fb7185; }

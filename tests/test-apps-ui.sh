@@ -26,6 +26,31 @@ check('rgb(239 68 68 / 0.16)' in styles, 'dark-mode removal hover should be subt
 check('installed && managed ? <span class="rounded-full border border-emerald-200' in page,
       'managed installed apps need a green status badge')
 
+
+# App installation storage must refer to the writable APK filesystem.
+backend = (root / 'root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc').read_text()
+card = (root / 'frontend/src/components/AppsStorageCard.tsx').read_text()
+utils = (root / 'frontend/src/utils/appsStorage.ts').read_text()
+check("fs.statvfs(mount)" in backend and "let mount = '/overlay'" in backend,
+      'Apps status must read writable overlay using fs.statvfs')
+check("mount = '/'" in backend, 'ext4 rootfs without /overlay requires a fallback')
+check('stats.bavail' in backend and 'stats.frsize' in backend and 'storage: writable_storage()' in backend,
+      'Apps status must report actual APK-available bytes without spawning df')
+check("'/bin/df'" not in backend, 'storage must not spawn a polling command')
+check('lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]' in page,
+      'Apps info and storage must be side by side on desktop and stacked on mobile')
+check('<AppsStorageCard storage={installStatus?.storage} />' in page,
+      'Apps storage must share existing status polling')
+check('stroke-dasharray=' in card and 'aria-label="앱 설치 저장 공간"' in card,
+      'storage donut must be accessible and use SVG')
+check('용량 정보를 확인할 수 없습니다.' in card and 'summarizeAppsStorage(storage)' in card,
+      'storage errors and older RPC responses need a safe fallback')
+check('storage.availableBytes > storage.totalBytes' in utils,
+      'malformed storage reports must be rejected')
+check(".ssh-app[data-theme='dark'] .ssh-apps-storage-track" in styles and
+      "[data-level='critical']" in styles,
+      'donut must support dark mode and dangerously low storage')
+
 # Removal never calls onRemove from a card or from the orphan-list button.
 check("onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget)" in page,
       'catalog removal must open confirmation')
