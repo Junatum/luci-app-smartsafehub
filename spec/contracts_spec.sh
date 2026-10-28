@@ -147,6 +147,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'CHANGELOG 릴리즈 사이 빈 줄 두 개를 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-changelog-spacing.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'README와 상세 문서 분리 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-documentation-contract.sh"
     The status should be success
