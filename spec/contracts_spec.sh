@@ -22,6 +22,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'OpenWrt 25.12 BusyBox 기본 명령과 의존성 호환성을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-openwrt-commands.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '셸 파이프라인의 Broken pipe 회귀를 방지한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-shell-pipeline-safety.sh"
     The status should be success

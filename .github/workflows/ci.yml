@@ -31,6 +31,10 @@ jobs:
       - name: Verify all tests are included in CI
         run: sh tests/test-suite-integrity.sh
 
+      # Validate router shell commands before downloading compiler dependencies.
+      - name: Verify OpenWrt 25.12 BusyBox compatibility
+        run: sh tests/test-openwrt-commands.sh
+
       - name: Install ShellSpec
         env:
           SHELLSPEC_VERSION: 0.28.1
