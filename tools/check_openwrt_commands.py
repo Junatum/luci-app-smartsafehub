@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
+import shlex
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,6 +216,136 @@ def commands(source: str) -> set[str]:
     return found
 
 
+
+# Performance guardrails for constrained router hardware. These are deliberately
+# high-confidence anti-patterns, not a blanket ban on grep/find/sort: bounded
+# scans and file processing are legitimate and often faster than alternatives.
+# Using the same shipped-script discovery as the compatibility audit ensures
+# that every added router entry point receives both checks automatically.
+# Detect executable sites, not command names embedded in quotes or comments.
+# Assignment prefixes such as LC_ALL=C grep -R must not bypass the audit.
+PERFORMANCE_SITE = re.compile(
+    r'(?:^|[;|`]|\$\(|\bthen\s+|\bdo\s+|\belse\s+|'
+    r'\bif\s+|\belif\s+|\bwhile\s+|\buntil\s+|\b!\s+)'
+    r'\s*(?:[a-zA-Z_][a-zA-Z_0-9]*=[^\s;|]+\s+)*'
+    r'(?P<name>find|du|grep|ls|dd|xargs|sleep)\b'
+)
+INFINITE_LOOP = re.compile(
+    r'(?:^|[;|]|\$\()\s*(?:while\s+(?:true|:)|until\s+false)\s*;\s*do\b'
+)
+NESTED_LOOP = re.compile(r'\b(?:for|while|until)\b[^;]*;\s*do\b')
+LOOP_DONE = re.compile(r'(?:^|;)\s*done\b')
+BLOCKING_ACTION = re.compile(r'\b(?:sleep|wait)\b|\bubus\s+listen\b')
+LOOP_EXIT = re.compile(r'\b(?:break|return|exit)\b')
+ZERO_SLEEP = re.compile(r'0+(?:\.0+)?[smhd]?$', re.IGNORECASE)
+
+
+def shell_lines(source: str) -> list[tuple[int, str, str]]:
+    """Return source and quote-masked shell lines, excluding heredoc data.
+
+    The mask retains offsets, so we can lex *real arguments* only after we have
+    established that a command name is executable shell, not a quoted string.
+    """
+    lines = []
+    heredoc_end: str | None = None
+    state = [{'quote': None, 'depth': 0}]
+    for number, raw in enumerate(source.splitlines(), 1):
+        if heredoc_end:
+            if raw.strip() == heredoc_end:
+                heredoc_end = None
+            continue
+        heredoc = HEREDOC.search(raw)
+        if heredoc and state[0]['quote'] is None and len(state) == 1:
+            heredoc_end = heredoc.group(2)
+        masked = unquoted_shell(raw, state)
+        lines.append((number, raw, masked))
+    return lines
+
+
+def call_arguments(raw: str, masked: str, end: int) -> list[str]:
+    """Parse arguments up to the next unquoted shell operator."""
+    boundary = re.search(r'[;|`]|\$\(', masked[end:])
+    stop = end + boundary.start() if boundary else len(masked)
+    try:
+        return shlex.split(raw[end:stop], comments=True, posix=True)
+    except ValueError:
+        # The command may use a line continuation or multiline quotes. Avoid
+        # a false positive based on incomplete arguments; build/runtime tests
+        # remain necessary for cases this static checker cannot resolve.
+        return []
+
+
+def command_risk(name: str, args: list[str]) -> str | None:
+    """Only report expensive or unbounded operations with clear evidence."""
+    options = [a for a in args if a.startswith('-')]
+    shorts = ''.join(a[1:] for a in options if a.startswith('-') and not a.startswith('--'))
+    recursive = 'R' in shorts or '--recursive' in options
+    if name == 'find' and args and args[0] == '/':
+        return 'full filesystem traversal (find /); use a bounded subtree'
+    if name == 'du' and ('a' in shorts or '--all' in options or '/' in args):
+        return 'unbounded disk scan (du -a or du /); target a bounded path'
+    if name == 'grep' and (recursive or 'r' in shorts):
+        return 'recursive grep; limit the files/directory and scan budget'
+    if name == 'ls' and recursive:
+        return 'recursive ls; use a targeted directory listing'
+    if name == 'dd' and any(a in ('if=/dev/zero', 'if=/dev/urandom') for a in args):
+        if not any(a.startswith(('count=', 'count_bytes=')) for a in args):
+            return 'unbounded dd from a generator; specify count='
+    if name == 'xargs' and ('-P0' in args or '--max-procs=0' in args or
+                            any(args[i:i + 2] == ['-P', '0']
+                                for i in range(len(args) - 1))):
+        return 'unbounded xargs concurrency (-P 0); specify a small limit'
+    if name == 'sleep' and args and ZERO_SLEEP.fullmatch(args[0]):
+        return 'zero-delay sleep; set a positive delay to prevent busy polling'
+    return None
+
+
+def performance_risks(source: str, rel: str) -> list[str]:
+    errors: list[str] = []
+    lines = shell_lines(source)
+    # Some shell code has case labels (`grep)`) and function declarations;
+    # they are not command invocations. Raw strings in heredocs are excluded.
+    for number, raw, masked in lines:
+        for match in PERFORMANCE_SITE.finditer(masked):
+            name = match.group('name')
+            suffix = masked[match.end('name'):].lstrip()
+            if suffix.startswith((')', '()')):
+                continue
+            args = call_arguments(raw, masked, match.end('name'))
+            reason = command_risk(name, args)
+            if reason:
+                errors.append(f'{rel}:{number}: performance risk: {reason}')
+
+    # An unconditional infinite loop needs explicit throttling, blocking
+    # wait, or an exit path. A zero-delay sleep is separately rejected. A
+    # bounded `while :` loop with `break` must remain valid (apps-manager).
+    for i, (number, _, masked) in enumerate(lines):
+        loop = INFINITE_LOOP.search(masked)
+        if not loop:
+            continue
+        depth = 1
+        body: list[str] = []
+        closed = False
+        # Handle both multiline loops and `while true; do :; done`.
+        for next_line in [masked[loop.end():], *(line[2] for line in lines[i + 1:])]:
+            closing = LOOP_DONE.search(next_line)
+            if depth == 1 and closing:
+                body.append(next_line[:closing.start()])
+                closed = True
+                break
+            depth += len(NESTED_LOOP.findall(next_line))
+            depth -= len(LOOP_DONE.findall(next_line))
+            if depth <= 0:
+                closed = True
+                break
+            body.append(next_line)
+        if closed and not any(BLOCKING_ACTION.search(line) or LOOP_EXIT.search(line)
+                              for line in body):
+            errors.append(f'{rel}:{number}: performance risk: '
+                          'unthrottled infinite loop (no sleep, wait, or exit)')
+    return errors
+
+
 def audit(root: Path, allowed: set[str]) -> list[str]:
     errors = []
     files = router_scripts(root)
@@ -254,6 +385,7 @@ def audit(root: Path, allowed: set[str]) -> list[str]:
                     legacy_curl_is_guarded(source)):
                 continue
             errors.append(f'{rel}: unsupported command: {command}')
+        errors.extend(performance_risks(source, rel))
     return errors
 
 
@@ -267,11 +399,11 @@ def main() -> int:
         print(f'FAIL: OpenWrt command policy: {exc}', file=sys.stderr)
         return 1
     if errors:
-        print('FAIL: OpenWrt 25.12 unsupported router shell command(s):', file=sys.stderr)
+        print('FAIL: OpenWrt 25.12 unsupported or high-cost router shell operation(s):', file=sys.stderr)
         for error in errors:
             print(f'  {error}', file=sys.stderr)
         return 1
-    print('PASS: OpenWrt 25.12 default command policy')
+    print('PASS: OpenWrt 25.12 command and performance policy')
     return 0
 
 
