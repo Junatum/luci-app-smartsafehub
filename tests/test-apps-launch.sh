@@ -21,6 +21,9 @@ assert 'useState<string | null>(readDismissedAppsJob)' in ui
 assert 'window.setTimeout(() => dismissJob(jobKey), 7000)' in ui
 assert 'webUiReady?: boolean' in types and 'webUi?:' in types
 assert 'operationId?: string' in types
+# rpcd must accept both existing timestamp-pid jobs and new receipt IDs.
+assert r'^[0-9]{1,12}-[0-9]{1,12}(-[0-9a-f]{16})?$' in status
+assert 'od -An' not in manager
 assert "if (webUi.type !== 'luci')" in route
 assert "'/cgi-bin/luci/admin/services/nlbw/display'" in catalog
 assert 'luci_web_ui_path(item.web_ui.path)' in catalog

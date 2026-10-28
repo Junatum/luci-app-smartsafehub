@@ -7,6 +7,15 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 fail() { echo "FAIL: $*" >&2; exit 1; }
 mkdir -p "$TMP/bin" "$TMP/runtime" "$TMP/owned" "$TMP/repo" "$TMP/overlay"
+# A default OpenWrt BusyBox image does not provide od. Simulate that
+# environment even if the developer workstation has GNU/coreutils od.
+cat > "$TMP/bin/od" <<'SH_OD'
+#!/bin/sh
+exit 127
+SH_OD
+chmod +x "$TMP/bin/od"
+PATH="$TMP/bin:$PATH"
+export PATH
 # Linux /proc is unavailable on macOS. A fixture keeps the production check enabled.
 printf 'MemTotal:       262144 kB\n' > "$TMP/meminfo"
 printf 'all\naarch64_cortex-a53\n' > "$TMP/apk-arch"
@@ -212,6 +221,7 @@ export APPS_TEST_OPERATION_START_LOG="$TMP/operation-start-ids"
 grep -Fqx "$(printf 'code\tE22')" "$TMP/runtime/apps-operation.state" || fail 'unknown app was installed'
 first_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$TMP/runtime/apps-operation.state")"
 [ -n "$first_operation_id" ] || fail 'first failed operation has no identity'
+printf '%s\n' "$first_operation_id" | grep -Eq '^[0-9]{10}-[0-9]+-[0-9a-f]{16}$' || fail 'operation ID must include a valid random nonce without od'
 [ "$(sed -n '1p' "$APPS_TEST_OPERATION_START_LOG")" = "$first_operation_id" ] || fail 'operation identity changed during failure'
 "$MANAGER" start install not-approved || fail 'repeated failed install did not queue'
 repeat_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$TMP/runtime/apps-operation.state")"
@@ -229,6 +239,20 @@ grep -Eq '^enqueue network-usage-monitor 2025\.06\.02-r1 [0-9]+-[0-9]+-[a-f0-9]{
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb update$' "$APPS_TEST_APK_LOG" || fail 'approved local index not loaded before simulation'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add --simulate nlbwmon=2025\.06\.02~29236be6-r1 luci-app-nlbwmon=26\.288\.56989~75a306d luci-lib-chartjs=26\.288\.56989~75a306d$' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository simulation not used'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add nlbwmon=' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository install not used'
+# A failed random-source read must never launch a removal or leave a lock.
+# This also guards against accidentally generating a fixed nonce from empty data.
+cat > "$TMP/bin/dd" <<'SH_DD'
+#!/bin/sh
+exit 1
+SH_DD
+chmod +x "$TMP/bin/dd"
+if "$MANAGER" start remove network-usage-monitor >/dev/null 2>&1; then
+ fail 'failed entropy read started a removal'
+fi
+rm -f "$TMP/bin/dd"
+[ ! -e "$TMP/runtime/apps-operation.lock" ] || fail 'failed entropy read left a lock'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'failed launch overwrote existing operation'
+[ "$(wc -l < "$APPS_TEST_INSTALLED" | tr -d ' ')" -eq 3 ] || fail 'failed entropy read touched installed APKs'
 "$MANAGER" status
 grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'ready state missing'
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'

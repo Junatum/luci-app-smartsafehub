@@ -26,7 +26,7 @@ function job() {
 			state.appId = value;
 		else if (key == 'code' && match(value, /^(NONE|LAUNCH|E[0-9]{1,3})$/) != null)
 			state.code = value;
-		else if (key == 'operation_id' && match(value, /^[0-9]{1,12}-[0-9]{1,12}$/) != null)
+		else if (key == 'operation_id' && match(value, /^[0-9]{1,12}-[0-9]{1,12}(-[0-9a-f]{16})?$/) != null)
 			state.operationId = value;
 	}
 	return state;

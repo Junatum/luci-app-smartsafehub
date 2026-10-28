@@ -428,7 +428,18 @@ start() {
  mkdir -p "$RUNTIME" || exit 1
  mkdir "$LOCK" 2>/dev/null || exit 3
  # The ID is unique to each invocation, even if the same error repeats.
- random="$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n' || :)"
+ # OpenWrt's default BusyBox image does not include the od applet.
+ # dd and sha256sum are available; hash 8 random bytes into a 16-hex nonce.
+ # Fail closed if the entropy read fails rather than reusing a fixed ID.
+ random_file="$(mktemp "$RUNTIME/apps-random.XXXXXXXX")" || { rmdir "$LOCK" 2>/dev/null || :; exit 1; }
+ if ! dd if=/dev/urandom of="$random_file" bs=8 count=1 2>/dev/null ||
+    [ "$(wc -c < "$random_file" | tr -d ' ')" -ne 8 ]; then
+  rm -f "$random_file"
+  rmdir "$LOCK" 2>/dev/null || :
+  exit 1
+ fi
+ random="$("$SHA256" "$random_file" | cut -c 1-16)"
+ rm -f "$random_file"
  [ "${#random}" -eq 16 ] || { rmdir "$LOCK" 2>/dev/null || :; exit 1; }
  operation_id="$(date +%s)-$$-$random"
  write_state starting "$action" "$app" NONE "$operation_id" "$source"
