@@ -92,6 +92,8 @@ case "$url" in
    cp "$APPS_TEST_REPO/luci-lib-chartjs-26.288.56989~75a306d.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.0.0-r1.apk)
    cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.0.0-r1.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.1.0-r1.apk)
+   cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.1.0-r1.apk" "$dest";;
  *) exit 2;;
 esac
 printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
@@ -101,12 +103,24 @@ cat > "$TMP/bin/apk" <<'SH2'
 printf '%s\n' "$*" >> "$APPS_TEST_APK_LOG"
 case "$1" in
  --print-arch) [ "${APPS_TEST_ARCH_CLI_FAIL:-0}" = 0 ] || exit 1; echo "${APPS_TEST_ARCH_CLI:-aarch64_cortex-a53}"; exit 0;;
+ version)
+   [ "$2" = -t ] || exit 2
+   case "$3:$4" in
+    1.0.0-r1:1.1.0-r1) echo '<';;
+    1.1.0-r1:1.0.0-r1) echo '>';;
+    *) [ "$3" = "$4" ] && echo '=' || exit 2;;
+   esac
+   exit 0;;
  info)
    [ "$2" = -e ] || exit 2
    grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null; exit $?;;
  list)
    [ "$2" = -I ] || exit 2
    grep -qxF "$3" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 0
+   if [ -s "$APPS_TEST_VERSION_DB" ]; then
+     version="$(awk -v n="$3" '$1 == n {print $2; exit}' "$APPS_TEST_VERSION_DB")"
+     [ -z "$version" ] || { echo "$3-$version aarch64_cortex-a53 [installed]"; exit 0; }
+   fi
    echo "$3-${APPS_TEST_SHARED_VERSION:-26.288.56989~75a306d} aarch64_cortex-a53 [installed]"
    exit 0;;
  --repositories-file)
@@ -118,7 +132,8 @@ case "$1" in
    esac
    [ -s "$local_index" ] || exit 2
    cmp -s "$local_index" "$APPS_TEST_REPO/packages.adb" || exit 2
-   if [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.0.0-r1.apk" ]; then
+   if [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.0.0-r1.apk" ] ||
+      [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.1.0-r1.apk" ]; then
      [ "$(find "${local_index%/*}" -name '*.apk' | wc -l | tr -d ' ')" -eq 1 ] || exit 2
    else
      for name in nlbwmon-2025.06.02~29236be6-r1 \
@@ -152,6 +167,8 @@ case "$1" in
    exit 0;;
  *) exit 2;;
 esac
+upgrade=0
+if [ "${1:-}" = --upgrade ]; then upgrade=1; shift; fi
 if [ "${1:-}" = --simulate ]; then
  [ "${APPS_TEST_MISSING_DEP:-0}" = 1 ] && { echo 'ERROR: unable to select packages: missing dependency' >&2; exit 1; }
  shift
@@ -163,6 +180,8 @@ if [ "${1:-}" = --simulate ]; then
   esac
   if [ "${APPS_TEST_UPGRADE:-0}" = 1 ]; then
     echo '(1/3) Upgrading luci-base (mock)'
+  elif [ "$upgrade" = 1 ]; then
+    echo "(1/1) Upgrading $name (mock)"
   else
     echo "(1/2) Installing $name (mock)"
   fi
@@ -176,6 +195,11 @@ for pin in "$@"; do
   *) exit 2;;
  esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
+ if [ "$upgrade" = 1 ]; then
+  awk -v n="$name" '$1 != n' "$APPS_TEST_VERSION_DB" > "$APPS_TEST_VERSION_DB.tmp"
+  printf '%s %s\n' "$name" "${pin#*=}" >> "$APPS_TEST_VERSION_DB.tmp"
+  mv -f "$APPS_TEST_VERSION_DB.tmp" "$APPS_TEST_VERSION_DB"
+ fi
 done
 SH2
 cat > "$TMP/bin/start-stop-daemon" <<'SH2'
@@ -213,6 +237,8 @@ export APPS_TEST_REPO="$TMP/repo"
 export APPS_TEST_INSTALLED="$TMP/installed"
 export APPS_TEST_APK_LOG="$TMP/apk-commands"
 export APPS_TEST_INDEX_READY="$TMP/index-ready"
+export APPS_TEST_VERSION_DB="$TMP/installed-versions"
+: > "$APPS_TEST_VERSION_DB"
 export APPS_TEST_OPERATION_START_LOG="$TMP/operation-start-ids"
 : > "$APPS_TEST_INSTALLED"
 # A validated fixed release installs all three APKs from a single signed feed.
@@ -350,15 +376,15 @@ EOF_BOTH
 "$TMP/bin/fetch-catalog"
 "$MANAGER" status
 [ "$(wc -l < "$TMP/runtime/apps-status.tsv" | tr -d ' ')" -eq 2 ] || fail 'status lost the second approved app'
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'manual Retro Arcade status incorrect'
-grep -Fqx "$(printf 'network-usage-monitor\t0\t0\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'second app omitted from status'
+grep -Fq "$(printf 'retro-arcade\t1\t1\t0\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'manual Retro Arcade status incorrect'
+grep -Fq "$(printf 'network-usage-monitor\t0\t0\t0\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'second app omitted from status'
 "$MANAGER" start install network-usage-monitor || fail 'second app installation did not queue'
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'second app install unexpectedly failed E22'
 [ "$(wc -l < "$APPS_TEST_INSTALLED" | tr -d ' ')" -eq 4 ] || fail 'install changed unrelated packages'
 grep -Fqx smartsafehub-app-retro-arcade "$APPS_TEST_INSTALLED" || fail 'manual Retro Arcade was modified'
 [ ! -e "$TMP/owned/retro-arcade" ] || fail 'manual Retro Arcade was adopted'
 "$MANAGER" status
-grep -Fqx "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'second app installed state missing'
+grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1\t')" "$TMP/runtime/apps-status.tsv" || fail 'second app installed state missing'
 "$MANAGER" start remove network-usage-monitor || fail 'second app removal did not queue'
 [ "$(cat "$APPS_TEST_INSTALLED")" = smartsafehub-app-retro-arcade ] || fail 'remove touched manual Retro Arcade'
 # Reverse the catalog to verify lookup and status for the other second app.
@@ -374,7 +400,77 @@ PY_BOTH_REVERSED
 "$TMP/bin/fetch-catalog"
 "$MANAGER" status
 [ "$(wc -l < "$TMP/runtime/apps-status.tsv" | tr -d ' ')" -eq 2 ] || fail 'reversed catalog lost an app'
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'second Retro Arcade status missing'
+grep -Fq "$(printf 'retro-arcade\t1\t1\t0\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'second Retro Arcade status missing'
 "$MANAGER" start install retro-arcade || fail 'second Retro Arcade installation did not queue'
 grep -Fqx "$(printf 'code\tE29')" "$TMP/runtime/apps-operation.state" || fail 'second app did not reach manual ownership check'
 printf 'PASS: multi-app lookup, E22 regression and manual package protection\n'
+
+# An Apps-owned app can update to a newer approved, signed package without
+# reinstalling, touching system packages or generating a new install receipt.
+: > "$APPS_TEST_INSTALLED"
+rm -f "$TMP/owned/network-usage-monitor" "$TMP/owned/retro-arcade"
+: > "$APPS_TEST_VERSION_DB"
+cat > "$TMP/catalog.json" <<EOF_UPDATE_OLD
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","version":"1.0.0-r1","name":"Retro Arcade","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.0.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_UPDATE_OLD
+"$MANAGER" start install retro-arcade || fail 'old Retro Arcade install not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'old Retro Arcade install failed'
+printf 'smartsafehub-app-retro-arcade 1.0.0-r1\n' > "$APPS_TEST_VERSION_DB"
+receipt_before="$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')"
+printf 'new signed Retro payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk"
+NEWRETROSHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk" | cut -d ' ' -f 1)"
+python3 - "$TMP/catalog.json" "$NEWRETROSHA" <<'PY_UPDATE'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p)); app=data['apps'][0]
+app['version']='1.1.0-r1'; app['packages'][0]['version']='1.1.0-r1'
+app['packages'][0]['sha256']=sys.argv[2]
+open(p,'w').write(json.dumps(data))
+PY_UPDATE
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t1')" "$TMP/runtime/apps-status.tsv" || fail 'new approved release not offered as update'
+# Prevent core upgrades even if the APK solver proposes them.
+export APPS_TEST_UPGRADE=1
+"$MANAGER" start update retro-arcade || fail 'unrelated package simulation did not queue'
+grep -Fqx "$(printf 'code\tE53')" "$TMP/runtime/apps-operation.state" || fail 'unrelated system upgrade was not blocked'
+grep -Fq "$(printf 'smartsafehub-app-retro-arcade\t1.0.0-r1\t')" "$TMP/owned/retro-arcade" || fail 'failed simulation changed ownership'
+unset APPS_TEST_UPGRADE
+# Reject altered signed payloads before mutation.
+printf 'tampered\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk"
+"$MANAGER" start update retro-arcade || fail 'tampered update did not queue'
+grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'tampered update was not rejected'
+printf 'new signed Retro payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk"
+"$MANAGER" start update retro-arcade || fail 'approved update did not queue'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'approved update did not succeed'
+grep -Fqx "$(printf 'smartsafehub-app-retro-arcade\t1.1.0-r1\t%s' "$NEWRETROSHA")" "$TMP/owned/retro-arcade" || fail 'new version manifest not committed'
+[ "$(awk '$1 == "smartsafehub-app-retro-arcade" {print $2}' "$APPS_TEST_VERSION_DB")" = 1.1.0-r1 ] || fail 'mock apk version did not update'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" = "$receipt_before" ] || fail 'upgrade was counted as an install'
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'already updated app still advertises update'
+"$MANAGER" start update retro-arcade || fail 'repeated update should report a no-op'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'repeated update was not rejected'
+# Any attempt to downgrade a package must fail closed.
+python3 - "$TMP/catalog.json" "$RETROSHA" <<'PY_DOWNGRADE'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p)); app=data['apps'][0]
+app['version']='1.0.0-r1'; app['packages'][0]['version']='1.0.0-r1'
+app['packages'][0]['sha256']=sys.argv[2]
+open(p,'w').write(json.dumps(data))
+PY_DOWNGRADE
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0')" "$TMP/runtime/apps-status.tsv" || fail 'downgrade must not be advertised'
+"$MANAGER" start update retro-arcade || fail 'downgrade did not queue'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'downgrade was not refused'
+# Installed APK changed outside Apps ownership: never perform another upgrade.
+python3 - "$TMP/catalog.json" "$NEWRETROSHA" <<'PY_NEW'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p)); app=data['apps'][0]
+app['version']='1.1.0-r1'; app['packages'][0]['version']='1.1.0-r1'
+app['packages'][0]['sha256']=sys.argv[2]
+open(p,'w').write(json.dumps(data))
+PY_NEW
+printf 'smartsafehub-app-retro-arcade 1.0.0-r1\n' > "$APPS_TEST_VERSION_DB"
+"$MANAGER" start update retro-arcade || fail 'manual version change did not queue'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'manual version drift not rejected'
+printf 'PASS: selected-app signed updates, version checks, no core upgrades and no duplicate receipts\n'

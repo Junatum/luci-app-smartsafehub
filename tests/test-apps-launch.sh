@@ -21,6 +21,8 @@ assert 'useState<string | null>(readDismissedAppsJob)' in ui
 assert 'window.setTimeout(() => dismissJob(jobKey), 7000)' in ui
 assert 'webUiReady?: boolean' in types and 'webUi?:' in types
 assert 'operationId?: string' in types
+assert 'updateAvailable?: boolean' in types
+assert "updateAvailable: length(fields) == 6 && fields[5] == '1'" in status
 # rpcd must accept both existing timestamp-pid jobs and new receipt IDs.
 assert r'^[0-9]{1,12}-[0-9]{1,12}(-[0-9a-f]{16})?$' in status
 assert 'od -An' not in manager
@@ -34,7 +36,7 @@ assert 'smartsafehub-app-retro-arcade' in manager
 assert 'SMARTSAFEHUB_APPS_WEB_ROOT' in manager
 assert "{ id: 'entertainment', label: '엔터테인먼트' }" in ui
 assert 'web_ui_package "$id" "$idx"' in manager
-assert "webUiReady: length(fields) == 5 && fields[4] == '1'" in status
+assert "webUiReady: length(fields) >= 5 && fields[4] == '1'" in status
 allowed = re.compile(r'^/cgi-bin/luci/admin/[a-z0-9_-]+(?:/[a-z0-9_-]+)*$')
 assert allowed.fullmatch('/cgi-bin/luci/admin/services/nlbw/display')
 for bad in ('https://evil.example/', '//evil.example/', '/cgi-bin/luci/admin/../logout',

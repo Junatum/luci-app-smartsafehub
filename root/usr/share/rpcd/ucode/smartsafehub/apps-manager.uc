@@ -20,7 +20,7 @@ function job() {
 		const value = fields[1];
 		if (key == 'phase' && match(value, /^(idle|starting|running|success|failed)$/) != null)
 			state.phase = value;
-		else if (key == 'action' && (value == 'install' || value == 'remove'))
+		else if (key == 'action' && (value == 'install' || value == 'update' || value == 'remove'))
 			state.action = value;
 		else if (key == 'app_id' && match(value, /^[a-z0-9][a-z0-9-]{0,79}$/) != null)
 			state.appId = value;
@@ -58,14 +58,15 @@ export function read_apps_status() {
 	const installed = {};
 	for (let line in split(raw, /\r?\n/)) {
 		const fields = split(line, /\t/);
-		if ((length(fields) != 4 && length(fields) != 5) ||
+		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6) ||
 			match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null)
 			continue;
 		installed[fields[0]] = {
 			installed: fields[1] == '1',
 			partial: fields[2] == '1',
 			managed: fields[3] == '1',
-			webUiReady: length(fields) == 5 && fields[4] == '1',
+			webUiReady: length(fields) >= 5 && fields[4] == '1',
+			updateAvailable: length(fields) == 6 && fields[5] == '1',
 		};
 	}
 	return success({ job: job(), restore: restore_status(), installed: installed });
@@ -82,4 +83,5 @@ function start_apps_operation(request, action) {
 }
 
 export function install_app(request) { return start_apps_operation(request, 'install'); };
+export function update_app(request) { return start_apps_operation(request, 'update'); };
 export function remove_app(request) { return start_apps_operation(request, 'remove'); };

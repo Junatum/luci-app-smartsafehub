@@ -108,6 +108,27 @@ review_install_plan() {
  ' "$plan"
 }
 
+# Only explicitly approved, already-owned APKs may be upgraded. Never let
+# apk upgrade the firmware, pull new dependencies, remove packages or downgrade.
+review_update_plan() {
+ plan="$1"; allow="$2"
+ awk -v allowed="$allow" '
+  BEGIN { split(allowed, names, " "); for (i in names) if (names[i] != "") ok[names[i]]=1 }
+  {
+   line=$0
+   sub(/^\([0-9]+\/[0-9]+\) /, "", line)
+   if (line ~ /^(Installing|Upgrading|Downgrading|Purging|Removing|Replacing) /) {
+    split(line, fields, " ")
+    if (fields[1] != "Upgrading" || !(fields[2] in ok) || ++seen[fields[2]] != 1) bad=1
+   }
+  }
+  END {
+   for (name in ok) if (seen[name] != 1) bad=1
+   exit bad ? 1 : 0
+  }
+ ' "$plan"
+}
+
 # Likewise, removal may touch only package names in the Apps-owned manifest.
 # Shared dependencies, manually installed packages and system packages must
 # remain untouched even if apk considers them orphaned.
@@ -144,6 +165,41 @@ append_owned_pin() {
 }
 
 installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
+# apk info -e verifies only the name. Version checks must use the installed
+# database or an old, manually changed APK could be mistaken for our release.
+installed_version() {
+ "$APK" list -I "$1" 2>/dev/null | awk -v prefix="$1-" '
+  index($1, prefix) == 1 { print substr($1, length(prefix) + 1); exit }
+ '
+}
+# Refuse a downgrade, a same-version rebuild with a different digest, any
+# package-set change, or an APK that no longer matches our ownership record.
+# The approved replacement must be strictly newer according to apk itself.
+select_upgrades() {
+ old_manifest="$1"; approved_pins="$2"; changed_pins="$3"
+ [ -s "$old_manifest" ] || return 1
+ : > "$changed_pins"
+ old_count=0
+ while IFS="$(printf '\t')" read -r name old_version old_hash; do
+  valid_package "$name" && valid_version "$old_version" && valid_sha "$old_hash" || return 1
+  protected_package "$name" && return 1
+  new_version="$(awk -F '\t' -v name="$name" '$1 == name { print $2; exit }' "$approved_pins")"
+  new_hash="$(awk -F '\t' -v name="$name" '$1 == name { print $3; exit }' "$approved_pins")"
+  [ -n "$new_version" ] && valid_sha "$new_hash" || return 1
+  [ "$(installed_version "$name")" = "$old_version" ] || return 1
+  if [ "$old_version" = "$new_version" ]; then
+   [ "$old_hash" = "$new_hash" ] || return 1
+  else
+   [ "$("$APK" version -t "$old_version" "$new_version" 2>/dev/null)" = '<' ] || return 1
+   printf '%s\t%s\t%s\n' "$name" "$new_version" "$new_hash" >> "$changed_pins"
+  fi
+  old_count=$((old_count + 1))
+  [ "$old_count" -le 32 ] || return 1
+ done < "$old_manifest"
+ [ "$old_count" -gt 0 ] || return 1
+ [ "$old_count" -eq "$(wc -l < "$approved_pins" | tr -d ' ')" ] || return 1
+ [ -s "$changed_pins" ]
+}
 # Prefer OpenWrt's configured apk architecture. Some package-manager builds
 # do not support --print-arch consistently. Never guess based on the CPU type,
 # device name, or the channel: the Hub approval must match an exact native arch.
@@ -214,10 +270,21 @@ status() {
     ui_ready=1
    fi
   fi
+  # Update availability requires a complete Apps-owned install and a newer
+  # Hub-approved exact package set; it never uses an untrusted URL or version.
+  update_ready=0
+  if [ "$managed" -eq 1 ] && [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then
+   status_pins="$(mktemp "$RUNTIME/apps-status-pins.XXXXXXXX")" || return 1
+   status_changes="$(mktemp "$RUNTIME/apps-status-changes.XXXXXXXX")" || { rm -f "$status_pins"; return 1; }
+   if extract_pins "$idx" "$status_pins" && select_upgrades "$(owned_manifest "$id")" "$status_pins" "$status_changes"; then
+    update_ready=1
+   fi
+   rm -f "$status_pins" "$status_changes"
+  fi
   # id, fully installed, at least one package installed, SmartSafeHub-owned
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
-  printf '%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"
@@ -282,6 +349,26 @@ preflight_install() {
  return 0
 }
 
+# Download and hash-check all approved archives prior to any APK mutation.
+# Both initial installation and a selected-app update use this same check.
+fetch_approved_archives() {
+ mkdir -p "$stage/packages" || return 30
+ while IFS="$(printf '\t')" read -r name version hash; do
+  archive="$stage/packages/$name-$version.apk"
+  "$UCLIENT" -q -T 30 -O "$archive" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
+  [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
+  archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
+  [ "$archive_bytes" -le 33554432 ] || return 32
+  [ "$("$SHA256" "$archive" | cut -d ' ' -f 1)" = "$hash" ] || return 33
+ done < "$pins"
+}
+prepare_signed_index() {
+ cp "$stage/packages.adb" "$stage/packages/packages.adb" || return 34
+ [ "$("$SHA256" "$stage/packages/packages.adb" | cut -d ' ' -f 1)" = "$approved_hash" ] || return 34
+ local_index="file://$stage/packages/packages.adb"
+ "$APK" --repositories-file /dev/null -X "$local_index" update > "$stage/repo-update.log" 2>&1 || return 34
+}
+
 # All packages come from one SmartSafeHub-signed immutable release.
 install_app() {
  preflight_install || return $?
@@ -308,30 +395,15 @@ install_app() {
   fi
  done < "$pins"
  [ "$need_install" -eq 1 ] || return 28
- mkdir -p "$stage/packages" || return 30
- # Independently check every approved archive, even for existing packages.
- # Package-manager signatures are still validated during the remote install.
- while IFS="$(printf '\t')" read -r name version hash; do
-  archive="$stage/packages/$name-$version.apk"
-  "$UCLIENT" -q -T 30 -O "$archive" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
-  [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
-  archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
-  [ "$archive_bytes" -le 33554432 ] || return 32
-  [ "$("$SHA256" "$archive" | cut -d ' ' -f 1)" = "$hash" ] || return 33
- done < "$pins"
+ fetch_approved_archives || return $?
  # Only missing packages enter the single signed repository transaction.
  set --; base_names=''
  while IFS="$(printf '\t')" read -r name version hash; do
   if ! installed "$name"; then set -- "$@" "$name=$version"; base_names="${base_names:+$base_names }$name"; fi
  done < "$pins"
  if [ "$#" -gt 0 ]; then
-  # apk --simulate disables automatic repository-index updates, even with -U.
-  # Use only the immutable index and APKs whose SHA-256 we already verified.
-  # apk still verifies the signed index using the firmware's trusted keys.
-  cp "$stage/packages.adb" "$stage/packages/packages.adb" || return 34
-  [ "$("$SHA256" "$stage/packages/packages.adb" | cut -d ' ' -f 1)" = "$approved_hash" ] || return 34
-  local_index="file://$stage/packages/packages.adb"
-  "$APK" --repositories-file /dev/null -X "$local_index" update > "$stage/repo-update.log" 2>&1 || return 34
+  # Only the verified immutable index can supply packages.
+  prepare_signed_index || return $?
   "$APK" --repositories-file /dev/null -X "$local_index" add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
   review_install_plan "$stage/plan.log" "$base_names" || return 34
   # Write ownership immediately before modifying packages. If APK partially
@@ -345,6 +417,38 @@ install_app() {
  while IFS="$(printf '\t')" read -r name version hash; do
   installed "$name" || return 35
  done < "$pins"
+ return 0
+}
+
+# Upgrade only packages already owned by this app, and only when the newly
+# approved version is strictly newer. Re-fetch approval at click time, use a
+# signed immutable repository, and reject any unrelated solver action.
+update_app() {
+ preflight_install || return $?
+ manifest="$(owned_manifest "$app")"
+ [ -s "$manifest" ] || return 51
+ changes="$stage/changes"
+ select_upgrades "$manifest" "$pins" "$changes" || return 52
+ # No package installation has been changed at this point. Keep the previous
+ # manifest intact until every targeted APK has been upgraded and verified.
+ fetch_approved_archives || return $?
+ prepare_signed_index || return $?
+ set --; update_names=''
+ while IFS="$(printf '\t')" read -r name version hash; do
+  set -- "$@" "$name=$version"
+  update_names="${update_names:+$update_names }$name"
+ done < "$changes"
+ [ "$#" -gt 0 ] || return 52
+ "$APK" --repositories-file /dev/null -X "$local_index" add --upgrade --simulate "$@" > "$stage/plan.log" 2>&1 || return 53
+ review_update_plan "$stage/plan.log" "$update_names" || return 53
+ "$APK" --repositories-file /dev/null -X "$local_index" add --upgrade "$@" > "$stage/install.log" 2>&1 || return 54
+ while IFS="$(printf '\t')" read -r name version hash; do
+  [ "$(installed_version "$name")" = "$version" ] || return 54
+ done < "$pins"
+ # Preserve ownership atomically; future removal and firmware restore now use
+ # the new pins. Never record an update as a first-time download receipt.
+ cp "$pins" "$manifest.new" || return 55
+ mv -f "$manifest.new" "$manifest" || return 55
  return 0
 }
 
@@ -398,7 +502,11 @@ worker() {
  rm -f "$RUNTIME/apps-last-error.log"
  write_state running "$action" "$app" NONE "$operation_id" "$source"
  rc=0
- if [ "$action" = install ]; then install_app || rc=$?; else remove_app || rc=$?; fi
+ case "$action" in
+  install) install_app || rc=$?;;
+  update) update_app || rc=$?;;
+  remove) remove_app || rc=$?;;
+ esac
  if [ "$rc" -eq 0 ]; then
   write_state success "$action" "$app" NONE "$operation_id" "$source"
   # Count only completed user installs. Restore, removals and failed/no-op
@@ -422,8 +530,8 @@ worker() {
 start() {
  action="$1"; app="$2"; source="${3:-user}"
  case "$source" in user|restore) ;; *) exit 2;; esac
- [ "$action" != remove ] || [ "$source" = user ] || exit 2
- case "$action" in install|remove) ;; *) exit 2;; esac
+ [ "$action" = install ] || [ "$source" = user ] || exit 2
+ case "$action" in install|update|remove) ;; *) exit 2;; esac
  valid_id "$app" || exit 2
  mkdir -p "$RUNTIME" || exit 1
  mkdir "$LOCK" 2>/dev/null || exit 3

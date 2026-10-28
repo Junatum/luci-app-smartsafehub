@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect } from 'preact/hooks';
 
-import { fetchAppsCatalog, fetchAppsStatus, installVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchAppsCatalog, fetchAppsStatus, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
@@ -155,6 +155,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
           onRefreshStatus={() => void appsStatus.refresh()}
           onInstall={async (id) => {
             await installVerifiedApp(id);
+            await appsStatus.refresh();
+          }}
+          onUpdate={async (id) => {
+            await updateVerifiedApp(id);
             await appsStatus.refresh();
           }}
           onRemove={async (id) => {

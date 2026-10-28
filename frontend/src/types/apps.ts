@@ -22,7 +22,7 @@ export interface AppsCatalog {
 export interface AppsInstallStatus {
   job: {
     phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
-    action: 'install' | 'remove' | '';
+    action: 'install' | 'update' | 'remove' | '';
     appId: string;
     code: string;
     operationId?: string;
@@ -36,6 +36,7 @@ export interface AppsInstallStatus {
     installed: boolean;
     partial: boolean;
     managed: boolean;
+    updateAvailable?: boolean;
     webUiReady?: boolean;
   }>;
 }
@@ -43,5 +44,5 @@ export interface AppsInstallStatus {
 export interface AppsOperationAccepted {
   accepted: boolean;
   appId: string;
-  action: 'install' | 'remove';
+  action: 'install' | 'update' | 'remove';
 }

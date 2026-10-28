@@ -20,6 +20,7 @@ interface AppsPageProps {
   onRefreshStatus: () => void;
   onInstall: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  onUpdate: (id: string) => Promise<void>;
 }
 
 function categoryOf(app: VerifiedApp): Category {
@@ -49,6 +50,11 @@ const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
   E35: '패키지를 설치하지 못했습니다.',
   E37: '공식 OpenWrt LuCI 저장소가 승인 당시와 다릅니다. 관리자에게 확인해 주세요.',
   E38: '기존 공유 라이브러리의 버전이 승인된 버전과 달라 설치할 수 없습니다.',
+  E51: 'SmartSafeHub Apps에서 관리하는 앱만 업데이트할 수 있습니다.',
+  E52: '현재 설치 버전과 승인된 업데이트가 일치하지 않습니다. 앱 구성과 업데이트 버전을 확인해 주세요.',
+  E53: '다른 시스템 패키지 변경이 필요하여 앱 업데이트를 중단했습니다.',
+  E54: '앱 업데이트에 실패했습니다. 일부 패키지가 변경되었을 수 있으니 관리자에게 확인해 주세요.',
+  E55: '업데이트 후 설치 기록을 저장하지 못했습니다. 관리자에게 확인해 주세요.',
   E41: 'SmartSafeHub Apps에서 설치한 앱만 여기서 제거할 수 있습니다.',
   E44: '기존 시스템에 영향을 줄 수 있어 앱 제거가 차단됐습니다.',
   E45: '앱 제거에 실패했습니다.',
@@ -63,7 +69,7 @@ const TABS: readonly { id: Category; label: string }[] = [
   { id: 'other', label: '기타' },
 ];
 
-type AppAction = 'install' | 'remove';
+type AppAction = 'install' | 'update' | 'remove';
 
 function OperationIndicator({ action }: { action: AppAction }) {
   const removing = action === 'remove';
@@ -73,13 +79,13 @@ function OperationIndicator({ action }: { action: AppAction }) {
         <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25" />
         <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
       </svg>
-      {removing ? '제거 중…' : '설치 중…'}
+      {removing ? '제거 중…' : action === 'update' ? '업데이트 중…' : '설치 중…'}
     </span>
   );
 }
 
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, statusError,
-  onRefreshStatus, onInstall, onRemove }: AppsPageProps) {
+  onRefreshStatus, onInstall, onUpdate, onRemove }: AppsPageProps) {
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
@@ -106,7 +112,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
     const timeout = window.setTimeout(() => dismissJob(jobKey), 7000);
     return () => window.clearTimeout(timeout);
   }, [jobKey, job?.phase, showJob]);
-  const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'remove' ? job.action : null;
+  const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'update' || job?.action === 'remove' ? job.action : null;
   const filtered = useMemo(() => apps.filter((app) =>
     (category === 'all' || categoryOf(app) === category) &&
     `${app.name} ${app.summary}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
@@ -139,12 +145,14 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
 
   const requestOperation = async (app: VerifiedApp, action: AppAction) => {
     if (!installStatus || statusError || pending !== null || running || restoring) return;
+    if (action === 'update' && !window.confirm(`${app.name} 앱을 최신 승인 버전으로 업데이트하시겠습니까?\n\n업데이트 중 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
     setActionError(null);
     setPending({ appId: app.id, action });
     try {
       if (action === 'install') await onInstall(app.id);
+      else if (action === 'update') await onUpdate(app.id);
       else await onRemove(app.id);
       onRefreshStatus();
     } catch (cause: unknown) {
@@ -239,7 +247,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
             </div>
           </div>
           <p class="mt-4 mb-0 text-xs leading-5 text-slate-500">
-            검증된 APK 패키지를 설치하거나 제거할 수 있습니다. 설치 및 제거는 공유기에서 실행되며, 완료할 때까지 다른 앱 작업을 시작할 수 없습니다.
+            검증된 APK 패키지를 설치·업데이트·제거할 수 있습니다. 앱 작업은 공유기에서 실행되며, 완료할 때까지 다른 작업을 시작할 수 없습니다.
           </p>
         </div>
       </div>
@@ -255,12 +263,12 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
         <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800' : running && job.action === 'remove' ? 'border-red-200 bg-red-50 text-red-800' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              {running ? (job.action === 'remove' ? '앱 제거 중' : '앱 설치 중') : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
+              {running ? (job.action === 'remove' ? '앱 제거 중' : job.action === 'update' ? '앱 업데이트 중' : '앱 설치 중') : job.phase === 'success' ? '마지막 앱 작업 완료' : '마지막 앱 작업 실패'}
               {job.appId ? ` · ${job.appId}` : ''}
               {job.code && job.code !== 'NONE' ? ` · 오류 코드 ${job.code}` : ''}
               {job.phase === 'failed' && job.code && OPERATION_MESSAGES[job.code]
                 ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
-              {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
+              {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : job.action === 'update' ? '승인된 버전으로 앱을 업데이트하고 있습니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
             </div>
             {!running ? <button aria-label="앱 작업 알림 닫기" class="shrink-0 rounded-lg px-2 py-1 text-xs font-bold hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2" onClick={() => dismissJob(jobKey)} type="button">닫기 ×</button> : null}
           </div>
@@ -307,6 +315,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const state = installStatus?.installed[app.id];
                   const installed = state?.installed ?? false;
                   const managed = state?.managed ?? false;
+                  const updateAvailable = Boolean(installed && managed && state?.updateAvailable);
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running || restoring;
                   const removable = managed && (installed || Boolean(state?.partial));
@@ -320,6 +329,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                           <div class="mt-1 flex flex-wrap items-center gap-2">
                             <span class="text-xs text-slate-500">v{app.version}</span>
                             {installed && managed ? <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">✓ 설치됨</span> : null}
+                            {updateAvailable ? <span class="rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-800">업데이트 가능</span> : null}
                           </div>
                         </div>
                       </div>
@@ -331,6 +341,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             {managed && state?.partial && !installed ? (
                               <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
                             ) : null}
+                            {updateAvailable ? <button class="min-h-9 rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
                             {launchPath ? (
                               <a aria-label={`${app.name} 새 탭에서 열기`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href={launchPath} rel="noopener noreferrer" target="_blank">열기 ↗</a>
                             ) : installed && app.webUi ? (
