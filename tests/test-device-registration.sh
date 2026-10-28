@@ -99,7 +99,7 @@ grep -Fq 'const pairingCode = !connected && !expired ? status?.pairingCode : nul
 ! grep -Fq 'safeshield_license_update' "$MAIN" || fail 'legacy SafeShield license update RPC must stay removed'
 ! grep -Fq '"license_get"' "$ROOT/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json" || fail 'legacy SafeShield license_get ACL must stay removed'
 ! grep -Fq '"license_update"' "$ROOT/root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json" || fail 'legacy SafeShield license_update ACL must stay removed'
-echo 'device registration contract: ok'
+echo 'PASS: device registration source contract'
 
 grep -Fq '/etc/smartsafehub/device-credential.json' "$HELPER"
 grep -Fq 'devices/bootstrap' "$HELPER"
@@ -698,3 +698,4 @@ grep -Fq '"plan":"free"' "$PLAN_RETRY_RUNTIME/device.json" || {
   echo 'invalid entitlement must not request SafeShield refresh' >&2
   exit 1
 }
+printf 'PASS: device registration, entitlements and refresh retries\n'
