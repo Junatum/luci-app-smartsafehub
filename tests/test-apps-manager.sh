@@ -172,6 +172,9 @@ SH2
 cat > "$TMP/bin/start-stop-daemon" <<'SH2'
 #!/bin/sh
 [ "$1" = -S ] && [ "$2" = -b ] && [ "$3" = -x ] && [ "$5" = -- ] || exit 2
+# Starting and final states must carry the same operation ID.
+awk -F '\t' '$1 == "operation_id" { print $2; exit }' \
+  "$SMARTSAFEHUB_APPS_RUNTIME_DIR/apps-operation.state" >> "$APPS_TEST_OPERATION_START_LOG"
 "$4" "$6" "$7" "$8"
 SH2
 chmod +x "$TMP/bin/"*
@@ -192,13 +195,24 @@ export APPS_TEST_REPO="$TMP/repo"
 export APPS_TEST_INSTALLED="$TMP/installed"
 export APPS_TEST_APK_LOG="$TMP/apk-commands"
 export APPS_TEST_INDEX_READY="$TMP/index-ready"
+export APPS_TEST_OPERATION_START_LOG="$TMP/operation-start-ids"
 : > "$APPS_TEST_INSTALLED"
 # A validated fixed release installs all three APKs from a single signed feed.
 "$MANAGER" start install '../../../../etc/passwd' >/dev/null 2>&1 && fail 'invalid app ID accepted'
 "$MANAGER" start install 'not-approved' || fail 'unknown app should queue'
 grep -Fqx "$(printf 'code\tE22')" "$TMP/runtime/apps-operation.state" || fail 'unknown app was installed'
+first_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$TMP/runtime/apps-operation.state")"
+[ -n "$first_operation_id" ] || fail 'first failed operation has no identity'
+[ "$(sed -n '1p' "$APPS_TEST_OPERATION_START_LOG")" = "$first_operation_id" ] || fail 'operation identity changed during failure'
+"$MANAGER" start install not-approved || fail 'repeated failed install did not queue'
+repeat_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$TMP/runtime/apps-operation.state")"
+[ "$repeat_operation_id" != "$first_operation_id" ] || fail 'repeated E22 failure reused dismissed operation ID'
+[ "$(sed -n '2p' "$APPS_TEST_OPERATION_START_LOG")" = "$repeat_operation_id" ] || fail 'repeated failure changed identity between phases'
 "$MANAGER" start install network-usage-monitor || fail 'install did not queue'
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'three APK installation failed'
+second_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$TMP/runtime/apps-operation.state")"
+[ -n "$second_operation_id" ] && [ "$first_operation_id" != "$second_operation_id" ] || fail 'new operation reused old identity'
+[ "$(sed -n '3p' "$APPS_TEST_OPERATION_START_LOG")" = "$second_operation_id" ] || fail 'operation identity changed during success'
 [ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 3 ] || fail 'all three APKs were not installed'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb update$' "$APPS_TEST_APK_LOG" || fail 'approved local index not loaded before simulation'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add --simulate nlbwmon=2025\.06\.02~29236be6-r1 luci-app-nlbwmon=26\.288\.56989~75a306d luci-lib-chartjs=26\.288\.56989~75a306d$' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository simulation not used'

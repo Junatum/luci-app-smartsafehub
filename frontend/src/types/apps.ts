@@ -25,6 +25,7 @@ export interface AppsInstallStatus {
     action: 'install' | 'remove' | '';
     appId: string;
     code: string;
+    operationId?: string;
   };
   restore?: {
     phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';

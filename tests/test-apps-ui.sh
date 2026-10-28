@@ -53,5 +53,11 @@ check("job.action === 'remove' ? '앱 제거 중' : '앱 설치 중'" in page,
       'running job status must use the action name')
 check("job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800'" in page,
       'errors must keep a red alert')
+check('useState<string | null>(readDismissedAppsJob)' in page,
+      'dismissal must be restored after refreshing Apps')
+check('saveDismissedAppsJob(key)' in page and 'onClick={() => dismissJob(jobKey)}' in page,
+      'dismissing a job should persist the dismissed operation ID')
+check('setDismissedJob(null)' not in page,
+      'starting a new operation must not resurrect the previous failure')
 PY
 echo 'PASS: Apps removal confirmation, theme and operation states'

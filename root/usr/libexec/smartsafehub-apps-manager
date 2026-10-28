@@ -48,9 +48,9 @@ protected_package() {
  return 1
 }
 write_state() {
- phase="$1"; action="$2"; app="$3"; code="$4"
+ phase="$1"; action="$2"; app="$3"; code="$4"; operation_id="$5"
  tmp="$(mktemp "$RUNTIME/apps-state.XXXXXXXX")" || return 1
- printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\n' "$phase" "$action" "$app" "$code" > "$tmp"
+ printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\noperation_id\t%s\n' "$phase" "$action" "$app" "$code" "$operation_id" > "$tmp"
  mv -f "$tmp" "$STATE"
 }
 # Persist *ownership*, not merely an installed flag, so removal never deletes
@@ -385,16 +385,19 @@ remove_app() {
 
 worker() {
  action="$1"; app="$2"
+ # Keep the ID from the queued job across running/success/failed states.
+ # The browser uses it to distinguish a new failure from a dismissed one.
+ operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$STATE" 2>/dev/null || :)"
  trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
  stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
  pins="$stage/pins"
  # Never expose error text from a previous install as the current result.
  rm -f "$RUNTIME/apps-last-error.log"
- write_state running "$action" "$app" NONE
+ write_state running "$action" "$app" NONE "$operation_id"
  rc=0
  if [ "$action" = install ]; then install_app || rc=$?; else remove_app || rc=$?; fi
  if [ "$rc" -eq 0 ]; then
-  write_state success "$action" "$app" NONE
+  write_state success "$action" "$app" NONE "$operation_id"
  else
   # Keep only the latest package-manager diagnostic after the workspace is
   # removed. Never record an auth token, catalog JSON, or package contents.
@@ -403,7 +406,7 @@ worker() {
     tail -c 4096 "$log" > "$RUNTIME/apps-last-error.log" 2>/dev/null || :
    fi
   done
-  write_state failed "$action" "$app" "E$rc"
+  write_state failed "$action" "$app" "E$rc" "$operation_id"
  fi
 }
 
@@ -413,9 +416,11 @@ start() {
  valid_id "$app" || exit 2
  mkdir -p "$RUNTIME" || exit 1
  mkdir "$LOCK" 2>/dev/null || exit 3
- write_state starting "$action" "$app" NONE
+ # The ID is unique to each invocation, even if the same error repeats.
+ operation_id="$(date +%s)-$$"
+ write_state starting "$action" "$app" NONE "$operation_id"
  if ! "$DAEMON" -S -b -x "$SELF" -- worker "$action" "$app" >/dev/null 2>&1; then
-  write_state failed "$action" "$app" LAUNCH
+  write_state failed "$action" "$app" LAUNCH "$operation_id"
   rmdir "$LOCK" 2>/dev/null || true
   exit 1
  fi

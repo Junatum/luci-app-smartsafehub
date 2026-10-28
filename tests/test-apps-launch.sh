@@ -16,9 +16,11 @@ status = (root/'root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc').read_te
 assert 'target="_blank"' in ui and 'rel="noopener noreferrer"' in ui
 assert 'approvedAppPath(app.webUi)' in ui and 'state?.webUiReady' in ui
 assert '웹 UI 미설치' in ui and '설치 마무리' in ui
-assert 'onClick={() => setDismissedJob(jobKey)}' in ui
-assert 'window.setTimeout(() => setDismissedJob(jobKey), 7000)' in ui
+assert 'onClick={() => dismissJob(jobKey)}' in ui
+assert 'useState<string | null>(readDismissedAppsJob)' in ui
+assert 'window.setTimeout(() => dismissJob(jobKey), 7000)' in ui
 assert 'webUiReady?: boolean' in types and 'webUi?:' in types
+assert 'operationId?: string' in types
 assert "if (webUi.type !== 'luci')" in route
 assert "'/cgi-bin/luci/admin/services/nlbw/display'" in catalog
 assert 'luci_web_ui_path(item.web_ui.path)' in catalog

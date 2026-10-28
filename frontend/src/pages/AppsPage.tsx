@@ -5,6 +5,7 @@ import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
 import { approvedAppPath } from '../utils/appsWebUi';
+import { appsJobNoticeKey, readDismissedAppsJob, saveDismissedAppsJob } from '../utils/appsJobNotice';
 
 type Category = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'other';
 
@@ -86,7 +87,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const cancelRemoveRef = useRef<HTMLButtonElement>(null);
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [dismissedJob, setDismissedJob] = useState<string | null>(null);
+  const [dismissedJob, setDismissedJob] = useState<string | null>(readDismissedAppsJob);
   const currentData = error ? null : data;
   const apps = currentData?.apps ?? [];
   const orphans = Object.entries(installStatus?.installed ?? {}).filter(([id, state]) => state.managed && !apps.some((app) => app.id === id));
@@ -94,11 +95,15 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
   const restoring = restore?.phase === 'starting' || restore?.phase === 'running';
-  const jobKey = job ? `${job.phase}:${job.action}:${job.appId}:${job.code}` : '';
+  const jobKey = appsJobNoticeKey(job);
+  const dismissJob = (key: string) => {
+    setDismissedJob(key);
+    saveDismissedAppsJob(key);
+  };
   const showJob = job && job.phase !== 'idle' && jobKey !== dismissedJob;
   useEffect(() => {
     if (job?.phase !== 'success' || !showJob) return;
-    const timeout = window.setTimeout(() => setDismissedJob(jobKey), 7000);
+    const timeout = window.setTimeout(() => dismissJob(jobKey), 7000);
     return () => window.clearTimeout(timeout);
   }, [jobKey, job?.phase, showJob]);
   const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'remove' ? job.action : null;
@@ -137,7 +142,6 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
     setActionError(null);
-    setDismissedJob(null);
     setPending({ appId: app.id, action });
     try {
       if (action === 'install') await onInstall(app.id);
@@ -258,7 +262,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                 ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[job.code]}</p> : null}
               {running ? <p class="mb-0 mt-1 text-xs">{job.action === 'remove' ? '앱 제거와 패키지 정리가 진행 중입니다.' : '설치 확인과 패키지 처리가 진행 중입니다.'} 화면을 닫아도 작업은 계속됩니다.</p> : null}
             </div>
-            {!running ? <button aria-label="앱 작업 알림 닫기" class="shrink-0 rounded-lg px-2 py-1 text-xs font-bold hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2" onClick={() => setDismissedJob(jobKey)} type="button">닫기 ×</button> : null}
+            {!running ? <button aria-label="앱 작업 알림 닫기" class="shrink-0 rounded-lg px-2 py-1 text-xs font-bold hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2" onClick={() => dismissJob(jobKey)} type="button">닫기 ×</button> : null}
           </div>
         </div>
       ) : null}

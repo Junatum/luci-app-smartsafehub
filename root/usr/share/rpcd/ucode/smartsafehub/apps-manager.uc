@@ -10,7 +10,7 @@ const STATUS = '/tmp/smartsafehub/apps-status.tsv';
 const RESTORE_STATE = '/tmp/smartsafehub/apps-restore.state';
 
 function job() {
-	const state = { phase: 'idle', action: '', appId: '', code: '' };
+	const state = { phase: 'idle', action: '', appId: '', code: '', operationId: '' };
 	const raw = fs.readfile(STATE);
 	if (type(raw) != 'string' || length(raw) > 4096) return state;
 	for (let line in split(raw, /\r?\n/)) {
@@ -26,6 +26,8 @@ function job() {
 			state.appId = value;
 		else if (key == 'code' && match(value, /^(NONE|LAUNCH|E[0-9]{1,3})$/) != null)
 			state.code = value;
+		else if (key == 'operation_id' && match(value, /^[0-9]{1,12}-[0-9]{1,12}$/) != null)
+			state.operationId = value;
 	}
 	return state;
 }
