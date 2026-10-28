@@ -2306,3 +2306,41 @@
 .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #be123c; }
 .ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #fbbf24; }
 .ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #fb7185; }
+
+/* Apps cards: installed is a quiet state, updates are an amber action. */
+.ssh-apps-installed-badge {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+}
+.ssh-apps-update-badge {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+.ssh-apps-update-button {
+  border-color: #d97706;
+  background: #d97706;
+  color: #fff;
+}
+.ssh-apps-update-button:hover:not(:disabled) { background: #b45309; border-color: #b45309; }
+.ssh-apps-update-button:focus-visible { outline: 2px solid #d97706; outline-offset: 2px; }
+.ssh-app[data-theme='dark'] .ssh-apps-installed-badge {
+  border-color: #475569;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+.ssh-app[data-theme='dark'] .ssh-apps-update-badge {
+  border-color: #92400e;
+  background: #451a03;
+  color: #fcd34d;
+}
+.ssh-app[data-theme='dark'] .ssh-apps-update-button {
+  border-color: #b45309;
+  background: #b45309;
+  color: #fff;
+}
+.ssh-app[data-theme='dark'] .ssh-apps-update-button:hover:not(:disabled) {
+  background: #d97706;
+  border-color: #d97706;
+}

@@ -5,6 +5,8 @@
 - `System` 영역: `SmartSafeHub 계정 → Apps → 업데이트 → 설정` / 해시 URL `#apps`.
 - 앱 목록: `smartsafehub.apps_catalog` RPC → `/usr/libexec/smartsafehub-apps` → Hub 승인 카탈로그.
 - 설치 상태: `smartsafehub.apps_status` RPC → 독립된 `smartsafehub-apps-manager`의 로컬 APK 상태와 설치 기록.
+- 앱 설치 저장 공간과 설치된 APK의 용량은 별도 `smartsafehub.apps_metrics` 읽기 RPC로 조회합니다. LuCI ACL의 `read.ubus.smartsafehub`에도 `apps_metrics`가 있어야 합니다. 실패하더라도 설치·제거 상태에는 영향을 주지 않습니다.
+- 설치된 버전은 `apk list -I`에서 조회한 첫 번째 승인 APK의 실제 설치 버전입니다. 카탈로그의 `version`은 현재 **제공/승인된 앱 버전**이므로 둘을 구분해 표시합니다. 복수 APK 앱은 대표 패키지 버전이 앱 릴리스 버전과 다를 수 있습니다.
 - 설치·업데이트·제거: `smartsafehub.apps_install`, `smartsafehub.apps_update`, `smartsafehub.apps_remove` RPC. 앱 ID만 받으며, 실제 작업은 root 전용 백그라운드 매니저에서 진행합니다. 다른 앱 작업이 진행 중이면 거절합니다.
 - Phase 2의 IoT/로컬 AI 설치기는 추후 `runtime`에 따라 별도 어댑터로 추가합니다. 현재는 `router + apk`만 가능하며 Hub의 패키지명·URL·명령을 브라우저가 보낼 수 없습니다.
 

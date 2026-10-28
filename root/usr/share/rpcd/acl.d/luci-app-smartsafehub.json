@@ -12,6 +12,7 @@
           "firmware_status",
           "apps_catalog",
           "apps_status",
+          "apps_metrics",
           "system_time_settings",
           "system_scheduled_reboot_settings",
           "health_status",

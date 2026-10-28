@@ -279,11 +279,12 @@ status() {
   valid_id "$id" || continue
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break
-  total=0; present=0; p=0
+  total=0; present=0; p=0; primary_package=''
   while :; do
    name="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
    [ -n "$name" ] || break
    valid_package "$name" || break
+   [ -n "$primary_package" ] || primary_package="$name"
    total=$((total + 1)); installed "$name" && present=$((present + 1))
    p=$((p + 1)); [ "$p" -le 32 ] || break
   done
@@ -307,10 +308,18 @@ status() {
    fi
    rm -f "$status_pins" "$status_changes"
   fi
-  # Installation status remains a cheap, dependency-free lookup.
+  # The catalog version is the latest approved release, not the APK
+  # currently installed. Read the actual version of the first approved
+  # package as a representative version; never infer it from the catalog.
+  # Use a fixed APK command and validate the field before putting it in TSV.
+  installed_release=''
+  if [ -n "$primary_package" ] && installed "$primary_package"; then
+   installed_release="$(installed_version "$primary_package" || :)"
+   valid_version "$installed_release" || installed_release=''
+  fi
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready" "$installed_release"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"

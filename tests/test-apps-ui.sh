@@ -23,8 +23,11 @@ check('border-teal-300 text-teal-800 hover:bg-teal-50' in page, 'install should 
 check('border-red-300 text-red-700 hover:bg-red-50' in page, 'removal must be red outline')
 check('hover\\:bg-red-50:hover' in styles, 'red hover needs an explicit dark-mode style')
 check('rgb(239 68 68 / 0.16)' in styles, 'dark-mode removal hover should be subtle')
-check('installed && managed ? <span class="rounded-full border border-emerald-200' in page,
-      'managed installed apps need a green status badge')
+check('ssh-apps-installed-badge' in page and 'ssh-apps-update-badge' in page and
+      'ssh-apps-update-button' in page,
+      'installed, update notice and update action need distinct styles')
+check('.ssh-apps-update-button' in styles and ".ssh-app[data-theme='dark'] .ssh-apps-update-button" in styles,
+      'update action must have a distinct dark-mode style')
 
 
 # App installation storage must refer to the writable APK filesystem.
@@ -42,6 +45,10 @@ check("run_command([ MANAGER, 'sizes' ], 6000)" in backend and 'try {' in backen
       'optional APK size failures must not block status')
 check('apps_metrics:' in (root / 'root/usr/share/rpcd/ucode/smartsafehub.uc').read_text(),
       'metrics RPC must be independently accessible')
+import json
+acl = json.loads((root / 'root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json').read_text())
+check('apps_metrics' in acl['luci-app-smartsafehub']['read']['ubus']['smartsafehub'],
+      'critical regression: Apps metrics RPC is missing from LuCI read ACL')
 check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
       'pollInterval: 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
       'optional Apps metrics should run separately and less frequently')
@@ -67,7 +74,7 @@ check('installed_size_bytes() {' in manager and '"$APK" info -s "$@"' in manager
 check('du -' not in manager and 'find /' not in manager,
       'installed size must not recursively scan the router filesystem')
 check('installedSizes[fields[0]]' in backend and 'length(fields) != 2' in backend and
-      'installedBytes:' not in backend and 'length(fields) != 7' not in backend,
+      'installedBytes:' not in backend and 'installedVersion:' in backend,
       'package size data must be parsed separately from the six-column status')
 check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$@"' in manager,
       'optional sizes command must report app APK totals without modifying status')
@@ -79,6 +86,18 @@ check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in p
       'missing or invalid sizes must not be guessed')
 check('캐시는 포함되지 않습니다' in page,
       'metadata size must not be misrepresented as actual overlay consumption')
+check('installedVersion?: string | null' in (root / 'frontend/src/types/apps.ts').read_text(),
+      'installed APK version must have a typed field')
+check('installed_release="$(installed_version "$primary_package" || :)"' in manager and
+      '"$update_ready" "$installed_release"' in manager,
+      'current APK version must originate from installed package metadata')
+check('installedVersion: length(fields) >= 7' in backend and
+      'match(fields[6]' in backend,
+      'RPC parser must validate installed APK version')
+check('설치 v${installedVersion}' in page and '제공 v{app.version}' in page,
+      'installed and approved versions must have independent labels')
+check('업데이트 가능</span>' in page and '설치 버전 확인 불가' in page,
+      'updates must be distinguished from unknown installed versions')
 
 # Removal never calls onRemove from a card or from the orphan-list button.
 check("onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget)" in page,

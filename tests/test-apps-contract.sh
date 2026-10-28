@@ -63,6 +63,7 @@ grep -Fq '"apps_install"' "$ACL" || fail 'Apps install ACL missing'
 grep -Fq '"apps_update"' "$ACL" || fail 'Apps update ACL missing'
 grep -Fq '"apps_remove"' "$ACL" || fail 'Apps remove ACL missing'
 grep -Fq '"apps_status"' "$ACL" || fail 'Apps status ACL missing'
+grep -Fq '"apps_metrics"' "$ACL" || fail 'Apps metrics read ACL missing'
 grep -Fq 'updateVerifiedApp' "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'Apps frontend update call missing'
 grep -Fq 'installVerifiedApp' "$ROOT/frontend/src/api/smartsafehub.ts" || fail 'Apps frontend installation call missing'
 # 다크 모드에서 앱 작업 상태 텍스트가 어둡게 남지 않도록 색상 매핑을 확인한다.

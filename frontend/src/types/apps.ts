@@ -50,6 +50,8 @@ export interface AppsInstallStatus {
     partial: boolean;
     managed: boolean;
     updateAvailable?: boolean;
+    /** Actual installed version of the first approved APK; not the catalog version. */
+    installedVersion?: string | null;
     webUiReady?: boolean;
   }>;
 }

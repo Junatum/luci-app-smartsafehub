@@ -325,6 +325,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                     ? formatStorageBytes(bytes) : null;
                   const managed = state?.managed ?? false;
                   const updateAvailable = Boolean(installed && managed && state?.updateAvailable);
+                  const installedVersion = installed ? state?.installedVersion : null;
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running || restoring;
                   const removable = managed && (installed || Boolean(state?.partial));
@@ -334,12 +335,19 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       <div class="flex min-w-0 items-start gap-3">
                         <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsIcon class="size-5" /></span>
                         <div class="min-w-0 flex-1">
-                          <h3 class="m-0 break-words text-sm font-black text-slate-950">{app.name}</h3>
-                          <div class="mt-1 flex flex-wrap items-center gap-2">
-                            <span class="text-xs text-slate-500">v{app.version}</span>
-                            {installed && managed ? <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">✓ 설치됨</span> : null}
-                            {updateAvailable ? <span class="rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-800">업데이트 가능</span> : null}
+                          <div class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                            <h3 class="m-0 min-w-0 flex-1 break-words text-sm font-black text-slate-950">{app.name}</h3>
+                            {installed && managed ? <span class="ssh-apps-installed-badge shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold">✓ 설치됨</span> : null}
                           </div>
+                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span class="text-xs text-slate-500" title={installed ? '공유기에 설치된 대표 APK 패키지 버전입니다.' : '현재 제공 중인 승인 버전입니다.'}>
+                              {installed ? installedVersion ? `설치 v${installedVersion}` : '설치 버전 확인 불가' : `v${app.version}`}
+                            </span>
+                            {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
+                          </div>
+                          {installed && installedVersion && (updateAvailable || installedVersion !== app.version) ? (
+                            <p class="mb-0 mt-1 text-[11px] text-slate-500" title="현재 서버가 승인한 앱 릴리스 버전입니다. 설치된 APK 패키지의 버전과 다를 수 있습니다.">제공 v{app.version}</p>
+                          ) : null}
                           {sizeLabel !== null ? (
                             <p class="mb-0 mt-1 text-[11px] text-slate-500" title="설치된 APK 패키지의 용량 합계입니다. 앱 데이터 및 캐시는 포함되지 않습니다.">
                               패키지 설치 용량 약 {sizeLabel}
@@ -355,7 +363,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             {managed && state?.partial && !installed ? (
                               <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
                             ) : null}
-                            {updateAvailable ? <button class="min-h-9 rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
+                            {updateAvailable ? <button class="ssh-apps-update-button min-h-9 rounded-lg border px-3 text-xs font-bold transition disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
                             {launchPath ? (
                               <a aria-label={`${app.name} 새 탭에서 열기`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href={launchPath} rel="noopener noreferrer" target="_blank">열기 ↗</a>
                             ) : installed && app.webUi ? (
