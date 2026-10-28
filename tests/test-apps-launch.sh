@@ -22,7 +22,7 @@ assert 'window.setTimeout(() => dismissJob(jobKey), 7000)' in ui
 assert 'webUiReady?: boolean' in types and 'webUi?:' in types
 assert 'operationId?: string' in types
 assert 'updateAvailable?: boolean' in types
-assert "updateAvailable: length(fields) == 6 && fields[5] == '1'" in status
+assert "updateAvailable: length(fields) >= 6 && fields[5] == '1'" in status
 # rpcd must accept both existing timestamp-pid jobs and new receipt IDs.
 assert r'^[0-9]{1,12}-[0-9]{1,12}(-[0-9a-f]{16})?$' in status
 assert 'od -An' not in manager

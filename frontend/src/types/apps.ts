@@ -47,6 +47,8 @@ export interface AppsInstallStatus {
     managed: boolean;
     updateAvailable?: boolean;
     webUiReady?: boolean;
+    /** Sum of installed APK package metadata sizes; excludes app data and caches. */
+    installedBytes?: number | null;
   }>;
 }
 

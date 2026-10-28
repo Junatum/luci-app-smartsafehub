@@ -172,6 +172,32 @@ installed_version() {
   index($1, prefix) == 1 { print substr($1, length(prefix) + 1); exit }
  '
 }
+# Use APK's installed-size metadata, not archive/download size or a slow
+# recursive scan of /overlay. Query all packages for one app in one call.
+# Metadata may be unavailable on older APK versions: report no value rather
+# than guessing. Sizes exclude app-created data and caches.
+installed_size_bytes() {
+ [ "$#" -gt 0 ] || return 1
+ "$APK" info -s "$@" 2>/dev/null | awk -v expected="$#" '
+  / installed size:$/ { if (waiting) invalid=1; waiting=1; next }
+  waiting && NF == 2 {
+   if ($1 !~ /^[0-9]+([.][0-9]+)?$/) { invalid=1; waiting=0; next }
+   if ($2 == "B") factor=1
+   else if ($2 == "KiB") factor=1024
+   else if ($2 == "MiB") factor=1048576
+   else if ($2 == "GiB") factor=1073741824
+   else { invalid=1; waiting=0; next }
+   sum += $1 * factor
+   count++
+   waiting=0
+  }
+  END {
+   if (!invalid && !waiting && count == expected && sum >= 0 && sum <= 1099511627776)
+    printf "%.0f\n", sum
+   else exit 1
+  }
+ '
+}
 # Refuse a downgrade, a same-version rebuild with a different digest, any
 # package-set change, or an APK that no longer matches our ownership record.
 # The approved replacement must be strictly newer according to apk itself.
@@ -254,11 +280,16 @@ status() {
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break
   total=0; present=0; p=0
+  set --
   while :; do
    name="$(field "$CATALOG" "@.apps[$idx].packages[$p].name")"
    [ -n "$name" ] || break
    valid_package "$name" || break
-   total=$((total + 1)); installed "$name" && present=$((present + 1))
+   total=$((total + 1))
+   if installed "$name"; then
+    present=$((present + 1))
+    set -- "$@" "$name"
+   fi
    p=$((p + 1)); [ "$p" -le 32 ] || break
   done
   managed=0
@@ -281,10 +312,17 @@ status() {
    fi
    rm -f "$status_pins" "$status_changes"
   fi
-  # id, fully installed, at least one package installed, SmartSafeHub-owned
-  if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
+  # Only report complete app package sets, not potentially misleading
+  # partial installs. A missing/unsupported size remains an empty field.
+  app_bytes=''
+  if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then
+   full=1
+   app_bytes="$(installed_size_bytes "$@" || :)"
+  else
+   full=0
+  fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready" "$app_bytes"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"

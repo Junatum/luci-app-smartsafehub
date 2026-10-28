@@ -51,6 +51,21 @@ check(".ssh-app[data-theme='dark'] .ssh-apps-storage-track" in styles and
       "[data-level='critical']" in styles,
       'donut must support dark mode and dangerously low storage')
 
+# Per-app size reflects the installed APK package metadata only (no du scan).
+manager = (root / 'root/usr/libexec/smartsafehub-apps-manager').read_text()
+check('installed_size_bytes() {' in manager and '"$APK" info -s "$@"' in manager,
+      'Apps installed size should use one APK metadata lookup per app')
+check('du -' not in manager and 'find /' not in manager,
+      'installed size must not recursively scan the router filesystem')
+check('installedBytes:' in backend and 'length(fields) >= 7' in backend,
+      'new response must extend old six-field statuses without breaking compatibility')
+check('sizeLabel !== null' in page and '패키지 설치 용량 약 {sizeLabel}' in page,
+      'installed app card must show a real size only when known')
+check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in page,
+      'missing or invalid sizes must not be guessed')
+check('캐시는 포함되지 않습니다' in page,
+      'metadata size must not be misrepresented as actual overlay consumption')
+
 # Removal never calls onRemove from a card or from the orphan-list button.
 check("onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget)" in page,
       'catalog removal must open confirmation')

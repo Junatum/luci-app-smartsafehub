@@ -6,6 +6,7 @@ import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
 import { approvedAppPath } from '../utils/appsWebUi';
+import { formatStorageBytes } from '../utils/appsStorage';
 import { appsJobNoticeKey, readDismissedAppsJob, saveDismissedAppsJob } from '../utils/appsJobNotice';
 
 type Category = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'other';
@@ -318,6 +319,9 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                 {filtered.map((app) => {
                   const state = installStatus?.installed[app.id];
                   const installed = state?.installed ?? false;
+                  const bytes = state?.installedBytes;
+                  const sizeLabel = installed && typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
+                    ? formatStorageBytes(bytes) : null;
                   const managed = state?.managed ?? false;
                   const updateAvailable = Boolean(installed && managed && state?.updateAvailable);
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
@@ -335,6 +339,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             {installed && managed ? <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">✓ 설치됨</span> : null}
                             {updateAvailable ? <span class="rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-800">업데이트 가능</span> : null}
                           </div>
+                          {sizeLabel !== null ? (
+                            <p class="mb-0 mt-1 text-[11px] text-slate-500" title="설치된 APK 패키지의 용량 합계입니다. 앱 데이터 및 캐시는 포함되지 않습니다.">
+                              패키지 설치 용량 약 {sizeLabel}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <p class="mt-4 mb-4 min-h-10 break-words text-sm leading-5 text-slate-600">{app.summary}</p>

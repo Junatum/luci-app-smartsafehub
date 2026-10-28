@@ -84,7 +84,7 @@ export function read_apps_status() {
 	const installed = {};
 	for (let line in split(raw, /\r?\n/)) {
 		const fields = split(line, /\t/);
-		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6) ||
+		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6 && length(fields) != 7) ||
 			match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null)
 			continue;
 		installed[fields[0]] = {
@@ -92,7 +92,8 @@ export function read_apps_status() {
 			partial: fields[2] == '1',
 			managed: fields[3] == '1',
 			webUiReady: length(fields) >= 5 && fields[4] == '1',
-			updateAvailable: length(fields) == 6 && fields[5] == '1',
+			updateAvailable: length(fields) >= 6 && fields[5] == '1',
+			installedBytes: length(fields) >= 7 && match(fields[6], /^(0|[1-9][0-9]{0,12})$/) != null ? int(fields[6]) : null,
 		};
 	}
 	return success({ job: job(), restore: restore_status(), installed: installed, storage: writable_storage() });
