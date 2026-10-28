@@ -306,14 +306,21 @@ install_app() {
   if ! installed "$name"; then set -- "$@" "$name=$version"; base_names="${base_names:+$base_names }$name"; fi
  done < "$pins"
  if [ "$#" -gt 0 ]; then
-  "$APK" --repositories-file /dev/null -X "$index_url" -U add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
+  # apk --simulate disables automatic repository-index updates, even with -U.
+  # Use only the immutable index and APKs whose SHA-256 we already verified.
+  # apk still verifies the signed index using the firmware's trusted keys.
+  cp "$stage/packages.adb" "$stage/packages/packages.adb" || return 34
+  [ "$("$SHA256" "$stage/packages/packages.adb" | cut -d ' ' -f 1)" = "$approved_hash" ] || return 34
+  local_index="file://$stage/packages/packages.adb"
+  "$APK" --repositories-file /dev/null -X "$local_index" update > "$stage/repo-update.log" 2>&1 || return 34
+  "$APK" --repositories-file /dev/null -X "$local_index" add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
   review_install_plan "$stage/plan.log" "$base_names" || return 34
   # Write ownership immediately before modifying packages. If APK partially
   # succeeds, the UI offers repair/removal without adopting unrelated packages.
   while IFS="$(printf '\t')" read -r name version hash; do
    if ! installed "$name"; then append_owned_pin "$name" "$version" "$hash" || return 36; fi
   done < "$pins"
-  "$APK" --repositories-file /dev/null -X "$index_url" -U add "$@" > "$stage/install.log" 2>&1 || return 35
+  "$APK" --repositories-file /dev/null -X "$local_index" add "$@" > "$stage/install.log" 2>&1 || return 35
  fi
  # A failed or incomplete add never counts as a successful application.
  while IFS="$(printf '\t')" read -r name version hash; do
@@ -373,7 +380,7 @@ worker() {
  else
   # Keep only the latest package-manager diagnostic after the workspace is
   # removed. Never record an auth token, catalog JSON, or package contents.
-  for log in "$stage/plan.log" "$stage/install.log" "$stage/remove.log"; do
+  for log in "$stage/repo-update.log" "$stage/plan.log" "$stage/install.log" "$stage/remove.log"; do
    if [ -s "$log" ]; then
     tail -c 4096 "$log" > "$RUNTIME/apps-last-error.log" 2>/dev/null || :
    fi

@@ -100,11 +100,30 @@ case "$1" in
    [ "$2" = /dev/null ] || exit 2
    [ "$3" = -X ] || exit 2
    case "$4" in
-    https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb) repo=hub;;
+    file://*/apps-work.*/packages/packages.adb) repo=hub; local_index="${4#file://}";;
     *) exit 2;;
    esac
-   [ "$5" = -U ] && [ "$6" = add ] || exit 2
-   shift 6;;
+   [ -s "$local_index" ] || exit 2
+   cmp -s "$local_index" "$APPS_TEST_REPO/packages.adb" || exit 2
+   for name in nlbwmon-2025.06.02~29236be6-r1 \
+       luci-app-nlbwmon-26.288.56989~75a306d \
+       luci-lib-chartjs-26.288.56989~75a306d; do
+     [ -s "${local_index%/*}/$name.apk" ] || exit 2
+   done
+   if [ "$5" = update ]; then
+     if [ "${APPS_TEST_REPO_UPDATE_FAIL:-0}" = 1 ]; then
+       echo 'ERROR: repository index update rejected' >&2
+       exit 1
+     fi
+     touch "$APPS_TEST_INDEX_READY"
+     exit 0
+   fi
+   [ "$5" = add ] || exit 2
+   [ -f "$APPS_TEST_INDEX_READY" ] || {
+     echo 'WARNING: opening from cache: No such file or directory' >&2
+     exit 1
+   }
+   shift 5;;
  del)
    if [ "$2" = --simulate ]; then
      [ "${APPS_TEST_DEL_CORE:-0}" = 1 ] && echo 'Purging kmod-nf-conntrack-netlink (mock)'
@@ -164,6 +183,7 @@ export APPS_TEST_CATALOG="$TMP/catalog.json"
 export APPS_TEST_REPO="$TMP/repo"
 export APPS_TEST_INSTALLED="$TMP/installed"
 export APPS_TEST_APK_LOG="$TMP/apk-commands"
+export APPS_TEST_INDEX_READY="$TMP/index-ready"
 : > "$APPS_TEST_INSTALLED"
 # A validated fixed release installs all three APKs from a single signed feed.
 "$MANAGER" start install '../../../../etc/passwd' >/dev/null 2>&1 && fail 'invalid app ID accepted'
@@ -172,7 +192,9 @@ grep -Fqx "$(printf 'code\tE22')" "$TMP/runtime/apps-operation.state" || fail 'u
 "$MANAGER" start install network-usage-monitor || fail 'install did not queue'
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'three APK installation failed'
 [ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 3 ] || fail 'all three APKs were not installed'
-grep -Fqx -- '--repositories-file /dev/null -X https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb -U add --simulate nlbwmon=2025.06.02~29236be6-r1 luci-app-nlbwmon=26.288.56989~75a306d luci-lib-chartjs=26.288.56989~75a306d' "$APPS_TEST_APK_LOG" || fail 'single signed repository not used'
+grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb update$' "$APPS_TEST_APK_LOG" || fail 'approved local index not loaded before simulation'
+grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add --simulate nlbwmon=2025\.06\.02~29236be6-r1 luci-app-nlbwmon=26\.288\.56989~75a306d luci-lib-chartjs=26\.288\.56989~75a306d$' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository simulation not used'
+grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add nlbwmon=' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository install not used'
 "$MANAGER" status
 grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1')" "$TMP/runtime/apps-status.tsv" || fail 'ready state missing'
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'
@@ -193,6 +215,15 @@ open(path,'w').write(json.dumps(obj))
 PY_BAD
 "$MANAGER" start install network-usage-monitor || fail 'partial package set did not queue'
 grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'partial package set accepted'
+cp "$TMP/catalog-good.json" "$TMP/catalog.json"
+# A repository signature/index failure must fail closed before any install.
+export APPS_TEST_REPO_UPDATE_FAIL=1
+rm -f "$APPS_TEST_INDEX_READY"
+"$MANAGER" start install network-usage-monitor || fail 'failed repository update did not queue'
+grep -Fqx "$(printf 'code\tE34')" "$TMP/runtime/apps-operation.state" || fail 'failed repository update was accepted'
+grep -Fq 'repository index update rejected' "$TMP/runtime/apps-last-error.log" || fail 'repository update error was not preserved'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'failed repository update installed packages'
+unset APPS_TEST_REPO_UPDATE_FAIL
 cp "$TMP/catalog-good.json" "$TMP/catalog.json"
 printf 'tampered APK\n' > "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk"
 "$MANAGER" start install network-usage-monitor || fail 'tampered APK did not queue'
