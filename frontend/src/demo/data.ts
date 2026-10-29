@@ -10,9 +10,81 @@ import type { LanSettings } from '../types/lan';
 import type { SafeShieldStatistics, SafeShieldStatus } from '../types/safeshield';
 import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
+import type { DeviceRegistrationStatus } from '../api/smartsafehub';
+import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps';
 
 const now = Math.floor(Date.now() / 1000);
 const hour = 3600;
+
+// Demo-only account status: no user, device credential, pairing token or live Hub session.
+export const demoAccount: DeviceRegistrationStatus = {
+  schema: 1,
+  component: 'device',
+  phase: 'registered',
+  lastResult: 'success',
+  lastErrorCode: null,
+  accountRegistered: true,
+  plan: 'free',
+  pairingCode: null,
+  pairingExpiresAt: null,
+  nextSyncAt: 0,
+  lastSuccessAt: now - 300,
+};
+
+// Demo-only catalog. No APK URLs or authenticated API responses are used.
+export const demoApps: AppsCatalog = {
+  schema: 1,
+  deviceCode: 'iptime-ax3000sm',
+  firmwareBuildId: 'demo-build',
+  channel: 'stable',
+  apps: [
+    {
+      id: 'network-usage-monitor',
+      name: '네트워크 사용량 모니터',
+      summary: '기기별 네트워크 사용량과 통계를 확인하는 앱입니다.',
+      description: '네트워크 트래픽을 모니터링합니다.',
+      category: 'network',
+      version: '26.288.56989~75a306d',
+      webUi: null,
+    },
+    {
+      id: 'retro-arcade',
+      name: 'SmartSafeHub Retro Arcade',
+      summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
+      description: '사용자가 직접 준비한 게임 파일로 즐기는 레트로 아케이드입니다.',
+      category: 'entertainment',
+      version: '1.0.0-r1',
+      webUi: { type: 'static', path: '/retro-arcade/' },
+    },
+  ],
+};
+
+export const demoAppsStatus: AppsInstallStatus = {
+  job: { phase: 'idle', action: '', appId: '', code: 'NONE' },
+  installed: {
+    'network-usage-monitor': {
+      installed: false,
+      partial: false,
+      managed: false,
+      updateAvailable: false,
+      installedVersion: null,
+      webUiReady: false,
+    },
+    'retro-arcade': {
+      installed: true,
+      partial: false,
+      managed: true,
+      updateAvailable: false,
+      installedVersion: '1.0.0-r1',
+      webUiReady: true,
+    },
+  },
+};
+
+export const demoAppsMetrics: AppsMetrics = {
+  storage: { mount: '/overlay', totalBytes: 256 * 1024 * 1024, availableBytes: 185 * 1024 * 1024 },
+  installedSizes: { 'retro-arcade': 18 * 1024 * 1024 },
+};
 
 export const demoDevices: ConnectedDevicesSummary = {
   generatedAt: now,

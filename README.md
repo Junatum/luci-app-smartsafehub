@@ -21,6 +21,12 @@ SmartSafeHub는 OpenWrt 공유기를 위한 통합 홈 게이트웨이 관리 UI
 
 변경 내역은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
 
+## 공유기 웹사이트 체험
+
+**[SmartSafeHub 공유기 체험하기](https://www.smartsafehub.com/router-demo/)** — 설치 없이 대시보드, SafeShield, SmartSafeHub 계정 및 Apps를 미리 살펴볼 수 있습니다.
+
+체험 화면의 계정·앱·기기 상태와 통계는 모두 예시 데이터입니다. 앱 설치·제거·업데이트, 계정 연결 및 공유기 설정 변경은 실제로 수행되지 않습니다.
+
 ## 주요 기능
 
 - **반응형 UI**: 데스크톱과 모바일, 라이트/다크 모드를 지원합니다.

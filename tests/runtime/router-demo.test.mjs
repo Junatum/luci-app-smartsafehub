@@ -79,3 +79,53 @@ test('추천 규칙 API 조회는 실제 공유기 앱에서만 주입된다', (
   assert.match(app, /onLoadRecommendedRulesStatus=\{fetchRecommendedRulesStatus\}/);
   assert.doesNotMatch(demo, /onLoadRecommendedRulesStatus=/);
 });
+
+
+test('SmartSafeHub Account and Apps use fictional fixtures, not live APIs', () => {
+  const routes = readFileSync(resolve(root, 'app/routes.ts'), 'utf8');
+  const app = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
+  const fixtures = readFileSync(resolve(root, 'demo/data.ts'), 'utf8');
+  assert.match(routes, /'rules', 'account', 'apps', 'system'/);
+  for (const [route, component] of [['account', 'SmartSafeHubAccountPage'], ['apps', 'AppsPage']]) {
+    assert.match(app, new RegExp(`case '${route}':`));
+    assert.ok(app.includes(`<${component}`), `${component} not reused by demo`);
+    assert.match(app, new RegExp(`<${component}[^;]*?demo`, 's'));
+  }
+  for (const fixture of ['demoAccount', 'demoApps', 'demoAppsStatus', 'demoAppsMetrics']) {
+    assert.ok(fixtures.includes(`export const ${fixture}:`), `missing ${fixture}`);
+    assert.ok(app.includes(fixture), `unused ${fixture}`);
+  }
+  assert.match(fixtures, /accountRegistered: true/);
+  assert.match(fixtures, /pairingCode: null/);
+  assert.match(fixtures, /id: 'network-usage-monitor'/);
+  assert.match(fixtures, /id: 'retro-arcade'/);
+  assert.match(fixtures, /category: 'entertainment'/);
+  const newFixtures = fixtures.slice(fixtures.indexOf('export const demoAccount:'), fixtures.indexOf('export const demoDevices:'));
+  assert.doesNotMatch(newFixtures, /https?:\/\/|\/cgi-bin\/|password|token|api_key/i);
+  assert.match(app, /accountRegistered=\{demoAccount\.accountRegistered\}/);
+});
+
+test('public demo actions never install APKs, pair an account, or open a live app', () => {
+  const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
+  const apps = readFileSync(resolve(root, 'pages/AppsPage.tsx'), 'utf8');
+  const account = readFileSync(resolve(root, 'pages/SmartSafeHubAccountPage.tsx'), 'utf8');
+  assert.match(demo, /onDemoAction=\{readonlyNotice\}/);
+  assert.match(demo, /onRequestPairing=\{async \(\) => \{ readonlyNotice\(\); return null; \}\}/);
+  for (const action of ['onInstall', 'onRemove', 'onUpdate']) {
+    assert.ok(demo.includes(`${action}={async () => { readonlyNotice(); }}`), `${action} must be a no-op`);
+  }
+  assert.match(apps, /if \(demo\) \{/);
+  assert.match(apps, /if \(action === 'remove'\) closeRemoveDialog\(\)/);
+  assert.match(apps, /onDemoAction\?\.\(\);/);
+  assert.match(apps, /launchPath \? \(demo \?/);
+  assert.match(apps, /onClick=\{onDemoAction\} type="button">열기/);
+  assert.match(account, /demo \? \(/);
+  assert.match(account, /onClick=\{onDemoAction\}/);
+  assert.match(account, /href=\{DEVICE_CONSOLE_URL\}/);
+  assert.doesNotMatch(demo, /import .*from ['"]\.\.\/api\//);
+});
+
+test('README links to the public router demo', () => {
+  const readme = readFileSync(resolve(root, '../../README.md'), 'utf8');
+  assert.match(readme, /https:\/\/www\.smartsafehub\.com\/router-demo\//);
+});

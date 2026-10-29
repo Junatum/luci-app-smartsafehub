@@ -13,9 +13,19 @@ done
 grep -Fq "<HomePage" "$DEMO"
 grep -Fq "<SafeShieldPage" "$DEMO"
 grep -Fq "<ConnectedDevicesPage" "$DEMO"
-for page in ActivityPage WanPage LanPage WifiPage SafeShieldRulesPage UpdatePage; do
+for page in ActivityPage WanPage LanPage WifiPage SafeShieldRulesPage UpdatePage SmartSafeHubAccountPage AppsPage; do
   grep -Fq "<$page" "$DEMO"
 done
+grep -Fq "'rules', 'account', 'apps', 'system'" "$ROOT/frontend/src/app/routes.ts"
+grep -Fq 'onDemoAction={readonlyNotice}' "$DEMO"
+grep -Fq 'demoAccount, demoApps, demoAppsStatus, demoAppsMetrics' "$DEMO"
+grep -Fq 'https://www.smartsafehub.com/router-demo/' "$ROOT/README.md"
+grep -Fq "demo ? (" "$ROOT/frontend/src/pages/SmartSafeHubAccountPage.tsx"
+grep -Fq "if (demo) {" "$ROOT/frontend/src/pages/AppsPage.tsx"
+grep -Fq "if (action === 'remove') closeRemoveDialog();" "$ROOT/frontend/src/pages/AppsPage.tsx"
+grep -Fq "demo ? (" "$ROOT/frontend/src/pages/AppsPage.tsx"
+grep -Fq "demoAccount" "$FIXTURES"
+grep -Fq "demoApps" "$FIXTURES"
 grep -Fq "demo={demo}" "$ROOT/frontend/src/components/AppShell.tsx"
 grep -Fq "!demo ?" "$ROOT/frontend/src/components/ProductNavigation.tsx"
 grep -Fq "base: '/static/router-demo/'" "$CONFIG"

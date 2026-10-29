@@ -24,6 +24,9 @@ interface AppsPageProps {
   onInstall: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onUpdate: (id: string) => Promise<void>;
+  /** All public demo actions are local-only; no installs or real app launch. */
+  demo?: boolean;
+  onDemoAction?: () => void;
 }
 
 const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
@@ -77,7 +80,7 @@ function OperationIndicator({ action }: { action: AppAction }) {
 }
 
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, metrics, statusError,
-  onRefreshStatus, onInstall, onUpdate, onRemove }: AppsPageProps) {
+  onRefreshStatus, onInstall, onUpdate, onRemove, demo = false, onDemoAction }: AppsPageProps) {
   const [category, setCategory] = useState<AppsCategory>('all');
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
@@ -137,6 +140,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
 
   const requestOperation = async (app: VerifiedApp, action: AppAction) => {
     if (!installStatus || statusError || pending !== null || running || restoring) return;
+    if (demo) {
+      if (action === 'remove') closeRemoveDialog();
+      onDemoAction?.();
+      return;
+    }
     if (action === 'update' && !window.confirm(`${app.name} 앱을 최신 승인 버전으로 업데이트하시겠습니까?\n\n업데이트 중 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
@@ -357,9 +365,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                               <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
                             ) : null}
                             {updateAvailable ? <button class="ssh-apps-update-button min-h-9 rounded-lg border px-3 text-xs font-bold transition disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
-                            {launchPath ? (
+                            {launchPath ? (demo ? (
+                              <button aria-label={`${app.name} 데모 실행 안내`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" onClick={onDemoAction} type="button">열기 ↗</button>
+                            ) : (
                               <a aria-label={`${app.name} 새 탭에서 열기`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href={launchPath} rel="noopener noreferrer" target="_blank">열기 ↗</a>
-                            ) : installed && app.webUi ? (
+                            )) : installed && app.webUi ? (
                               <span class="text-xs text-amber-700" title="이 앱의 웹 UI 패키지를 설치해야 열 수 있습니다.">웹 UI 미설치</span>
                             ) : null}
                             {installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
