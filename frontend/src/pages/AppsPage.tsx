@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { AppsStorageCard } from '../components/AppsStorageCard';
+import { AppsCategoryIcon, appsCategoryOf } from '../components/AppsCategoryIcon';
+import type { AppsCategory } from '../components/AppsCategoryIcon';
 import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, AppsMetrics, VerifiedApp } from '../types/apps';
 import { errorMessage } from '../utils/errors';
 import { approvedAppPath } from '../utils/appsWebUi';
 import { formatStorageBytes } from '../utils/appsStorage';
 import { appsJobNoticeKey, readDismissedAppsJob, saveDismissedAppsJob } from '../utils/appsJobNotice';
-
-type Category = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'other';
 
 interface AppsPageProps {
   data: AppsCatalog | null;
@@ -24,17 +24,6 @@ interface AppsPageProps {
   onInstall: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onUpdate: (id: string) => Promise<void>;
-}
-
-function categoryOf(app: VerifiedApp): Category {
-  switch (app.category) {
-    case 'network': return 'network';
-    case 'security': return 'security';
-    case 'entertainment': return 'entertainment';
-    case 'smart_home':
-    case 'iot': return 'smart_home';
-    default: return 'other';
-  }
 }
 
 const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
@@ -63,7 +52,7 @@ const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
   E45: '앱 제거에 실패했습니다.',
 };
 
-const TABS: readonly { id: Category; label: string }[] = [
+const TABS: readonly { id: AppsCategory; label: string }[] = [
   { id: 'all', label: '전체' },
   { id: 'network', label: '네트워크' },
   { id: 'security', label: '보안' },
@@ -89,7 +78,7 @@ function OperationIndicator({ action }: { action: AppAction }) {
 
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, metrics, statusError,
   onRefreshStatus, onInstall, onUpdate, onRemove }: AppsPageProps) {
-  const [category, setCategory] = useState<Category>('all');
+  const [category, setCategory] = useState<AppsCategory>('all');
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<VerifiedApp | null>(null);
@@ -117,7 +106,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   }, [jobKey, job?.phase, showJob]);
   const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'update' || job?.action === 'remove' ? job.action : null;
   const filtered = useMemo(() => apps.filter((app) =>
-    (category === 'all' || categoryOf(app) === category) &&
+    (category === 'all' || appsCategoryOf(app.category) === category) &&
     `${app.name} ${app.summary}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   ), [apps, category, query]);
 
@@ -300,11 +289,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                 <div class="flex flex-wrap items-center gap-2" role="group" aria-label="앱 카테고리">
                   {TABS.map((tab) => (
                     <button
-                      class={`min-h-10 rounded-xl border px-3 text-xs font-bold ${category === tab.id ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white text-slate-600'}`}
+                      class={`inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold ${category === tab.id ? 'border-teal-400 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white text-slate-600'}`}
                       key={tab.id}
                       onClick={() => setCategory(tab.id)}
                       type="button"
-                    >{tab.label}</button>
+                    ><AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />{tab.label}</button>
                   ))}
                 </div>
                 <input
@@ -334,7 +323,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   return (
                     <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
                       <div class="flex min-w-0 items-start gap-3">
-                        <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsIcon class="size-5" /></span>
+                        <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-5" /></span>
                         <div class="min-w-0 flex-1">
                           <div class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
                             <h3 class="m-0 min-w-0 flex-1 break-words text-sm font-black text-slate-950">{app.name}</h3>

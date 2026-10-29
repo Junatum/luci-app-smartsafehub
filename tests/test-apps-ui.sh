@@ -128,6 +128,42 @@ check('설치 v${installedVersion}' in page and '제공 v{app.version}' in page,
 check('업데이트 가능</span>' in page and '설치 버전 확인 불가' in page,
       'updates must be distinguished from unknown installed versions')
 
+# Category icons are local, consistent across cards and filters, and safe
+# for unknown/future catalog categories. No external icon service or assets.
+icon_source = (root / 'frontend/src/components/AppsCategoryIcon.tsx').read_text()
+shared_icons = (root / 'frontend/src/components/Icons.tsx').read_text()
+check('AppsCategoryIcon, appsCategoryOf' in page and
+      '<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page and
+      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-5" />' in page,
+      'filters and cards must share category-specific icons in appropriately sized frames')
+check('appsCategoryOf(app.category) === category' in page,
+      'icon categorization and filtering must use the same normalization')
+check('aria-label="앱 카테고리"' in page and '>{tab.label}</button>' in page and
+      'inline-flex min-h-10 items-center gap-1.5' in page,
+      'filter icons must retain text labels, touch targets and wrapping')
+for catalog_key, category_key in [('network', 'network'), ('security', 'security'),
+                                  ('entertainment', 'entertainment'), ('smart_home', 'smart_home'),
+                                  ('iot', 'smart_home')]:
+    check(f"case '{catalog_key}':" in icon_source,
+          f'category {catalog_key} must be explicitly mapped to {category_key}')
+for tab_key, icon_name in [('all', 'AppsIcon'), ('network', 'NetworkNodesIcon'),
+                           ('security', 'ShieldIcon'), ('smart_home', 'HomeIcon'),
+                           ('entertainment', 'GamepadIcon')]:
+    check(f"case '{tab_key}': return <{icon_name}" in icon_source,
+          f'{tab_key} category has the wrong icon')
+check("default: return 'other';" in icon_source and
+      'default: return <PuzzleIcon' in icon_source and
+      "{ id: 'other', label: '기타' }" in page,
+      'unknown categories must use the other filter and its puzzle icon')
+for name in ['NetworkNodesIcon', 'GamepadIcon', 'PuzzleIcon']:
+    check(f'export function {name}(props: IconProps)' in shared_icons,
+          f'{name} should use the local SVG IconBase and remain in the UI bundle')
+check('aria-hidden={title ? undefined : true}' in shared_icons and
+      'fill="none"' in shared_icons and 'stroke="currentColor"' in shared_icons,
+      'icons must be decorative line SVGs that inherit light/dark text color')
+check('https://' not in icon_source and '<img' not in icon_source,
+      'category icons must not load unverified remote artwork')
+
 # Removal never calls onRemove from a card or from the orphan-list button.
 check("onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget)" in page,
       'catalog removal must open confirmation')

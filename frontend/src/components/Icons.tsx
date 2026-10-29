@@ -81,6 +81,37 @@ export function AppsIcon(props: IconProps) {
   );
 }
 
+/** Connected nodes for network-monitoring Apps. */
+export function NetworkNodesIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="2.5" y="3.5" width="7" height="6" rx="1.5" />
+      <rect x="14.5" y="3.5" width="7" height="6" rx="1.5" />
+      <rect x="8.5" y="15" width="7" height="6" rx="1.5" />
+      <path d="M6 9.5v2.5h12V9.5M12 12v3" />
+    </IconBase>
+  );
+}
+
+/** Controller outline for games and entertainment Apps. */
+export function GamepadIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M7.5 7h9a5 5 0 0 1 4.9 4l.8 5a2.5 2.5 0 0 1-4 2.3L15.5 16h-7l-2.7 2.3a2.5 2.5 0 0 1-4-2.3l.8-5A5 5 0 0 1 7.5 7Z" />
+      <path d="M6.5 11v4M4.5 13h4M16 11.5h.01M18.5 13.5h.01" />
+    </IconBase>
+  );
+}
+
+/** Neutral fallback for uncategorized Apps. */
+export function PuzzleIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M9 3h3v2a2 2 0 1 0 4 0V3h5v6h-2a2 2 0 1 0 0 4h2v8h-6v-2a2 2 0 1 0-4 0v2H3v-7h2a2 2 0 1 0 0-4H3V3h6Z" />
+    </IconBase>
+  );
+}
+
 export function UpdateIcon(props: IconProps) {
   return (
     <IconBase {...props}>
