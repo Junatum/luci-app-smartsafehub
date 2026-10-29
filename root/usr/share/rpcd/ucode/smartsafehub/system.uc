@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 
 import { read_activity_history } from './activity.uc';
+import { from_system_root } from './apps-storage.uc';
 
 import {
 	defer_call,
@@ -585,6 +586,8 @@ function system_status_payload(board, info, wan) {
 		runtime: {
 			uptime: number_value(info?.uptime),
 			localtime: number_value(info?.localtime),
+			// Reuse the same writable root counters as Apps; no extra RPC or APK scan.
+			storage: from_system_root(info?.root),
 			load: [
 				number_value(load?.[0]),
 				number_value(load?.[1]),

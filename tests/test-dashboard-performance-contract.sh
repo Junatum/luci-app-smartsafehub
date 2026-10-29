@@ -15,6 +15,8 @@ assert "useFirmwareUpdates(true)" in app  # sidebar firmware badge stays current
 assert 'if (loading && !data)' in home
 assert "let info_finished = false" in server and "let wan_finished = false" in server
 assert server.index("const info_request = defer_call('system', 'info'") < server.index("const wan_request = defer_call('network.interface.wan'")
+assert "storage: from_system_root(info?.root)" in server
+assert "storage: from_system_root(info?.root)" in server[server.index('function system_status_payload('):server.index('function collect_system_status(')]
 for hook in ('useSoftwareUpdates', 'useFirmwareUpdates'):
     source = Path(f'frontend/src/hooks/{hook}.ts').read_text()
     assert 'const [pollingPhase, setPollingPhase]' in source

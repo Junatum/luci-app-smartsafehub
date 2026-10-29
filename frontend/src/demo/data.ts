@@ -109,7 +109,7 @@ export const demoActivity: ActivityHistory = {
 export const demoStatus: SmartSafeHubStatus = {
   device: { hostname: 'SmartRouter', model: 'ipTIME AX3000SM', boardName: 'iptime,ax3000sm' },
   software: { distribution: 'OpenWrt', version: '25.12', revision: 'demo', kernel: '6.12' },
-  runtime: { uptime: 86400, localtime: now, load: [0.08, 0.12, 0.05], memory: { total: 268435456, free: 83886080, shared: 4194304, buffered: 41943040, available: 171966464, cached: 41943040 } },
+  runtime: { uptime: 86400, localtime: now, load: [0.08, 0.12, 0.05], memory: { total: 268435456, free: 83886080, shared: 4194304, buffered: 41943040, available: 171966464, cached: 41943040 }, storage: demoAppsMetrics.storage },
   network: { available: true, up: true, protocol: 'dhcp', ipv4Address: '198.51.100.20' },
   activityHistory: demoActivity,
 };

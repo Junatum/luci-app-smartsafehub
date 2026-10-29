@@ -51,3 +51,11 @@ test('앱 공간: 작은 용량과 큰 용량을 올바른 단위로 표시한�
   assert.equal(formatStorageBytes(3 * 1024 ** 3), '3.0 GB');
   assert.equal(formatStorageBytes(-3), '—');
 });
+
+test('대시보드 디스크 사용률은 Apps 설치 가능 여유 공간과 정확히 대응한다', () => {
+  const summary = summarizeAppsStorage({ mount: '/', totalBytes: 100 * MB, availableBytes: 89 * MB });
+  assert.equal(100 - summary.availablePercent, 11);
+  assert.equal(summary.usedText, '11.0 MB');
+  assert.equal(summary.totalText, '100.0 MB');
+  assert.equal(summarizeAppsStorage(null), null); // older RPC: never show a false 0% bar
+});

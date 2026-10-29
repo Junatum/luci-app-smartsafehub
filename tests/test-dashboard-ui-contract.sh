@@ -257,6 +257,43 @@ if grep -Fq '<span>메모리 사용률</span>' "$HOME"; then
 	fail '대시보드는 메모리 사용률을 별도 블록으로 중복 표시하지 않아야 합니다'
 fi
 
+# Disk belongs to the normal dashboard status payload; no Apps metrics polling.
+python3 - "$HOME" "$ROOT_DIR/root/usr/share/rpcd/ucode/smartsafehub/system.uc" "$ROOT_DIR/frontend/src/types/status.ts" "$ROOT_DIR/frontend/src/demo/data.ts" <<'PY_DASH_DISK'
+from pathlib import Path
+import sys
+
+home, backend, types, demo = [Path(name).read_text() for name in sys.argv[1:]]
+labels = [f'<span class="text-xs font-extrabold">{title}</span>' for title in
+          ('메모리', '디스크', '시스템 부하', '실행 시간')]
+assert all(home.count(label) == 1 for label in labels), '리소스 카드 네 종류가 필요합니다'
+assert [home.index(label) for label in labels] == sorted(home.index(label) for label in labels), '카드 순서 오류'
+assert 'class="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"' in home, '데스크톱 4열, 태블릿 2열, 모바일 1열이 필요합니다'
+assert 'summarizeAppsStorage(data.runtime.storage)' in home, 'Apps 저장 공간 계산을 재사용해야 합니다'
+assert 'disk.availablePercent' in home and 'disk.availableText' in home, 'Apps와 동일한 여유 공간 표시가 필요합니다'
+assert '사용 {disk.usedText} / 전체 {disk.totalText}' in home, '사용/전체 용량을 표시해야 합니다'
+assert "disk.availableRatio * DISK_RING_CIRCUMFERENCE" in home, '실제 여유 비율로 도넛 호를 계산해야 합니다'
+assert 'DISK_RING_CIRCUMFERENCE = 2 * Math.PI * 39' in home, 'Apps 도넛과 같은 반지름을 사용해야 합니다'
+assert 'ssh-apps-storage-track' in home and 'ssh-apps-storage-free' in home and 'ssh-apps-storage-ring' in home, 'Apps의 테마 색상과 도넛 스타일을 재사용해야 합니다'
+assert 'disk && disk.availableRatio > 0' in home, '여유 공간이 0인 경우 가짜 호를 그리면 안 됩니다'
+assert "data-level={disk?.level ?? 'unavailable'}" in home, 'Apps와 같은 부족 경고 색상 상태가 필요합니다'
+assert 'aria-label={disk' in home and '디스크 여유 공간 ${disk.availablePercent}%' in home, '스크린 리더에 저장 공간 정보를 제공해야 합니다'
+assert "{disk ? `${disk.availableText} 남음` : '저장 공간 확인 불가'}" in home, '용량 조회 실패를 0%로 표시하면 안 됩니다'
+assert 'diskUsedPercent' not in home, '기존 선형 사용률 막대 로직을 제거해야 합니다'
+assert '<svg aria-hidden="true" class="size-24" viewBox="0 0 96 96">' in home, 'Apps와 같은 96px 도넛 SVG가 필요합니다'
+assert 'stroke-dasharray={`${diskAvailableArc} ${DISK_RING_CIRCUMFERENCE.toFixed(2)}`}' in home, 'Apps와 동일한 SVG 호 표시가 필요합니다'
+apps_card = Path('frontend/src/components/AppsStorageCard.tsx').read_text()
+styles = Path('frontend/src/styles/app.css').read_text()
+for css_class in ('ssh-apps-storage-ring', 'ssh-apps-storage-track', 'ssh-apps-storage-free'):
+    assert css_class in home and css_class in apps_card and css_class in styles, f'Apps와 대시보드가 {css_class} 스타일을 공유해야 합니다'
+assert 'r="39"' in apps_card and 'r="39"' in home, '두 페이지의 도넛 반지름이 같아야 합니다'
+assert "import { from_system_root } from './apps-storage.uc'" in backend
+assert 'storage: from_system_root(info?.root)' in backend, '기존 system.info를 재사용해야 합니다'
+assert "'apps_metrics'" not in backend and "'df'" not in backend, '새 저장 공간 조회 금지'
+assert 'storage?: AppsStorage | null' in types, '구버전 RPC는 저장 공간 값을 생략할 수 있어야 합니다'
+assert 'storage: demoAppsMetrics.storage' in demo, '체험 페이지도 디스크 정보를 제공해야 합니다'
+print('PASS: 대시보드 디스크 카드 순서, 퍼센트, 미확인 처리, RPC 재사용')
+PY_DASH_DISK
+
 grep -Fq "import { SafeShieldBlockedBarChart } from './SafeShieldBlockedBarChart';" "$ACTIVITY" || \
 	fail '대시보드는 기존 SafeShield Chart.js 막대 차트를 재사용해야 합니다'
 grep -Fq 'const DISPLAY_HOURS = 24;' "$ACTIVITY" || \
