@@ -2,7 +2,8 @@
 'use strict';
 
 import * as fs from 'fs';
-import { failure, run_command, success } from './core.uc';
+import { failure, run_command, safe_call, success } from './core.uc';
+import { from_system_root, from_statvfs } from './apps-storage.uc';
 
 const MANAGER = '/usr/libexec/smartsafehub-apps-manager';
 const STATE = '/tmp/smartsafehub/apps-operation.state';
@@ -10,30 +11,31 @@ const STATUS = '/tmp/smartsafehub/apps-status.tsv';
 const SIZES = '/tmp/smartsafehub/apps-size.tsv';
 const RESTORE_STATE = '/tmp/smartsafehub/apps-restore.state';
 
-// An installed APK consumes the writable root filesystem, not the /rom
-// squashfs image or the RAM-backed /tmp filesystem. statvfs is inexpensive
-// and avoids spawning df on every Apps status poll.
+// OpenWrt procd already reports the writable root filesystem in system.info.
+// Those counters are KiB, unlike ucode fs.statvfs() which returns blocks.
+// Prefer the existing ubus connection, then fall back to statvfs without
+// spawning df or allowing optional metrics to affect core Apps status.
 function writable_storage() {
-	let mount = '/overlay';
-	let stats = fs.statvfs(mount);
-	if (stats == null) {
-		// OpenWrt ext4/rootfs layouts may have no separate /overlay mount.
-		mount = '/';
-		stats = fs.statvfs(mount);
+	const info = safe_call('system', 'info', {});
+	const root_storage = from_system_root(info?.root);
+	if (root_storage != null)
+		return root_storage;
+
+	// Do not assume /overlay is present (e.g. ext4 or extroot installs).
+	// Both paths are fixed trusted paths. Each call is inexpensive.
+	for (let mount in [ '/overlay', '/' ]) {
+		let stats = null;
+		try {
+			stats = fs.statvfs(mount);
+		}
+		catch (e) {
+			continue;
+		}
+		const storage = from_statvfs(stats, mount);
+		if (storage != null)
+			return storage;
 	}
-	if (stats == null ||
-		(type(stats.frsize) != 'integer' && type(stats.frsize) != 'double') ||
-		(type(stats.blocks) != 'integer' && type(stats.blocks) != 'double') ||
-		(type(stats.bavail) != 'integer' && type(stats.bavail) != 'double') ||
-		stats.frsize <= 0 || stats.blocks <= 0 ||
-		stats.bavail < 0 || stats.bavail > stats.blocks)
-		return null;
-	const total = stats.frsize * stats.blocks;
-	const available = stats.frsize * stats.bavail;
-	if (total <= 0 || available < 0 || available > total)
-		return null;
-	// bavail excludes reserved filesystem blocks that APK cannot use.
-	return { mount: mount, totalBytes: total, availableBytes: available };
+	return null;
 }
 
 function job() {

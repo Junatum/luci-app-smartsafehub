@@ -34,17 +34,19 @@ check('.ssh-apps-update-button' in styles and ".ssh-app[data-theme='dark'] .ssh-
 backend = (root / 'root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc').read_text()
 card = (root / 'frontend/src/components/AppsStorageCard.tsx').read_text()
 utils = (root / 'frontend/src/utils/appsStorage.ts').read_text()
-check("fs.statvfs(mount)" in backend and "let mount = '/overlay'" in backend,
-      'Apps status must read writable overlay using fs.statvfs')
-check("mount = '/'" in backend, 'ext4 rootfs without /overlay requires a fallback')
-# ucode type() returns "integer", never "int". The old check rejected
-# all valid statvfs counters, silently producing storage: null on routers.
-for counter in ('frsize', 'blocks', 'bavail'):
-    check(f"type(stats.{counter}) != 'integer'" in backend and
-          f"type(stats.{counter}) != 'double'" in backend and
-          f"type(stats.{counter}) != 'int'" not in backend,
-          f'Apps storage must accept ucode integer/double statvfs {counter}')
-check('stats.bavail' in backend and 'stats.frsize' in backend and 'storage: storage' in backend,
+check("safe_call('system', 'info', {})" in backend and
+      "from_system_root(info?.root)" in backend,
+      'Apps disk data must prefer procd system.info root stats')
+check("from_statvfs(stats, mount)" in backend and "[ '/overlay', '/' ]" in backend,
+      'statvfs fallback must support overlay and ext4 rootfs')
+storage_module = (root / 'root/usr/share/rpcd/ucode/smartsafehub/apps-storage.uc').read_text()
+check("type(value) == 'int'" in storage_module and "type(value) == 'double'" in storage_module,
+      'ucode type() emits int/double and must never require integer')
+check("root.total * 1024" in storage_module and "root.avail * 1024" in storage_module,
+      'procd system.info root counters are KiB, not raw bytes')
+check("MAX_BYTES / frsize" in storage_module,
+      'unexpected statvfs counters must not overflow safe byte values')
+check('stats.bavail' in storage_module and 'stats.frsize' in storage_module and 'storage: storage' in backend,
       'optional Apps metrics must report actual APK-available bytes without spawning df')
 check('read_apps_metrics()' in backend and 'return success({ job: job(), restore: restore_status(), installed: installed });' in backend,
       'critical Apps status must be separate from optional storage metrics')
@@ -59,7 +61,7 @@ check('apps_metrics' in acl['luci-app-smartsafehub']['read']['ubus']['smartsafeh
 check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
       'pollInterval: 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
       'optional Apps metrics should run separately and less frequently')
-check("'/bin/df'" not in backend, 'storage must not spawn a polling command')
+check("'/bin/df'" not in backend and "'/bin/df'" not in storage_module, 'storage must not spawn a polling command')
 check('lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]' in page,
       'Apps info and storage must be side by side on desktop and stacked on mobile')
 check('<AppsStorageCard storage={metrics?.storage} />' in page,
@@ -142,3 +144,12 @@ check('setDismissedJob(null)' not in page,
       'starting a new operation must not resurrect the previous failure')
 PY
 echo 'PASS: Apps removal confirmation, theme and operation states'
+
+# Real ucode runtime coverage: prevents wrong numeric type names and unit
+# conversions from passing the static Apps UI contract again.
+if command -v ucode >/dev/null 2>&1; then
+    ucode "$ROOT/tests/apps-storage-test.uc"
+elif [ "${SMARTSAFEHUB_REQUIRE_UCODE:-0}" = '1' ]; then
+    echo 'FAIL: Apps storage runtime test requires ucode' >&2
+    exit 1
+fi
