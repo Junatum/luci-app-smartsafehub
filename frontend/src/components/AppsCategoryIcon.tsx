@@ -1,6 +1,6 @@
-import { AppsIcon, GamepadIcon, HomeIcon, NetworkNodesIcon, PuzzleIcon, ShieldIcon } from './Icons';
+import { AppsIcon, GamepadIcon, HomeIcon, NetworkNodesIcon, PowerIcon, PuzzleIcon, ShieldIcon } from './Icons';
 
-export type AppsCategory = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'other';
+export type AppsCategory = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'utilities' | 'other';
 
 /** Normalize catalog categories once for both the filter and icon fallback. */
 export function appsCategoryOf(category: string): AppsCategory {
@@ -8,6 +8,7 @@ export function appsCategoryOf(category: string): AppsCategory {
     case 'network': return 'network';
     case 'security': return 'security';
     case 'entertainment': return 'entertainment';
+    case 'utilities': return 'utilities';
     case 'smart_home':
     case 'iot': return 'smart_home';
     default: return 'other';
@@ -23,6 +24,7 @@ export function AppsCategoryIcon({ category, class: className }: { category: App
     case 'security': return <ShieldIcon class={className} />;
     case 'smart_home': return <HomeIcon class={className} />;
     case 'entertainment': return <GamepadIcon class={className} />;
+    case 'utilities': return <PowerIcon class={className} />;
     default: return <PuzzleIcon class={className} />;
   }
 }

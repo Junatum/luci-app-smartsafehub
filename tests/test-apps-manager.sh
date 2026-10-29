@@ -24,11 +24,15 @@ printf 'signed mock package payload\n' > "$TMP/repo/nlbwmon-2025.06.02~29236be6-
 printf 'approved LuCI mock package payload\n' > "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk"
 printf 'approved chart mock package payload\n' > "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk"
 printf 'approved Retro Arcade mock package payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.0.0-r1.apk"
+printf 'approved etherwake mock package payload\n' > "$TMP/repo/etherwake-1.09-r5.apk"
+printf 'approved WOL LuCI mock package payload\n' > "$TMP/repo/luci-app-wol-26.288.56989~75a306d.apk"
 INDEX_SHA="$(sha256sum "$TMP/repo/packages.adb" | cut -d ' ' -f 1)"
 ARCHIVE_SHA="$(sha256sum "$TMP/repo/nlbwmon-2025.06.02~29236be6-r1.apk" | cut -d ' ' -f 1)"
 LUCISH="$(sha256sum "$TMP/repo/luci-app-nlbwmon-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 CHARTSHA="$(sha256sum "$TMP/repo/luci-lib-chartjs-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 RETROSHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.0.0-r1.apk" | cut -d ' ' -f 1)"
+ETHERSHA="$(sha256sum "$TMP/repo/etherwake-1.09-r5.apk" | cut -d ' ' -f 1)"
+WOLSHA="$(sha256sum "$TMP/repo/luci-app-wol-26.288.56989~75a306d.apk" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF
 {"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"network-usage-monitor","version":"2025.06.02-r1","name":"네트워크 사용량 모니터","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"nlbwmon","version":"2025.06.02~29236be6-r1","sha256":"$ARCHIVE_SHA"},{"name":"luci-app-nlbwmon","version":"26.288.56989~75a306d","sha256":"$LUCISH"},{"name":"luci-lib-chartjs","version":"26.288.56989~75a306d","sha256":"$CHARTSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
 EOF
@@ -94,6 +98,10 @@ case "$url" in
    cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.0.0-r1.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.1.0-r1.apk)
    cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.1.0-r1.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/etherwake-1.09-r5.apk)
+   cp "$APPS_TEST_REPO/etherwake-1.09-r5.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-app-wol-26.288.56989~75a306d.apk)
+   cp "$APPS_TEST_REPO/luci-app-wol-26.288.56989~75a306d.apk" "$dest";;
  *) exit 2;;
 esac
 printf '%s\n' "$url" >> "$APPS_TEST_URL_LOG"
@@ -196,7 +204,11 @@ case "$1" in
      version="$(awk -v n="$3" '$1 == n {print $2; exit}' "$APPS_TEST_VERSION_DB")"
      [ -z "$version" ] || { echo "$3-$version aarch64_cortex-a53 [installed]"; exit 0; }
    fi
-   echo "$3-${APPS_TEST_SHARED_VERSION:-26.288.56989~75a306d} aarch64_cortex-a53 [installed]"
+   if [ "$3" = etherwake ]; then
+     echo 'etherwake-1.09-r5 aarch64_cortex-a53 [installed]'
+   else
+     echo "$3-${APPS_TEST_SHARED_VERSION:-26.288.56989~75a306d} aarch64_cortex-a53 [installed]"
+   fi
    exit 0;;
  --repositories-file)
    [ "$2" = /dev/null ] || exit 2
@@ -210,6 +222,12 @@ case "$1" in
    if [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.0.0-r1.apk" ] ||
       [ -s "${local_index%/*}/smartsafehub-app-retro-arcade-1.1.0-r1.apk" ]; then
      [ "$(find "${local_index%/*}" -name '*.apk' | wc -l | tr -d ' ')" -eq 1 ] || exit 2
+   elif [ -s "${local_index%/*}/etherwake-1.09-r5.apk" ] ||
+        [ -s "${local_index%/*}/luci-app-wol-26.288.56989~75a306d.apk" ]; then
+     [ "$(find "${local_index%/*}" -name '*.apk' | wc -l | tr -d ' ')" -eq 2 ] || exit 2
+     for name in etherwake-1.09-r5 luci-app-wol-26.288.56989~75a306d; do
+       [ -s "${local_index%/*}/$name.apk" ] || exit 2
+     done
    else
      for name in nlbwmon-2025.06.02~29236be6-r1 \
          luci-app-nlbwmon-26.288.56989~75a306d \
@@ -250,7 +268,7 @@ if [ "${1:-}" = --simulate ]; then
  for pin in "$@"; do
   name="${pin%%=*}"
   case "$repo:$name" in
-   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade) ;;
+   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol) ;;
    *) exit 2;;
   esac
   if [ "${APPS_TEST_UPGRADE:-0}" = 1 ]; then
@@ -266,7 +284,7 @@ fi
 for pin in "$@"; do
  name="${pin%%=*}"
  case "$repo:$name" in
-  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade) ;;
+  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol) ;;
   *) exit 2;;
  esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
@@ -307,6 +325,7 @@ export SMARTSAFEHUB_APPS_JSONFILTER_BIN="$TMP/bin/jsonfilter"
 export SMARTSAFEHUB_APPS_APK_BIN="$TMP/bin/apk"
 export SMARTSAFEHUB_APPS_ARCH_FILE="$TMP/apk-arch"
 export SMARTSAFEHUB_APPS_DAEMON_BIN="$TMP/bin/start-stop-daemon"
+export SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE="$TMP/luci-indexcache"
 export APPS_TEST_CATALOG="$TMP/catalog.json"
 export APPS_TEST_REPO="$TMP/repo"
 export APPS_TEST_INSTALLED="$TMP/installed"
@@ -644,3 +663,66 @@ printf 'invalid manifest contents\n' > "$TMP/owned/retro-arcade"
 [ ! -s "$TMP/runtime/apps-status.tsv" ] || fail 'invalid manifest falsely marked retired'
 rm -f "$TMP/owned/retro-arcade"
 printf 'PASS: catalog/status refresh races do not mistake manual APK installs for retired Apps\n'
+
+# Wake-on-LAN integrates with the same signed APK flow, but requires exactly
+# etherwake + luci-app-wol. Its UI is NOT the etherwake helper executable.
+printf 'signed index cache\n' > "$SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE"
+: > "$APPS_TEST_INSTALLED"
+: > "$APPS_TEST_VERSION_DB"
+cat > "$TMP/catalog.json" <<EOF_WOL
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"wake-on-lan","version":"26.288.56989~75a306d","name":"Wake-on-LAN","category":"utilities","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"luci","path":"/cgi-bin/luci/admin/services/wol","package":"luci-app-wol"},"packages":[{"name":"etherwake","version":"1.09-r5","sha256":"$ETHERSHA"},{"name":"luci-app-wol","version":"26.288.56989~75a306d","sha256":"$WOLSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_WOL
+"$TMP/bin/fetch-catalog"
+"$MANAGER" start install wake-on-lan || fail 'Wake-on-LAN install not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'Wake-on-LAN installation failed'
+[ ! -e "$SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE" ] || fail 'LuCI menu cache not invalidated after WOL install'
+[ "$(wc -l < "$TMP/owned/wake-on-lan" | tr -d ' ')" -eq 2 ] || fail 'WOL must own exactly two APKs'
+grep -q "^etherwake$(printf '\t')" "$TMP/owned/wake-on-lan" || fail 'etherwake ownership missing'
+grep -q "^luci-app-wol$(printf '\t')" "$TMP/owned/wake-on-lan" || fail 'luci-app-wol ownership missing'
+"$MANAGER" status
+grep -Fqx "$(printf 'wake-on-lan\t1\t1\t1\t1\t0\t26.288.56989~75a306d')" "$TMP/runtime/apps-status.tsv" || fail 'WOL should open LuCI after both APKs installed'
+# A different LuCI route is not an approved WOL launch target.
+python3 - "$TMP/catalog.json" <<'PY_WRONG_WOL_UI'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p))
+data['apps'][0]['web_ui']['path']='/cgi-bin/luci/admin/system/admin'
+open(p,'w').write(json.dumps(data))
+PY_WRONG_WOL_UI
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'wake-on-lan\t1\t1\t1\t0\t0\t26.288.56989~75a306d')" "$TMP/runtime/apps-status.tsv" || fail 'unexpected WOL LuCI route exposed'
+# Fix approval, then remove both packages. LuCI must not retain a stale menu.
+python3 - "$TMP/catalog.json" <<'PY_WOL_UI'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p))
+data['apps'][0]['web_ui']['path']='/cgi-bin/luci/admin/services/wol'
+open(p,'w').write(json.dumps(data))
+PY_WOL_UI
+"$TMP/bin/fetch-catalog"
+printf 'cached menu\n' > "$SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE"
+"$MANAGER" start remove wake-on-lan || fail 'WOL removal not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'WOL removal failed'
+[ ! -e "$SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE" ] || fail 'LuCI menu cache not invalidated after WOL removal'
+[ ! -e "$TMP/owned/wake-on-lan" ] || fail 'WOL ownership not cleared'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'WOL left installed APKs behind'
+# An extra/omitted package in a bad catalog must be rejected before any APK
+# download/install, even if the index and SHA values look valid.
+python3 - "$TMP/catalog.json" <<'PY_WOL_EXTRA'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p))
+data['apps'][0]['packages'].append({'name':'luci-app-nlbwmon','version':'26.288.56989~75a306d','sha256': 'b'*64})
+open(p,'w').write(json.dumps(data))
+PY_WOL_EXTRA
+"$MANAGER" start install wake-on-lan || fail 'bad WOL catalog not queued'
+grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'WOL extra APK was not rejected'
+[ ! -s "$APPS_TEST_INSTALLED" ] || fail 'invalid WOL feed changed package state'
+[ ! -e "$TMP/owned/wake-on-lan" ] || fail 'invalid WOL feed wrote ownership'
+python3 - "$TMP/catalog.json" <<'PY_WOL_MISSING'
+import json,sys
+p=sys.argv[1]; data=json.load(open(p))
+data['apps'][0]['packages']=data['apps'][0]['packages'][:1]
+open(p,'w').write(json.dumps(data))
+PY_WOL_MISSING
+"$MANAGER" start install wake-on-lan || fail 'incomplete WOL catalog not queued'
+grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'missing WOL LuCI APK was not rejected'
+printf 'PASS: Wake-on-LAN signed dual-APK lifecycle, LuCI route and corrupt approvals\n'

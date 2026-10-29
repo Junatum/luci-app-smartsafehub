@@ -6,7 +6,7 @@
 - 앱 목록: `smartsafehub.apps_catalog` RPC → `/usr/libexec/smartsafehub-apps` → Hub 승인 카탈로그.
 - 설치 상태: `smartsafehub.apps_status` RPC → 독립된 `smartsafehub-apps-manager`의 로컬 APK 상태와 설치 기록.
 - 앱 설치 저장 공간과 설치된 APK의 용량은 별도 `smartsafehub.apps_metrics` 읽기 RPC로 조회합니다. LuCI ACL의 `read.ubus.smartsafehub`에도 `apps_metrics`가 있어야 합니다. 실패하더라도 설치·제거 상태에는 영향을 주지 않습니다.
-- 설치된 버전은 `apk list -I`에서 조회한 첫 번째 승인 APK의 실제 설치 버전입니다. 카탈로그의 `version`은 현재 **제공/승인된 앱 버전**이므로 둘을 구분해 표시합니다. 복수 APK 앱은 대표 패키지 버전이 앱 릴리스 버전과 다를 수 있습니다.
+- 설치된 버전은 `apk list -I`에서 조회한 대표 승인 APK의 실제 설치 버전입니다. Wake-on-LAN은 백엔드 `etherwake`가 아닌 `luci-app-wol` 버전을 표시합니다. 카탈로그의 `version`은 현재 **제공/승인된 앱 버전**이므로 둘을 구분해 표시합니다. 복수 APK 앱은 대표 패키지 버전이 앱 릴리스 버전과 다를 수 있습니다.
 - 설치·업데이트·제거: `smartsafehub.apps_install`, `smartsafehub.apps_update`, `smartsafehub.apps_remove` RPC. 앱 ID만 받으며, 실제 작업은 root 전용 백그라운드 매니저에서 진행합니다. 다른 앱 작업이 진행 중이면 거절합니다.
 - Phase 2의 IoT/로컬 AI 설치기는 추후 `runtime`에 따라 별도 어댑터로 추가합니다. 현재는 `router + apk`만 가능하며 Hub의 패키지명·URL·명령을 브라우저가 보낼 수 없습니다.
 
@@ -26,6 +26,14 @@
 **의존성 주의:** `nlbwmon`, `luci-app-nlbwmon`, `luci-lib-chartjs`는 동일한 SmartSafeHub 서명 저장소에서만 설치합니다. 이외의 의존성을 자동으로 가져오지 않으며, 새로운 커널 모듈·라이브러리는 별도 검증이 필요합니다.
 
 OpenWrt 25.12의 패키지 인덱스는 `packages.adb` 형식일 수 있으며, 이전의 `APKINDEX.tar.gz` 형식이라고 가정하면 안 됩니다.
+
+## Wake-on-LAN 앱 (0.2.30-r37)
+
+- Hub에서 `wake-on-lan` 앱을 현재 펌웨어와 아키텍처에 승인하면 Apps에 표시됩니다. `utilities` 카테고리는 **도구** 탭에 표시합니다.
+- 서명된 고정 릴리스에서 `etherwake`, `luci-app-wol` **두 APK만** 함께 설치합니다. 다른 경로로 설치된 패키지는 Apps가 자동으로 소유하지 않습니다.
+- `luci-app-wol`까지 설치된 경우에만 **열기**를 표시하고, 새 탭에서 공유기의 `/cgi-bin/luci/admin/services/wol`로 이동합니다. LuCI 로그인을 추가로 요구할 수 있습니다.
+- 지원되는 유선 컴퓨터의 BIOS/UEFI 및 운영체제에서 Wake-on-LAN 기능을 켜야 합니다. 원격 인터넷에서 임의로 전원을 켜는 기능이나 별도 포트 개방을 제공하지 않습니다.
+- 패키지를 설치·제거하면 LuCI 메뉴 캐시를 갱신합니다. 공유기 체험 화면의 카드는 예시이며 실제 설치·신호 전송을 하지 않습니다.
 
 ## 설치된 앱 열기 (0.2.30-r9)
 

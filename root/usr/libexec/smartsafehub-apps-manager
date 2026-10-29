@@ -21,6 +21,7 @@ ARCH_FILE="${SMARTSAFEHUB_APPS_ARCH_FILE:-/etc/apk/arch}"
 SHA256="${SMARTSAFEHUB_APPS_SHA256_BIN:-sha256sum}"
 DAEMON="${SMARTSAFEHUB_APPS_DAEMON_BIN:-start-stop-daemon}"
 METRICS="${SMARTSAFEHUB_APPS_METRICS_BIN:-/usr/libexec/smartsafehub-apps-metrics}"
+LUCI_INDEX_CACHE="${SMARTSAFEHUB_APPS_LUCI_INDEX_CACHE:-/tmp/luci-indexcache}"
 LOCK="$RUNTIME/apps-operation.lock"
 STATE="$RUNTIME/apps-operation.state"
 CATALOG="$RUNTIME/apps-catalog.json"
@@ -329,6 +330,13 @@ web_ui_package() {
   printf '%s\n' luci-app-nlbwmon
   return 0
  fi
+ if [ "$id" = wake-on-lan ]; then
+  # The approved app has exactly one LuCI entry point. Do not mistake the
+  # backend etherwake package (or a different LuCI page) for that UI.
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /cgi-bin/luci/admin/services/wol ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = luci-app-wol ] || return 1
+ fi
  if [ "$id" = retro-arcade ]; then
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = static ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /retro-arcade/ ] || return 1
@@ -370,6 +378,11 @@ status() {
    total=$((total + 1)); installed "$name" && present=$((present + 1))
    p=$((p + 1)); [ "$p" -le 32 ] || break
   done
+  # WOL's public release version belongs to its LuCI APK, not the
+  # etherwake backend. Avoid showing a false installed/offered mismatch.
+  if [ "$id" = wake-on-lan ] && [ "$total" -eq 2 ]; then
+   primary_package=luci-app-wol
+  fi
   managed=0
   [ -f "$(owned_manifest "$id")" ] && managed=1
   ui_ready=0
@@ -521,6 +534,13 @@ preflight_install() {
  if [ "$app" = network-usage-monitor ]; then
   [ "$(wc -l < "$pins" | tr -d ' ')" -eq 3 ] || return 27
   for required in nlbwmon luci-app-nlbwmon luci-lib-chartjs; do
+   grep -q "^${required}$(printf '\t')" "$pins" || return 27
+  done
+ elif [ "$app" = wake-on-lan ]; then
+  # WOL always requires both the signal sender and its LuCI user interface.
+  # Never install extra packages just because a catalog lists them.
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 2 ] || return 27
+  for required in etherwake luci-app-wol; do
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
  elif [ "$app" = retro-arcade ]; then
@@ -691,6 +711,11 @@ worker() {
   remove) remove_app || rc=$?;;
  esac
  if [ "$rc" -eq 0 ]; then
+  # The LuCI menu tree may be cached before an optional UI is installed.
+  # Invalidate the cache only after a successful package transaction.
+  if [ "$app" = wake-on-lan ]; then
+   rm -f "$LUCI_INDEX_CACHE"
+  fi
   write_state success "$action" "$app" NONE "$operation_id" "$source"
   # Count successful user installs and updates separately. Restores,
   # removals and failed/no-op operations never become receipts. Telemetry

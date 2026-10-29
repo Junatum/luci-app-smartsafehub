@@ -56,6 +56,15 @@ export const demoApps: AppsCatalog = {
       version: '2025.06.02~29236be6-r1',
       webUi: null,
     },
+    {
+      id: 'wake-on-lan',
+      name: 'Wake-on-LAN',
+      summary: '공유기에서 PC와 홈서버의 전원을 켤 수 있는 도구입니다.',
+      description: 'Wake-on-LAN 지원 컴퓨터를 네트워크에서 깨우는 앱입니다.',
+      category: 'utilities',
+      version: '26.288.56989~75a306d',
+      webUi: null, // Public demo must never link to an actual LuCI control page.
+    },
   ],
 };
 
@@ -76,6 +85,14 @@ export const demoAppsStatus: AppsInstallStatus = {
       managed: true,
       updateAvailable: false,
       installedVersion: '2025.06.02~29236be6-r1',
+      webUiReady: false,
+    },
+    'wake-on-lan': {
+      installed: false,
+      partial: false,
+      managed: false,
+      updateAvailable: false,
+      installedVersion: null,
       webUiReady: false,
     },
   },

@@ -99,6 +99,7 @@ test('SmartSafeHub Account and Apps use fictional fixtures, not live APIs', () =
   assert.match(fixtures, /pairingCode: null/);
   assert.match(fixtures, /id: 'network-usage-monitor'/);
   assert.match(fixtures, /id: 'retro-arcade'/);
+  assert.match(fixtures, /id: 'wake-on-lan'/);
   assert.match(fixtures, /category: 'entertainment'/);
   const newFixtures = fixtures.slice(fixtures.indexOf('export const demoAccount:'), fixtures.indexOf('export const demoDevices:'));
   assert.doesNotMatch(newFixtures, /https?:\/\/|\/cgi-bin\/|password|token|api_key/i);
@@ -115,6 +116,10 @@ test('demo showcases verified Apps versions, upgrade badge, and installed sizes 
     'demo card ordering should match the actual Apps page');
   assert.match(catalog, /id: 'retro-arcade',[\s\S]*?version: '1\.1\.0-r5'/);
   assert.match(catalog, /id: 'network-usage-monitor',[\s\S]*?version: '2025\.06\.02~29236be6-r1'/);
+  assert.match(catalog, /id: 'wake-on-lan',[\s\S]*?category: 'utilities',[\s\S]*?version: '26\.288\.56989~75a306d'/);
+  assert.ok(catalog.indexOf("id: 'network-usage-monitor'") < catalog.indexOf("id: 'wake-on-lan'"));
+  assert.match(status, /'wake-on-lan': \{\s*installed: false,\s*partial: false,\s*managed: false/);
+
   assert.match(status, /'retro-arcade': \{\s*installed: true,\s*partial: false,\s*managed: true,\s*updateAvailable: true,\s*installedVersion: '1\.0\.0-r1'/);
   assert.match(status, /'network-usage-monitor': \{\s*installed: true,\s*partial: false,\s*managed: true,\s*updateAvailable: false,\s*installedVersion: '2025\.06\.02~29236be6-r1'/);
   assert.match(metrics, /'retro-arcade': 1394688/);

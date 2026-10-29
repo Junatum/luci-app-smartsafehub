@@ -30,6 +30,24 @@ assert "if (webUi.type !== 'luci')" in route
 assert "'/cgi-bin/luci/admin/services/nlbw/display'" in catalog
 assert 'luci_web_ui_path(item.web_ui.path)' in catalog
 assert 'luci-app-nlbwmon' in manager
+# Hub-approved Wake-on-LAN must route only to its matching LuCI app, never
+# another administrator view or to the backend etherwake executable.
+assert "id == 'wake-on-lan'" in catalog
+assert "item?.web_ui?.package == 'luci-app-wol'" in catalog
+assert "item?.web_ui?.path == '/cgi-bin/luci/admin/services/wol'" in catalog
+assert '[ "$id" = wake-on-lan ]' in manager
+assert 'web_ui.package")" = luci-app-wol' in manager
+assert 'web_ui.path")" = /cgi-bin/luci/admin/services/wol' in manager
+assert '[ "$app" = wake-on-lan ]' in manager
+assert 'for required in etherwake luci-app-wol' in manager
+assert 'primary_package=luci-app-wol' in manager
+assert 'rm -f "$LUCI_INDEX_CACHE"' in manager
+category = (root/'frontend/src/components/AppsCategoryIcon.tsx').read_text()
+page = (root/'frontend/src/pages/AppsPage.tsx').read_text()
+assert "case 'utilities': return 'utilities'" in category
+assert "case 'utilities': return <PowerIcon" in category
+assert "{ id: 'utilities', label: '도구' }" in page
+
 assert "id == 'retro-arcade'" in catalog and "type: id == 'retro-arcade'" in catalog
 assert "'/retro-arcade/'" in route and "webUi.type === 'static'" in route
 assert 'smartsafehub-app-retro-arcade' in manager

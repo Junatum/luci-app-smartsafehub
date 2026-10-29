@@ -60,7 +60,13 @@ export function read_apps_catalog() {
 		// Backward-compatible route for the already approved nlbwmon catalog.
 		// The page is only launchable if its UI package is actually installed.
 		let path = '';
-		if (item?.web_ui?.type == 'luci')
+		if (id == 'wake-on-lan') {
+			if (item?.web_ui?.type == 'luci' &&
+				item?.web_ui?.path == '/cgi-bin/luci/admin/services/wol' &&
+				item?.web_ui?.package == 'luci-app-wol')
+				path = '/cgi-bin/luci/admin/services/wol';
+		}
+		else if (item?.web_ui?.type == 'luci')
 			path = luci_web_ui_path(item.web_ui.path);
 		else if (id == 'retro-arcade' && item?.web_ui?.type == 'static' &&
 			item?.web_ui?.path == '/retro-arcade/' &&

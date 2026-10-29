@@ -61,6 +61,7 @@ const TABS: readonly { id: AppsCategory; label: string }[] = [
   { id: 'security', label: '보안' },
   { id: 'smart_home', label: '스마트홈' },
   { id: 'entertainment', label: '엔터테인먼트' },
+  { id: 'utilities', label: '도구' },
   { id: 'other', label: '기타' },
 ];
 
