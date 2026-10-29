@@ -48,10 +48,10 @@ check("MAX_BYTES / frsize" in storage_module,
       'unexpected statvfs counters must not overflow safe byte values')
 check('stats.bavail' in storage_module and 'stats.frsize' in storage_module and 'storage: storage' in backend,
       'optional Apps metrics must report actual APK-available bytes without spawning df')
-check('read_apps_metrics()' in backend and 'return success({ job: job(), restore: restore_status(), installed: installed });' in backend,
+check('read_apps_metrics(request)' in backend and 'restore: restore_status(), installed: installed' in backend,
       'critical Apps status must be separate from optional storage metrics')
-check("run_command([ MANAGER, 'sizes' ], 6000)" in backend and 'try {' in backend,
-      'optional APK size failures must not block status')
+check("ensure_job('sizes')" in backend and "ensure_job('status')" in backend,
+      'APK scan must execute asynchronously and independently from RPC status')
 check('apps_metrics:' in (root / 'root/usr/share/rpcd/ucode/smartsafehub.uc').read_text(),
       'metrics RPC must be independently accessible')
 import json
@@ -59,7 +59,7 @@ acl = json.loads((root / 'root/usr/share/rpcd/acl.d/luci-app-smartsafehub.json')
 check('apps_metrics' in acl['luci-app-smartsafehub']['read']['ubus']['smartsafehub'],
       'critical regression: Apps metrics RPC is missing from LuCI read ACL')
 check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
-      'pollInterval: 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
+      '!data?.ready ? 3_000 : 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
       'optional Apps metrics should run separately and less frequently')
 check("'/bin/df'" not in backend and "'/bin/df'" not in storage_module, 'storage must not spawn a polling command')
 check('lg:grid-cols-[minmax(0,1fr)_minmax(0,18.5rem)]' in page,

@@ -495,7 +495,21 @@ grep -Fq 'RECOMMENDED_POLL_INTERVAL_S=30' "$DEVICE"
 grep -Fq 'next_fast=' "$DEVICE"
 grep -Fq 'next_full=' "$DEVICE"
 grep -Fq "recommended-sync) recommended_fast_sync" "$DEVICE"
-grep -Fq "[ HELPER, 'recommended-sync' ]" "$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
+# r39 queues the Hub sync in a separate worker; the RPC must only accept
+# a request, not block rpcd while it runs the helper in the foreground.
+RECOMMENDED_RPC="$ROOT/root/usr/share/rpcd/ucode/smartsafehub/device-registration.uc"
+grep -Fq "request_job('recommended-sync')" "$RECOMMENDED_RPC" || {
+  echo 'FAIL: recommended sync must enqueue the background worker' >&2
+  exit 1
+}
+grep -Fq "return read_recommended_rules_status(request);" "$RECOMMENDED_RPC" || {
+  echo 'FAIL: recommended sync must report the local status after enqueue' >&2
+  exit 1
+}
+if grep -Fq "[ HELPER, 'recommended-sync' ]" "$RECOMMENDED_RPC"; then
+  echo 'FAIL: recommended sync must not run the slow device helper in rpcd' >&2
+  exit 1
+fi
 # With exactOptionalPropertyTypes, omit an optional callback rather than pass undefined.
 # The block card does not need a revoke callback; only recommended allow rules do.
 if grep -Fq 'onRequestRevoke={onRevokeRecommendedRule ? setRevokeTarget : undefined}' "$PAGE"; then

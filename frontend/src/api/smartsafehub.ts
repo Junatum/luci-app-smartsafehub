@@ -88,30 +88,39 @@ export interface DeviceRegistrationStatus {
   pairingExpiresAt: string | null;
   nextSyncAt: number;
   lastSuccessAt: number;
+  operation?: BackgroundOperation;
+  pairingOperation?: BackgroundOperation;
 }
 
-export function fetchRecommendedRulesStatus(): Promise<RecommendedRulesStatus> {
-  return callApi(API_OBJECT, 'device_recommended_rules_status', {}, { timeoutMs: 5000 });
+export interface BackgroundOperation {
+  phase: 'idle' | 'starting' | 'running' | 'success' | 'failed';
+  code: string;
+  argument: string;
+  updatedAt: number;
+}
+
+export function fetchRecommendedRulesStatus(signal?: AbortSignal): Promise<RecommendedRulesStatus> {
+  return callApi(API_OBJECT, 'device_recommended_rules_status', {}, { ...(signal ? { signal } : {}), priority: 'low', timeoutMs: 5000 });
 }
 
 export function refreshRecommendedRulesStatus(): Promise<RecommendedRulesStatus> {
-  return callApi(API_OBJECT, 'device_recommended_rules_refresh', {}, { timeoutMs: 30000 });
+  return callApi(API_OBJECT, 'device_recommended_rules_refresh', {}, { priority: 'high', timeoutMs: 6000 });
 }
 
 export function revokeRecommendedRule(ruleId: number): Promise<RecommendedRulesStatus> {
-  return callApi(API_OBJECT, 'device_recommended_rules_revoke', { rule_id: ruleId }, { timeoutMs: 30000 });
+  return callApi(API_OBJECT, 'device_recommended_rules_revoke', { rule_id: ruleId }, { priority: 'high', timeoutMs: 6000 });
 }
 
-export function fetchDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
-  return callApi(API_OBJECT, 'device_registration_status', {}, { timeoutMs: 5000 });
+export function fetchDeviceRegistrationStatus(signal?: AbortSignal): Promise<DeviceRegistrationStatus> {
+  return callApi(API_OBJECT, 'device_registration_status', {}, { ...(signal ? { signal } : {}), priority: 'low', timeoutMs: 5000 });
 }
 
 export function refreshDeviceRegistrationStatus(): Promise<DeviceRegistrationStatus> {
-  return callApi(API_OBJECT, 'device_registration_refresh', {}, { timeoutMs: 30000 });
+  return callApi(API_OBJECT, 'device_registration_refresh', {}, { priority: 'high', timeoutMs: 6000 });
 }
 
 export function requestDevicePairingCode(): Promise<DeviceRegistrationStatus> {
-  return callApi(API_OBJECT, 'device_pairing_refresh', {}, { timeoutMs: 15000 });
+  return callApi(API_OBJECT, 'device_pairing_refresh', {}, { priority: 'high', timeoutMs: 6000 });
 }
 
 export function fetchHealthStatus(): Promise<HealthStatus> {
@@ -126,16 +135,28 @@ export function updateHealthReporter(enabled: boolean): Promise<HealthStatus> {
   return callApi(API_OBJECT, 'health_reporter_update', { enabled });
 }
 
-export function fetchAppsCatalog(): Promise<AppsCatalog> {
-  return callApi(API_OBJECT, 'apps_catalog', {}, { timeoutMs: 15000 });
+export function fetchAppsCatalog(signal?: AbortSignal): Promise<AppsCatalog> {
+  return callApi(API_OBJECT, 'apps_catalog', {}, { ...(signal ? { signal } : {}), priority: 'low', timeoutMs: 6000 });
 }
 
-export function fetchAppsStatus(): Promise<AppsInstallStatus> {
-  return callApi(API_OBJECT, 'apps_status', {}, { timeoutMs: 18000 });
+export function refreshAppsCatalog(): Promise<AppsCatalog> {
+  return callApi(API_OBJECT, 'apps_catalog', { refresh: true }, { priority: 'high', timeoutMs: 6000 });
 }
 
-export function fetchAppsMetrics(): Promise<AppsMetrics> {
-  return callApi(API_OBJECT, 'apps_metrics', {}, { timeoutMs: 10000 });
+export function fetchAppsStatus(signal?: AbortSignal): Promise<AppsInstallStatus> {
+  return callApi(API_OBJECT, 'apps_status', {}, { ...(signal ? { signal } : {}), priority: 'low', timeoutMs: 6000 });
+}
+
+export function refreshAppsStatus(): Promise<AppsInstallStatus> {
+  return callApi(API_OBJECT, 'apps_status', { refresh: true }, { priority: 'high', timeoutMs: 6000 });
+}
+
+export function fetchAppsMetrics(signal?: AbortSignal): Promise<AppsMetrics> {
+  return callApi(API_OBJECT, 'apps_metrics', {}, { ...(signal ? { signal } : {}), priority: 'low', timeoutMs: 6000 });
+}
+
+export function refreshAppsMetrics(): Promise<AppsMetrics> {
+  return callApi(API_OBJECT, 'apps_metrics', { refresh: true }, { priority: 'high', timeoutMs: 6000 });
 }
 
 export function installVerifiedApp(appId: string): Promise<AppsOperationAccepted> {

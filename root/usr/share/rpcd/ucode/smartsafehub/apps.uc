@@ -2,9 +2,9 @@
 'use strict';
 
 import * as fs from 'fs';
-import { failure, run_command, success } from './core.uc';
+import { failure, success } from './core.uc';
+import { ensure_job, job_state, request_job } from './rpc-jobs.uc';
 
-const HELPER = '/usr/libexec/smartsafehub-apps';
 const CATALOG_FILE = '/tmp/smartsafehub/apps-catalog.json';
 
 function text(value, max_length) {
@@ -23,14 +23,19 @@ function luci_web_ui_path(value) {
 // This endpoint is *read-only*. The catalog never supplies executable
 // commands, repository URLs or permissions to a package installer. The
 // separate privileged installer must revalidate every approval in the future.
-export function read_apps_catalog() {
-	if (!run_command([ HELPER ], 12000)) {
-		return failure('APPS_CATALOG_UNAVAILABLE',
-			'검증된 앱 목록을 불러오지 못했습니다. 인터넷 연결과 펌웨어 정보를 확인해 주세요.');
-	}
-
+export function read_apps_catalog(request) {
+	// Never perform an HTTP request on rpcd's event loop. Serve a last-known
+	// display-only snapshot while the detached worker updates it atomically.
+	if (request?.args?.refresh == true) request_job('catalog');
+	else ensure_job('catalog');
+	const operation = job_state('catalog');
 	const raw = fs.readfile(CATALOG_FILE);
-	if (type(raw) != 'string' || length(raw) < 2 || length(raw) > 131072) {
+	const pending = operation.phase == 'starting' || operation.phase == 'running';
+	if (type(raw) != 'string' || length(raw) < 2) {
+		return success({ schema: 1, deviceCode: '', firmwareBuildId: '', channel: '', apps: [],
+			ready: false, refreshing: pending, refreshFailed: operation.phase == 'failed' });
+	}
+	if (length(raw) > 131072) {
 		return failure('APPS_CATALOG_INVALID', '앱 목록 데이터가 올바르지 않습니다.');
 	}
 
@@ -47,6 +52,20 @@ export function read_apps_catalog() {
 		return failure('APPS_CATALOG_INVALID', '앱 목록 형식이 올바르지 않습니다.');
 	}
 
+	// A firmware change invalidates the old catalog before any cards are shown.
+	// The ROM metadata takes precedence over writable overlay metadata.
+	let metadataRaw = fs.readfile('/rom/usr/share/smartsafehub/firmware.json');
+	if (type(metadataRaw) != 'string' || !length(metadataRaw))
+		metadataRaw = fs.readfile('/usr/share/smartsafehub/firmware.json');
+	if (type(metadataRaw) == 'string' && length(metadataRaw)) {
+		let metadata = null;
+		try { metadata = json(metadataRaw); } catch (e) { /* reject stale catalog below */ }
+		if (metadata == null || metadata?.device_code != data.device_code ||
+			metadata?.build_id != data.firmware_build_id ||
+			(metadata?.channel ?? 'stable') != (data?.channel ?? 'stable'))
+			return success({ schema: 1, deviceCode: '', firmwareBuildId: '', channel: '', apps: [],
+				ready: false, refreshing: pending, refreshFailed: operation.phase == 'failed' });
+	}
 	const apps = [];
 	for (let item in data.apps) {
 		if (type(item) != 'object' || item.runtime != 'router' || item.installer != 'apk') {
@@ -93,5 +112,8 @@ export function read_apps_catalog() {
 		firmwareBuildId: data.firmware_build_id,
 		channel: text(data?.channel, 16),
 		apps: apps,
+		ready: true,
+		refreshing: pending,
+		refreshFailed: operation.phase == 'failed',
 	});
 };

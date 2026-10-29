@@ -384,7 +384,17 @@ export function SafeShieldRulesPage({
     }
     previousStatusSignature.current = signature;
 
-    if (status.syncStatus === 'confirmed' && pendingRevokeId.current === null) {
+    // A worker failure is not a successful revoke. Keep the previous rule
+    // visible and let the user retry instead of waiting indefinitely.
+    if (pendingRevokeId.current !== null && status.revokeOperation?.phase === 'failed' &&
+        status.revokeOperation.argument === String(pendingRevokeId.current)) {
+      pendingRevokeId.current = null;
+      setRevokeConfirming(false);
+      setRevokeConfirmationDelayed(false);
+      setSyncError('추천 규칙 적용 해제를 완료하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요.');
+    }
+    if (status.syncStatus === 'confirmed' && pendingRevokeId.current === null &&
+        status.revokeOperation?.phase !== 'failed') {
       setSyncError(null);
     }
     if (

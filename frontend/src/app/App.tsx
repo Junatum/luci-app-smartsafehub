@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 
-import { fetchAppsCatalog, fetchAppsStatus, fetchAppsMetrics, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchAppsCatalog, fetchAppsStatus, fetchAppsMetrics, refreshAppsCatalog, refreshAppsStatus, refreshAppsMetrics, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
@@ -58,13 +58,14 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     active: route === 'apps',
     fallbackError: '검증된 앱 목록을 불러오지 못했습니다.',
     loader: fetchAppsCatalog,
-    staleTimeMs: 60_000,
+    pollInterval: (data) => data?.refreshing ? 2_000 : !data?.ready ? (data?.refreshFailed ? 15_000 : 2_000) : 60_000,
+    staleTimeMs: 2_000,
   });
   const appsStatus = useAsyncResource<AppsInstallStatus>({
     active: route === 'apps',
     fallbackError: '앱 설치 상태를 불러오지 못했습니다.',
     loader: fetchAppsStatus,
-    pollInterval: (data) => data?.job.phase === 'running' || data?.job.phase === 'starting' || data?.restore?.phase === 'running' || data?.restore?.phase === 'starting' ? 3000 : 12000,
+    pollInterval: (data) => !data?.ready || data?.refreshing ? 2_000 : data?.job.phase === 'running' || data?.job.phase === 'starting' || data?.restore?.phase === 'running' || data?.restore?.phase === 'starting' ? 3000 : 12000,
     staleTimeMs: 3000,
   });
   // Optional metrics never participate in the status/error guard for buttons.
@@ -72,8 +73,8 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     active: route === 'apps',
     fallbackError: '저장 공간 정보를 확인하지 못했습니다.',
     loader: fetchAppsMetrics,
-    pollInterval: 60000,
-    staleTimeMs: 60000,
+    pollInterval: (data) => data?.refreshing || !data?.ready ? 3_000 : 60000,
+    staleTimeMs: 5000,
   });
   const status = useStatus(route === 'home' || route === 'settings');
   const updates = useSoftwareUpdates(true);
@@ -119,14 +120,21 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
       });
   }, []);
 
-  // When an operation finishes, refresh space and package sizes promptly.
+  // A completed install/remove invalidates both APK snapshots even if their
+  // background TTL has not elapsed. Never force them on every render/poll.
   const appsJobId = appsStatus.data?.job.operationId;
   const appsJobPhase = appsStatus.data?.job.phase;
   const appsRestorePhase = appsStatus.data?.restore?.phase;
+  const previousAppsRefreshKey = useRef('');
   useEffect(() => {
-    if (route === 'apps' && (appsJobPhase === 'success' || appsRestorePhase === 'success')) {
+    if (route !== 'apps' || (appsJobPhase !== 'success' && appsRestorePhase !== 'success')) return;
+    const key = `${appsJobId ?? ''}:${appsJobPhase}:${appsRestorePhase ?? ''}`;
+    if (key === previousAppsRefreshKey.current) return;
+    previousAppsRefreshKey.current = key;
+    void Promise.allSettled([refreshAppsStatus(), refreshAppsMetrics()]).then(() => {
+      void appsStatus.refresh();
       void appsMetrics.refresh();
-    }
+    });
   }, [route, appsJobId, appsJobPhase, appsRestorePhase]);
 
   const safeshieldActions = useSafeShieldActions(
@@ -163,14 +171,15 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     case 'apps':
       content = (
         <AppsPage
-          data={apps.data}
-          error={apps.error}
-          loading={apps.loading}
-          refreshing={apps.refreshing}
-          onRetry={() => void Promise.all([apps.refresh(), appsStatus.refresh(), appsMetrics.refresh()])}
-          installStatus={appsStatus.data}
+          data={apps.data?.ready === false ? null : apps.data}
+          error={apps.error ?? (apps.data?.refreshFailed && !apps.data?.ready ? '앱 목록 갱신에 실패했습니다. 서버 연결을 확인해 주세요.' : null)}
+          loading={apps.loading || (!!apps.data && !apps.data.ready && !apps.data.refreshFailed)}
+          refreshing={apps.refreshing || !!apps.data?.refreshing}
+          onRetry={() => void refreshAppsCatalog().then(() => apps.refresh()).then(() =>
+            Promise.all([appsStatus.refresh(), appsMetrics.refresh()])).catch(() => apps.refresh())}
+          installStatus={appsStatus.data?.ready === false ? null : appsStatus.data}
           metrics={appsMetrics.data}
-          statusError={appsStatus.error}
+          statusError={appsStatus.error ?? (appsStatus.data?.ready === false ? '설치 상태를 확인하고 있습니다.' : null)}
           onRefreshStatus={() => void appsStatus.refresh()}
           onInstall={async (id) => {
             await installVerifiedApp(id);

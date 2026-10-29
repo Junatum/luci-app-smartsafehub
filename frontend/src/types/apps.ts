@@ -16,6 +16,10 @@ export interface AppsCatalog {
   firmwareBuildId: string;
   channel: string;
   apps: VerifiedApp[];
+  /** False until the first immutable, firmware-matched snapshot is available. */
+  ready?: boolean;
+  refreshing?: boolean;
+  refreshFailed?: boolean;
 }
 
 /** Writable filesystem used for installing APKs (not RAM or squashfs). */
@@ -29,6 +33,8 @@ export interface AppsStorage {
 export interface AppsMetrics {
   storage: AppsStorage | null;
   installedSizes: Record<string, number>;
+  ready?: boolean;
+  refreshing?: boolean;
 }
 
 /** Local APK adapter state, independent from the future IoT / AI runtimes. */
@@ -45,6 +51,9 @@ export interface AppsInstallStatus {
     appId: string;
     code: string;
   };
+  ready?: boolean;
+  refreshing?: boolean;
+  refreshFailed?: boolean;
   installed: Record<string, {
     installed: boolean;
     partial: boolean;

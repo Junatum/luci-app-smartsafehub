@@ -49,8 +49,19 @@ grep -Fq 'refresh_device_pairing' "$RPC"
 # Pairing can bootstrap an unregistered local credential itself, so the
 # dedicated account page must not deadlock the flow by requiring a registered
 # phase before a code can be requested.
-grep -Fq 'disabled={pairingBusy}' "$ACCOUNT_PAGE" || {
-	echo 'pairing button must stay available while device bootstrap is pending' >&2
+# Disable the button only while an issuance is already in flight, including
+# the new background worker's starting/running phases. A pending bootstrap
+# alone must never prevent the first pairing request.
+grep -Fq 'disabled={issuingCode}' "$ACCOUNT_PAGE" || {
+	echo 'pairing button must be gated by an active code issuance only' >&2
+	exit 1
+}
+grep -Fq 'const issuingCode = pairingBusy || status?.pairingOperation?.phase' "$ACCOUNT_PAGE" || {
+	echo 'pairing button must honor local and background issuance state' >&2
+	exit 1
+}
+grep -Fq "status?.pairingOperation?.phase === 'running'" "$ACCOUNT_PAGE" || {
+	echo 'pairing button must prevent duplicate requests while the worker runs' >&2
 	exit 1
 }
 if grep -Fq "pairingBusy || data?.phase !== 'registered'" "$ACCOUNT_PAGE"; then

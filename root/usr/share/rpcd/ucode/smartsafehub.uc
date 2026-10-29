@@ -176,16 +176,19 @@ const methods = {
 		}),
 	},
 	apps_catalog: {
+		args: { refresh: false },
 		call: require_root_password(function(request) {
 			return read_apps_catalog(request);
 		}),
 	},
 	apps_status: {
+		args: { refresh: false },
 		call: require_root_password(function(request) {
 			return read_apps_status(request);
 		}),
 	},
 	apps_metrics: {
+		args: { refresh: false },
 		call: require_root_password(function(request) {
 			return read_apps_metrics(request);
 		}),

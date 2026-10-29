@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 import { failure, run_command, safe_call, success } from './core.uc';
 import { from_system_root, from_statvfs } from './apps-storage.uc';
+import { ensure_job, job_state, request_job } from './rpc-jobs.uc';
 
 const MANAGER = '/usr/libexec/smartsafehub-apps-manager';
 const STATE = '/tmp/smartsafehub/apps-operation.state';
@@ -42,7 +43,7 @@ function job() {
 	const state = { phase: 'idle', action: '', appId: '', code: '', operationId: '' };
 	const raw = fs.readfile(STATE);
 	if (type(raw) != 'string' || length(raw) > 4096) return state;
-	for (let line in split(raw, /\r?\n/)) {
+	for (let line in split(type(raw) == 'string' ? raw : '', /\r?\n/)) {
 		const fields = split(line, /\t/);
 		if (length(fields) != 2) continue;
 		const key = fields[0];
@@ -78,9 +79,10 @@ function restore_status() {
 	return result;
 }
 
-export function read_apps_status() {
-	if (!run_command([ MANAGER, 'status' ], 15000))
-		return failure('APPS_STATUS_UNAVAILABLE', '설치된 앱 상태를 확인하지 못했습니다.');
+export function read_apps_status(request) {
+	if (request?.args?.refresh == true) request_job('status');
+	else ensure_job('status');
+	const scan = job_state('status');
 	const raw = fs.readfile(STATUS);
 	if (type(raw) != 'string' || length(raw) > 16384)
 		return failure('APPS_STATUS_INVALID', '설치 상태 데이터가 올바르지 않습니다.');
@@ -105,12 +107,15 @@ export function read_apps_status() {
 				? fields[6] : null,
 		};
 	}
-	return success({ job: job(), restore: restore_status(), installed: installed });
+	return success({ job: job(), restore: restore_status(), installed: installed,
+		ready: type(raw) == 'string',
+		refreshing: scan.phase == 'starting' || scan.phase == 'running',
+		refreshFailed: scan.phase == 'failed' });
 };
 
 // Optional data lives behind an independent RPC. A slow APK database lookup
 // or filesystem error must never prevent installation/removal status checks.
-export function read_apps_metrics() {
+export function read_apps_metrics(request) {
 	let storage = null;
 	try {
 		storage = writable_storage();
@@ -121,26 +126,25 @@ export function read_apps_metrics() {
 	}
 
 	const installedSizes = {};
-	try {
-		// 6s upper bound. This optional command never runs on the 12s status poll.
-		if (run_command([ MANAGER, 'sizes' ], 6000)) {
-			const raw = fs.readfile(SIZES);
-			if (type(raw) == 'string' && length(raw) <= 8192) {
-				for (let line in split(raw, /\r?\n/)) {
-					const fields = split(line, /\t/);
-					if (length(fields) != 2 ||
-						match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null ||
-						match(fields[1], /^(0|[1-9][0-9]{0,12})$/) == null)
-						continue;
-					installedSizes[fields[0]] = int(fields[1]);
-				}
-			}
+	// Disk accounting is optional and runs outside rpcd. Parse only the
+	// last atomically committed snapshot; it may be empty on first load.
+	if (request?.args?.refresh == true) request_job('sizes');
+	else ensure_job('sizes');
+	const sizesScan = job_state('sizes');
+	const raw = fs.readfile(SIZES);
+	if (type(raw) == 'string' && length(raw) <= 8192) {
+		for (let line in split(raw, /\r?\n/)) {
+			const fields = split(line, /\t/);
+			if (length(fields) != 2 ||
+				match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null ||
+				match(fields[1], /^(0|[1-9][0-9]{0,12})$/) == null)
+				continue;
+			installedSizes[fields[0]] = int(fields[1]);
 		}
 	}
-	catch (e) {
-		warn('smartsafehub: Apps package size statistics unavailable\n');
-	}
-	return success({ storage: storage, installedSizes: installedSizes });
+	return success({ storage: storage, installedSizes: installedSizes,
+		ready: type(raw) == 'string',
+		refreshing: sizesScan.phase == 'starting' || sizesScan.phase == 'running' });
 };
 
 function start_apps_operation(request, action) {

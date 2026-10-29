@@ -50,7 +50,7 @@ test('추천 규칙 수동 동기화와 적용 확인 상태는 데모 API를 �
   assert.match(acl, /"device_recommended_rules_refresh"/);
   assert.match(device, /write_recommended_sync_status failed/);
   assert.match(device, /write_recommended_sync_status confirmed/);
-  assert.match(rpc, /const syncStatus = sync\?\.status == 'pending'/);
+  assert.match(rpc, /const syncStatus = operationRunning \|\| sync\?\.status == 'pending'/);
   assert.match(rpc, /const syncWarning = confirmed &&/);
   assert.match(rpc, /const confirmed = revision != null && receipt\?\.status == 'confirmed'/);
   assert.doesNotMatch(page, /from ['"]\.\.\/api\//);
