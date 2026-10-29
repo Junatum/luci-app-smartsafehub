@@ -177,7 +177,7 @@ installed_version() {
 # line as the "installed size" heading or on the next line. Do not guess
 # missing metadata, and do not accept a size from a different package.
 parse_installed_apk_size() {
- awk -v name="$1" '
+ awk -v name="$1" -v expected="$2" '
   function number_of_bytes(value, parts, count, factor, bytes) {
    gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
    # Accept the standard "123 KiB" and compact "123KiB" forms.
@@ -196,8 +196,20 @@ parse_installed_apk_size() {
   # apk v3 may print the exact same installed-size record more than once
   # (for instance, when package names are returned from multiple indexes).
   # Accept only consistent repetitions; never sum duplicate records.
-  function record_size(value, parsed_bytes) {
+  function record_size(value, version, parsed_bytes) {
    parsed_bytes=number_of_bytes(value)
+   # An APK upgrade can leave multiple versions in index-derived info.
+   # Prefer the exact locally installed release over older/newer entries.
+   if (expected != "" && version == expected) {
+    matched=1
+    if (parsed_bytes < 0 || (selected && parsed_bytes != selected_bytes)) {
+     selected_invalid=1
+     return
+    }
+    selected_bytes=parsed_bytes
+    selected=1
+    return
+   }
    if (parsed_bytes < 0 || (parsed && parsed_bytes != bytes)) {
     invalid=1
     return
@@ -212,35 +224,55 @@ parse_installed_apk_size() {
    marker=index(line, heading)
    if (marker > 0 && (substr(line, 1, length(name) + 1) == name "-" ||
        substr(line, 1, length(name) + length(heading)) == name heading)) {
-    if (waiting) invalid=1
+    if (waiting) {
+     if (expected != "" && pending_version == expected) selected_invalid=1
+     else invalid=1
+    }
     seen++
+    prefix=substr(line, 1, marker-1)
+    version=prefix == name ? "" : substr(prefix, length(name)+2)
     value=substr(line, marker+length(heading))
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-    if (value == "") waiting=1
-    else record_size(value)
+    waiting=0
+    if (value == "") {
+     waiting=1
+     pending_version=version
+    } else record_size(value, version)
     next
    }
    if (waiting) {
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
     if (line == "") next
-    record_size(line)
+    record_size(line, pending_version)
     waiting=0
    }
   }
   END {
-   if (!invalid && !waiting && seen > 0 && parsed == 1)
+   if (waiting) {
+    if (expected != "" && pending_version == expected) selected_invalid=1
+    else invalid=1
+   }
+   if (matched) {
+    if (!selected_invalid && selected)
+     printf "%.0f\n", selected_bytes
+    else exit 1
+   } else if (!invalid && seen > 0 && parsed == 1) {
+    # Keep supporting APK variants without exact version records.
     printf "%.0f\n", bytes
-   else exit 1
+   } else exit 1
   }
  '
 }
 installed_size_bytes() {
  [ "$#" -eq 1 ] || return 1
  name="$1"
+ # Match the package release actually installed, not a stale APK index hit.
+ current_version="$(installed_version "$name" || :)"
+ valid_version "$current_version" || current_version=''
  # Try APK's size-only view first; fall back to its full information view.
  # Do not attempt a potentially expensive recursive disk scan.
- bytes="$("$APK" info -s "$name" 2>/dev/null | parse_installed_apk_size "$name")" || {
-  bytes="$("$APK" info "$name" 2>/dev/null | parse_installed_apk_size "$name")" || return 1
+ bytes="$("$APK" info -s "$name" 2>/dev/null | parse_installed_apk_size "$name" "$current_version")" || {
+  bytes="$("$APK" info "$name" 2>/dev/null | parse_installed_apk_size "$name" "$current_version")" || return 1
  }
  case "$bytes" in ''|*[!0-9]*) return 1;; esac
  printf '%s\n' "$bytes"

@@ -122,6 +122,17 @@ case "$1" in
        [ "${APPS_TEST_SIZE_MISSING_PACKAGE:-}" != "$name" ] || exit 2
        # Device capture (OpenWrt 25.12 APK): repeating the same installed
        # size twice or three times is valid, but conflicting values are not.
+       # During an update the APK index can expose old and new versions.
+       # Only the installed version should determine the displayed size.
+       if [ "${APPS_TEST_SIZE_MIXED_RELEASES:-0}" != 0 ] &&
+          [ "$name" = smartsafehub-app-retro-arcade ]; then
+         printf '%s-1.0.0-r1 installed size:\n1362 KiB\n\n' "$name"
+         printf '%s-1.1.0-r1 installed size:\n2048 KiB\n\n' "$name"
+         if [ "$APPS_TEST_SIZE_MIXED_RELEASES" = conflicting ]; then
+           printf '%s-1.1.0-r1 installed size:\n2096 KiB\n\n' "$name"
+         fi
+         continue
+       fi
        if [ "${APPS_TEST_SIZE_DEVICE_REPEAT:-0}" = 1 ]; then
          case "$name" in
           nlbwmon) version=2025.06.02~29236be6-r1; kib=46; copies=2;;
@@ -568,6 +579,16 @@ grep -Fqx "$(printf 'smartsafehub-app-retro-arcade\t1.1.0-r1\t%s' "$NEWRETROSHA"
 [ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" = "$receipt_before" ] || fail 'upgrade was counted as an install'
 "$MANAGER" status
 grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t1.1.0-r1')" "$TMP/runtime/apps-status.tsv" || fail 'installed version not updated after APK upgrade'
+# Update releases may appear alongside older APK index metadata: the size
+# must match the installed version, even if the older version appears first.
+export APPS_TEST_SIZE_MIXED_RELEASES=1
+"$MANAGER" sizes
+grep -Fqx "$(printf 'retro-arcade\t2097152')" "$TMP/runtime/apps-size.tsv" || fail 'updated Retro size lost when APK info listed multiple releases'
+# Contradictory records for that same installed version are still rejected.
+export APPS_TEST_SIZE_MIXED_RELEASES=conflicting
+"$MANAGER" sizes
+[ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'conflicting current APK release size must be omitted'
+unset APPS_TEST_SIZE_MIXED_RELEASES
 "$MANAGER" start update retro-arcade || fail 'repeated update should report a no-op'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'repeated update was not rejected'
 # Any attempt to downgrade a package must fail closed.

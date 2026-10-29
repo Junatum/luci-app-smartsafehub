@@ -64,12 +64,14 @@ check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
 check("'/bin/df'" not in backend and "'/bin/df'" not in storage_module, 'storage must not spawn a polling command')
 check('lg:grid-cols-[minmax(0,1fr)_minmax(0,18.5rem)]' in page,
       'Apps storage should be a compact fixed-width column on desktop, stacked on mobile')
-check('ssh-apps-storage-card' in card and 'size-20' in card and 'gap-3' in card and 'sm:p-5' not in card,
+check('ssh-apps-storage-card' in card and 'size-24' in card and 'gap-3' in card and 'sm:p-5' not in card,
       'storage card must be compact without hiding the donut or capacity data')
 check('<AppsStorageCard storage={metrics?.storage} />' in page,
       'Apps storage should be read from independent optional metrics')
 check('stroke-dasharray=' in card and 'aria-label="앱 설치 저장 공간"' in card,
       'storage donut must be accessible and use SVG')
+check('Math.PI * 39' in card and 'r="39"' in card and card.count('size-24') == 2,
+      'storage donut needs a larger ring and enough room around the center label')
 check('용량 정보를 확인할 수 없습니다.' in card and 'summarizeAppsStorage(storage)' in card,
       'storage errors and older RPC responses need a safe fallback')
 check('storage.availableBytes > storage.totalBytes' in utils,
