@@ -164,6 +164,20 @@ check('aria-hidden={title ? undefined : true}' in shared_icons and
 check('https://' not in icon_source and '<img' not in icon_source,
       'category icons must not load unverified remote artwork')
 
+# A transient catalog failure must not erase a previous successful result or
+# turn asynchronously fetched installation status into false retired warnings.
+check('const currentData = data;' in page, 'cached catalog must remain visible after a refresh failure')
+check('error && !currentData' in page and 'error && currentData' in page,
+      'catalog errors should be prominent only when no previous catalog exists')
+check('role="status">이전 목록</span>' in page, 'cached catalog should have a compact non-blocking stale marker')
+check('state.retired === true && state.managed' in page and '!error && !loading && !refreshing' in page,
+      'retirement must require explicit backend proof and a complete catalog')
+status_rpc = (root / 'root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc').read_text()
+check("retired: length(fields) == 8 && fields[7] == '1'" in status_rpc,
+      'retired status must originate only from a signed-off local owner manifest record')
+check('retired?: boolean;' in (root / 'frontend/src/types/apps.ts').read_text(),
+      'retired proof must be optional for older router responses')
+
 # Removal never calls onRemove from a card or from the orphan-list button.
 check("onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget)" in page,
       'catalog removal must open confirmation')

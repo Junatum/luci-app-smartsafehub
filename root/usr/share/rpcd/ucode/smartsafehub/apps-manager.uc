@@ -87,13 +87,15 @@ export function read_apps_status() {
 	const installed = {};
 	for (let line in split(raw, /\r?\n/)) {
 		const fields = split(line, /\t/);
-		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6 && length(fields) != 7) ||
+		if ((length(fields) != 4 && length(fields) != 5 && length(fields) != 6 && length(fields) != 7 && length(fields) != 8) ||
 			match(fields[0], /^[a-z0-9][a-z0-9-]{0,79}$/) == null)
 			continue;
 		installed[fields[0]] = {
 			installed: fields[1] == '1',
 			partial: fields[2] == '1',
 			managed: fields[3] == '1',
+			// Only the local manifest scanner can mark a removed approval as retired.
+			retired: length(fields) == 8 && fields[7] == '1',
 			webUiReady: length(fields) >= 5 && fields[4] == '1',
 			updateAvailable: length(fields) >= 6 && fields[5] == '1',
 			// This is a representative installed APK version, not the Hub's

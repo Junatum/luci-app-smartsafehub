@@ -619,3 +619,28 @@ printf 'smartsafehub-app-retro-arcade 1.0.0-r1\n' > "$APPS_TEST_VERSION_DB"
 "$MANAGER" start update retro-arcade || fail 'manual version change did not queue'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'manual version drift not rejected'
 printf 'PASS: selected-app signed updates, version checks, no core upgrades and no duplicate receipts\n'
+
+# Approved catalog and installed status are fetched independently. A mismatch
+# across requests is not an orphan: only an Apps-owned manifest for a package
+# that remains installed can mark an approval as retired.
+python3 - "$TMP/catalog.json" <<'PY_RETIRED'
+import json, sys
+p = sys.argv[1]
+data = json.load(open(p))
+data['apps'] = []
+with open(p, 'w') as fp:
+    json.dump(data, fp)
+PY_RETIRED
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t0\t1\t1\t0\t0\t\t1')" "$TMP/runtime/apps-status.tsv" ||     fail 'a genuinely Apps-owned removed approval was not marked retired'
+# Manual APK installations have no ownership manifest and must not be promoted
+# to managed/retired Apps. Likewise, forged/corrupt ownership is ignored.
+rm -f "$TMP/owned/retro-arcade"
+"$MANAGER" status
+[ ! -s "$TMP/runtime/apps-status.tsv" ] || fail 'manually installed APK falsely marked retired'
+printf 'invalid manifest contents\n' > "$TMP/owned/retro-arcade"
+"$MANAGER" status
+[ ! -s "$TMP/runtime/apps-status.tsv" ] || fail 'invalid manifest falsely marked retired'
+rm -f "$TMP/owned/retro-arcade"
+printf 'PASS: catalog/status refresh races do not mistake manual APK installs for retired Apps\n'

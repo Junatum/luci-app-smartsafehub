@@ -353,8 +353,11 @@ status() {
  {
  # A disconnected device can still report its local installation state.
  if [ ! -r "$CATALOG" ]; then : > "$tmp"; mv -f "$tmp" "$RUNTIME/apps-status.tsv"; return 0; fi
+ # Snapshot approved IDs once. Both catalog membership and local ownership
+ # checks below refer to the same on-disk approved generation.
+ approved_ids="$(catalog_ids)"
  n=0
- for id in $(catalog_ids); do
+ for id in $approved_ids; do
   valid_id "$id" || continue
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break
@@ -399,6 +402,29 @@ status() {
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready" "$installed_release"
+ done
+ # Removed approvals must be proven by a valid Apps-owned manifest, not
+ # inferred from racing UI/catalog RPC responses. Manual apk add does not
+ # write an Apps manifest and therefore must never appear as retired.
+ retired_count=0
+ for manifest in "$OWNED"/*; do
+  [ -f "$manifest" ] || continue
+  id="${manifest##*/}"
+  valid_id "$id" || continue
+  printf '%s\n' "$approved_ids" | grep -Fxq "$id" && continue
+  retired_count=$((retired_count + 1))
+  [ "$retired_count" -le 100 ] || break
+  count=0; present=0; valid=1
+  while IFS="$(printf '\t')" read -r name version hash; do
+   valid_package "$name" && valid_version "$version" && valid_sha "$hash" || { valid=0; break; }
+   protected_package "$name" && { valid=0; break; }
+   count=$((count + 1))
+   [ "$count" -le 32 ] || { valid=0; break; }
+   installed "$name" && present=$((present + 1))
+  done < "$manifest"
+  [ "$valid" -eq 1 ] && [ "$count" -gt 0 ] && [ "$present" -gt 0 ] || continue
+  # Eighth column explicitly marks the verified retired ownership record.
+  printf '%s\t0\t1\t1\t0\t0\t\t1\n' "$id"
  done
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-status.tsv"

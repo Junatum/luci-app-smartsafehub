@@ -89,9 +89,15 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedJob, setDismissedJob] = useState<string | null>(readDismissedAppsJob);
-  const currentData = error ? null : data;
+  // Keep the last successful catalog while a refresh fails. A separate status
+  // request may describe a different catalog generation, so a missing ID
+  // alone is NOT proof that an app has been discontinued.
+  const currentData = data;
   const apps = currentData?.apps ?? [];
-  const orphans = Object.entries(installStatus?.installed ?? {}).filter(([id, state]) => state.managed && !apps.some((app) => app.id === id));
+  const orphans = currentData && !error && !loading && !refreshing && !statusError
+    ? Object.entries(installStatus?.installed ?? {}).filter(([id, state]) =>
+      state.retired === true && state.managed && !apps.some((app) => app.id === id))
+    : [];
   const restore = installStatus?.restore;
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
@@ -236,6 +242,9 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                 <span class="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">
                   {currentData ? `${apps.length}개` : '확인 전'}
                 </span>
+                {error && currentData ? (
+                  <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800" title={error} role="status">이전 목록</span>
+                ) : null}
                 <button
                   class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-teal-300 hover:text-teal-700 disabled:opacity-50"
                   disabled={loading || refreshing}
@@ -279,7 +288,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
       ) : null}
       {actionError ? <p class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{actionError}</p> : null}
       {statusError ? <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">설치 상태를 확인하지 못했습니다. 설치 및 제거 버튼이 비활성화됩니다. <button class="underline" onClick={onRefreshStatus} type="button">다시 확인</button></div> : null}
-      {error ? (
+      {error && !currentData ? (
         <div class="rounded-2xl border border-rose-200 bg-rose-50 p-5" role="alert">
           <p class="m-0 text-sm font-bold text-rose-800">앱 목록을 불러오지 못했습니다.</p>
           <p class="mt-2 mb-0 text-sm text-rose-700">{error}</p>

@@ -49,6 +49,8 @@ export interface AppsInstallStatus {
     installed: boolean;
     partial: boolean;
     managed: boolean;
+    /** Verified by a local Apps-owned manifest, not inferred by comparing asynchronous RPC replies. */
+    retired?: boolean;
     updateAvailable?: boolean;
     /** Actual installed version of the first approved APK; not the catalog version. */
     installedVersion?: string | null;
