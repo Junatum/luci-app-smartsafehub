@@ -39,22 +39,22 @@ export const demoApps: AppsCatalog = {
   channel: 'stable',
   apps: [
     {
+      id: 'retro-arcade',
+      name: '레트로 아케이드',
+      summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
+      description: '사용자가 직접 준비한 게임 파일로 즐기는 레트로 아케이드입니다.',
+      category: 'entertainment',
+      version: '1.1.0-r5',
+      webUi: { type: 'static', path: '/retro-arcade/' },
+    },
+    {
       id: 'network-usage-monitor',
       name: '네트워크 사용량 모니터',
       summary: '기기별 네트워크 사용량과 통계를 확인하는 앱입니다.',
       description: '네트워크 트래픽을 모니터링합니다.',
       category: 'network',
-      version: '26.288.56989~75a306d',
+      version: '2025.06.02~29236be6-r1',
       webUi: null,
-    },
-    {
-      id: 'retro-arcade',
-      name: 'SmartSafeHub Retro Arcade',
-      summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
-      description: '사용자가 직접 준비한 게임 파일로 즐기는 레트로 아케이드입니다.',
-      category: 'entertainment',
-      version: '1.0.0-r1',
-      webUi: { type: 'static', path: '/retro-arcade/' },
     },
   ],
 };
@@ -62,28 +62,29 @@ export const demoApps: AppsCatalog = {
 export const demoAppsStatus: AppsInstallStatus = {
   job: { phase: 'idle', action: '', appId: '', code: 'NONE' },
   installed: {
-    'network-usage-monitor': {
-      installed: false,
-      partial: false,
-      managed: false,
-      updateAvailable: false,
-      installedVersion: null,
-      webUiReady: false,
-    },
     'retro-arcade': {
       installed: true,
       partial: false,
       managed: true,
-      updateAvailable: false,
+      updateAvailable: true,
       installedVersion: '1.0.0-r1',
       webUiReady: true,
+    },
+    'network-usage-monitor': {
+      installed: true,
+      partial: false,
+      managed: true,
+      updateAvailable: false,
+      installedVersion: '2025.06.02~29236be6-r1',
+      webUiReady: false,
     },
   },
 };
 
 export const demoAppsMetrics: AppsMetrics = {
   storage: { mount: '/overlay', totalBytes: 256 * 1024 * 1024, availableBytes: 185 * 1024 * 1024 },
-  installedSizes: { 'retro-arcade': 18 * 1024 * 1024 },
+  // Installed APK metadata; neither app cache nor runtime data is included.
+  installedSizes: { 'retro-arcade': 1394688, 'network-usage-monitor': 117760 },
 };
 
 export const demoDevices: ConnectedDevicesSummary = {

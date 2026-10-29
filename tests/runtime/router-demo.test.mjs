@@ -105,6 +105,28 @@ test('SmartSafeHub Account and Apps use fictional fixtures, not live APIs', () =
   assert.match(app, /accountRegistered=\{demoAccount\.accountRegistered\}/);
 });
 
+test('demo showcases verified Apps versions, upgrade badge, and installed sizes without changing router state', () => {
+  const fixtures = readFileSync(resolve(root, 'demo/data.ts'), 'utf8');
+  const catalog = fixtures.split('export const demoApps: AppsCatalog = {')[1].split('export const demoAppsStatus:')[0];
+  const status = fixtures.split('export const demoAppsStatus: AppsInstallStatus = {')[1].split('export const demoAppsMetrics:')[0];
+  const metrics = fixtures.split('export const demoAppsMetrics: AppsMetrics = {')[1].split('export const demoDevices:')[0];
+
+  assert.ok(catalog.indexOf("id: 'retro-arcade'") < catalog.indexOf("id: 'network-usage-monitor'"),
+    'demo card ordering should match the actual Apps page');
+  assert.match(catalog, /id: 'retro-arcade',[\s\S]*?version: '1\.1\.0-r5'/);
+  assert.match(catalog, /id: 'network-usage-monitor',[\s\S]*?version: '2025\.06\.02~29236be6-r1'/);
+  assert.match(status, /'retro-arcade': \{\s*installed: true,\s*partial: false,\s*managed: true,\s*updateAvailable: true,\s*installedVersion: '1\.0\.0-r1'/);
+  assert.match(status, /'network-usage-monitor': \{\s*installed: true,\s*partial: false,\s*managed: true,\s*updateAvailable: false,\s*installedVersion: '2025\.06\.02~29236be6-r1'/);
+  assert.match(metrics, /'retro-arcade': 1394688/);
+  assert.match(metrics, /'network-usage-monitor': 117760/);
+  assert.match(fixtures, /storage: demoAppsMetrics\.storage/,
+    'dashboard disk and Apps donut must share the same fictional storage');
+
+  const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
+  assert.match(demo, /installStatus=\{demoAppsStatus\} metrics=\{demoAppsMetrics\}/);
+  assert.match(demo, /onUpdate=\{async \(\) => \{ readonlyNotice\(\); \}\}/);
+});
+
 test('public demo actions never install APKs, pair an account, or open a live app', () => {
   const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
   const apps = readFileSync(resolve(root, 'pages/AppsPage.tsx'), 'utf8');

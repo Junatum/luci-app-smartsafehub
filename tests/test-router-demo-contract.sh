@@ -25,6 +25,18 @@ grep -Fq "if (demo) {" "$ROOT/frontend/src/pages/AppsPage.tsx"
 grep -Fq "if (action === 'remove') closeRemoveDialog();" "$ROOT/frontend/src/pages/AppsPage.tsx"
 grep -Fq "demo ? (" "$ROOT/frontend/src/pages/AppsPage.tsx"
 grep -Fq "demoAccount" "$FIXTURES"
+grep -Fq "updateAvailable: true," "$FIXTURES" || {
+  echo 'demo must show an App update badge' >&2
+  exit 1
+}
+grep -Fq "'network-usage-monitor': 117760" "$FIXTURES" || {
+  echo 'demo must provide an installed size for the network app' >&2
+  exit 1
+}
+grep -Fq 'storage: demoAppsMetrics.storage' "$FIXTURES" || {
+  echo 'dashboard and Apps demo storage must share one fixture' >&2
+  exit 1
+}
 grep -Fq "demoApps" "$FIXTURES"
 grep -Fq "demo={demo}" "$ROOT/frontend/src/components/AppShell.tsx"
 grep -Fq "!demo ?" "$ROOT/frontend/src/components/ProductNavigation.tsx"
