@@ -1,4 +1,4 @@
-import { AppsIcon, GamepadIcon, HomeIcon, NetworkNodesIcon, PowerIcon, PuzzleIcon, ShieldIcon } from './Icons';
+import { AppsIcon, CircleEllipsisIcon, GamepadIcon, HomeIcon, NetworkNodesIcon, ShieldIcon, WrenchIcon } from './Icons';
 
 export type AppsCategory = 'all' | 'network' | 'security' | 'smart_home' | 'entertainment' | 'utilities' | 'other';
 
@@ -9,6 +9,7 @@ export function appsCategoryOf(category: string): AppsCategory {
     case 'security': return 'security';
     case 'entertainment': return 'entertainment';
     case 'utilities': return 'utilities';
+    case 'other': return 'other';
     case 'smart_home':
     case 'iot': return 'smart_home';
     default: return 'other';
@@ -24,7 +25,8 @@ export function AppsCategoryIcon({ category, class: className }: { category: App
     case 'security': return <ShieldIcon class={className} />;
     case 'smart_home': return <HomeIcon class={className} />;
     case 'entertainment': return <GamepadIcon class={className} />;
-    case 'utilities': return <PowerIcon class={className} />;
-    default: return <PuzzleIcon class={className} />;
+    case 'utilities': return <WrenchIcon class={className} />;
+    case 'other': return <CircleEllipsisIcon class={className} />;
+    default: return <CircleEllipsisIcon class={className} />;
   }
 }

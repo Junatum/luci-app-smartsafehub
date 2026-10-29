@@ -45,8 +45,11 @@ assert 'rm -f "$LUCI_INDEX_CACHE"' in manager
 category = (root/'frontend/src/components/AppsCategoryIcon.tsx').read_text()
 page = (root/'frontend/src/pages/AppsPage.tsx').read_text()
 assert "case 'utilities': return 'utilities'" in category
-assert "case 'utilities': return <PowerIcon" in category
+assert "case 'utilities': return <WrenchIcon" in category
 assert "{ id: 'utilities', label: '도구' }" in page
+assert "case 'other': return <CircleEllipsisIcon" in category
+assert "default: return <CircleEllipsisIcon" in category
+assert "{ id: 'other', label: '기타' }" in page
 
 assert "id == 'retro-arcade'" in catalog and "type: id == 'retro-arcade'" in catalog
 assert "'/retro-arcade/'" in route and "webUi.type === 'static'" in route

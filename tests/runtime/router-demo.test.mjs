@@ -132,6 +132,26 @@ test('demo showcases verified Apps versions, upgrade badge, and installed sizes 
   assert.match(demo, /onUpdate=\{async \(\) => \{ readonlyNotice\(\); \}\}/);
 });
 
+test('Apps 카테고리 아이콘은 공유기와 데모에서 동일하고 도구와 기타가 구분된다', () => {
+  const page = readFileSync(resolve(root, 'pages/AppsPage.tsx'), 'utf8');
+  const category = readFileSync(resolve(root, 'components/AppsCategoryIcon.tsx'), 'utf8');
+  const icons = readFileSync(resolve(root, 'components/Icons.tsx'), 'utf8');
+  const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
+  assert.match(demo, /<AppsPage data=\{demoApps\}/);
+  assert.match(page, /<AppsCategoryIcon category=\{tab\.id\}/);
+  assert.match(page, /<AppsCategoryIcon category=\{appsCategoryOf\(app\.category\)\}/);
+  assert.match(page, /\{ id: 'utilities', label: '도구' \}/);
+  assert.match(page, /\{ id: 'other', label: '기타' \}/);
+  assert.match(category, /case 'utilities': return <WrenchIcon/);
+  assert.match(category, /case 'other': return <CircleEllipsisIcon/);
+  assert.match(category, /default: return 'other'/);
+  assert.match(category, /default: return <CircleEllipsisIcon/);
+  assert.match(icons, /export function WrenchIcon/);
+  assert.match(icons, /export function CircleEllipsisIcon/);
+  assert.match(icons, /export function NetworkNodesIcon/);
+  assert.doesNotMatch(category, /PowerIcon|PuzzleIcon/);
+});
+
 test('public demo actions never install APKs, pair an account, or open a live app', () => {
   const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
   const apps = readFileSync(resolve(root, 'pages/AppsPage.tsx'), 'utf8');

@@ -160,12 +160,23 @@ for tab_key, icon_name in [('all', 'AppsIcon'), ('network', 'NetworkNodesIcon'),
     check(f"case '{tab_key}': return <{icon_name}" in icon_source,
           f'{tab_key} category has the wrong icon')
 check("default: return 'other';" in icon_source and
-      'default: return <PuzzleIcon' in icon_source and
+      'default: return <CircleEllipsisIcon' in icon_source and
       "{ id: 'other', label: '기타' }" in page,
-      'unknown categories must use the other filter and its puzzle icon')
-for name in ['NetworkNodesIcon', 'GamepadIcon', 'PuzzleIcon']:
+      'unknown categories must use the other filter and its ellipsis icon')
+check("case 'utilities': return <WrenchIcon" in icon_source and
+      "case 'other': return <CircleEllipsisIcon" in icon_source and
+      "case 'other': return 'other'" in icon_source and
+      "{ id: 'utilities', label: '도구' }" in page,
+      'tools and other must have their own explicit category and distinct icons')
+check('PowerIcon' not in icon_source and 'PuzzleIcon' not in icon_source,
+      'category icons must not revert to power or puzzle symbols')
+for name in ['NetworkNodesIcon', 'GamepadIcon', 'WrenchIcon', 'CircleEllipsisIcon']:
     check(f'export function {name}(props: IconProps)' in shared_icons,
           f'{name} should use the local SVG IconBase and remain in the UI bundle')
+check('<circle cx="12" cy="12" r="10" />' in shared_icons and
+      'M8 12h.01M12 12h.01M16 12h.01' in shared_icons and
+      '3.106-3.105' in shared_icons,
+      'tools use a wrench, other uses a circle ellipsis, not network-like nodes')
 check('aria-hidden={title ? undefined : true}' in shared_icons and
       'fill="none"' in shared_icons and 'stroke="currentColor"' in shared_icons,
       'icons must be decorative line SVGs that inherit light/dark text color')

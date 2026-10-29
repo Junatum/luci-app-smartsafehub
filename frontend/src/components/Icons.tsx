@@ -103,11 +103,21 @@ export function GamepadIcon(props: IconProps) {
   );
 }
 
-/** Neutral fallback for uncategorized Apps. */
-export function PuzzleIcon(props: IconProps) {
+/** Tools and utilities: a wrench is distinct from the power control. */
+export function WrenchIcon(props: IconProps) {
   return (
     <IconBase {...props}>
-      <path d="M9 3h3v2a2 2 0 1 0 4 0V3h5v6h-2a2 2 0 1 0 0 4h2v8h-6v-2a2 2 0 1 0-4 0v2H3v-7h2a2 2 0 1 0 0-4H3V3h6Z" />
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.287l-7.91 7.91a2.121 2.121 0 0 1-3-3l7.91-7.91a6 6 0 0 1 7.287-8.259c.438.12.54.662.218.984z" />
+    </IconBase>
+  );
+}
+
+/** Other/unknown Apps: a simple ellipsis, distinct from network nodes. */
+export function CircleEllipsisIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12h.01M12 12h.01M16 12h.01" />
     </IconBase>
   );
 }
