@@ -223,7 +223,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
           title="Apps"
           description="SmartSafeHub에서 직접 검증한 앱으로 공유기의 기능을 확장하세요."
         />
-        <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,18.5rem)]">
           <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">

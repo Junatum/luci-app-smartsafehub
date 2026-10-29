@@ -364,25 +364,25 @@ unset APPS_TEST_SIZE_FULL_INFO_ONLY
 export APPS_TEST_SIZE_INLINE=1
 "$MANAGER" sizes
 grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'inline/compact installed size not summed'
-[ ! -s "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'successful size query unexpectedly logged failure'
+[ ! -e "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'retired size diagnostic file was created'
 unset APPS_TEST_SIZE_INLINE
 # Real OpenWrt 25.12 device output repeats the *same* installed-size header:
 # nlbwmon twice, luci-app-nlbwmon / luci-lib-chartjs three times each.
 export APPS_TEST_SIZE_DEVICE_REPEAT=1
 "$MANAGER" sizes
 grep -Fqx "$(printf 'network-usage-monitor\t117760')" "$TMP/runtime/apps-size.tsv" || fail 'real duplicated APK info output did not sum to 115 KiB'
-[ ! -s "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'valid repeated APK metadata logged as missing'
+[ ! -e "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'repeated APK size metadata wrote a diagnostic file'
 # A repeated heading with a *different* size is ambiguous: refuse to guess.
 export APPS_TEST_SIZE_CONFLICTING_REPEAT=1
 "$MANAGER" sizes
 [ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'conflicting duplicated size was accepted'
-grep -Fqx "$(printf 'network-usage-monitor\tnlbwmon\tmissing_size')" "$TMP/runtime/apps-size-diagnostics.tsv" || fail 'conflicting repeated size did not trigger diagnostics'
+[ ! -e "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'conflicting size metadata wrote a diagnostic file'
 unset APPS_TEST_SIZE_CONFLICTING_REPEAT APPS_TEST_SIZE_DEVICE_REPEAT
 # Do not show a misleading partial sum if one package cannot be measured.
 export APPS_TEST_SIZE_MISSING_PACKAGE=luci-lib-chartjs
 "$MANAGER" sizes
 [ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'partial APK metadata reported as complete installed size'
-grep -Fqx "$(printf 'network-usage-monitor\tluci-lib-chartjs\tmissing_size')" "$TMP/runtime/apps-size-diagnostics.tsv" || fail 'missing-package diagnostic absent'
+[ ! -e "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'missing package size wrote a diagnostic file'
 unset APPS_TEST_SIZE_MISSING_PACKAGE
 # Malformed and missing metadata must not alter the actual installed state.
 export APPS_TEST_SIZE_INVALID=1
@@ -394,6 +394,7 @@ unset APPS_TEST_SIZE_INVALID
 export APPS_TEST_SIZE_MISSING=1
 "$MANAGER" sizes
 [ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'missing APK size must be omitted'
+[ ! -e "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'invalid/missing APK size created retired diagnostics'
 unset APPS_TEST_SIZE_MISSING
 "$MANAGER" start remove network-usage-monitor || fail 'remove did not queue'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'new Apps uninstall did not remove owned packages'

@@ -374,11 +374,9 @@ status() {
 
 # Optional read-only sizes. Consult the *last known installed* status and
 # approved catalog. For incomplete metadata, omit the total rather than show
-# a misleading partial sum. The tiny diagnostic TSV identifies which package
-# could not be measured, without exposing arbitrary APK output or credentials.
+# a misleading partial sum.
 sizes() {
  tmp="$(mktemp "$RUNTIME/apps-size.XXXXXXXX")" || return 1
- diagnostic="$(mktemp "$RUNTIME/apps-size-diag.XXXXXXXX")" || { rm -f "$tmp"; return 1; }
  {
  if [ -r "$CATALOG" ] && [ -r "$RUNTIME/apps-status.tsv" ]; then
   for id in $(awk -F '\t' '$2 == "1" {print $1}' "$RUNTIME/apps-status.tsv"); do
@@ -399,13 +397,11 @@ sizes() {
     bytes="$(installed_size_bytes "$name" || :)"
     case "$bytes" in
      ''|*[!0-9]*)
-      printf '%s\t%s\tmissing_size\n' "$id" "$name" >> "$diagnostic"
       complete=0;;
      *)
       # Never overflow signed shell arithmetic or report an impossible total.
       if [ "${#bytes}" -gt 13 ] || [ "$bytes" -gt 1099511627776 ] ||
          [ "$total_bytes" -gt $((1099511627776 - bytes)) ]; then
-       printf '%s\t%s\tinvalid_size\n' "$id" "$name" >> "$diagnostic"
        complete=0
       else
        total_bytes=$((total_bytes + bytes))
@@ -418,7 +414,6 @@ sizes() {
  fi
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-size.tsv"
- mv -f "$diagnostic" "$RUNTIME/apps-size-diagnostics.tsv"
 }
 # Release names from the Hub have zero command authority. We cross-check the
 # fresh exact-build approval, locally trusted immutable index, architecture and

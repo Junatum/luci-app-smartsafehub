@@ -7,9 +7,9 @@ export function AppsStorageCard({ storage }: { storage: AppsStorage | null | und
   const summary = summarizeAppsStorage(storage);
   const availableArc = summary ? (summary.availableRatio * RING_CIRCUMFERENCE).toFixed(2) : '0';
   return (
-    <aside aria-label="앱 설치 저장 공간" data-level={summary?.level ?? 'unavailable'} class="ssh-apps-storage-card flex min-w-0 items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <div class="ssh-apps-storage-ring relative grid size-24 shrink-0 place-items-center" data-level={summary?.level ?? 'unavailable'}>
-        <svg aria-hidden="true" class="size-24" viewBox="0 0 96 96">
+    <aside aria-label="앱 설치 저장 공간" data-level={summary?.level ?? 'unavailable'} class="ssh-apps-storage-card flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5">
+      <div class="ssh-apps-storage-ring relative grid size-20 shrink-0 place-items-center" data-level={summary?.level ?? 'unavailable'}>
+        <svg aria-hidden="true" class="size-20" viewBox="0 0 96 96">
           <circle class="ssh-apps-storage-track" cx="48" cy="48" r="34" />
           {summary && summary.availableRatio > 0 ? (
             <circle class="ssh-apps-storage-free" cx="48" cy="48" r="34"

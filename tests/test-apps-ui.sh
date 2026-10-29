@@ -62,8 +62,10 @@ check('fetchAppsMetrics' in (root / 'frontend/src/app/App.tsx').read_text() and
       'pollInterval: 60000' in (root / 'frontend/src/app/App.tsx').read_text(),
       'optional Apps metrics should run separately and less frequently')
 check("'/bin/df'" not in backend and "'/bin/df'" not in storage_module, 'storage must not spawn a polling command')
-check('lg:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]' in page,
-      'Apps info and storage must be side by side on desktop and stacked on mobile')
+check('lg:grid-cols-[minmax(0,1fr)_minmax(0,18.5rem)]' in page,
+      'Apps storage should be a compact fixed-width column on desktop, stacked on mobile')
+check('ssh-apps-storage-card' in card and 'size-20' in card and 'gap-3' in card and 'sm:p-5' not in card,
+      'storage card must be compact without hiding the donut or capacity data')
 check('<AppsStorageCard storage={metrics?.storage} />' in page,
       'Apps storage should be read from independent optional metrics')
 check('stroke-dasharray=' in card and 'aria-label="앱 설치 저장 공간"' in card,
@@ -85,8 +87,12 @@ check('du -' not in manager and 'find /' not in manager,
 check('installedSizes[fields[0]]' in backend and 'length(fields) != 2' in backend and
       'installedBytes:' not in backend and 'installedVersion:' in backend,
       'package size data must be parsed separately from the six-column status')
-check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$name"' in manager and 'apps-size-diagnostics.tsv' in manager,
+check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$name"' in manager,
       'optional sizes command must report app APK totals without modifying status')
+check('apps-size-diag' not in manager and 'diagnostic=' not in manager,
+      'optional size checks must not create the retired diagnostics TSV')
+check('rm -f /tmp/smartsafehub/apps-size-diagnostics.tsv' in package,
+      'package upgrade must clean up the retired runtime diagnostic file')
 check('app_bytes=' not in manager and 'set --' not in manager.split('sizes() {')[0].split('status() {')[1],
       'status must not invoke optional size processing')
 check('sizeLabel !== null' in page and '설치 용량 약 {sizeLabel}' in page,
