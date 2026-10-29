@@ -279,15 +279,40 @@ assert "data-level={disk?.level ?? 'unavailable'}" in home, 'Apps와 같은 부�
 assert 'aria-label={disk' in home and '디스크 여유 공간 ${disk.availablePercent}%' in home, '스크린 리더에 저장 공간 정보를 제공해야 합니다'
 assert "{disk ? `${disk.availableText} 남음` : '저장 공간 확인 불가'}" in home, '용량 조회 실패를 0%로 표시하면 안 됩니다'
 assert 'diskUsedPercent' not in home, '기존 선형 사용률 막대 로직을 제거해야 합니다'
-assert '<svg aria-hidden="true" class="size-24" viewBox="0 0 96 96">' in home, 'Apps와 같은 96px 도넛 SVG가 필요합니다'
+assert '<svg aria-hidden="true" class="size-[76px]" viewBox="0 0 96 96">' in home, '대시보드 도넛은 76px로 줄이고 Apps 링 스타일을 유지해야 합니다'
 assert 'stroke-dasharray={`${diskAvailableArc} ${DISK_RING_CIRCUMFERENCE.toFixed(2)}`}' in home, 'Apps와 동일한 SVG 호 표시가 필요합니다'
+assert 'class="ssh-apps-storage-ring relative grid size-[76px] shrink-0 place-items-center"' in home, '도넛 외곽도 76px이어야 합니다'
+ring = home[home.index('class="ssh-apps-storage-ring relative grid size-[76px]'):home.index('ssh-apps-storage-available mt-1 mb-0')]
+assert 'text-base leading-none font-black' in ring, '도넛 % 글자는 16px로 표시해야 합니다'
+assert 'text-[20px]' not in ring, '이전 20px 글자 크기가 남아 있으면 안 됩니다'
+assert 'font-bold text-slate-500">여유</span>' not in ring, '도넛 중앙 여유 문구를 제거해야 합니다'
+assert 'class="mt-1 flex justify-center"' in home, '도넛 위 간격을 줄여 전체 카드 높이를 낮춰야 합니다'
+
 apps_card = Path('frontend/src/components/AppsStorageCard.tsx').read_text()
 styles = Path('frontend/src/styles/app.css').read_text()
 for css_class in ('ssh-apps-storage-ring', 'ssh-apps-storage-track', 'ssh-apps-storage-free'):
     assert css_class in home and css_class in apps_card and css_class in styles, f'Apps와 대시보드가 {css_class} 스타일을 공유해야 합니다'
 assert 'r="39"' in apps_card and 'r="39"' in home, '두 페이지의 도넛 반지름이 같아야 합니다'
-assert "import { from_system_root } from './apps-storage.uc'" in backend
-assert 'storage: from_system_root(info?.root)' in backend, '기존 system.info를 재사용해야 합니다'
+# Same threshold semantics and readable warning colors on both pages.
+utils = Path('frontend/src/utils/appsStorage.ts').read_text()
+assert "availableRatio <= 0.1 ? 'critical' : availableRatio <= 0.2 ? 'warning' : 'normal'" in utils, '여유 10%/20% 경고 기준이 필요합니다'
+assert 'ssh-dashboard-storage-card' in home and 'ssh-apps-storage-available' in home, '대시보드 남은 용량 텍스트도 경고 색상을 따라야 합니다'
+assert 'ssh-apps-storage-card' in apps_card and 'ssh-apps-storage-available' in apps_card, 'Apps의 경고 색상을 유지해야 합니다'
+for severity in ('warning', 'critical'):
+    assert f".ssh-apps-storage-ring[data-level='{severity}'] .ssh-apps-storage-free" in styles, '두 페이지 도넛에 부족 경고 색상이 적용되어야 합니다'
+    assert f".ssh-apps-storage-card[data-level='{severity}'] .ssh-apps-storage-available" in styles, 'Apps 텍스트에도 경고 색상이 필요합니다'
+    assert f".ssh-dashboard-storage-card[data-level='{severity}'] .ssh-apps-storage-available" in styles, '대시보드 텍스트에도 경고 색상이 필요합니다'
+    assert f".ssh-app[data-theme='dark'] .ssh-dashboard-storage-card[data-level='{severity}']" in styles, '다크 모드에서 경고 색상을 유지해야 합니다'
+assert home.count('class="flex min-h-0 flex-1 flex-col justify-center py-1"') == 3, '메모리·시스템 부하·실행 시간은 세로 중앙 정렬하면서 패딩을 줄여야 합니다'
+assert 'class="mt-5 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"' in home, '기존 반응형 4열을 유지해야 합니다'
+assert "import { from_system_root, from_statvfs } from './apps-storage.uc'" in backend
+assert 'storage: dashboard_writable_storage(info?.root)' in backend, '기존 system.info를 재사용해야 합니다'
+assert 'const from_root = from_system_root(root)' in backend, '기존 procd 파일시스템 통계를 우선 사용해야 합니다'
+assert "for (let mount in [ '/overlay', '/' ])" in backend, 'OpenWrt 쓰기 가능한 저장소 fallback이 필요합니다'
+assert 'from_statvfs(fs.statvfs(mount), mount)' in backend, 'Apps와 동일한 statvfs 계산 fallback을 사용해야 합니다'
+assert 'if (storage != null)' in backend and 'catch (e)' in backend, '스토리지 조회 실패 시 다른 대시보드 항목에 영향이 없어야 합니다'
+assert 'run_command' not in backend.split('function dashboard_writable_storage(root)', 1)[1].split('function system_status_payload(', 1)[0], '새 프로세스 실행으로 디스크 통계를 구하지 않아야 합니다'
+assert 'from_system_root(info?.root)' not in backend, '별도의 fallback 없이 procd 통계만 사용하면 안 됩니다'
 assert "'apps_metrics'" not in backend and "'df'" not in backend, '새 저장 공간 조회 금지'
 assert 'storage?: AppsStorage | null' in types, '구버전 RPC는 저장 공간 값을 생략할 수 있어야 합니다'
 assert 'storage: demoAppsMetrics.storage' in demo, '체험 페이지도 디스크 정보를 제공해야 합니다'

@@ -2302,10 +2302,15 @@
 .ssh-app[data-theme='dark'] .ssh-apps-storage-ring[data-level='warning'] .ssh-apps-storage-free { stroke: #fbbf24; }
 .ssh-app[data-theme='dark'] .ssh-apps-storage-ring[data-level='critical'] .ssh-apps-storage-free { stroke: #fb7185; }
 
-.ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #b45309; }
-.ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #be123c; }
-.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #fbbf24; }
-.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #fb7185; }
+/* Identical low-space warnings in Apps and Dashboard, including the capacity label. */
+.ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available,
+.ssh-dashboard-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #b45309; }
+.ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available,
+.ssh-dashboard-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #be123c; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='warning'] .ssh-apps-storage-available,
+.ssh-app[data-theme='dark'] .ssh-dashboard-storage-card[data-level='warning'] .ssh-apps-storage-available { color: #fbbf24; }
+.ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available,
+.ssh-app[data-theme='dark'] .ssh-dashboard-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #fb7185; }
 
 /* Apps cards: installed is a quiet state, updates are an amber action. */
 .ssh-apps-installed-badge {
