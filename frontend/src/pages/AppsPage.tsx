@@ -340,7 +340,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   return (
                     <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
                       <div class="flex min-w-0 items-start gap-3">
-                        <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-5" /></span>
+                        <span class="grid size-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" /></span>
                         <div class="min-w-0 flex-1">
                           <div class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
                             <h3 class="m-0 min-w-0 flex-1 break-words text-sm font-black text-slate-950">{app.name}</h3>

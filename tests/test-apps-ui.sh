@@ -134,8 +134,16 @@ icon_source = (root / 'frontend/src/components/AppsCategoryIcon.tsx').read_text(
 shared_icons = (root / 'frontend/src/components/Icons.tsx').read_text()
 check('AppsCategoryIcon, appsCategoryOf' in page and
       '<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page and
-      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-5" />' in page,
+      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in page,
       'filters and cards must share category-specific icons in appropriately sized frames')
+
+check('class="grid size-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"' in page,
+      'app card category icon frame must be 56px and align with the installed size row')
+check('<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in page and
+      'class="grid size-11 shrink-0 place-items-center' not in page,
+      'app category icon itself must be 28px while retaining the 56px frame')
+check('<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page,
+      'category filter icons must remain compact and not change touch targets')
 check('appsCategoryOf(app.category) === category' in page,
       'icon categorization and filtering must use the same normalization')
 check('aria-label="앱 카테고리"' in page and '>{tab.label}</button>' in page and
