@@ -335,7 +335,7 @@ second_operation_id="$(awk -F '\t' '$1 == "operation_id" { print $2; exit }' "$T
 [ "$(sed -n '3p' "$APPS_TEST_OPERATION_START_LOG")" = "$second_operation_id" ] || fail 'operation identity changed during success'
 [ "$(wc -l < "$APPS_TEST_INSTALLED")" -eq 3 ] || fail 'all three APKs were not installed'
 [ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 1 ] || fail 'successful installation not recorded exactly once'
-grep -Eq '^enqueue network-usage-monitor 2025\.06\.02-r1 [0-9]+-[0-9]+-[a-f0-9]{16}$' "$APPS_TEST_METRICS_LOG" || fail 'invalid receipt fields'
+grep -Eq '^enqueue network-usage-monitor 2025\.06\.02-r1 [0-9]+-[0-9]+-[a-f0-9]{16} install$' "$APPS_TEST_METRICS_LOG" || fail 'invalid install receipt fields'
 
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb update$' "$APPS_TEST_APK_LOG" || fail 'approved local index not loaded before simulation'
 grep -Eq '^--repositories-file /dev/null -X file://.*/packages/packages.adb add --simulate nlbwmon=2025\.06\.02~29236be6-r1 luci-app-nlbwmon=26\.288\.56989~75a306d luci-lib-chartjs=26\.288\.56989~75a306d$' "$APPS_TEST_APK_LOG" || fail 'isolated signed repository simulation not used'
@@ -461,7 +461,7 @@ EOF_RETRO
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'single Retro APK installation failed'
 [ "$(cat "$APPS_TEST_INSTALLED")" = smartsafehub-app-retro-arcade ] || fail 'unexpected Retro APK installation set'
 [ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq 2 ] || fail 'Retro install not counted'
-grep -Eq '^enqueue retro-arcade 1\.0\.0-r1 [0-9]+-[0-9]+-[a-f0-9]{16}$' "$APPS_TEST_METRICS_LOG" || fail 'Retro receipt incorrect'
+grep -Eq '^enqueue retro-arcade 1\.0\.0-r1 [0-9]+-[0-9]+-[a-f0-9]{16} install$' "$APPS_TEST_METRICS_LOG" || fail 'Retro receipt incorrect'
 # Pin the exact installed package version used by the status query. The
 # approved catalog version must never be substituted for this value.
 printf 'smartsafehub-app-retro-arcade 1.0.0-r1\n' > "$APPS_TEST_VERSION_DB"
@@ -576,7 +576,9 @@ printf 'new signed Retro payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'approved update did not succeed'
 grep -Fqx "$(printf 'smartsafehub-app-retro-arcade\t1.1.0-r1\t%s' "$NEWRETROSHA")" "$TMP/owned/retro-arcade" || fail 'new version manifest not committed'
 [ "$(awk '$1 == "smartsafehub-app-retro-arcade" {print $2}' "$APPS_TEST_VERSION_DB")" = 1.1.0-r1 ] || fail 'mock apk version did not update'
-[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" = "$receipt_before" ] || fail 'upgrade was counted as an install'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq "$((receipt_before + 1))" ] || fail 'successful upgrade not recorded exactly once'
+grep -Eq '^enqueue retro-arcade 1\.1\.0-r1 [0-9]+-[0-9]+-[a-f0-9]{16} update$' "$APPS_TEST_METRICS_LOG" || fail 'update receipt kind/version incorrect'
+[ "$(awk '$1 == "enqueue" && $5 == "update" { n++ } END {print n+0}' "$APPS_TEST_METRICS_LOG")" -eq 1 ] || fail 'upgrade counted as a new install or multiple updates'
 "$MANAGER" status
 grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t1.1.0-r1')" "$TMP/runtime/apps-status.tsv" || fail 'installed version not updated after APK upgrade'
 # Update releases may appear alongside older APK index metadata: the size
@@ -591,6 +593,7 @@ export APPS_TEST_SIZE_MIXED_RELEASES=conflicting
 unset APPS_TEST_SIZE_MIXED_RELEASES
 "$MANAGER" start update retro-arcade || fail 'repeated update should report a no-op'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'repeated update was not rejected'
+[ "$(wc -l < "$APPS_TEST_METRICS_LOG" | tr -d ' ')" -eq "$((receipt_before + 1))" ] || fail 'no-op upgrade produced an event'
 # Any attempt to downgrade a package must fail closed.
 python3 - "$TMP/catalog.json" "$RETROSHA" <<'PY_DOWNGRADE'
 import json,sys

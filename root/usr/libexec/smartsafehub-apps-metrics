@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Local durable outbox for authenticated, successful SmartSafeHub Apps installs.
-# Never affects package transactions; send nothing except app/version/receipt ID.
+# Durable outbox for authenticated successful user installs and updates.
+# Never affects APK transactions; send only app, release, kind and receipt ID.
 set -eu
 umask 077
 QUEUE="${SMARTSAFEHUB_APPS_METRICS_DIR:-/etc/smartsafehub/apps-metrics-pending}"
@@ -20,8 +20,10 @@ valid_event() {
  printf '%s\n' "$1" | grep -Eq '^[0-9]{10}-[0-9]+-[0-9a-f]{16}$' && [ "${#1}" -le 64 ]
 }
 enqueue() {
- [ "$#" -eq 3 ] || exit 2
+ [ "$#" -eq 3 ] || [ "$#" -eq 4 ] || exit 2
  valid_id "$1" && valid_version "$2" && valid_event "$3" || exit 2
+ kind="${4:-install}"
+ case "$kind" in install|update) ;; *) exit 2;; esac
  mkdir -p "$QUEUE" || exit 1
  [ -d "$QUEUE" ] && [ ! -L "$QUEUE" ] || exit 1
  file="$QUEUE/$3.json"
@@ -30,7 +32,7 @@ enqueue() {
  count="$(find "$QUEUE" -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' ')"
  [ "$count" -lt "$MAX_PENDING" ] || exit 1
  tmp="$(mktemp "$QUEUE/.pending.XXXXXXXX")" || exit 1
- if ! printf '{"app_id":"%s","version":"%s","event_id":"%s"}\n' "$1" "$2" "$3" > "$tmp"; then
+ if ! printf '{"app_id":"%s","version":"%s","event_id":"%s","kind":"%s"}\n' "$1" "$2" "$3" "$kind" > "$tmp"; then
   rm -f "$tmp"; exit 1
  fi
  mv -f "$tmp" "$file"

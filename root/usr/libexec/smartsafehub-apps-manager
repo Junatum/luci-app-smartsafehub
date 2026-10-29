@@ -666,11 +666,12 @@ worker() {
  esac
  if [ "$rc" -eq 0 ]; then
   write_state success "$action" "$app" NONE "$operation_id" "$source"
-  # Count only completed user installs. Restore, removals and failed/no-op
-  # operations never become new download counts; telemetry cannot fail an APK.
-  if [ "$action" = install ] && [ "$source" = user ]; then
+  # Count successful user installs and updates separately. Restores,
+  # removals and failed/no-op operations never become receipts. Telemetry
+  # must not affect the success of an APK transaction.
+  if [ "$source" = user ] && { [ "$action" = install ] || [ "$action" = update ]; }; then
    version="$(field "$CATALOG" "@.apps[$index].version")"
-   "$METRICS" enqueue "$app" "$version" "$operation_id" >/dev/null 2>&1 || :
+   "$METRICS" enqueue "$app" "$version" "$operation_id" "$action" >/dev/null 2>&1 || :
   fi
  else
   # Keep only the latest package-manager diagnostic after the workspace is

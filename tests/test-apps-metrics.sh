@@ -49,6 +49,8 @@ EVENT=1793170000-4321-1234567890abcdef
 "$HELPER" enqueue retro-arcade 1.0.0-r1 "$EVENT"
 [ "$(find "$TMP/pending" -name '*.json' | wc -l | tr -d ' ')" -eq 1 ] || fail 'same event duplicated'
 "$HELPER" enqueue '../../etc/passwd' x "$EVENT" >/dev/null 2>&1 && fail 'unsafe app ID accepted'
+"$HELPER" enqueue retro-arcade 1.0.0-r1 "$EVENT" invalid >/dev/null 2>&1 && fail 'invalid event kind accepted'
+"$HELPER" enqueue retro-arcade 1.0.0-r1 "$EVENT" update extra >/dev/null 2>&1 && fail 'extra event fields accepted'
 "$HELPER" enqueue retro-arcade x 'bad/id' >/dev/null 2>&1 && fail 'unsafe event accepted'
 "$HELPER" flush
 [ -f "$TMP/pending/$EVENT.json" ] || fail 'unregistered device lost receipt'
@@ -60,16 +62,30 @@ export APPS_METRICS_TEST_MODE=recorded
 "$HELPER" flush
 [ ! -f "$TMP/pending/$EVENT.json" ] || fail 'acknowledged event not cleared'
 grep -Fq '"app_id":"retro-arcade"' "$TMP/last-body.json" || fail 'app ID lost'
+grep -Fq '"kind":"install"' "$TMP/last-body.json" || fail 'legacy install kind lost'
+# The same device can report a newer app release as an update; retry must
+# preserve the kind and event ID without changing the install counter.
+UPDATE_EVENT=1793170001-4322-abcdef1234567890
+"$HELPER" enqueue retro-arcade 1.1.0-r5 "$UPDATE_EVENT" update
+[ "$(find "$TMP/pending" -name '*.json' | wc -l | tr -d ' ')" -eq 1 ] || fail 'update receipt not queued'
+grep -Fq '"kind":"update"' "$TMP/pending/$UPDATE_EVENT.json" || fail 'update recorded as install'
+export APPS_METRICS_TEST_MODE=fail
+"$HELPER" flush >/dev/null 2>&1 && fail 'failed update upload returned success'
+[ -f "$TMP/pending/$UPDATE_EVENT.json" ] || fail 'update receipt lost on failure'
+export APPS_METRICS_TEST_MODE=recorded
+"$HELPER" flush
+[ ! -f "$TMP/pending/$UPDATE_EVENT.json" ] || fail 'updated receipt not acknowledged'
+grep -Fq '"kind":"update"' "$TMP/last-body.json" || fail 'update kind lost over HTTP'
 "$HELPER" enqueue retro-arcade 1.0.0-r1 "$EVENT"
 export APPS_METRICS_TEST_MODE=duplicate
 "$HELPER" flush
 [ ! -f "$TMP/pending/$EVENT.json" ] || fail 'deduplicated event not cleared'
 ! grep -Eiq '(credential|mac|ip_address|device_uuid|user)' "$TMP/last-body.json" || fail 'private metadata uploaded'
-grep -Fq '"$METRICS" enqueue "$app" "$version" "$operation_id"' "$MANAGER" || fail 'successful installation not queued'
+grep -Fq '"$METRICS" enqueue "$app" "$version" "$operation_id" "$action"' "$MANAGER" || fail 'successful installation/update not queued'
 grep -Fq '[ "$source" = user ]' "$MANAGER" || fail 'restores are included in download count'
 grep -Fq 'start install "$id" restore' "$RESTORE" || fail 'restore source missing'
 grep -Fq '"$APPS_METRICS" flush' "$DEVICE" || fail 'background queue retry missing'
 grep -Fxq '/etc/smartsafehub/apps-metrics-pending/' "$ROOT/root/lib/upgrade/keep.d/smartsafehub-apps" || fail 'sysupgrade lost pending receipts'
 sh -n "$HELPER" "$MANAGER" "$DEVICE" "$RESTORE" || fail 'shell syntax invalid'
-printf 'PASS: authenticated Apps install receipt queue, retry, dedup and restore exclusion
+printf 'PASS: authenticated Apps install/update receipt queue, retry, dedup and restore exclusion
 '
