@@ -115,9 +115,12 @@ case "$1" in
    if [ "$2" = -s ]; then
      shift 2
      [ "${APPS_TEST_SIZE_MISSING:-0}" = 0 ] || exit 2
+     [ "$#" -eq 1 ] || exit 2
+     [ "${APPS_TEST_SIZE_FULL_INFO_ONLY:-0}" = 0 ] || exit 2
      for name in "$@"; do
        grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 2
-       printf '%s installed size:\n' "$name"
+       [ "${APPS_TEST_SIZE_MISSING_PACKAGE:-}" != "$name" ] || exit 2
+       printf '%s-1.0.0-r1 installed size:\n' "$name"
        if [ "${APPS_TEST_SIZE_INVALID:-0}" = 1 ]; then
          echo 'not-a-size'; continue
        fi
@@ -129,6 +132,18 @@ case "$1" in
         *) printf '0 B\n';;
        esac
      done
+     exit 0
+   fi
+   if [ "$#" -eq 2 ] && [ "${APPS_TEST_SIZE_FULL_INFO_ONLY:-0}" = 1 ]; then
+     name="$2"
+     grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 2
+     printf '%s-1.0.0-r1 description:\nMock metadata\n\n%s-1.0.0-r1 installed size:\n' "$name" "$name"
+     case "$name" in
+       nlbwmon) printf '1.5 MiB\n';;
+       luci-app-nlbwmon) printf '512 KiB\n';;
+       luci-lib-chartjs) printf '256 KiB\n';;
+       *) exit 2;;
+     esac
      exit 0
    fi
    [ "$2" = -e ] || exit 2
@@ -305,6 +320,20 @@ grep -Fq "$(printf 'network-usage-monitor\t1\t1\t1\t1\t0\t')" "$TMP/runtime/apps
 [ "$(grep -c '^info -s ' "$APPS_TEST_APK_LOG" || :)" -eq 0 ] || fail 'status unexpectedly queried APK sizes'
 "$MANAGER" sizes
 grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'multi-package installed size not summed'
+[ "$(grep -c '^info -s ' "$APPS_TEST_APK_LOG" || :)" -eq 3 ] || fail 'each network APK size must be queried separately'
+for package in nlbwmon luci-app-nlbwmon luci-lib-chartjs; do
+ grep -Fqx "info -s $package" "$APPS_TEST_APK_LOG" || fail "missing individual size lookup: $package"
+done
+# Standard apk info must work when this apk v3 variant does not expose -s.
+export APPS_TEST_SIZE_FULL_INFO_ONLY=1
+"$MANAGER" sizes
+grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'full APK info fallback failed'
+unset APPS_TEST_SIZE_FULL_INFO_ONLY
+# Do not show a misleading partial sum if one package cannot be measured.
+export APPS_TEST_SIZE_MISSING_PACKAGE=luci-lib-chartjs
+"$MANAGER" sizes
+[ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'partial APK metadata reported as complete installed size'
+unset APPS_TEST_SIZE_MISSING_PACKAGE
 # Malformed and missing metadata must not alter the actual installed state.
 export APPS_TEST_SIZE_INVALID=1
 "$MANAGER" sizes

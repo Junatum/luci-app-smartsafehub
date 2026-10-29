@@ -78,8 +78,8 @@ check(".ssh-app[data-theme='dark'] .ssh-apps-storage-track" in styles and
 
 # Per-app size reflects the installed APK package metadata only (no du scan).
 manager = (root / 'root/usr/libexec/smartsafehub-apps-manager').read_text()
-check('installed_size_bytes() {' in manager and '"$APK" info -s "$@"' in manager,
-      'Apps installed size should use one APK metadata lookup per app')
+check('installed_size_bytes() {' in manager and '"$APK" info -s "$name"' in manager,
+      'Apps installed size should query each package independently')
 check('du -' not in manager and 'find /' not in manager,
       'installed size must not recursively scan the router filesystem')
 check('installedSizes[fields[0]]' in backend and 'length(fields) != 2' in backend and
@@ -89,7 +89,7 @@ check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes
       'optional sizes command must report app APK totals without modifying status')
 check('app_bytes=' not in manager and 'set --' not in manager.split('sizes() {')[0].split('status() {')[1],
       'status must not invoke optional size processing')
-check('sizeLabel !== null' in page and '패키지 설치 용량 약 {sizeLabel}' in page,
+check('sizeLabel !== null' in page and '설치 용량 약 {sizeLabel}' in page,
       'installed app card must show a real size only when known')
 check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in page and 'metrics?.installedSizes' in page,
       'missing or invalid sizes must not be guessed')

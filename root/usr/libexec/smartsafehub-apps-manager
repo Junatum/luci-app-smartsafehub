@@ -176,10 +176,15 @@ installed_version() {
 # recursive scan of /overlay. Query all packages for one app in one call.
 # Metadata may be unavailable on older APK versions: report no value rather
 # than guessing. Sizes exclude app-created data and caches.
-installed_size_bytes() {
- [ "$#" -gt 0 ] || return 1
- "$APK" info -s "$@" 2>/dev/null | awk -v expected="$#" '
-  / installed size:$/ { if (waiting) invalid=1; waiting=1; next }
+parse_installed_apk_size() {
+ # Parse apk v3's human-readable installed-size record. Require exactly
+ # one package's metadata; ignore unrelated description/dependency fields.
+ awk -v name="$1" '
+  / installed size:$/ {
+   # Real apk v3 includes the version; tests may use a name-only heading.
+   if (seen || ($0 != name " installed size:" && index($0, name "-") != 1)) invalid=1
+   seen++; waiting=1; next
+  }
   waiting && NF == 2 {
    if ($1 !~ /^[0-9]+([.][0-9]+)?$/) { invalid=1; waiting=0; next }
    if ($2 == "B") factor=1
@@ -187,13 +192,40 @@ installed_size_bytes() {
    else if ($2 == "MiB") factor=1048576
    else if ($2 == "GiB") factor=1073741824
    else { invalid=1; waiting=0; next }
-   sum += $1 * factor
+   bytes=$1 * factor
+   if (bytes < 0 || bytes > 1099511627776) invalid=1
    count++
    waiting=0
   }
   END {
-   if (!invalid && !waiting && count == expected && sum >= 0 && sum <= 1099511627776)
-    printf "%.0f\n", sum
+   if (!invalid && !waiting && seen == 1 && count == 1)
+    printf "%.0f\n", bytes
+   else exit 1
+  }
+ '
+}
+installed_size_bytes() {
+ [ "$#" -gt 0 ] || return 1
+ # A multi-name apk info request may omit individual metadata. Query each
+ # installed package separately; the standard info view is a fallback for
+ # builds where -s does not expose the full installed-size record.
+ # This optional path never runs as part of Apps installation status.
+ {
+  for name in "$@"; do
+   bytes="$("$APK" info -s "$name" 2>/dev/null | parse_installed_apk_size "$name")" || {
+    bytes="$("$APK" info "$name" 2>/dev/null | parse_installed_apk_size "$name")" || continue
+   }
+   printf '%s\n' "$bytes"
+  done
+ } | awk -v expected="$#" '
+  /^[0-9]+$/ {
+   if (length($0) > 13) { invalid=1; next }
+   total += $1; count++; next
+  }
+  { invalid=1 }
+  END {
+   if (!invalid && count == expected && total >= 0 && total <= 1099511627776)
+    printf "%.0f\n", total
    else exit 1
   }
  '

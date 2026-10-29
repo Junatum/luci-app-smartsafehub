@@ -350,7 +350,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                           ) : null}
                           {sizeLabel !== null ? (
                             <p class="mb-0 mt-1 text-[11px] text-slate-500" title="설치된 APK 패키지의 용량 합계입니다. 앱 데이터 및 캐시는 포함되지 않습니다.">
-                              패키지 설치 용량 약 {sizeLabel}
+                              설치 용량 약 {sizeLabel}
                             </p>
                           ) : null}
                         </div>
