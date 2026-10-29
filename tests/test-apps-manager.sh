@@ -120,6 +120,15 @@ case "$1" in
      for name in "$@"; do
        grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 2
        [ "${APPS_TEST_SIZE_MISSING_PACKAGE:-}" != "$name" ] || exit 2
+       if [ "${APPS_TEST_SIZE_INLINE:-0}" = 1 ]; then
+         case "$name" in
+          nlbwmon) printf '%s-1.0.0-r1 installed size: 1.5 MiB\n' "$name";;
+          luci-app-nlbwmon) printf '%s-1.0.0-r1 installed size: 512KiB\n' "$name";;
+          luci-lib-chartjs) printf '%s-1.0.0-r1 installed size: 256 KiB\n' "$name";;
+          smartsafehub-app-retro-arcade) printf '%s-1.0.0-r1 installed size: 12.5 MiB\n' "$name";;
+         esac
+         continue
+       fi
        printf '%s-1.0.0-r1 installed size:\n' "$name"
        if [ "${APPS_TEST_SIZE_INVALID:-0}" = 1 ]; then
          echo 'not-a-size'; continue
@@ -329,10 +338,18 @@ export APPS_TEST_SIZE_FULL_INFO_ONLY=1
 "$MANAGER" sizes
 grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'full APK info fallback failed'
 unset APPS_TEST_SIZE_FULL_INFO_ONLY
+# OpenWrt APK versions may render the size on the header line or with no
+# whitespace between the number and KiB. The sum must be identical.
+export APPS_TEST_SIZE_INLINE=1
+"$MANAGER" sizes
+grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'inline/compact installed size not summed'
+[ ! -s "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'successful size query unexpectedly logged failure'
+unset APPS_TEST_SIZE_INLINE
 # Do not show a misleading partial sum if one package cannot be measured.
 export APPS_TEST_SIZE_MISSING_PACKAGE=luci-lib-chartjs
 "$MANAGER" sizes
 [ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'partial APK metadata reported as complete installed size'
+grep -Fqx "$(printf 'network-usage-monitor\tluci-lib-chartjs\tmissing_size')" "$TMP/runtime/apps-size-diagnostics.tsv" || fail 'missing-package diagnostic absent'
 unset APPS_TEST_SIZE_MISSING_PACKAGE
 # Malformed and missing metadata must not alter the actual installed state.
 export APPS_TEST_SIZE_INVALID=1

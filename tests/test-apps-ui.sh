@@ -85,7 +85,7 @@ check('du -' not in manager and 'find /' not in manager,
 check('installedSizes[fields[0]]' in backend and 'length(fields) != 2' in backend and
       'installedBytes:' not in backend and 'installedVersion:' in backend,
       'package size data must be parsed separately from the six-column status')
-check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$@"' in manager,
+check('sizes) mkdir -p "$RUNTIME"; sizes;;' in manager and 'installed_size_bytes "$name"' in manager and 'apps-size-diagnostics.tsv' in manager,
       'optional sizes command must report app APK totals without modifying status')
 check('app_bytes=' not in manager and 'set --' not in manager.split('sizes() {')[0].split('status() {')[1],
       'status must not invoke optional size processing')

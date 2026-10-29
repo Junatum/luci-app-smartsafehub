@@ -173,62 +173,70 @@ installed_version() {
  '
 }
 # Use APK's installed-size metadata, not archive/download size or a slow
-# recursive scan of /overlay. Query all packages for one app in one call.
-# Metadata may be unavailable on older APK versions: report no value rather
-# than guessing. Sizes exclude app-created data and caches.
+# recursive scan of /overlay. apk versions may put the number on the same
+# line as the "installed size" heading or on the next line. Do not guess
+# missing metadata, and do not accept a size from a different package.
 parse_installed_apk_size() {
- # Parse apk v3's human-readable installed-size record. Require exactly
- # one package's metadata; ignore unrelated description/dependency fields.
  awk -v name="$1" '
-  / installed size:$/ {
-   # Real apk v3 includes the version; tests may use a name-only heading.
-   if (seen || ($0 != name " installed size:" && index($0, name "-") != 1)) invalid=1
-   seen++; waiting=1; next
+  function number_of_bytes(value, parts, count, factor, bytes) {
+   gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+   # Accept the standard "123 KiB" and compact "123KiB" forms.
+   sub(/(B|KiB|MiB|GiB)$/, " &", value)
+   count=split(value, parts, /[[:space:]]+/)
+   if (count != 2 || parts[1] !~ /^[0-9]+([.][0-9]+)?$/) return -1
+   if (parts[2] == "B") factor=1
+   else if (parts[2] == "KiB") factor=1024
+   else if (parts[2] == "MiB") factor=1048576
+   else if (parts[2] == "GiB") factor=1073741824
+   else return -1
+   bytes=parts[1]*factor
+   if (bytes < 0 || bytes > 1099511627776) return -1
+   return bytes
   }
-  waiting && NF == 2 {
-   if ($1 !~ /^[0-9]+([.][0-9]+)?$/) { invalid=1; waiting=0; next }
-   if ($2 == "B") factor=1
-   else if ($2 == "KiB") factor=1024
-   else if ($2 == "MiB") factor=1048576
-   else if ($2 == "GiB") factor=1073741824
-   else { invalid=1; waiting=0; next }
-   bytes=$1 * factor
-   if (bytes < 0 || bytes > 1099511627776) invalid=1
-   count++
-   waiting=0
+  {
+   line=$0
+   sub(/\r$/, "", line)
+   heading=" installed size:"
+   marker=index(line, heading)
+   if (marker > 0 && (substr(line, 1, length(name) + 1) == name "-" ||
+       substr(line, 1, length(name) + length(heading)) == name heading)) {
+    if (++seen != 1) { invalid=1; next }
+    value=substr(line, marker+length(heading))
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+    if (value == "") waiting=1
+    else {
+     bytes=number_of_bytes(value)
+     if (bytes < 0) invalid=1
+     else parsed=1
+    }
+    next
+   }
+   if (waiting) {
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+    if (line == "") next
+    bytes=number_of_bytes(line)
+    if (bytes < 0) invalid=1
+    else parsed=1
+    waiting=0
+   }
   }
   END {
-   if (!invalid && !waiting && seen == 1 && count == 1)
+   if (!invalid && !waiting && seen == 1 && parsed == 1)
     printf "%.0f\n", bytes
    else exit 1
   }
  '
 }
 installed_size_bytes() {
- [ "$#" -gt 0 ] || return 1
- # A multi-name apk info request may omit individual metadata. Query each
- # installed package separately; the standard info view is a fallback for
- # builds where -s does not expose the full installed-size record.
- # This optional path never runs as part of Apps installation status.
- {
-  for name in "$@"; do
-   bytes="$("$APK" info -s "$name" 2>/dev/null | parse_installed_apk_size "$name")" || {
-    bytes="$("$APK" info "$name" 2>/dev/null | parse_installed_apk_size "$name")" || continue
-   }
-   printf '%s\n' "$bytes"
-  done
- } | awk -v expected="$#" '
-  /^[0-9]+$/ {
-   if (length($0) > 13) { invalid=1; next }
-   total += $1; count++; next
-  }
-  { invalid=1 }
-  END {
-   if (!invalid && count == expected && total >= 0 && total <= 1099511627776)
-    printf "%.0f\n", total
-   else exit 1
-  }
- '
+ [ "$#" -eq 1 ] || return 1
+ name="$1"
+ # Try APK's size-only view first; fall back to its full information view.
+ # Do not attempt a potentially expensive recursive disk scan.
+ bytes="$("$APK" info -s "$name" 2>/dev/null | parse_installed_apk_size "$name")" || {
+  bytes="$("$APK" info "$name" 2>/dev/null | parse_installed_apk_size "$name")" || return 1
+ }
+ case "$bytes" in ''|*[!0-9]*) return 1;; esac
+ printf '%s\n' "$bytes"
 }
 # Refuse a downgrade, a same-version rebuild with a different digest, any
 # package-set change, or an APK that no longer matches our ownership record.
@@ -358,9 +366,12 @@ status() {
 }
 
 # Optional read-only sizes. Consult the *last known installed* status and
-# the approved catalog. Failures cannot change installation state or buttons.
+# approved catalog. For incomplete metadata, omit the total rather than show
+# a misleading partial sum. The tiny diagnostic TSV identifies which package
+# could not be measured, without exposing arbitrary APK output or credentials.
 sizes() {
  tmp="$(mktemp "$RUNTIME/apps-size.XXXXXXXX")" || return 1
+ diagnostic="$(mktemp "$RUNTIME/apps-size-diag.XXXXXXXX")" || { rm -f "$tmp"; return 1; }
  {
  if [ -r "$CATALOG" ] && [ -r "$RUNTIME/apps-status.tsv" ]; then
   for id in $(awk -F '\t' '$2 == "1" {print $1}' "$RUNTIME/apps-status.tsv"); do
@@ -376,15 +387,32 @@ sizes() {
     p=$((p + 1)); [ "$p" -le 32 ] || break
    done
    [ "$#" -gt 0 ] || continue
-   bytes="$(installed_size_bytes "$@" || :)"
-   case "$bytes" in ''|*[!0-9]*) continue;; esac
-   printf '%s\t%s\n' "$id" "$bytes"
+   complete=1; total_bytes=0
+   for name in "$@"; do
+    bytes="$(installed_size_bytes "$name" || :)"
+    case "$bytes" in
+     ''|*[!0-9]*)
+      printf '%s\t%s\tmissing_size\n' "$id" "$name" >> "$diagnostic"
+      complete=0;;
+     *)
+      # Never overflow signed shell arithmetic or report an impossible total.
+      if [ "${#bytes}" -gt 13 ] || [ "$bytes" -gt 1099511627776 ] ||
+         [ "$total_bytes" -gt $((1099511627776 - bytes)) ]; then
+       printf '%s\t%s\tinvalid_size\n' "$id" "$name" >> "$diagnostic"
+       complete=0
+      else
+       total_bytes=$((total_bytes + bytes))
+      fi;;
+    esac
+   done
+   [ "$complete" -eq 1 ] || continue
+   printf '%s\t%s\n' "$id" "$total_bytes"
   done
  fi
  } > "$tmp"
  mv -f "$tmp" "$RUNTIME/apps-size.tsv"
+ mv -f "$diagnostic" "$RUNTIME/apps-size-diagnostics.tsv"
 }
-
 # Release names from the Hub have zero command authority. We cross-check the
 # fresh exact-build approval, locally trusted immutable index, architecture and
 # resource requirements before invoking the fixed APK binary.
