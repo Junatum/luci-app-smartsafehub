@@ -9,16 +9,28 @@ test('앱 공간: /overlay 기준 실제 설치 가능 공간과 백분율을 �
   const summary = summarizeAppsStorage({ mount: '/overlay', totalBytes: 80 * MB, availableBytes: 68 * MB });
   assert.equal(summary.availablePercent, 85);
   assert.equal(summary.availableText, '68.0 MB');
+  assert.equal(summary.usedText, '12.0 MB');
   assert.equal(summary.totalText, '80.0 MB');
   assert.ok(Math.abs(summary.availableRatio - 0.85) < 1e-10);
   assert.equal(summary.level, 'normal');
 });
 
 test('앱 공간: 극단값, 경계값과 ext4 루트 파일시스템을 처리한다', () => {
-  assert.equal(summarizeAppsStorage({ mount: '/', totalBytes: 100 * MB, availableBytes: 0 }).availablePercent, 0);
-  assert.equal(summarizeAppsStorage({ mount: '/', totalBytes: 100 * MB, availableBytes: 100 * MB }).availableRatio, 1);
+  const empty = summarizeAppsStorage({ mount: '/', totalBytes: 100 * MB, availableBytes: 0 });
+  assert.equal(empty.availablePercent, 0);
+  assert.equal(empty.usedText, '100.0 MB');
+  const full = summarizeAppsStorage({ mount: '/', totalBytes: 100 * MB, availableBytes: 100 * MB });
+  assert.equal(full.availableRatio, 1);
+  assert.equal(full.usedText, '0 B');
   assert.equal(summarizeAppsStorage({ mount: '/overlay', totalBytes: 100 * MB, availableBytes: 20 * MB }).level, 'warning');
   assert.equal(summarizeAppsStorage({ mount: '/overlay', totalBytes: 100 * MB, availableBytes: 10 * MB }).level, 'critical');
+});
+
+test('앱 공간: 실제 시스템 용량은 MiB(표시 MB)로 계산하고 반올림한다', () => {
+  const summary = summarizeAppsStorage({ mount: '/', totalBytes: 81031168, availableBytes: 75153408 });
+  assert.equal(summary.availableText, '71.7 MB');
+  assert.equal(summary.usedText, '5.6 MB');
+  assert.equal(summary.totalText, '77.3 MB');
 });
 
 test('앱 공간: 누락·유효하지 않은 RPC 응답은 임의의 용량으로 채우지 않는다', () => {

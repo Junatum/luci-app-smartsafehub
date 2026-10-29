@@ -26,12 +26,13 @@ export function AppsStorageCard({ storage }: { storage: AppsStorage | null | und
         {summary ? (
           <>
             <p class="ssh-apps-storage-available mb-0 mt-1 text-base font-extrabold text-teal-700">{summary.availableText} 남음</p>
-            <p class="mb-0 mt-1 text-xs text-slate-500">전체 {summary.totalText}</p>
+            <p class="mb-0 mt-1 text-[11px] leading-4 text-slate-500" title="앱 설치 가능 용량을 기준으로 계산하며, 파일시스템 예약 공간이 사용량에 포함될 수 있습니다.">
+              사용 {summary.usedText} / 전체 {summary.totalText}
+            </p>
           </>
         ) : (
           <p class="mb-0 mt-1 text-xs leading-5 text-slate-500">용량 정보를 확인할 수 없습니다.</p>
         )}
-        <p class="mb-0 mt-2 text-[11px] leading-4 text-slate-500">앱 설치 가능 공간</p>
       </div>
     </aside>
   );

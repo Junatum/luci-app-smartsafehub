@@ -74,6 +74,12 @@ check('용량 정보를 확인할 수 없습니다.' in card and 'summarizeAppsS
       'storage errors and older RPC responses need a safe fallback')
 check('storage.availableBytes > storage.totalBytes' in utils,
       'malformed storage reports must be rejected')
+check('usedText: formatStorageBytes(storage.totalBytes - storage.availableBytes)' in utils,
+      'used storage must be derived from validated total and APK-available counters')
+check('사용 {summary.usedText} / 전체 {summary.totalText}' in card,
+      'storage card must show used and total bytes without increasing its height')
+check('파일시스템 예약 공간' in card and '앱 설치 가능 공간</p>' not in card,
+      'capacity breakdown must explain reserved space and avoid redundant footer')
 check(".ssh-app[data-theme='dark'] .ssh-apps-storage-track" in styles and
       "[data-level='critical']" in styles,
       'donut must support dark mode and dangerously low storage')
@@ -97,6 +103,12 @@ check('app_bytes=' not in manager and 'set --' not in manager.split('sizes() {')
       'status must not invoke optional size processing')
 check('sizeLabel !== null' in page and '설치 용량 약 {sizeLabel}' in page,
       'installed app card must show a real size only when known')
+check('showOfferedVersion || sizeLabel !== null' in page and
+      'showOfferedVersion && sizeLabel !== null' in page and
+      'flex-wrap items-center gap-x-1.5' in page,
+      'offered version and installed size must share a compact wrapping metadata row')
+check(page.count('설치 용량 약 {sizeLabel}') == 1 and page.count('제공 v{app.version}') == 1,
+      'Apps metadata must not duplicate version or installed size rows')
 check('Number.isSafeInteger(bytes)' in page and 'installed && typeof bytes' in page and 'metrics?.installedSizes' in page,
       'missing or invalid sizes must not be guessed')
 check('캐시는 포함되지 않습니다' in page,

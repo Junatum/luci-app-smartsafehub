@@ -4,6 +4,7 @@ export interface StorageSummary {
   availablePercent: number;
   availableRatio: number;
   availableText: string;
+  usedText: string;
   totalText: string;
   level: 'normal' | 'warning' | 'critical';
 }
@@ -28,6 +29,8 @@ export function summarizeAppsStorage(storage: AppsStorage | null | undefined): S
     availablePercent: Math.round(availableRatio * 100),
     availableRatio,
     availableText: formatStorageBytes(storage.availableBytes),
+    // Includes filesystem-reserved space, not only files written by apps.
+    usedText: formatStorageBytes(storage.totalBytes - storage.availableBytes),
     totalText: formatStorageBytes(storage.totalBytes),
     level: availableRatio <= 0.1 ? 'critical' : availableRatio <= 0.2 ? 'warning' : 'normal',
   };

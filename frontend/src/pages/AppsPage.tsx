@@ -326,6 +326,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const managed = state?.managed ?? false;
                   const updateAvailable = Boolean(installed && managed && state?.updateAvailable);
                   const installedVersion = installed ? state?.installedVersion : null;
+                  const showOfferedVersion = Boolean(installed && installedVersion && (updateAvailable || installedVersion !== app.version));
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
                   const disabled = !installStatus || Boolean(statusError) || pending !== null || running || restoring;
                   const removable = managed && (installed || Boolean(state?.partial));
@@ -345,12 +346,15 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             </span>
                             {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
                           </div>
-                          {installed && installedVersion && (updateAvailable || installedVersion !== app.version) ? (
-                            <p class="mb-0 mt-1 text-[11px] text-slate-500" title="현재 서버가 승인한 앱 릴리스 버전입니다. 설치된 APK 패키지의 버전과 다를 수 있습니다.">제공 v{app.version}</p>
-                          ) : null}
-                          {sizeLabel !== null ? (
-                            <p class="mb-0 mt-1 text-[11px] text-slate-500" title="설치된 APK 패키지의 용량 합계입니다. 앱 데이터 및 캐시는 포함되지 않습니다.">
-                              설치 용량 약 {sizeLabel}
+                          {showOfferedVersion || sizeLabel !== null ? (
+                            <p class="mb-0 mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
+                              {showOfferedVersion ? (
+                                <span title="현재 서버가 승인한 앱 릴리스 버전입니다. 설치된 APK 패키지의 버전과 다를 수 있습니다.">제공 v{app.version}</span>
+                              ) : null}
+                              {showOfferedVersion && sizeLabel !== null ? <span aria-hidden="true">·</span> : null}
+                              {sizeLabel !== null ? (
+                                <span title="설치된 APK 패키지의 용량 합계입니다. 앱 데이터 및 캐시는 포함되지 않습니다.">설치 용량 약 {sizeLabel}</span>
+                              ) : null}
                             </p>
                           ) : null}
                         </div>
