@@ -120,6 +120,27 @@ case "$1" in
      for name in "$@"; do
        grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || exit 2
        [ "${APPS_TEST_SIZE_MISSING_PACKAGE:-}" != "$name" ] || exit 2
+       # Device capture (OpenWrt 25.12 APK): repeating the same installed
+       # size twice or three times is valid, but conflicting values are not.
+       if [ "${APPS_TEST_SIZE_DEVICE_REPEAT:-0}" = 1 ]; then
+         case "$name" in
+          nlbwmon) version=2025.06.02~29236be6-r1; kib=46; copies=2;;
+          luci-app-nlbwmon) version=26.288.56989~75a306d; kib=36; copies=3;;
+          luci-lib-chartjs) version=26.288.56989~75a306d; kib=33; copies=3;;
+          *) exit 2;;
+         esac
+         i=0
+         while [ "$i" -lt "$copies" ]; do
+           value="$kib"
+           if [ "${APPS_TEST_SIZE_CONFLICTING_REPEAT:-0}" = 1 ] &&
+              [ "$name" = nlbwmon ] && [ "$i" -eq 1 ]; then
+             value=47
+           fi
+           printf '%s-%s installed size:\n%s KiB\n\n' "$name" "$version" "$value"
+           i=$((i + 1))
+         done
+         continue
+       fi
        if [ "${APPS_TEST_SIZE_INLINE:-0}" = 1 ]; then
          case "$name" in
           nlbwmon) printf '%s-1.0.0-r1 installed size: 1.5 MiB\n' "$name";;
@@ -345,6 +366,18 @@ export APPS_TEST_SIZE_INLINE=1
 grep -Fqx "$(printf 'network-usage-monitor\t2359296')" "$TMP/runtime/apps-size.tsv" || fail 'inline/compact installed size not summed'
 [ ! -s "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'successful size query unexpectedly logged failure'
 unset APPS_TEST_SIZE_INLINE
+# Real OpenWrt 25.12 device output repeats the *same* installed-size header:
+# nlbwmon twice, luci-app-nlbwmon / luci-lib-chartjs three times each.
+export APPS_TEST_SIZE_DEVICE_REPEAT=1
+"$MANAGER" sizes
+grep -Fqx "$(printf 'network-usage-monitor\t117760')" "$TMP/runtime/apps-size.tsv" || fail 'real duplicated APK info output did not sum to 115 KiB'
+[ ! -s "$TMP/runtime/apps-size-diagnostics.tsv" ] || fail 'valid repeated APK metadata logged as missing'
+# A repeated heading with a *different* size is ambiguous: refuse to guess.
+export APPS_TEST_SIZE_CONFLICTING_REPEAT=1
+"$MANAGER" sizes
+[ ! -s "$TMP/runtime/apps-size.tsv" ] || fail 'conflicting duplicated size was accepted'
+grep -Fqx "$(printf 'network-usage-monitor\tnlbwmon\tmissing_size')" "$TMP/runtime/apps-size-diagnostics.tsv" || fail 'conflicting repeated size did not trigger diagnostics'
+unset APPS_TEST_SIZE_CONFLICTING_REPEAT APPS_TEST_SIZE_DEVICE_REPEAT
 # Do not show a misleading partial sum if one package cannot be measured.
 export APPS_TEST_SIZE_MISSING_PACKAGE=luci-lib-chartjs
 "$MANAGER" sizes

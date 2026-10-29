@@ -193,6 +193,18 @@ parse_installed_apk_size() {
    if (bytes < 0 || bytes > 1099511627776) return -1
    return bytes
   }
+  # apk v3 may print the exact same installed-size record more than once
+  # (for instance, when package names are returned from multiple indexes).
+  # Accept only consistent repetitions; never sum duplicate records.
+  function record_size(value, parsed_bytes) {
+   parsed_bytes=number_of_bytes(value)
+   if (parsed_bytes < 0 || (parsed && parsed_bytes != bytes)) {
+    invalid=1
+    return
+   }
+   bytes=parsed_bytes
+   parsed=1
+  }
   {
    line=$0
    sub(/\r$/, "", line)
@@ -200,28 +212,23 @@ parse_installed_apk_size() {
    marker=index(line, heading)
    if (marker > 0 && (substr(line, 1, length(name) + 1) == name "-" ||
        substr(line, 1, length(name) + length(heading)) == name heading)) {
-    if (++seen != 1) { invalid=1; next }
+    if (waiting) invalid=1
+    seen++
     value=substr(line, marker+length(heading))
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
     if (value == "") waiting=1
-    else {
-     bytes=number_of_bytes(value)
-     if (bytes < 0) invalid=1
-     else parsed=1
-    }
+    else record_size(value)
     next
    }
    if (waiting) {
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
     if (line == "") next
-    bytes=number_of_bytes(line)
-    if (bytes < 0) invalid=1
-    else parsed=1
+    record_size(line)
     waiting=0
    }
   }
   END {
-   if (!invalid && !waiting && seen == 1 && parsed == 1)
+   if (!invalid && !waiting && seen > 0 && parsed == 1)
     printf "%.0f\n", bytes
    else exit 1
   }
