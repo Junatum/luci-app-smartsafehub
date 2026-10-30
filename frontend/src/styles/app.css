@@ -259,6 +259,45 @@
 }
 
 
+/* Apps is an optional expansion area, not the current page by default.
+ * Avoid translucent *light* teal utilities on dark backgrounds: the 40% white
+ * mix makes an unselected Apps link look like a grey selected overlay. */
+.ssh-apps-nav-link:not([aria-current='page']) {
+  border: 1px solid #99f6e4;
+  background-color: #f0fdfa;
+  color: #115e59;
+}
+
+.ssh-apps-nav-link:not([aria-current='page']):hover {
+  border-color: #5eead4;
+  background-color: #ccfbf1;
+}
+
+.ssh-apps-nav-description {
+  color: #0f766e;
+}
+
+.ssh-app[data-theme='dark'] .ssh-apps-nav-link:not([aria-current='page']) {
+  border-color: #134e4a;
+  background-color: rgb(20 184 166 / 0.09);
+  color: #e2e8f0;
+}
+
+.ssh-app[data-theme='dark'] .ssh-apps-nav-link:not([aria-current='page']):hover {
+  border-color: #0f766e;
+  background-color: rgb(20 184 166 / 0.16);
+  color: #5eead4;
+}
+
+.ssh-app[data-theme='dark'] .ssh-apps-nav-description {
+  color: #5eead4;
+}
+
+.ssh-apps-nav-link:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+}
+
 .ssh-sidebar-toggle {
   border: 1px solid #e2e8f0;
   background: #ffffff;

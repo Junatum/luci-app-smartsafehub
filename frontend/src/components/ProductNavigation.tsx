@@ -48,7 +48,8 @@ const NAVIGATION_GROUPS: readonly {
   { label: 'Overview', routes: ['home', 'activity'] },
   { label: 'Network', routes: ['network', 'wifi', 'iptv', 'devices'] },
   { label: 'Security', routes: ['safeshield', 'rules'] },
-  { label: 'System', routes: ['account', 'apps', 'system', 'settings'] },
+  { label: 'Explore', routes: ['apps'] },
+  { label: 'System', routes: ['account', 'system', 'settings'] },
 ];
 
 function NavigationIcon({ route }: { route: AppRoute }) {
@@ -88,14 +89,25 @@ function themeActionLabel(theme: 'dark' | 'light'): string {
   return theme === 'dark' ? '라이트 모드' : '다크 모드';
 }
 
-function navigationClass(active: boolean, collapsed = false): string {
-  return `relative flex min-h-11 min-w-0 items-center rounded-xl py-2.5 text-sm font-extrabold no-underline transition ${
-    collapsed ? 'justify-center px-2' : 'gap-3 px-3'
-  } ${
-    active
-      ? 'bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200'
-      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
-  }`;
+function navigationClass(active: boolean, collapsed = false, routeName?: AppRoute): string {
+  const baseSpacing = collapsed ? 'justify-center px-2' : 'gap-3 px-3';
+  if (active) {
+    return `relative flex min-h-11 min-w-0 items-center rounded-xl py-2.5 text-sm font-extrabold no-underline transition ${baseSpacing} bg-teal-50 text-teal-800 ring-1 ring-inset ring-teal-200`;
+  }
+
+  if (routeName === 'apps') {
+    return `ssh-apps-nav-link relative flex min-h-11 min-w-0 items-center rounded-xl py-2.5 text-sm font-extrabold no-underline transition ${baseSpacing}`;
+  }
+
+  return `relative flex min-h-11 min-w-0 items-center rounded-xl py-2.5 text-sm font-extrabold text-slate-600 no-underline transition ${baseSpacing} hover:bg-slate-50 hover:text-slate-950`;
+}
+
+function navigationDescription(routeName: AppRoute): string | null {
+  if (routeName === 'apps') {
+    return '앱으로 확장하기';
+  }
+
+  return null;
 }
 
 function NavigationItems({
@@ -136,7 +148,7 @@ function NavigationItems({
                   aria-label={routeName === 'account' && accountRegistered === false
                     ? `${item.label} (계정 연결 필요)`
                     : collapsed ? item.label : undefined}
-                  class={navigationClass(active, collapsed)}
+                  class={navigationClass(active, collapsed, routeName)}
                   href={item.hash}
                   key={routeName}
                   title={routeName === 'account' && accountRegistered === false
@@ -152,7 +164,14 @@ function NavigationItems({
                   </span>
                   {collapsed ? null : (
                     <span class="flex min-w-0 flex-1 items-center gap-2">
-                      <span class="truncate">{item.label}</span>
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate">{item.label}</span>
+                        {navigationDescription(routeName) ? (
+                          <span class="ssh-apps-nav-description mt-0.5 block truncate text-[11px] font-semibold tracking-normal">
+                            {navigationDescription(routeName)}
+                          </span>
+                        ) : null}
+                      </span>
                       {routeName === 'iptv' ? (
                         <span class="rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-amber-800">
                           Beta

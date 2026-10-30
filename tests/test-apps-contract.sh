@@ -22,8 +22,10 @@ import sys
 routes, nav, hash_route = map(lambda p: Path(p).read_text(), sys.argv[1:])
 assert "route: 'apps'" in routes and "hash: '#apps'" in routes
 assert routes.index("route: 'account'") < routes.index("route: 'apps'") < routes.index("route: 'system'")
-assert "['account', 'apps', 'system', 'settings']" in nav
+assert "{ label: 'Explore', routes: ['apps'] }" in nav
+assert "{ label: 'System', routes: ['account', 'system', 'settings'] }" in nav
 assert "case 'apps':" in nav and '<AppsIcon' in nav
+assert "return '앱으로 확장하기';" in nav
 assert "'#apps': 'apps'" in hash_route
 PY
 
