@@ -79,7 +79,9 @@ extract_pins() {
   version="$(field "$CATALOG" "@.apps[$index].packages[$n].version")"
   hash="$(field "$CATALOG" "@.apps[$index].packages[$n].sha256")"
   valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 1
-  protected_package "$name" && return 1
+  if protected_package "$name"; then
+   [ "$app" = travelmate ] && [ "$name" = rpcd-mod-rpcsys ] || return 1
+  fi
   grep -Fq "$(printf '%s\t' "$name")" "$out" && return 1
   printf '%s\t%s\t%s\n' "$name" "$version" "$hash" >> "$out"
   n=$((n + 1))
@@ -165,6 +167,13 @@ append_owned_pin() {
  cp "$tmp_manifest" "$manifest.new" && mv -f "$manifest.new" "$manifest"
 }
 
+# These are independent OpenWrt packages, never Apps-owned. They must never
+# be upgraded or uninstalled by the app manager, even after Travelmate removal.
+shared_travelmate_dep() {
+ [ "$app" = travelmate ] || return 1
+ case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys) return 0;; esac
+ return 1
+}
 installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
 # apk info -e verifies only the name. Version checks must use the installed
 # database or an old, manually changed APK could be mistaken for our release.
@@ -303,7 +312,15 @@ select_upgrades() {
   [ "$old_count" -le 32 ] || return 1
  done < "$old_manifest"
  [ "$old_count" -gt 0 ] || return 1
- [ "$old_count" -eq "$(wc -l < "$approved_pins" | tr -d ' ')" ] || return 1
+ if [ "$app" = travelmate ]; then
+  [ "$old_count" -eq 2 ] || return 1
+  for name in curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys; do
+   version="$(awk -F '\t' -v n="$name" '$1==n {print $2; exit}' "$approved_pins")"
+   [ -n "$version" ] && [ "$(installed_version "$name")" = "$version" ] || return 1
+  done
+ else
+  [ "$old_count" -eq "$(wc -l < "$approved_pins" | tr -d ' ')" ] || return 1
+ fi
  [ -s "$changed_pins" ]
 }
 # Prefer OpenWrt's configured apk architecture. Some package-manager builds
@@ -373,6 +390,7 @@ status() {
  n=0
  for id in $approved_ids; do
   valid_id "$id" || continue
+  app="$id" # Status checks use the same app-specific protected-package policy.
   idx="$n"; n=$((n + 1))
   [ "$n" -le 100 ] || break
   total=0; present=0; p=0; primary_package=''
@@ -388,7 +406,7 @@ status() {
   # etherwake backend. Avoid showing a false installed/offered mismatch.
   if [ "$id" = wake-on-lan ] && [ "$total" -eq 2 ]; then
    primary_package=luci-app-wol
-  elif [ "$id" = travelmate ] && [ "$total" -eq 2 ]; then
+  elif [ "$id" = travelmate ] && [ "$total" -eq 7 ]; then
    # Public app release follows the LuCI package, not the backend version.
    primary_package=luci-app-travelmate
   fi
@@ -547,8 +565,9 @@ preflight_install() {
   done
  elif [ "$app" = travelmate ]; then
   # No extra dependencies or unreviewed packages may be pulled automatically.
-  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 2 ] || return 27
-  for required in travelmate luci-app-travelmate; do
+  # Two app packages and exactly five reviewed, shared system dependencies.
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 7 ] || return 27
+  for required in travelmate luci-app-travelmate curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys; do
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
  elif [ "$app" = wake-on-lan ]; then
@@ -606,6 +625,10 @@ install_app() {
   pin="$(printf '%s\t%s\t%s' "$name" "$version" "$hash")"
   if [ -e "$manifest" ] && grep -Fqx "$pin" "$manifest"; then
    installed "$name" || need_install=1
+  elif shared_travelmate_dep "$name" && installed "$name"; then
+   # A system package was already present. Never adopt it or silently
+   # replace it with a different build of the same release name.
+   [ "$(installed_version "$name")" = "$version" ] || return 34
   elif installed "$name"; then
    return 29
   else
@@ -627,7 +650,9 @@ install_app() {
   # Write ownership immediately before modifying packages. If APK partially
   # succeeds, the UI offers repair/removal without adopting unrelated packages.
   while IFS="$(printf '\t')" read -r name version hash; do
-   if ! installed "$name"; then append_owned_pin "$name" "$version" "$hash" || return 36; fi
+   if ! installed "$name" && ! shared_travelmate_dep "$name"; then
+    append_owned_pin "$name" "$version" "$hash" || return 36
+   fi
   done < "$pins"
   "$APK" --repositories-file /dev/null -X "$local_index" add "$@" > "$stage/install.log" 2>&1 || return 35
  fi
@@ -665,7 +690,11 @@ update_app() {
  done < "$pins"
  # Preserve ownership atomically; future removal and firmware restore now use
  # the new pins. Never record an update as a first-time download receipt.
- cp "$pins" "$manifest.new" || return 55
+ if [ "$app" = travelmate ]; then
+  awk -F '\t' '$1=="travelmate" || $1=="luci-app-travelmate"' "$pins" > "$manifest.new" || return 55
+ else
+  cp "$pins" "$manifest.new" || return 55
+ fi
  mv -f "$manifest.new" "$manifest" || return 55
  return 0
 }
@@ -677,6 +706,7 @@ remove_app() {
  while IFS="$(printf '\t')" read -r name version hash; do
   valid_package "$name" && valid_version "$version" && valid_sha "$hash" || return 42
   protected_package "$name" && return 42
+  shared_travelmate_dep "$name" && return 42
   # Reject packages owned by any other Apps installation.
   for other in "$OWNED"/*; do
    [ -f "$other" ] || continue
