@@ -18,7 +18,6 @@ def check(ok, message):
 
 
 # Version/revision validity is covered by test-package-contract.sh.
-check('PKG_VERSION:=0.2.30' in package, 'unexpected Apps package version')
 check('border-teal-300 text-teal-800 hover:bg-teal-50' in page, 'install should stay teal')
 check('border-red-300 text-red-700 hover:bg-red-50' in page, 'removal must be red outline')
 check('hover\\:bg-red-50:hover' in styles, 'red hover needs an explicit dark-mode style')
