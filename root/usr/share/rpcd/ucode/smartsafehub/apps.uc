@@ -79,7 +79,13 @@ export function read_apps_catalog(request) {
 		// Backward-compatible route for the already approved nlbwmon catalog.
 		// The page is only launchable if its UI package is actually installed.
 		let path = '';
-		if (id == 'wake-on-lan') {
+		if (id == 'travelmate') {
+			if (item?.web_ui?.type == 'luci' &&
+				item?.web_ui?.path == '/cgi-bin/luci/admin/services/travelmate' &&
+				item?.web_ui?.package == 'luci-app-travelmate')
+				path = '/cgi-bin/luci/admin/services/travelmate';
+		}
+		else if (id == 'wake-on-lan') {
 			if (item?.web_ui?.type == 'luci' &&
 				item?.web_ui?.path == '/cgi-bin/luci/admin/services/wol' &&
 				item?.web_ui?.package == 'luci-app-wol')

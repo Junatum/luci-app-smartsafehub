@@ -343,6 +343,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'Travelmate 앱의 표시와 고정 패키지 및 관리 화면 계약을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-travelmate.sh"
+    The status should be success
+    The output should start with 'PASS: Travelmate Apps demo and catalog contract'
+    The error should be blank
+  End
+
   It '모든 rpcd ucode 진입점과 모듈의 실제 컴파일을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-ucode-syntax.sh"
     The status should be success

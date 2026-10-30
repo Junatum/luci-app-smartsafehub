@@ -330,6 +330,12 @@ web_ui_package() {
   printf '%s\n' luci-app-nlbwmon
   return 0
  fi
+ if [ "$id" = travelmate ]; then
+  # Only the reviewed Travelmate LuCI route may be launched.
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /cgi-bin/luci/admin/services/travelmate ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = luci-app-travelmate ] || return 1
+ fi
  if [ "$id" = wake-on-lan ]; then
   # The approved app has exactly one LuCI entry point. Do not mistake the
   # backend etherwake package (or a different LuCI page) for that UI.
@@ -382,6 +388,9 @@ status() {
   # etherwake backend. Avoid showing a false installed/offered mismatch.
   if [ "$id" = wake-on-lan ] && [ "$total" -eq 2 ]; then
    primary_package=luci-app-wol
+  elif [ "$id" = travelmate ] && [ "$total" -eq 2 ]; then
+   # Public app release follows the LuCI package, not the backend version.
+   primary_package=luci-app-travelmate
   fi
   managed=0
   [ -f "$(owned_manifest "$id")" ] && managed=1
@@ -534,6 +543,12 @@ preflight_install() {
  if [ "$app" = network-usage-monitor ]; then
   [ "$(wc -l < "$pins" | tr -d ' ')" -eq 3 ] || return 27
   for required in nlbwmon luci-app-nlbwmon luci-lib-chartjs; do
+   grep -q "^${required}$(printf '\t')" "$pins" || return 27
+  done
+ elif [ "$app" = travelmate ]; then
+  # No extra dependencies or unreviewed packages may be pulled automatically.
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 2 ] || return 27
+  for required in travelmate luci-app-travelmate; do
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
  elif [ "$app" = wake-on-lan ]; then
@@ -713,7 +728,7 @@ worker() {
  if [ "$rc" -eq 0 ]; then
   # The LuCI menu tree may be cached before an optional UI is installed.
   # Invalidate the cache only after a successful package transaction.
-  if [ "$app" = wake-on-lan ]; then
+  if [ "$app" = wake-on-lan ] || [ "$app" = travelmate ]; then
    rm -f "$LUCI_INDEX_CACHE"
   fi
   write_state success "$action" "$app" NONE "$operation_id" "$source"

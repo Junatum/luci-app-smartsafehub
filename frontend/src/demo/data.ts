@@ -57,6 +57,15 @@ export const demoApps: AppsCatalog = {
       webUi: null,
     },
     {
+      id: 'travelmate',
+      name: 'Travelmate',
+      summary: '호텔·카페 Wi-Fi를 공유기에서 연결하고 관리합니다.',
+      description: '다른 Wi-Fi에 연결하고 저장된 Wi-Fi에 자동으로 재연결합니다. 설치 후 연결 설정이 필요합니다.',
+      category: 'network',
+      version: '2.4.9-r5',
+      webUi: null, // Demo never exposes actual LuCI administration routes.
+    },
+    {
       id: 'wake-on-lan',
       name: 'Wake-on-LAN',
       summary: '공유기에서 PC와 홈서버의 전원을 켤 수 있는 도구입니다.',
@@ -85,6 +94,14 @@ export const demoAppsStatus: AppsInstallStatus = {
       managed: true,
       updateAvailable: false,
       installedVersion: '2025.06.02~29236be6-r1',
+      webUiReady: false,
+    },
+    'travelmate': {
+      installed: false,
+      partial: false,
+      managed: false,
+      updateAvailable: false,
+      installedVersion: null,
       webUiReady: false,
     },
     'wake-on-lan': {
