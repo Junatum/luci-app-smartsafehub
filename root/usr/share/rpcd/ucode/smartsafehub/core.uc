@@ -67,7 +67,8 @@ export function string_value(value, fallback) {
 export function integer_value(value, fallback) {
 	const parsed = int(value);
 	const kind = type(parsed);
-	return (kind == 'int' || kind == 'double') && parsed == parsed
+	// ucode's loose equality coerces NaN, so use strict equality here.
+	return (kind == 'int' || kind == 'double') && parsed === parsed
 		? parsed
 		: fallback;
 };

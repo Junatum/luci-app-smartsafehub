@@ -41,11 +41,23 @@ export function cursor() { return null; };
 EOF_UCI
 cat > "$TMP/runner.uc" <<'EOF_RUNNER'
 import { integer_value, read_json_object } from './smartsafehub/core.uc';
-if (integer_value('17', 9) != 17 || integer_value('invalid', 9) != 9 ||
- integer_value(null, 9) != 9 || integer_value(0, 9) != 0) {
- printf('FAIL: integer parser returned wrong fallback or coercion\n');
- exit(1);
+function expect_integer(label, value, fallback, expected) {
+ const actual = integer_value(value, fallback);
+ // Strict equality is important here: ucode's == may coerce NaN.
+ if (actual !== expected) {
+  printf('FAIL: integer parser %s: actual=%J expected=%J\n', label, actual, expected);
+  exit(1);
+ }
 }
+expect_integer('numeric string', '17', 9, 17);
+expect_integer('invalid string', 'invalid', 9, 9);
+expect_integer('invalid with zero fallback', 'invalid', 0, 0);
+expect_integer('null', null, 9, 9);
+expect_integer('empty string', '', 9, 9);
+expect_integer('zero', 0, 9, 0);
+expect_integer('negative', -3, 9, -3);
+expect_integer('leading numeric substring', '18ms', 9, 18);
+expect_integer('NaN', int('invalid'), 9, 9);
 const value = read_json_object('/valid', 100);
 if (value == null || value.count != 3 || value.enabled != true ||
  read_json_object('/valid', 4) != null ||
