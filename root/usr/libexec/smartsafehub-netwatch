@@ -34,7 +34,7 @@ cleanup_orphan_temps() {
     local file pid seen=0
     for file in "$RUNTIME"/status.tmp.* "$RUNTIME"/previous.tmp.* \
         "$RUNTIME"/candidate.tmp.* "$RUNTIME"/conntrack.tmp.* \
-        "$RUNTIME"/conntrack-rc.tmp.* "$RUNTIME"/alerts.tmp.*; do
+        "$RUNTIME"/conntrack-rc.tmp.* "$RUNTIME"/conntrack-pid.tmp.* "$RUNTIME"/alerts.tmp.*; do
         [ -f "$file" ] || continue
         pid="${file##*.}"
         case "$pid" in ''|0*|*[!0-9]*) continue ;; esac
@@ -100,40 +100,53 @@ alert_if_due() {
     mv -f "$tmp" "$STAMPS"
 }
 
-# Avoid materializing the entire conntrack table. head closes the producer's
-# pipe after 2049 lines, allowing the AWK parser to flag partial observations.
-# A producer error on a short snapshot must not be mistaken for zero traffic.
+# Stream at most 2049 lines to tmpfs. A shell-script producer may ignore a
+# failed printf after SIGPIPE and keep generating records even after head exits.
+# Explicitly terminate the producer at the cap rather than trusting SIGPIPE.
+# The producer's exit status remains available for short/failed snapshots.
 read_conntrack_bounded() {
-    local output="$1" result="$2" rc
-    # A conntrack/netlink stall must not leave a sampler hanging forever.
-    # Only default BusyBox primitives are used; no timeout/flock dependency.
+    local output="$1" result="$2" pidfile="$3" rc lines producer_pid
     (
         "$CONNTRACK" -L -f ipv4 2>/dev/null &
         producer_pid=$!
+        printf '%s\n' "$producer_pid" > "$pidfile" || exit 1
+        # The watchdog must not retain the producer's stdout pipe: a live
+        # sleep child would otherwise delay EOF on a successful short read.
         (
             sleep 5
             kill -TERM "$producer_pid" 2>/dev/null || true
             sleep 1
             kill -KILL "$producer_pid" 2>/dev/null || true
-        ) &
+        ) >/dev/null 2>&1 &
         watchdog_pid=$!
         wait "$producer_pid" 2>/dev/null
         producer_rc=$?
         kill "$watchdog_pid" 2>/dev/null || true
         wait "$watchdog_pid" 2>/dev/null || true
         printf '%s\n' "$producer_rc" > "$result"
-    ) | head -n 2049 > "$output" || return 1
+    ) | (
+        head -n 2049 > "$output" || exit 1
+        lines="$(wc -l < "$output")"
+        if [ "$lines" -ge 2049 ]; then
+            producer_pid="$(cat "$pidfile" 2>/dev/null || true)"
+            case "$producer_pid" in
+                ''|0*|*[!0-9]*) return 1 ;;
+            esac
+            kill -TERM "$producer_pid" 2>/dev/null || true
+        fi
+    ) || return 1
     rc="$(cat "$result" 2>/dev/null || true)"
-    case "$rc" in
-        0) return 0 ;;
-        # SIGPIPE is expected when head cuts off a large conntrack dump.
-        141) [ "$(wc -l < "$output")" -ge 2049 ] 2>/dev/null ;;
-        *) return 1 ;;
-    esac
+    lines="$(wc -l < "$output")"
+    if [ "$lines" -ge 2049 ]; then
+        # A truncated sample is never used as a baseline or to raise alerts.
+        # Producer may exit due to SIGPIPE, SIGTERM, or the natural last line.
+        return 0
+    fi
+    [ "$rc" = 0 ]
 }
 
 sample() {
-    local enabled now source tmp_status tmp_snapshot tmp_candidate raw_tmp rc_tmp
+    local enabled now source tmp_status tmp_snapshot tmp_candidate raw_tmp rc_tmp pid_tmp
     mkdir -p "$RUNTIME" || return 1
     legacy_sampler_running && return 0
     ssh_lock_acquire "$LOCK" 3 0.05 sleep 1 || return 0
@@ -157,13 +170,14 @@ sample() {
     tmp_candidate="$RUNTIME/candidate.tmp.$$"
     raw_tmp="$RUNTIME/conntrack.tmp.$$"
     rc_tmp="$RUNTIME/conntrack-rc.tmp.$$"
+    pid_tmp="$RUNTIME/conntrack-pid.tmp.$$"
     : > "$tmp_candidate" || return 1
     if [ -r "$PROC" ]; then
         source="$PROC"
     else
         # Bounded producer/consumer pipeline, not an unbounded conntrack -L
         # output file. Cap tmpfs and refuse failed/partial failed reads.
-        if ! (ulimit -f 1024 2>/dev/null || true; read_conntrack_bounded "$raw_tmp" "$rc_tmp"); then
+        if ! (ulimit -f 1024 2>/dev/null || true; read_conntrack_bounded "$raw_tmp" "$rc_tmp" "$pid_tmp"); then
             write_status unavailable
             return 0
         fi

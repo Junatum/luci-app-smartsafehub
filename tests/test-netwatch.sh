@@ -103,10 +103,12 @@ rm -f "$TMP/run/sample.lock"
 # but never files owned by an active process.
 printf stale > "$TMP/run/status.tmp.99999999"
 printf stale > "$TMP/run/conntrack.tmp.99999999"
+printf stale > "$TMP/run/conntrack-pid.tmp.99999999"
 printf active > "$TMP/run/previous.tmp.$$"
 run
 [ ! -f "$TMP/run/status.tmp.99999999" ] || fail '죽은 작업의 status 임시 파일을 정리해야 함'
 [ ! -f "$TMP/run/conntrack.tmp.99999999" ] || fail '죽은 작업의 conntrack 임시 파일을 정리해야 함'
+[ ! -f "$TMP/run/conntrack-pid.tmp.99999999" ] || fail '죽은 작업의 conntrack PID 임시 파일을 정리해야 함'
 [ -f "$TMP/run/previous.tmp.$$" ] || fail '실행 중인 프로세스의 임시 파일을 지우면 안 됨'
 rm -f "$TMP/run/previous.tmp.$$"
 [ ! -e "$MOCK_FLOCK_LOG" ] || fail '공통 잠금도 flock을 사용하면 안 됨'
@@ -187,9 +189,12 @@ jq -e '.phase=="ready" and .totalConnections==125 and .alert==null' "$TMP/run/st
 
 # The userspace fallback must stop reading once the bounded parser input is
 # full, rather than writing the entire unbounded conntrack dump to tmpfs.
+# Ignore SIGPIPE to model a shell producer whose printf fails but whose loop
+# continues; a consumer-side head alone is not a reliable stop mechanism.
 cat > "$TMP/bin/conntrack" <<'SH'
 #!/bin/sh
 [ "$1" = '-L' ] && [ "$2" = '-f' ] && [ "$3" = 'ipv4' ] || exit 1
+trap '' PIPE
 i=0
 while [ "$i" -lt 20000 ]; do
     i=$((i+1))

@@ -51,7 +51,7 @@ export function read_netwatch_status(request) {
 		empty.phase = 'unavailable';
 		return success(empty);
 	}
-}
+};
 
 export function update_netwatch_enabled(request) {
 	const enabled = request?.args?.enabled;
@@ -67,4 +67,4 @@ export function update_netwatch_enabled(request) {
 	if (previous != enabled)
 		emit_activity_event('network_watch', enabled ? 'settings.netwatch.enabled' : 'settings.netwatch.disabled', 'info', { origin: 'direct' });
 	return read_netwatch_status(request);
-}
+};
