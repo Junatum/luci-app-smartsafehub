@@ -65,6 +65,10 @@ export function string_value(value, fallback) {
 // Shared parser for RPC fields. Unlike number_value (already numeric-only),
 // this accepts numeric UCI strings; invalid values and NaN use the fallback.
 export function integer_value(value, fallback) {
+	// int(null) and int('') may coerce to zero; absent values are not zero.
+	if (value === null || (type(value) == 'string' && !length(value))) {
+		return fallback;
+	}
 	const parsed = int(value);
 	const kind = type(parsed);
 	// ucode's loose equality coerces NaN, so use strict equality here.
