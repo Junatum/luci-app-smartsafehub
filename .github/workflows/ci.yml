@@ -33,7 +33,7 @@ jobs:
 
       # Validate router shell commands before downloading compiler dependencies.
       - name: Verify OpenWrt 25.12 BusyBox compatibility
-        run: sh tests/test-openwrt-commands.sh
+        run: sh tests/test-openwrt-commands.sh --self-test
 
       - name: Install ShellSpec
         env:

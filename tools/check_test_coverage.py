@@ -123,7 +123,7 @@ def check_ci(root: Path) -> None:
         'Backend CI에서 전체 ShellSpec 테스트를 실행하지 않습니다.',
     )
     require(
-        command_is_unconditional(backend, 'sh tests/test-openwrt-commands.sh'),
+        command_is_unconditional(backend, 'sh tests/test-openwrt-commands.sh --self-test'),
         'Backend CI에서 OpenWrt 25.12 명령 호환성 검사가 누락되거나 조건부로 실행됩니다.',
     )
     require(
@@ -160,7 +160,7 @@ def self_test() -> None:
       - name: Test
         run: shellspec
       - name: OpenWrt BusyBox
-        run: sh tests/test-openwrt-commands.sh
+        run: sh tests/test-openwrt-commands.sh --self-test
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -221,8 +221,9 @@ def self_test() -> None:
         (nested / 'new.test.mjs').unlink()
 
         for old, replacement, error in (
-            ('run: sh tests/test-openwrt-commands.sh', '# run: sh tests/test-openwrt-commands.sh', '명령 호환성'),
-            ('run: sh tests/test-openwrt-commands.sh', 'run: sh tests/test-openwrt-commands.sh || true', '명령 호환성'),
+            ('run: sh tests/test-openwrt-commands.sh --self-test', '# run: sh tests/test-openwrt-commands.sh --self-test', '명령 호환성'),
+            ('run: sh tests/test-openwrt-commands.sh --self-test', 'run: sh tests/test-openwrt-commands.sh', '명령 호환성'),
+            ('run: sh tests/test-openwrt-commands.sh --self-test', 'run: sh tests/test-openwrt-commands.sh --self-test || true', '명령 호환성'),
             ('run: sh tests/test-suite-integrity.sh', '# run: sh tests/test-suite-integrity.sh', '독립 테스트'),
             ('run: shellspec', 'run: shellspec spec/selected_spec.sh', 'ShellSpec 테스트'),
             ('run: node --experimental-strip-types --test ../tests/runtime/*.test.mjs',
