@@ -98,6 +98,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '기기 버전과 추천 규칙 확인을 함께 전송하는 동기화 요청을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-device-sync-version.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '추천 사용자 규칙의 빠른 적용 확인 보고와 재전송 방지를 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-recommended-ack.sh"
     The status should be success
