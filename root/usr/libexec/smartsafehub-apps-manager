@@ -167,11 +167,37 @@ append_owned_pin() {
  cp "$tmp_manifest" "$manifest.new" && mv -f "$manifest.new" "$manifest"
 }
 
+# Hub publishes the same reviewed set per OpenWrt package architecture.
+# Do not infer package architecture from `apk --print-arch` (which may say
+# just "mipsel"); preflight validates the exact native feed architecture.
+travelmate_required_packages() {
+ case "$1" in
+  aarch64_cortex-a53|x86_64)
+   printf '%s\n' 'travelmate luci-app-travelmate curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys libopenssl3';;
+  mipsel_24kc)
+   printf '%s\n' 'travelmate luci-app-travelmate curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys libopenssl3 libatomic1';;
+  *) return 1;;
+ esac
+}
+
+# extract_pins has already checked formatting and uniqueness. This check
+# rejects missing/extra approved names, including a MIPS-only libatomic1 on
+# another architecture. Do not issue any apk commands on invalid metadata.
+travelmate_pins_match_arch() {
+ tm_check_names="$(travelmate_required_packages "$1")" || return 1
+ tm_check_count=0
+ for tm_check_name in $tm_check_names; do
+  grep -q "^${tm_check_name}$(printf '\t')" "$2" || return 1
+  tm_check_count=$((tm_check_count + 1))
+ done
+ [ "$(wc -l < "$2" | tr -d ' ')" -eq "$tm_check_count" ]
+}
+
 # These are independent OpenWrt packages, never Apps-owned. They must never
 # be upgraded or uninstalled by the app manager, even after Travelmate removal.
 shared_travelmate_dep() {
  [ "$app" = travelmate ] || return 1
- case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys) return 0;; esac
+ case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys|libopenssl3|libatomic1) return 0;; esac
  return 1
 }
 installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
@@ -314,8 +340,11 @@ select_upgrades() {
  [ "$old_count" -gt 0 ] || return 1
  if [ "$app" = travelmate ]; then
   [ "$old_count" -eq 2 ] || return 1
-  for name in curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys; do
+  # Shared prerequisites must match the approved versions. libatomic1 is
+  # permitted only if it is explicitly pinned for the MIPS build.
+  for name in curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys libopenssl3 libatomic1; do
    version="$(awk -F '\t' -v n="$name" '$1==n {print $2; exit}' "$approved_pins")"
+   [ "$name" = libatomic1 ] && [ -z "$version" ] && continue
    [ -n "$version" ] && [ "$(installed_version "$name")" = "$version" ] || return 1
   done
  else
@@ -406,9 +435,15 @@ status() {
   # etherwake backend. Avoid showing a false installed/offered mismatch.
   if [ "$id" = wake-on-lan ] && [ "$total" -eq 2 ]; then
    primary_package=luci-app-wol
-  elif [ "$id" = travelmate ] && [ "$total" -eq 7 ]; then
-   # Public app release follows the LuCI package, not the backend version.
-   primary_package=luci-app-travelmate
+  elif [ "$id" = travelmate ]; then
+   # Public app version belongs to LuCI; MIPS needs an additional library.
+   reviewed_arch="$(field "$CATALOG" "@.apps[$idx].package_arch")"
+   expected_names="$(travelmate_required_packages "$reviewed_arch" || :)"
+   expected_count=0
+   for expected_name in $expected_names; do expected_count=$((expected_count + 1)); done
+   if [ "$expected_count" -gt 0 ] && [ "$total" -eq "$expected_count" ]; then
+    primary_package=luci-app-travelmate
+   fi
   fi
   managed=0
   [ -f "$(owned_manifest "$id")" ] && managed=1
@@ -564,12 +599,9 @@ preflight_install() {
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
  elif [ "$app" = travelmate ]; then
-  # No extra dependencies or unreviewed packages may be pulled automatically.
-  # Two app packages and exactly five reviewed, shared system dependencies.
-  [ "$(wc -l < "$pins" | tr -d ' ')" -eq 7 ] || return 27
-  for required in travelmate luci-app-travelmate curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys; do
-   grep -q "^${required}$(printf '\t')" "$pins" || return 27
-  done
+  # Exact architecture-specific contract: 8 reviewed APKs for aarch64/x86,
+  # 9 for MIPS (libatomic1). Never accept extra or unreviewed dependencies.
+  travelmate_pins_match_arch "$arch" "$pins" || return 27
  elif [ "$app" = wake-on-lan ]; then
   # WOL always requires both the signal sender and its LuCI user interface.
   # Never install extra packages just because a catalog lists them.

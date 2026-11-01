@@ -114,10 +114,13 @@ cd frontend && npm ci && npm run typecheck && npm run build
 Apps에서 사용자가 새로 설치에 성공하면, 앱 ID·릴리스 버전·작업 ID만 로컬 outbox에 보관했다가 기존 Device 자격증명으로 Hub에 전송합니다. 실패한 설치, 제거, 펌웨어 업데이트에 따른 자동 복원은 집계하지 않습니다. 최대 500건을 보관하고 네트워크 장애 시 5분 간격으로 최대 3건씩 재시도하며, 해당 전송은 앱 설치의 성공 여부에 영향을 주지 않습니다. 수치는 공개 Apps 화면에 표시하지 않습니다.
 
 
-### Travelmate 의존성 (0.2.31-r6)
+### Travelmate 의존성 (0.2.31-r7)
 
-Travelmate 설치 시 검증된 APK 묶음은 `travelmate`, `luci-app-travelmate`,
-`curl`, `libcurl4`, `libnghttp2-14`, `iwinfo`, `rpcd-mod-rpcsys` 총 7개입니다.
+Travelmate 설치 시 검증하는 공통 APK는 `travelmate`, `luci-app-travelmate`,
+`curl`, `libcurl4`, `libnghttp2-14`, `iwinfo`, `rpcd-mod-rpcsys`, `libopenssl3` 총 8개입니다.
+`mipsel_24kc`에서는 `libatomic1`이 추가되어 총 9개이고, `aarch64_cortex-a53`와
+`x86_64`에서는 8개만 허용합니다. 패키지 목록에 누락되거나 승인되지 않은 항목이
+추가되면 설치 전 검증에서 차단합니다.
 필요한 패키지만 고정된 자체 서명 저장소에서 설치하며, 설치 전에
 서명된 인덱스·각 APK SHA-256·설치 계획(기존 패키지 변경 금지)을 확인합니다.
 
