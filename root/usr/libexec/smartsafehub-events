@@ -36,6 +36,7 @@ SAFESHIELD_SLEEP_BIN="${SMARTSAFEHUB_EVENTS_SAFESHIELD_SLEEP_BIN:-sleep}"
 SAFESHIELD_POLL_INTERVAL_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_POLL_INTERVAL_S:-60}"
 SAFESHIELD_WATCH_INTERVAL_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_WATCH_INTERVAL_S:-1}"
 SAFESHIELD_WATCH_TIMEOUT_S="${SMARTSAFEHUB_EVENTS_SAFESHIELD_WATCH_TIMEOUT_S:-180}"
+NETWATCH_HELPER="${SMARTSAFEHUB_EVENTS_NETWATCH_HELPER:-/usr/libexec/smartsafehub-netwatch}"
 
 STOP_REQUESTED=0
 WAIT_PID=''
@@ -482,15 +483,22 @@ interruptible_sleep() {
 	[ "$STOP_REQUESTED" -eq 0 ]
 }
 
+netwatch_observe_detached() {
+	[ -x "$NETWATCH_HELPER" ] || return 0
+	( "$NETWATCH_HELPER" sample >/dev/null 2>&1 || true ) </dev/null >/dev/null 2>&1 &
+}
+
 events_daemon_loop() {
 	local interval
 	STOP_REQUESTED=0
 	trap request_stop INT TERM
 	safeshield_observe_once || true
+	netwatch_observe_detached
 	interval="$(normalized_integer "$SAFESHIELD_POLL_INTERVAL_S" 60 15 3600)"
 	while [ "$STOP_REQUESTED" -eq 0 ]; do
 		interruptible_sleep "$interval" || break
 		safeshield_observe_once || true
+		netwatch_observe_detached
 	done
 	trap - INT TERM
 }

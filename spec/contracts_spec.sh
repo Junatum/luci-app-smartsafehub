@@ -77,6 +77,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'Network Watch의 경량 연결 관찰과 중복 경고 제한을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-netwatch.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It '공유기 최근 활동 RPC와 UI 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-activity-ui-contract.sh"
     The status should be success

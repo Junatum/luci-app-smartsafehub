@@ -44,6 +44,9 @@ import { SmartSafeHubAccountPage } from '../pages/SmartSafeHubAccountPage';
 import { UpdatePage } from '../pages/UpdatePage';
 import { WifiPage } from '../pages/WifiPage';
 import { browserTimezone } from '../utils/timezone';
+import { fetchNetwatchStatus, updateNetwatchEnabled } from '../api/netwatch';
+import type { NetwatchStatus } from '../types/netwatch';
+import { NetworkWatchPage } from '../pages/NetworkWatchPage';
 
 interface AppProps {
   onAdministratorPasswordChanged: () => void;
@@ -83,6 +86,13 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const lan = useLan(route === 'home' || route === 'network');
   const iptv = useIptv(route === 'iptv');
   const wifi = useWifi(route === 'wifi');
+  const netwatch = useAsyncResource<NetwatchStatus>({
+    active: route === 'netwatch',
+    fallbackError: 'Network Watch 상태를 읽을 수 없습니다.',
+    loader: fetchNetwatchStatus,
+    pollInterval: 60000,
+    staleTimeMs: 5000,
+  });
   const dashboardDevices = useConnectedDevices(route === 'home', false);
   const devices = useConnectedDevices(route === 'devices');
   // Both views consume the same resource: switching pages must not re-query RPC.
@@ -145,7 +155,9 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const current =
     route === 'activity'
       ? activity
-      : route === 'network'
+      : route === 'netwatch'
+        ? netwatch
+        : route === 'network'
         ? wan
         : route === 'wifi'
           ? wifi
@@ -168,6 +180,21 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   let content: ComponentChildren;
 
   switch (route) {
+    case 'netwatch':
+      content = (
+        <NetworkWatchPage
+          data={netwatch.data}
+          error={netwatch.error}
+          loading={netwatch.loading}
+          onRetry={() => void netwatch.refresh()}
+          onSetEnabled={async (enabled) => {
+            await updateNetwatchEnabled(enabled);
+            await netwatch.refresh();
+          }}
+        />
+      );
+      break;
+
     case 'apps':
       content = (
         <AppsPage

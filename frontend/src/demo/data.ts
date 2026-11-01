@@ -12,6 +12,7 @@ import type { SmartSafeHubStatus } from '../types/status';
 import type { SoftwareUpdateStatus } from '../types/updates';
 import type { DeviceRegistrationStatus } from '../api/smartsafehub';
 import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps';
+import type { NetwatchStatus } from '../types/netwatch';
 
 const now = Math.floor(Date.now() / 1000);
 const hour = 3600;
@@ -287,3 +288,15 @@ export const demoWifiQr = async (section: string): Promise<WifiQrCredentials> =>
 export const demoGuestWifiQr = async (): Promise<WifiQrCredentials> => ({
   ssid: 'SmartSafeHub-Guest', security: 'sae-mixed', password: 'guest-demo-only-2026',
 });
+
+// Fictional conntrack statistics, never loaded from a real router.
+export const demoNetwatch: NetwatchStatus = {
+  schema: 1, enabled: true, phase: 'ready', sampledAt: now - 35,
+  intervalSeconds: 60, source: 'conntrack', ipv4Only: true, limited: false,
+  totalConnections: 54, totalDevices: 3, alert: null,
+  devices: [
+    { ip: '192.0.2.101', connections: 28, destinations: 14 },
+    { ip: '192.0.2.102', connections: 19, destinations: 11 },
+    { ip: '192.0.2.103', connections: 7, destinations: 3 },
+  ],
+};
