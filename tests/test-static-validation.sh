@@ -54,6 +54,7 @@ for script in \
 	tests/test-activity-ui-contract.sh \
 	tests/test-activity-cloud-sync.sh \
 	tests/test-common-shell.sh \
+	tests/test-lock-common.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-tailwind-shadow-dom.sh \
 	tests/test-document-ui-contract.sh \
@@ -82,6 +83,7 @@ for script in \
 	tests/test-statistics-ui-contract.sh \
 	tests/test-ucode-syntax.sh \
 	tests/test-ucode-imports.sh \
+	tests/test-ucode-common.sh \
 	tests/test-updater.sh \
 	tests/test-firmware-updater.sh \
 	tests/test-firmware-identity.sh; do

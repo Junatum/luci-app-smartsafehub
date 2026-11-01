@@ -62,7 +62,7 @@ emit_update_event() {
 }
 
 uci_get() {
-	"$UCI_BIN" -q get "smartsafehub.updates.$1" 2>/dev/null || true
+	ssh_uci_get "$UCI_BIN" "smartsafehub.updates.$1"
 }
 
 default_auto_install() {
@@ -191,26 +191,10 @@ set_phase() {
 }
 
 acquire_lock() {
-	local owner
-	if mkdir "$LOCK_DIR" 2>/dev/null; then
-		printf '%s\n' "$$" > "$LOCK_DIR/pid"
-		return 0
-	fi
-
-	owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
-	if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
-		return 1
-	fi
-
-	rm -rf "$LOCK_DIR" 2>/dev/null || return 1
-	mkdir "$LOCK_DIR" 2>/dev/null || return 1
-	printf '%s\n' "$$" > "$LOCK_DIR/pid"
-	return 0
+ ssh_lock_acquire "$LOCK_DIR" 40 0.05 sleep 1
 }
 
-release_lock() {
-	rm -rf "$LOCK_DIR" 2>/dev/null || true
-}
+release_lock() { ssh_lock_release "$LOCK_DIR"; }
 
 repository_is_configured() {
 	local file line
