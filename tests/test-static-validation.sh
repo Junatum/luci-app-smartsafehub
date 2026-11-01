@@ -55,6 +55,8 @@ for script in \
 	tests/test-activity-cloud-sync.sh \
 	tests/test-common-shell.sh \
 	tests/test-lock-common.sh \
+	tests/test-apps-storage.sh \
+	tests/test-apps-ui.sh \
 	tests/test-navigation-contract.sh \
 	tests/test-tailwind-shadow-dom.sh \
 	tests/test-document-ui-contract.sh \

@@ -74,12 +74,14 @@ def check_runtime(root: Path) -> int:
         name = path.name
         looks_like_test = (
             '.test.' in name or '.spec.' in name or
-            name.startswith(('test-', 'test_')) or name.endswith('_test.py')
+            name.startswith(('test-', 'test_')) or name.endswith('_test.py') or
+            name.endswith(('-test.uc', '_test.uc'))
         )
         if looks_like_test and path not in runtime:
             raise CoverageError(
                 f'CI 실행 대상이 아닌 테스트 파일: {path.relative_to(root)} '
-                '(JavaScript 테스트는 tests/runtime/*.test.mjs에 배치하세요)'
+                '(JavaScript는 tests/runtime/*.test.mjs, ucode 실행 테스트는 '
+                'ShellSpec에 등록된 tests/test-*.sh 형식으로 작성하세요)'
             )
     return len(runtime)
 
@@ -207,6 +209,11 @@ def self_test() -> None:
         unsupported_python.write_text('', encoding='utf-8')
         fails_with('CI 실행 대상이 아닌')
         unsupported_python.unlink()
+        # A standalone ucode test is not discovered by ShellSpec or frontend CI.
+        standalone_ucode = root / 'tests/apps-storage-test.uc'
+        standalone_ucode.write_text('exit(0);\n', encoding='utf-8')
+        fails_with('CI 실행 대상이 아닌')
+        standalone_ucode.unlink()
         nested = root / 'tests/runtime/nested'
         nested.mkdir()
         (nested / 'new.test.mjs').write_text('', encoding='utf-8')
