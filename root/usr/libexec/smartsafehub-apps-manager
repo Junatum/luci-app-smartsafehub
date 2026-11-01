@@ -476,6 +476,14 @@ status() {
   fi
   if [ "$total" -gt 0 ] && [ "$total" -eq "$present" ]; then full=1; else full=0; fi
   if [ "$present" -gt 0 ]; then partial=1; else partial=0; fi
+  # Travelmate's shared dependencies survive removal on purpose. Without
+  # either application APK or an Apps-owned recovery manifest, those system
+  # libraries do not mean that Travelmate is partially installed. Keep real
+  # interrupted installs and manually installed app components visible.
+  if [ "$id" = travelmate ] && [ "$managed" -eq 0 ] &&
+     ! installed travelmate && ! installed luci-app-travelmate; then
+   partial=0
+  fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$id" "$full" "$partial" "$managed" "$ui_ready" "$update_ready" "$installed_release"
  done
  # Removed approvals must be proven by a valid Apps-owned manifest, not

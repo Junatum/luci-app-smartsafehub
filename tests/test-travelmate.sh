@@ -31,6 +31,10 @@ assert 'rpcd-mod-rpcsys|libopenssl3|libatomic1' in manager
 assert 'shared_travelmate_dep "$name" && return 42' in manager
 assert 'app="$id" # Status checks' in manager
 assert 'append_owned_pin "$name"' in manager
+page=(root/'frontend/src/pages/AppsPage.tsx').read_text()
+assert "removeTarget.id === 'travelmate'" in page
+assert '공용 패키지는 안전을 위해 유지됩니다.' in page
+assert 'state?.partial && !managed' in page
 PY
 printf '%s\n' 'PASS: Travelmate Apps demo and catalog contract'
 
@@ -111,3 +115,76 @@ if review_remove_plan "$TMPDIR_TM/remove" 'travelmate luci-app-travelmate'; then
  echo 'FAIL: shared RPC package removal accepted' >&2; exit 1
 fi
 printf '%s\n' 'PASS: Travelmate signed dependencies and core package protection'
+
+# Exercise the actual status() implementation with a fake installed-package
+# database. Shared dependencies surviving removal must NOT appear as a partial
+# Travelmate install; interrupted owned installs must still be recoverable.
+awk '/^status\(\)/,/^}/' "$MANAGER" >> "$TMPDIR_TM/functions"
+cat > "$TMPDIR_TM/status-test.sh" <<'SH_STATUS'
+#!/bin/sh
+set -eu
+. "$1"
+RUNTIME="$2/runtime"
+OWNED="$2/owned"
+CATALOG="$2/catalog.json"
+TM_INSTALLED="$2/installed"
+TM_PKG_NAMES="$2/packages"
+mkdir -p "$RUNTIME" "$OWNED"
+: > "$CATALOG"
+: > "$TM_INSTALLED"
+printf '%s\n' 'travelmate' 'luci-app-travelmate' \
+  'curl' 'libcurl4' 'libnghttp2-14' 'iwinfo' \
+  'rpcd-mod-rpcsys' 'libopenssl3' > "$TM_PKG_NAMES"
+fail_status() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+catalog_ids() { printf '%s\n' travelmate; }
+valid_id() { return 0; }
+valid_package() { return 0; }
+valid_version() { return 0; }
+owned_manifest() { printf '%s/%s' "$OWNED" "$1"; }
+installed() { grep -Fxq "$1" "$TM_INSTALLED"; }
+installed_version() { printf '%s\n' '2.4.9-r5'; }
+web_ui_package() { printf '%s\n' luci-app-travelmate; }
+extract_pins() { return 1; }
+select_upgrades() { return 1; }
+field() {
+ case "$2" in
+  '@.apps[0].package_arch') printf '%s\n' aarch64_cortex-a53;;
+  '@.apps[0].packages['*'].name')
+   index="${2#*.packages[}"
+   index="${index%%]*}"
+   sed -n "$((index + 1))p" "$TM_PKG_NAMES";;
+ esac
+}
+assert_status() {
+ status || fail_status 'status command failed'
+ actual="$(awk -F '\t' '{print $2 ":" $3 ":" $4}' "$RUNTIME/apps-status.tsv")"
+ [ "$actual" = "$1" ] || fail_status "$2: expected $1, got $actual"
+}
+# No installed packages and no ownership.
+assert_status '0:0:0' 'fresh app'
+# APKs deliberately preserved by remove_app() are not an app installation.
+for dep in curl libcurl4 libnghttp2-14 iwinfo rpcd-mod-rpcsys libopenssl3; do
+ printf '%s\n' "$dep" >> "$TM_INSTALLED"
+done
+assert_status '0:0:0' 'shared dependencies remain after app removal'
+# A genuinely partial manual install cannot be silently adopted by Apps.
+printf '%s\n' travelmate >> "$TM_INSTALLED"
+assert_status '0:1:0' 'manually installed Travelmate remains partial'
+sed '/^travelmate$/d' "$TM_INSTALLED" > "$TM_INSTALLED.tmp"
+mv -f "$TM_INSTALLED.tmp" "$TM_INSTALLED"
+printf '%s\n' luci-app-travelmate >> "$TM_INSTALLED"
+assert_status '0:1:0' 'manually installed LuCI component remains partial'
+sed '/^luci-app-travelmate$/d' "$TM_INSTALLED" > "$TM_INSTALLED.tmp"
+mv -f "$TM_INSTALLED.tmp" "$TM_INSTALLED"
+# An unfinished Apps-owned transaction must retain its repair action.
+printf '%s\n' 'travelmate 2.4.9-r6 test-hash' > "$OWNED/travelmate"
+assert_status '0:1:1' 'owned interrupted install remains repairable'
+rm -f "$OWNED/travelmate"
+# Full installation remains fully installed and is never reclassified.
+printf '%s\n' travelmate luci-app-travelmate >> "$TM_INSTALLED"
+assert_status '1:1:0' 'fully present app not classified as removed'
+printf '%s\n' 'travelmate 2.4.9-r6 test-hash' > "$OWNED/travelmate"
+assert_status '1:1:1' 'fully Apps-managed app not classified as removed'
+printf '%s\n' 'PASS: Travelmate removal retains shared packages without confusing install status'
+SH_STATUS
+sh "$TMPDIR_TM/status-test.sh" "$TMPDIR_TM/functions" "$TMPDIR_TM"

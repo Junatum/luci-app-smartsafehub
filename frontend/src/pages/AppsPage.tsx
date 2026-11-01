@@ -203,6 +203,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
             <p class="mt-2 text-xs leading-5 text-slate-600">
               앱에서 제공하던 기능을 더 이상 사용할 수 없습니다. 제거하는 동안 공유기를 재부팅하지 마세요.
             </p>
+            {removeTarget.id === 'travelmate' ? (
+              <p class="mt-2 text-xs leading-5 text-slate-600">
+                다른 공유기 기능에서도 사용하는 공용 패키지는 안전을 위해 유지됩니다.
+              </p>
+            ) : null}
             <div class="mt-5 flex justify-end gap-2">
               <button
                 class="min-h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
