@@ -827,6 +827,60 @@
   background-color: rgb(244 63 94 / 0.22);
 }
 
+/* Keep pale state utilities dark too. Base bg/border/ring mappings do not
+ * override state variants, which Tailwind applies on the focused/hovered node. */
+.ssh-app[data-theme='dark'] .focus\:bg-white:focus {
+  background-color: #0f172a;
+}
+
+.ssh-app[data-theme='dark'] .disabled\:bg-slate-100:disabled {
+  background-color: #1e293b;
+}
+
+.ssh-app[data-theme='dark'] .focus\:ring-teal-100:focus,
+.ssh-app[data-theme='dark'] .focus-visible\:ring-teal-100:focus-visible,
+.ssh-app[data-theme='dark'] .focus-visible\:ring-teal-200:focus-visible {
+  --tw-ring-color: #134e4a;
+}
+
+.ssh-app[data-theme='dark'] .focus-visible\:ring-amber-100:focus-visible,
+.ssh-app[data-theme='dark'] .focus-visible\:ring-amber-200:focus-visible {
+  --tw-ring-color: #78350f;
+}
+
+.ssh-app[data-theme='dark'] .focus-visible\:ring-emerald-100:focus-visible {
+  --tw-ring-color: #064e3b;
+}
+
+.ssh-app[data-theme='dark'] .focus-visible\:ring-red-100:focus-visible,
+.ssh-app[data-theme='dark'] .focus-visible\:ring-red-200:focus-visible {
+  --tw-ring-color: #7f1d1d;
+}
+
+.ssh-app[data-theme='dark'] .hover\:border-red-200:hover,
+.ssh-app[data-theme='dark'] .hover\:border-red-300:hover {
+  border-color: #991b1b;
+}
+
+.ssh-app[data-theme='dark'] .hover\:border-teal-200:hover,
+.ssh-app[data-theme='dark'] .hover\:border-teal-300:hover {
+  border-color: #115e59;
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-teal-700:hover,
+.ssh-app[data-theme='dark'] .hover\:text-teal-800:hover,
+.ssh-app[data-theme='dark'] .hover\:text-teal-900:hover {
+  color: #5eead4;
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-slate-800:hover {
+  color: #e2e8f0;
+}
+
+.ssh-app[data-theme='dark'] .hover\:text-red-700:hover {
+  color: #fca5a5;
+}
+
 /* Apps removal stays understated at rest; dark mode uses a muted red hover. */
 .ssh-app[data-theme='dark'] .hover\:bg-red-50:hover {
   background-color: rgb(239 68 68 / 0.16);
