@@ -2351,6 +2351,18 @@
 .ssh-app[data-theme='dark'] .ssh-apps-storage-card[data-level='critical'] .ssh-apps-storage-available,
 .ssh-app[data-theme='dark'] .ssh-dashboard-storage-card[data-level='critical'] .ssh-apps-storage-available { color: #fb7185; }
 
+/* First-party publishing is distinct from the verification shared by all approved Apps. */
+.ssh-apps-official-badge {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+.ssh-app[data-theme='dark'] .ssh-apps-official-badge {
+  border-color: #115e59;
+  background: #042f2e;
+  color: #5eead4;
+}
+
 /* Apps cards: installed is a quiet state, updates are an amber action. */
 .ssh-apps-installed-badge {
   border-color: #cbd5e1;

@@ -392,6 +392,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'Apps 공식 제공 유형과 구버전 API 및 체험 화면 호환성을 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-apps-publisher.sh"
+    The status should be success
+    The output should start with 'PASS: Apps publisher type'
+    The error should be blank
+  End
+
   It 'Travelmate 앱의 표시와 고정 패키지 및 관리 화면 계약을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-travelmate.sh"
     The status should be success

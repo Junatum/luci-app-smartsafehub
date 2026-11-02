@@ -9,6 +9,7 @@ import type { AppsCatalog, AppsInstallStatus, AppsMetrics, VerifiedApp } from '.
 import { errorMessage } from '../utils/errors';
 import { approvedAppPath } from '../utils/appsWebUi';
 import { formatStorageBytes } from '../utils/appsStorage';
+import { isFirstPartyPublisher } from '../utils/appsPublisher';
 import { appsJobNoticeKey, readDismissedAppsJob, saveDismissedAppsJob } from '../utils/appsJobNotice';
 
 interface AppsPageProps {
@@ -373,7 +374,13 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       </div>
                       <p class="mt-4 mb-4 min-h-10 break-words text-sm leading-5 text-slate-600">{app.summary}</p>
                       <div class="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                        <span class="text-xs font-bold text-teal-700">✓ 검증된 앱</span>
+                        {isFirstPartyPublisher(app.publisherType) ? (
+                          <span class="ssh-apps-official-badge inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-bold" title="SmartSafeHub가 직접 개발하고 제공하는 앱입니다.">
+                            <span aria-hidden="true">✦</span> SmartSafeHub 공식
+                          </span>
+                        ) : (
+                          <span class="text-xs font-bold text-slate-500">✓ 검증된 앱</span>
+                        )}
                         {activeAction ? <OperationIndicator action={activeAction} /> : (
                           <span class="flex flex-wrap items-center gap-2">
                             {managed && state?.partial && !installed ? (

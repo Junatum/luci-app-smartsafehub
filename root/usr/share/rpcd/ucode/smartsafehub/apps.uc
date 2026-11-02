@@ -108,6 +108,8 @@ export function read_apps_catalog(request) {
 			summary: text(item?.summary, 320),
 			description: text(item?.description, 2000),
 			category: text(item?.category, 64),
+			// An older or unexpected catalog must never imply first-party ownership.
+			publisherType: item?.publisher_type == 'first_party' ? 'first_party' : 'third_party',
 			version: text(item?.version, 64),
 			webUi: length(path) ? { type: id == 'retro-arcade' && path == '/retro-arcade/' ? 'static' : 'luci', path: path } : null,
 		});

@@ -45,6 +45,7 @@ export const demoApps: AppsCatalog = {
       summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
       description: '사용자가 직접 준비한 게임 파일로 즐기는 레트로 아케이드입니다.',
       category: 'entertainment',
+      publisherType: 'first_party',
       version: '1.1.0-r5',
       webUi: { type: 'static', path: '/retro-arcade/' },
     },
@@ -54,6 +55,7 @@ export const demoApps: AppsCatalog = {
       summary: '기기별 네트워크 사용량과 통계를 확인하는 앱입니다.',
       description: '네트워크 트래픽을 모니터링합니다.',
       category: 'network',
+      publisherType: 'third_party',
       version: '2025.06.02~29236be6-r1',
       webUi: null,
     },
@@ -63,6 +65,7 @@ export const demoApps: AppsCatalog = {
       summary: '호텔·카페 Wi-Fi를 공유기에서 연결하고 관리합니다.',
       description: '다른 Wi-Fi에 연결하고 저장된 Wi-Fi에 자동으로 재연결합니다. 설치 후 연결 설정이 필요합니다.',
       category: 'network',
+      publisherType: 'third_party',
       version: '2.4.9-r5',
       webUi: null, // Demo never exposes actual LuCI administration routes.
     },
@@ -72,6 +75,7 @@ export const demoApps: AppsCatalog = {
       summary: '공유기에서 PC와 홈서버의 전원을 켤 수 있는 도구입니다.',
       description: 'Wake-on-LAN 지원 컴퓨터를 네트워크에서 깨우는 앱입니다.',
       category: 'utilities',
+      publisherType: 'third_party',
       version: '26.288.56989~75a306d',
       webUi: null, // Public demo must never link to an actual LuCI control page.
     },

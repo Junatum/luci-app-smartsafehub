@@ -10,6 +10,13 @@
 - 설치·업데이트·제거: `smartsafehub.apps_install`, `smartsafehub.apps_update`, `smartsafehub.apps_remove` RPC. 앱 ID만 받으며, 실제 작업은 root 전용 백그라운드 매니저에서 진행합니다. 다른 앱 작업이 진행 중이면 거절합니다.
 - Phase 2의 IoT/로컬 AI 설치기는 추후 `runtime`에 따라 별도 어댑터로 추가합니다. 현재는 `router + apk`만 가능하며 Hub의 패키지명·URL·명령을 브라우저가 보낼 수 없습니다.
 
+## 앱 제공 주체 표시 (0.2.31-r15)
+
+- Hub 카탈로그의 `publisher_type`을 공유기 RPC의 `publisherType`으로 전달합니다. `first_party`만 카드 하단에 **SmartSafeHub 공식**을 표시하며, 외부 제작 앱의 `third_party`는 **검증된 앱**으로 표시합니다.
+- 기존 Hub에서 필드가 누락되거나 알 수 없는 값이 내려와도 `third_party`로 처리합니다. 앱의 ID나 제작자 이름으로 공식 여부를 추측하지 않습니다.
+- 앱 제공 주체는 승인·서명·설치 권한과 별개의 표시 정보입니다. 앱 카탈로그의 검증과 설치 정책은 그대로 유지됩니다.
+- 공개 체험 화면도 동일한 제공 유형 예시를 사용하며, 빌드 결과물은 로컬에서 별도로 갱신합니다.
+
 ## 앱 카테고리 아이콘
 
 - **네트워크**: 연결된 노드 아이콘 / **도구**(`utilities`): 렌치 아이콘 / **기타**(`other`): 원 안의 점 3개 아이콘.
