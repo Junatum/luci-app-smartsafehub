@@ -59,7 +59,7 @@ function DemoApp() {
   let content;
   switch (route) {
     case 'netwatch':
-      content = <NetworkWatchPage data={demoNetwatch} error={null} loading={false} onRetry={reset}
+      content = <NetworkWatchPage data={demoNetwatch} devices={demoDevices} activity={demoActivity} error={null} loading={false} onRetry={reset}
         onSetEnabled={async () => { readonlyNotice(); }} demo onDemoAction={readonlyNotice} />;
       break;
     case 'account':

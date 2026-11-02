@@ -137,6 +137,7 @@ export const demoActivity: ActivityHistory = {
   schema: 1, scope: 'current_boot', volatile: true, maxEvents: 100,
   cloud: { enabled: false, phase: 'disabled', eligible: false, plan: 'free', retentionDays: 0, pendingEvents: 0, lastAttemptAt: 0, lastSuccessAt: 0, lastUploadedCount: 0, lastErrorCode: null, nextSyncAt: 0 },
   events: [
+    { schema: 1, eventId: 'demo-network-warning', eventType: 'network_watch.anomaly.warning', severity: 'warning', occurredAt: now - 900, deviceUuid: null, source: 'network_watch', metadata: { source_ip: '192.0.2.101', connections: 128, destinations: 42 } },
     { schema: 1, eventId: 'demo-event-1', eventType: 'safeshield.blocklist.updated', severity: 'success', occurredAt: now - 7200, deviceUuid: null, source: 'safeshield', metadata: {} },
     { schema: 1, eventId: 'demo-event-2', eventType: 'system.boot', severity: 'info', occurredAt: now - 86400, deviceUuid: null, source: 'system', metadata: {} },
   ],

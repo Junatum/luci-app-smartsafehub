@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 
-import { fetchAppsCatalog, fetchAppsStatus, fetchAppsMetrics, refreshAppsCatalog, refreshAppsStatus, refreshAppsMetrics, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
+import { fetchActivityHistory, fetchAppsCatalog, fetchAppsStatus, fetchAppsMetrics, refreshAppsCatalog, refreshAppsStatus, refreshAppsMetrics, installVerifiedApp, updateVerifiedApp, removeVerifiedApp, fetchGuestWifiQr, fetchRecommendedRulesStatus, refreshRecommendedRulesStatus,
   revokeRecommendedRule, fetchWifiQr, initializeSystemTimezone } from '../api/smartsafehub';
 
 import { AppShell } from '../components/AppShell';
@@ -46,6 +46,7 @@ import { WifiPage } from '../pages/WifiPage';
 import { browserTimezone } from '../utils/timezone';
 import { fetchNetwatchStatus, updateNetwatchEnabled } from '../api/netwatch';
 import type { NetwatchStatus } from '../types/netwatch';
+import type { ActivityHistory } from '../types/activity';
 import { NetworkWatchPage } from '../pages/NetworkWatchPage';
 
 interface AppProps {
@@ -94,7 +95,16 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     staleTimeMs: 5000,
   });
   const dashboardDevices = useConnectedDevices(route === 'home', false);
-  const devices = useConnectedDevices(route === 'devices');
+  // Network Watch reuses the device lookup once on entry; 15s polling stays on Devices only.
+  const devices = useConnectedDevices(route === 'devices' || route === 'netwatch', route === 'devices');
+  // Read existing activity events only while Network Watch is visible.
+  const netwatchActivity = useAsyncResource<ActivityHistory>({
+    active: route === 'netwatch',
+    fallbackError: 'Network Watch 최근 이벤트를 확인할 수 없습니다.',
+    loader: fetchActivityHistory,
+    pollInterval: 60_000,
+    staleTimeMs: 5_000,
+  });
   // Both views consume the same resource: switching pages must not re-query RPC.
   const safeshield = useSafeShieldStatus(route === 'home' || route === 'safeshield');
   const safeshieldStatistics = useSafeShieldStatistics(route === 'home' || route === 'safeshield', route === 'safeshield');
@@ -184,6 +194,8 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
       content = (
         <NetworkWatchPage
           data={netwatch.data}
+          devices={devices.data}
+          activity={netwatchActivity.data}
           error={netwatch.error}
           loading={netwatch.loading}
           onRetry={() => void netwatch.refresh()}
