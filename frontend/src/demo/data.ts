@@ -164,7 +164,7 @@ export const demoLan: LanSettings = {
 };
 
 export const demoSafeShield: SafeShieldStatus = {
-  available: true, version: '0.3.25', enabled: true, active: true, status: 'idle', stage: null,
+  available: true, version: '0.3.26', enabled: true, active: true, status: 'idle', stage: null,
   summary: { label: '보호 중', message: 'DNS 보호가 정상적으로 동작하고 있습니다.', severity: 'info' },
   runtime: { refreshdRunning: true, dnsmasqRunning: true, dnsRuntimeOk: true, lastResult: 'success', lastErrorCode: null },
   entitlement: { plan: 'free', status: 'active' },
