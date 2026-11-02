@@ -32,7 +32,8 @@ export const demoAccount: DeviceRegistrationStatus = {
   lastSuccessAt: now - 300,
 };
 
-// Demo-only catalog. No APK URLs or authenticated API responses are used.
+// Demo-only catalog. Versions are representative release examples, not live Hub approvals.
+// No APK URLs or authenticated API responses are used.
 export const demoApps: AppsCatalog = {
   schema: 1,
   deviceCode: 'iptime-ax3000sm',
@@ -46,7 +47,7 @@ export const demoApps: AppsCatalog = {
       description: '사용자가 직접 준비한 게임 파일로 즐기는 레트로 아케이드입니다.',
       category: 'entertainment',
       publisherType: 'first_party',
-      version: '1.1.0-r5',
+      version: '1.2.0-r4',
       webUi: { type: 'static', path: '/retro-arcade/' },
     },
     {
@@ -66,7 +67,7 @@ export const demoApps: AppsCatalog = {
       description: '다른 Wi-Fi에 연결하고 저장된 Wi-Fi에 자동으로 재연결합니다. 설치 후 연결 설정이 필요합니다.',
       category: 'network',
       publisherType: 'third_party',
-      version: '2.4.9-r5',
+      version: '2.4.9-r6',
       webUi: null, // Demo never exposes actual LuCI administration routes.
     },
     {

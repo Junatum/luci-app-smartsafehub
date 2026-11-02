@@ -7,7 +7,7 @@ import sys
 root=Path(sys.argv[1])
 demo=(root/'frontend/src/demo/data.ts').read_text()
 assert "id: 'travelmate'" in demo
-assert "version: '2.4.9-r5'" in demo
+assert "version: '2.4.9-r6'" in demo
 assert "webUi: null, // Demo never exposes actual LuCI administration routes." in demo
 assert "'travelmate': {" in demo
 assert "installed: false" in demo
