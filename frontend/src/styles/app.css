@@ -628,6 +628,14 @@
   border-color: #334155;
 }
 
+/* Tailwind v4's divide-y/divide-slate-* rules style the LIST CHILDREN,
+ * not the list container. Override that same child border in dark mode.
+ * A border-color on the parent alone leaves the light separator visible. */
+.ssh-app[data-theme='dark'] [class~='divide-slate-100'] > :not(:last-child),
+.ssh-app[data-theme='dark'] [class~='divide-slate-200'] > :not(:last-child) {
+  border-color: #1e293b;
+}
+
 .ssh-app[data-theme='dark'] [class~='border-white/80'] {
   border-color: #334155;
 }
@@ -671,6 +679,7 @@
   color: #7dd3fc;
 }
 
+.ssh-app[data-theme='dark'] [class~='border-sky-100'],
 .ssh-app[data-theme='dark'] [class~='border-sky-200'] {
   border-color: #075985;
 }
@@ -756,6 +765,7 @@
   --tw-ring-color: #7f1d1d;
 }
 
+.ssh-app[data-theme='dark'] [class~='bg-rose-100'],
 .ssh-app[data-theme='dark'] [class~='bg-rose-50'] {
   background-color: rgb(244 63 94 / 0.12);
 }
@@ -795,6 +805,26 @@
 
 .ssh-app[data-theme='dark'] .hover\:bg-slate-50:hover {
   background-color: #1e293b;
+}
+
+/* Only pale hover surfaces need remapping: filled action buttons use their
+ * own darker hover shades and must remain untouched. */
+.ssh-app[data-theme='dark'] .hover\:bg-slate-100:hover {
+  background-color: #334155;
+}
+
+.ssh-app[data-theme='dark'] .hover\:bg-teal-50:hover,
+.ssh-app[data-theme='dark'] .hover\:bg-teal-100:hover {
+  background-color: rgb(13 148 136 / 0.24);
+}
+
+.ssh-app[data-theme='dark'] .hover\:bg-amber-50:hover,
+.ssh-app[data-theme='dark'] .hover\:bg-amber-100:hover {
+  background-color: rgb(245 158 11 / 0.22);
+}
+
+.ssh-app[data-theme='dark'] .hover\:bg-rose-100:hover {
+  background-color: rgb(244 63 94 / 0.22);
 }
 
 /* Apps removal stays understated at rest; dark mode uses a muted red hover. */
