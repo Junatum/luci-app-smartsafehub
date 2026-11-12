@@ -35,3 +35,13 @@ export interface JarbisCredentials {
   username: string;
   secret: string;
 }
+
+// STATUS11 from the device (not the MQTT publisher acknowledgement).
+export interface JarbisLightState {
+  id: string;
+  observed: boolean;
+  power: 'ON' | 'OFF' | null;
+  brightness: number | null;
+  color: string | null;
+  colorTemperature: number | null; // Tasmota mired, 153..500
+}
