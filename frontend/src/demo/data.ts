@@ -300,9 +300,10 @@ export const demoNetwatch: NetwatchStatus = {
   schema: 1, enabled: true, phase: 'ready', sampledAt: now - 35,
   intervalSeconds: 60, source: 'conntrack', ipv4Only: true, limited: false,
   totalConnections: 54, totalDevices: 3, alert: null,
+  trainingDays: 9, trainingTargetDays: 14,
   devices: [
-    { ip: '192.0.2.101', connections: 28, destinations: 14 },
-    { ip: '192.0.2.102', connections: 19, destinations: 11 },
-    { ip: '192.0.2.103', connections: 7, destinations: 3 },
+    { ip: '192.0.2.101', connections: 28, destinations: 14, trainingDays: 9, baselineConnections: 80, baselineDestinations: 24, state: 'normal' },
+    { ip: '192.0.2.102', connections: 19, destinations: 11, trainingDays: 9, baselineConnections: 80, baselineDestinations: 20, state: 'normal' },
+    { ip: '192.0.2.103', connections: 7, destinations: 3, trainingDays: 3, baselineConnections: null, baselineDestinations: null, state: 'learning' },
   ],
 };

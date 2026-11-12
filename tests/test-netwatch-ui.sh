@@ -9,7 +9,7 @@ DEMO="$ROOT/frontend/src/demo/main.tsx"
 DATA="$ROOT/frontend/src/demo/data.ts"
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 for file in "$PAGE" "$APP" "$DEMO" "$DATA"; do [ -f "$file" ] || fail "missing $file"; done
-for str in 'role="switch"' 'aria-checked={enabled}' 'ssh-switch-control' 'ssh-switch-thumb' 'setTimeout(() => setNotice(null), 3500)' 'formatTimestamp(data.sampledAt)' '관찰 상태' '연결 많음' '판단 보류' '기기 이름을 확인할 수 없으면 IP만 표시합니다' 'recentWarnings(activity)' '최근 감지 이벤트' '관찰 범위 안내' 'list-disc'; do
+for str in 'role="switch"' 'aria-checked={enabled}' 'ssh-switch-control' 'ssh-switch-thumb' 'setTimeout(() => setNotice(null), 3500)' 'formatTimestamp(data.sampledAt)' '관찰 상태' '정상 범위' '변화 관찰' '학습 중' '이상 증가 감지' '판단 보류' '기기 이름을 확인할 수 없으면 IP만 표시합니다' 'recentWarnings(activity)' '최근 감지 이벤트' '관찰 범위 안내' 'list-disc'; do
     grep -Fq "$str" "$PAGE" || fail "화면 설정 및 표시 계약 누락: $str"
 done
 # Match SafeShield's compact SectionHeading action instead of a full-width settings card.

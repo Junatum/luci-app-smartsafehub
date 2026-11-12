@@ -13,7 +13,7 @@ function empty_status(enabled) {
 		phase: enabled ? 'preparing' : 'disabled',
 		sampledAt: 0, intervalSeconds: 60, source: 'conntrack',
 		ipv4Only: true, limited: false, totalConnections: 0,
-		totalDevices: 0, devices: [], alert: null,
+		totalDevices: 0, trainingDays: 0, trainingTargetDays: 14, devices: [], alert: null,
 	};
 }
 
