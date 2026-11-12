@@ -7,6 +7,7 @@ export type AppRoute =
   | 'devices'
   | 'safeshield'
   | 'netwatch'
+  | 'smarthome'
   | 'rules'
   | 'account'
   | 'apps'
@@ -77,6 +78,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: 'Network Watch',
     title: 'Network Watch',
     description: '연결된 기기의 외부 통신 변화를 가볍게 관찰하고 주의 신호를 확인합니다.',
+  },
+  {
+    route: 'smarthome',
+    hash: '#smarthome',
+    label: '스마트홈',
+    title: '스마트홈',
+    description: 'Jarbis로 Wi-Fi 스마트 전구를 검색하고 제어합니다.',
   },
   {
     route: 'rules',

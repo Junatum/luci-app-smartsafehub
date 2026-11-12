@@ -49,8 +49,8 @@ test('통합 UI는 기존 다크 모드 토큰을 재사용하며 패키지 revi
   assert.match(overview, /bg-slate-100/);
   assert.match(css, /\.ssh-app\[data-theme='dark'\] \[class~='border-slate-200'\]/);
   assert.match(css, /\.ssh-app\[data-theme='dark'\] \[class~='bg-slate-100'\]/);
-  assert.match(makefile, /PKG_RELEASE:=5/);
-  assert.match(main, /assetVersion: host\.dataset\.assetVersion \?\? '0\.2\.33-r5'/);
+  assert.match(makefile, /PKG_RELEASE:=6/);
+  assert.match(main, /assetVersion: host\.dataset\.assetVersion \?\? '0\.2\.33-r6'/);
 });
 
 test('Network Watch는 수집기에서 선별한 위험 기기를 우선 보여주고 모바일 목록을 별도로 제공한다', () => {

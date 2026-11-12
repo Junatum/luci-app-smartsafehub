@@ -34,6 +34,11 @@
         ],
         "smartsafehub_guest": [
           "wifi_guest_summary"
+        ],
+        "jarbis": [
+          "status",
+          "devices_list",
+          "discovery_list"
         ]
       },
       "cgi-io": [
@@ -97,6 +102,15 @@
         "smartsafehub_guest": [
           "wifi_guest_qr",
           "wifi_guest_update"
+        ],
+        "jarbis": [
+          "settings_update",
+          "device_add",
+          "device_update",
+          "device_remove",
+          "light_set",
+          "discovery_scan",
+          "broker_credentials"
         ]
       },
       "cgi-io": [

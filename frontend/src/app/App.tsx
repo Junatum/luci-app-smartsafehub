@@ -48,6 +48,7 @@ import { fetchNetwatchStatus, updateNetwatchEnabled } from '../api/netwatch';
 import type { NetwatchStatus } from '../types/netwatch';
 import type { ActivityHistory } from '../types/activity';
 import { NetworkWatchPage } from '../pages/NetworkWatchPage';
+import { SmartHomePage } from '../pages/SmartHomePage';
 
 interface AppProps {
   onAdministratorPasswordChanged: () => void;
@@ -190,6 +191,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   let content: ComponentChildren;
 
   switch (route) {
+    case 'smarthome':
+      content = <SmartHomePage />;
+      break;
+
     case 'netwatch':
       content = (
         <NetworkWatchPage
