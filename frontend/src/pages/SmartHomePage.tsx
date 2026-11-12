@@ -62,11 +62,30 @@ export function SmartHomePage() {
   const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>({});
   const [checkingStates, setCheckingStates] = useState<Record<string, boolean>>({});
   const stateRequest = useRef(0);
+  const manageMenus = useRef<Record<string, HTMLDetailsElement | null>>({});
   const editingDevice = useRef<string | null>(null);
   const [pairTarget, setPairTarget] = useState<JarbisDevice | null>(null);
   const [pairOptionsVisible, setPairOptionsVisible] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [replaceExisting, setReplaceExisting] = useState(false);
+
+  // Native <details> does not close on outside clicks. Keep the menu as a
+  // small popup, but dismiss it on outside pointer interaction and Escape.
+  useEffect(() => {
+    const dismiss = (target: Node | null) => {
+      for (const menu of Object.values(manageMenus.current)) {
+        if (menu?.open && (!target || !menu.contains(target))) menu.open = false;
+      }
+    };
+    const onOutside = (event: PointerEvent) => dismiss(event.target instanceof Node ? event.target : null);
+    const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(null); };
+    document.addEventListener('pointerdown', onOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('pointerdown', onOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, []);
 
   // Match the other SmartSafeHub pages: transient successes must not keep
   // pushing device controls down, while errors remain until acknowledged.
@@ -434,11 +453,11 @@ export function SmartHomePage() {
               <span class={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-bold ${!device.enabled ? 'bg-slate-100 text-slate-600' : bulbOnline ? 'bg-teal-50 text-teal-800' : 'bg-amber-50 text-amber-800'}`}>
                 {!device.enabled ? '사용 중지' : bulbOnline
                   ? (observed.power === 'ON' ? '응답 확인 · 켜짐' : observed.power === 'OFF' ? '응답 확인 · 꺼짐' : '응답 확인 · 전원 미확인')
-                  : !observed || checkingStates[device.id] ? '상태 확인 중' : '상태 확인 불가'}
+                  : !observed || checkingStates[device.id] ? '상태 확인 중' : '상태 응답 없음'}
               </span>
             </div>
             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-              <span>{bulbOnline ? `전구에서 확인한 현재 밝기: ${currentBrightness === null ? '미확인' : `${currentBrightness}%`}` : '전구의 현재 상태가 확인되지 않았습니다.'}</span>
+              <span>{bulbOnline ? `전구에서 확인한 현재 밝기: ${currentBrightness === null ? '미확인' : `${currentBrightness}%`}${observed?.source === 'http' ? ' · 로컬 직접 조회' : ''}` : '전구의 응답을 받지 못했습니다. 잠시 후 다시 확인해 주세요.'}</span>
               <button class={secondaryButton} type="button" disabled={!!busy || !ready || !device.enabled || Boolean(checkingStates[device.id])}
                 onClick={() => void refreshLight(device.id)}>상태 새로고침</button>
             </div>
@@ -506,15 +525,16 @@ export function SmartHomePage() {
                 onClick={() => activePair ? closePair() : openPair(device)}>
                 {activePair ? '연결 설정 닫기' : '전구 연결 설정'}
               </button>
-              <details class="relative z-20 min-w-0 text-sm text-slate-600">
+              <details ref={element => { manageMenus.current[device.id] = element; }}
+                class="relative z-20 min-w-0 text-sm text-slate-600">
                 <summary class={`${secondaryButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>관리</summary>
                 <div class="absolute left-0 top-full z-30 mt-2 flex w-64 max-w-[calc(100vw-3rem)] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <p class="m-0 break-all text-xs text-slate-500">기기 ID: {device.id}<br />Topic: {device.topic}</p>
                   <button class={secondaryButton} type="button" disabled={!!busy}
-                    onClick={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}>
+                    onClick={() => { manageMenus.current[device.id]!.open = false; void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}>
                     {device.enabled ? '기기 사용 중지' : '기기 다시 사용'}
                   </button>
-                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => void remove(device)}>기기 삭제</button>
+                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => { manageMenus.current[device.id]!.open = false; void remove(device); }}>기기 삭제</button>
                 </div>
               </details>
             </div>
@@ -548,7 +568,7 @@ export function SmartHomePage() {
           </article>;
         })}
       </div>}
-      <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">전원·밝기·색상은 전구에서 보내온 MQTT 상태 응답이 있을 때만 실제 값으로 표시합니다. 응답이 없으면 상태 확인 불가로 표시합니다. 기기 모델에 따라 일부 색상 기능이 제한될 수 있습니다.</p>
+      <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">전원·밝기·색상은 전구에서 직접 확인한 상태만 실제 값으로 표시합니다. MQTT 응답이 없을 때는 검증된 내부망 HTTP 조회를 시도합니다. 확인되지 않은 값은 실제 상태로 표시하지 않습니다.</p>
     </section>
 
     <section aria-label="새 전구 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">

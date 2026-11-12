@@ -40,6 +40,7 @@ export interface JarbisCredentials {
 export interface JarbisLightState {
   id: string;
   observed: boolean;
+  source?: 'mqtt' | 'http' | null;
   power: 'ON' | 'OFF' | null;
   brightness: number | null;
   color: string | null;

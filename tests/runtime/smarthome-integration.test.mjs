@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r13"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r13'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r14"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r14'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -45,7 +45,7 @@ test('명시적으로 승인한 기기만 등록하고 전원 명령을 실제 �
   assert.match(page, /candidate\.registered/);
   assert.match(page, /candidate\.topic/);
   assert.match(page, /전구의 상태 응답에서 변경된 값을 확인했습니다/);
-  assert.match(page, /응답이 없으면 상태 확인 불가로 표시합니다/);
+  assert.match(page, /확인되지 않은 값은 실제 상태로 표시하지 않습니다/);
   assert.match(page, /credentials \? '인증 정보 숨기기'/);
   assert.doesNotMatch(page, /localStorage|sessionStorage/);
   assert.doesNotMatch(api, /console\.log/);
@@ -103,8 +103,8 @@ test('인증 비밀번호와 MQTT 비밀번호를 구분하고 실패할 때만 
 test('MQTT 메시지 전송을 실제 전구 점등이나 연결 확정으로 표시하지 않는다', () => {
   assert.match(page, /전구 제어 연결/);
   assert.match(page, /연결 준비됨/);
-  assert.match(page, /상태 확인 불가/);
-  assert.match(page, /전구에서 보내온 MQTT 상태 응답/);
+  assert.match(page, /상태 응답 없음/);
+  assert.match(page, /MQTT 응답이 없을 때는 검증된 내부망 HTTP 조회/);
   assert.match(page, /전구의 상태 응답에서 변경된 값을 확인했습니다/);
   assert.match(page, /mqttConfirmed/);
   assert.doesNotMatch(page, /'전구가 켜졌습니다'|'전구가 꺼졌습니다'/);
@@ -145,7 +145,7 @@ test('스마트홈은 전구 상태 확인과 RGB·색온도를 제공하되 응
   assert.match(api, /getJarbisLightState = .*'light_state'/);
   assert.match(page, /state\.observed/);
   assert.match(page, /전구에서 확인한 현재 밝기/);
-  assert.match(page, /상태 확인 불가/);
+  assert.match(page, /상태 응답 없음/);
   assert.match(page, /type="color"/);
   assert.match(page, /min="2700" max="6500" step="100"/);
   assert.match(page, /onPointerUp=/);
@@ -184,7 +184,7 @@ test('성공 알림은 왼쪽에서 나타나고 관리 메뉴는 카드 배치�
   assert.doesNotMatch(notice, /justify-end/);
   assert.match(notice, /sm:max-w-2xl/);
   assert.match(notice, /aria-label="성공 알림 닫기"/);
-  assert.match(page, /<details class="relative z-20 min-w-0 text-sm text-slate-600">/);
+  assert.match(page, /<details ref=\{element => \{ manageMenus\.current\[device\.id\] = element; \}\}/);
   assert.match(page, /absolute left-0 top-full z-30/);
   assert.match(page, /<summary class=\{`\$\{secondaryButton\} cursor-pointer/);
   assert.match(page, /기기 사용 중지/);
@@ -234,4 +234,22 @@ test('등록 전구가 한 대여도 데스크톱에서는 반쪽 너비에 배�
   assert.doesNotMatch(inventory, /lg:grid-cols-1/);
   // 각 장치 카드 안에서는 전원·RGB·밝기·색온도가 하나의 카드로 유지돼야 합니다.
   assert.match(page, /aria-label="전구 조명 제어"/);
+});
+
+test('관리 메뉴는 바깥 클릭과 Escape로 닫고 전구 카드 조작은 유지한다', () => {
+  assert.match(page, /document\.addEventListener\('pointerdown', onOutside\)/);
+  assert.match(page, /document\.removeEventListener\('pointerdown', onOutside\)/);
+  assert.match(page, /document\.addEventListener\('keydown', onEscape\)/);
+  assert.match(page, /event\.key === 'Escape'/);
+  assert.match(page, /!menu\.contains\(target\)/);
+  assert.match(page, /manageMenus\.current\[device\.id\]/);
+});
+
+test('스마트홈은 상태 응답이 없으면 실제 점등으로 오인하지 않고 검증된 HTTP 상태도 받아들인다', () => {
+  const types = source('frontend/src/types/jarbis.ts');
+  assert.match(types, /source\?: 'mqtt' \| 'http' \| null/);
+  assert.match(page, /observed\?\.source === 'http'/);
+  assert.match(page, /상태 응답 없음/);
+  assert.match(page, /검증된 내부망 HTTP 조회/);
+  assert.match(page, /const confirmedPower = observed\?\.observed === true/);
 });
