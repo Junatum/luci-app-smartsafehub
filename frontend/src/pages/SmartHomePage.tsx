@@ -54,6 +54,9 @@ export function SmartHomePage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [brightness, setBrightness] = useState<Record<string, number>>({});
+  // A switch is still operable when the bulb has not reported its state.
+  // Pending values represent the user's last request, never an observed state.
+  const [requestedPower, setRequestedPower] = useState<Record<string, 'ON' | 'OFF'>>({});
   const [colors, setColors] = useState<Record<string, string>>({});
   const [kelvins, setKelvins] = useState<Record<string, number>>({});
   const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>({});
@@ -109,6 +112,14 @@ export function SmartHomePage() {
     try {
       const state = await getJarbisLightState(id);
       setLightStates(old => ({ ...old, [id]: state }));
+      if (state.observed && state.power !== null) {
+        setRequestedPower(old => {
+          if (old[id] !== state.power) return old;
+          const next = { ...old };
+          delete next[id];
+          return next;
+        });
+      }
       if (state.observed && editingDevice.current !== id) {
         if (state.brightness !== null) setBrightness(old => ({ ...old, [id]: state.brightness! }));
         if (state.color) setColors(old => ({ ...old, [id]: state.color! }));
@@ -148,9 +159,10 @@ export function SmartHomePage() {
   }, [stateIds, status?.enabled, status?.brokerReady]);
 
   const sendLight = async (device: JarbisDevice,
-    capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) => {
+    capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string): Promise<boolean> => {
     editingDevice.current = null;
-    if (busy) return;
+    // A skipped request is not a successful MQTT command.
+    if (busy) return false;
     setBusy(`light:${device.id}`);
     setError('');
     setMessage('');
@@ -166,9 +178,28 @@ export function SmartHomePage() {
       setMessage(matched
         ? '전구의 상태 응답에서 변경된 값을 확인했습니다.'
         : '명령은 전송됐지만 요청한 상태로 변경됐는지는 아직 확인되지 않았습니다.');
+      return true;
     } catch (cause) {
       setError(errorMessage(cause));
+      return false;
     } finally { setBusy(''); }
+  };
+
+  const toggleBulbPower = async (device: JarbisDevice, currentlyOn: boolean) => {
+    if (busy) return;
+    const nextPower = currentlyOn ? 'OFF' : 'ON';
+    const previous = requestedPower[device.id];
+    setRequestedPower(old => ({ ...old, [device.id]: nextPower }));
+    const sent = await sendLight(device, 'power', nextPower);
+    if (!sent) {
+      setRequestedPower(old => {
+        if (old[device.id] !== nextPower) return old;
+        const restored = { ...old };
+        if (previous) restored[device.id] = previous;
+        else delete restored[device.id];
+        return restored;
+      });
+    }
   };
 
   const run = async (key: string, action: () => Promise<unknown>, ok: string, reload = true) => {
@@ -362,12 +393,10 @@ export function SmartHomePage() {
       <AlertIcon class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1">{error}</span>
       <button class="shrink-0 font-bold underline" type="button" onClick={() => setError('')}>닫기</button>
     </div> : null}
-    {message ? <div class="flex justify-end">
-      <div role="status" aria-live="polite" class="flex w-full items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 sm:max-w-2xl">
-        <CheckCircleIcon class="mt-0.5 size-4 shrink-0" />
-        <span class="min-w-0 flex-1">{message}</span>
-        <button class="shrink-0 rounded-lg px-1 text-xs font-bold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600" type="button" aria-label="성공 알림 닫기" onClick={() => setMessage('')}>닫기</button>
-      </div>
+    {message ? <div role="status" aria-live="polite" class="flex w-full items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 sm:max-w-2xl">
+      <CheckCircleIcon class="mt-0.5 size-4 shrink-0" />
+      <span class="min-w-0 flex-1">{message}</span>
+      <button class="shrink-0 rounded-lg px-1 text-xs font-bold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600" type="button" aria-label="성공 알림 닫기" onClick={() => setMessage('')}>닫기</button>
     </div> : null}
 
     <section aria-label="등록된 전구" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
@@ -380,12 +409,17 @@ export function SmartHomePage() {
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
-      </div> : <div class={`mt-4 grid gap-3 ${devices.length > 1 ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
+      </div> : <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {devices.map(device => {
           const controlsDisabled = Boolean(busy) || !ready || !device.enabled;
           const activePair = pairTarget?.id === device.id;
           const observed = lightStates[device.id];
           const bulbOnline = observed?.observed === true;
+          const pendingPower = requestedPower[device.id];
+          const confirmedPower = observed?.observed === true ? observed.power : null;
+          // When unknown, start from OFF so the first tap requests ON.
+          const powerOn = pendingPower ? pendingPower === 'ON' : confirmedPower === 'ON';
+          const powerNeedsConfirmation = !!pendingPower && pendingPower !== confirmedPower;
           const currentBrightness = observed?.brightness;
           const chosenBrightness = brightness[device.id] ?? currentBrightness ?? 50;
           const chosenKelvin = kelvins[device.id] ?? (observed?.colorTemperature ? kelvinFromMired(observed.colorTemperature) : 4000);
@@ -398,7 +432,9 @@ export function SmartHomePage() {
                 <p class="mt-1 mb-0 break-all text-xs text-slate-500">Tasmota 스마트 전구</p>
               </div>
               <span class={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-bold ${!device.enabled ? 'bg-slate-100 text-slate-600' : bulbOnline ? 'bg-teal-50 text-teal-800' : 'bg-amber-50 text-amber-800'}`}>
-                {!device.enabled ? '사용 중지' : bulbOnline ? `응답 확인 · ${observed.power === 'ON' ? '켜짐' : '꺼짐'}` : !observed || checkingStates[device.id] ? '상태 확인 중' : '상태 확인 불가'}
+                {!device.enabled ? '사용 중지' : bulbOnline
+                  ? (observed.power === 'ON' ? '응답 확인 · 켜짐' : observed.power === 'OFF' ? '응답 확인 · 꺼짐' : '응답 확인 · 전원 미확인')
+                  : !observed || checkingStates[device.id] ? '상태 확인 중' : '상태 확인 불가'}
               </span>
             </div>
             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
@@ -406,62 +442,73 @@ export function SmartHomePage() {
               <button class={secondaryButton} type="button" disabled={!!busy || !ready || !device.enabled || Boolean(checkingStates[device.id])}
                 onClick={() => void refreshLight(device.id)}>상태 새로고침</button>
             </div>
-            <div class="mt-4 grid gap-4 xl:grid-cols-2">
-              <div class="space-y-4 rounded-xl bg-slate-50 p-3 sm:p-4">
-                <div class="grid grid-cols-2 gap-2">
-                  <button class={primaryButton} type="button" disabled={controlsDisabled}
-                    onClick={() => void sendLight(device, 'power', 'ON')}><PowerIcon class="size-4" />전구 켜기</button>
-                  <button class={secondaryButton} type="button" disabled={controlsDisabled}
-                    onClick={() => void sendLight(device, 'power', 'OFF')}>전구 끄기</button>
+            <div aria-label="전구 조명 제어" class="mt-4 min-w-0 space-y-3 rounded-xl bg-slate-50 p-3 sm:p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="m-0 text-sm font-extrabold text-slate-900">전구 전원</p>
+                  <p class="mt-1 mb-0 text-xs text-slate-500">
+                    {powerNeedsConfirmation ? '전원 변경을 요청했습니다 · 실제 상태 확인 중'
+                      : confirmedPower ? `전구 응답: ${confirmedPower === 'ON' ? '켜짐' : '꺼짐'}`
+                      : '실제 전원 상태 미확인 · 스위치로 제어할 수 있습니다.'}
+                  </p>
                 </div>
-                <div>
-                  <div class="flex items-center justify-between gap-2">
-                    <label class="text-xs font-bold text-slate-700" for={`brightness-${device.id}`}>밝기 조절</label>
-                    <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenBrightness}%</span>
-                  </div>
-                  <input id={`brightness-${device.id}`} type="range" min="0" max="100" step="5"
-                    class="mt-3 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
-                    value={chosenBrightness} onPointerDown={() => { editingDevice.current = device.id; }}
-                    onInput={event => setBrightness(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
-                    onPointerUp={event => void sendLight(device, 'brightness', event.currentTarget.value)}
-                    onKeyUp={event => { if (['ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(event.key)) void sendLight(device, 'brightness', event.currentTarget.value); }} />
-                  <p class="mt-2 mb-0 text-xs text-slate-500">슬라이더에서 손을 떼면 밝기를 적용합니다.</p>
+                <div class="flex shrink-0 items-center gap-2">
+                  <span class="text-xs font-bold text-slate-700">{pendingPower
+                    ? (powerOn ? '켜기 요청' : '끄기 요청')
+                    : confirmedPower === 'ON' ? '켜짐' : confirmedPower === 'OFF' ? '꺼짐' : '미확인'}</span>
+                  <button type="button" role="switch" aria-checked={powerOn}
+                    aria-label={`${device.name} 전원`} aria-busy={busy === `light:${device.id}`}
+                    disabled={controlsDisabled}
+                    onClick={() => void toggleBulbPower(device, powerOn)}
+                    class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50 ${powerOn ? 'bg-teal-600' : 'bg-slate-300'}`}>
+                    <span aria-hidden="true" class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${powerOn ? 'left-6' : 'left-1'}`} />
+                  </button>
                 </div>
               </div>
-              <div class="space-y-4 rounded-xl bg-slate-50 p-3 sm:p-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <label class="text-xs font-bold text-slate-700" for={`color-${device.id}`}>선택할 RGB 색상</label>
-                  <div class="flex items-center gap-2">
-                    <input id={`color-${device.id}`} type="color" class="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                      disabled={controlsDisabled} value={chosenColor}
-                      onInput={event => setColors(old => ({ ...old, [device.id]: event.currentTarget.value }))}
-                      onChange={event => void sendLight(device, 'color', event.currentTarget.value.slice(1).toUpperCase())} />
-                    <span class="font-mono text-xs text-slate-500">{chosenColor.toUpperCase()}</span>
-                  </div>
+              <div class="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+                <label class="text-xs font-bold text-slate-700" for={`color-${device.id}`}>RGB 색상</label>
+                <div class="flex items-center gap-2">
+                  <input id={`color-${device.id}`} type="color" class="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
+                    disabled={controlsDisabled} value={chosenColor}
+                    onInput={event => setColors(old => ({ ...old, [device.id]: event.currentTarget.value }))}
+                    onChange={event => void sendLight(device, 'color', event.currentTarget.value.slice(1).toUpperCase())} />
+                  <span class="font-mono text-xs text-slate-500">{chosenColor.toUpperCase()}</span>
                 </div>
-                <div>
-                  <div class="flex items-center justify-between gap-2">
-                    <label class="text-xs font-bold text-slate-700" for={`kelvin-${device.id}`}>색온도</label>
-                    <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenKelvin}K</span>
-                  </div>
-                  <input id={`kelvin-${device.id}`} type="range" min="2700" max="6500" step="100"
-                    class="mt-3 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
-                    value={chosenKelvin} onPointerDown={() => { editingDevice.current = device.id; }}
-                    onInput={event => setKelvins(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
-                    onPointerUp={event => void sendLight(device, 'color_temperature', miredFromKelvin(Number(event.currentTarget.value)))}
-                    onKeyUp={event => { if (['ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(event.key)) void sendLight(device, 'color_temperature', miredFromKelvin(Number(event.currentTarget.value))); }} />
-                  <div class="mt-1 flex items-center justify-between text-xs text-slate-500"><span>따뜻한색 · 2700K</span><span>차가운색 · 6500K</span></div>
+              </div>
+              <div class="border-t border-slate-200 pt-3">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-xs font-bold text-slate-700" for={`brightness-${device.id}`}>밝기 조절</label>
+                  <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenBrightness}%</span>
                 </div>
+                <input id={`brightness-${device.id}`} type="range" min="0" max="100" step="5"
+                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
+                  value={chosenBrightness} onPointerDown={() => { editingDevice.current = device.id; }}
+                  onInput={event => setBrightness(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
+                  onPointerUp={event => void sendLight(device, 'brightness', event.currentTarget.value)}
+                  onKeyUp={event => { if (['ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(event.key)) void sendLight(device, 'brightness', event.currentTarget.value); }} />
+              </div>
+              <div class="border-t border-slate-200 pt-3">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-xs font-bold text-slate-700" for={`kelvin-${device.id}`}>색온도</label>
+                  <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenKelvin}K</span>
+                </div>
+                <input id={`kelvin-${device.id}`} type="range" min="2700" max="6500" step="100"
+                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
+                  value={chosenKelvin} onPointerDown={() => { editingDevice.current = device.id; }}
+                  onInput={event => setKelvins(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
+                  onPointerUp={event => void sendLight(device, 'color_temperature', miredFromKelvin(Number(event.currentTarget.value)))}
+                  onKeyUp={event => { if (['ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(event.key)) void sendLight(device, 'color_temperature', miredFromKelvin(Number(event.currentTarget.value))); }} />
+                <div class="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500"><span>따뜻한색 · 2700K</span><span>차가운색 · 6500K</span></div>
               </div>
             </div>
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
               <button class={secondaryButton} type="button" disabled={!!busy || !ready || !device.enabled}
                 onClick={() => activePair ? closePair() : openPair(device)}>
                 {activePair ? '연결 설정 닫기' : '전구 연결 설정'}
               </button>
-              <details class="text-sm text-slate-600">
-                <summary class="cursor-pointer rounded-lg px-2 py-2 text-xs font-bold text-slate-600 focus-visible:outline-2 focus-visible:outline-teal-600">관리</summary>
-                <div class="mt-2 flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <details class="relative z-20 min-w-0 text-sm text-slate-600">
+                <summary class={`${secondaryButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>관리</summary>
+                <div class="absolute left-0 top-full z-30 mt-2 flex w-64 max-w-[calc(100vw-3rem)] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <p class="m-0 break-all text-xs text-slate-500">기기 ID: {device.id}<br />Topic: {device.topic}</p>
                   <button class={secondaryButton} type="button" disabled={!!busy}
                     onClick={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}>

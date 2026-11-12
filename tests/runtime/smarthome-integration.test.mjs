@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r10"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r10'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r13"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r13'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -133,9 +133,11 @@ test('스마트홈 성공 알림은 5초 후 사라지고 직접 닫을 수 있�
   assert.doesNotMatch(page, /setTimeout\(\(\) => setError/);
 });
 
-test('밝기 슬라이더가 실제 상태처럼 표시되지 않고 설정할 값이라고 안내한다', () => {
+test('밝기 슬라이더는 조정값과 포인터를 놓았을 때만 명령을 적용한다', () => {
   assert.match(page, />밝기 조절<\/label>/);
-  assert.match(page, /슬라이더에서 손을 떼면 밝기를 적용합니다/);
+  assert.match(page, /\{chosenBrightness\}%/);
+  assert.match(page, /onPointerUp=\{event => void sendLight\(device, 'brightness', event\.currentTarget\.value\)\}/);
+  assert.match(page, /전구에서 확인한 현재 밝기/);
 });
 
 
@@ -149,5 +151,87 @@ test('스마트홈은 전구 상태 확인과 RGB·색온도를 제공하되 응
   assert.match(page, /onPointerUp=/);
   assert.match(page, /document\.visibilityState === 'hidden'/);
   assert.match(page, /window\.setInterval\(poll, 30000\)/);
-  assert.match(page, /devices\.length > 1 \? 'lg:grid-cols-2' : 'lg:grid-cols-1'/);
+  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
+});
+
+
+test('전원은 단일 토글로 제어하고 상태 미확인 때도 요청값을 실제 상태로 표시하지 않는다', () => {
+  assert.match(page, /role="switch" aria-checked=\{powerOn\}/);
+  assert.match(page, /aria-label=\{`\$\{device\.name\} 전원`\}/);
+  assert.match(page, /onClick=\{\(\) => void toggleBulbPower\(device, powerOn\)\}/);
+  assert.match(page, /const powerOn = pendingPower \? pendingPower === 'ON' : confirmedPower === 'ON'/);
+  assert.match(page, /if \(!sent\) \{/);
+  assert.match(page, /전원 변경을 요청했습니다 · 실제 상태 확인 중/);
+  assert.match(page, /실제 전원 상태 미확인/);
+  assert.match(page, /응답 확인 · 전원 미확인/);
+  assert.doesNotMatch(page, />전구 켜기<\/button>|>전구 끄기<\/button>/);
+});
+
+test('전원·RGB·밝기·색온도를 하나의 카드로 합쳐 조작 순서를 일관되게 유지한다', () => {
+  const bulb = page.slice(page.indexOf('const controlsDisabled'));
+  const power = bulb.indexOf('aria-label={`${device.name} 전원`}');
+  const rgb = bulb.indexOf('for={`color-${device.id}`}');
+  const brightness = bulb.indexOf('for={`brightness-${device.id}`}');
+  const kelvin = bulb.indexOf('for={`kelvin-${device.id}`}');
+  assert.ok(power > -1 && rgb > power && brightness > rgb && kelvin > brightness);
+  assert.match(bulb, /aria-label="전구 조명 제어" class="mt-4 min-w-0 space-y-3 rounded-xl bg-slate-50/);
+  assert.match(bulb, /border-t border-slate-200 pt-3/);
+});
+
+test('성공 알림은 왼쪽에서 나타나고 관리 메뉴는 카드 배치를 밀지 않는다', () => {
+  const notice = page.slice(page.indexOf('{message ?'), page.indexOf('aria-label="등록된 전구"'));
+  assert.match(notice, /role="status" aria-live="polite"/);
+  assert.doesNotMatch(notice, /justify-end/);
+  assert.match(notice, /sm:max-w-2xl/);
+  assert.match(notice, /aria-label="성공 알림 닫기"/);
+  assert.match(page, /<details class="relative z-20 min-w-0 text-sm text-slate-600">/);
+  assert.match(page, /absolute left-0 top-full z-30/);
+  assert.match(page, /<summary class=\{`\$\{secondaryButton\} cursor-pointer/);
+  assert.match(page, /기기 사용 중지/);
+  assert.match(page, /기기 삭제/);
+});
+
+
+test('전원 변경 중복 요청은 Promise<boolean> 계약을 지키고 실패로 처리한다', () => {
+  const start = page.indexOf('const sendLight = async');
+  const end = page.indexOf('const toggleBulbPower =', start);
+  const sendLight = page.slice(start, end);
+  assert.match(sendLight, /Promise<boolean>\s*=>/);
+  assert.match(sendLight, /if \(busy\) return false;/);
+  assert.match(sendLight, /return true;/);
+  assert.doesNotMatch(sendLight, /\breturn\s*;/);
+  assert.match(page, /if \(!sent\) \{/);
+});
+
+
+test('전구 조작은 중첩 배경 카드 없이 하나의 영역에 전원·색상·밝기·색온도를 표시한다', () => {
+  const start = page.indexOf('aria-label="전구 조명 제어"');
+  const end = page.indexOf('전구 연결 설정', start);
+  assert.ok(start > -1 && end > start, '전구 제어 영역을 찾을 수 있어야 합니다');
+  const controls = page.slice(start, end);
+  const labels = ['전구 전원', 'RGB 색상', '밝기 조절', '색온도'];
+  let offset = -1;
+  for (const label of labels) {
+    const found = controls.indexOf(label);
+    assert.ok(found > offset, `${label}: 이전 조작 다음에 표시해야 합니다`);
+    offset = found;
+  }
+  assert.equal((controls.match(/rounded-xl bg-slate-50 p-3 sm:p-4/g) || []).length, 1, '제어 배경 카드는 하나여야 합니다');
+  assert.doesNotMatch(controls, /grid-cols-2|space-y-4 rounded-xl bg-slate-50/, '조작 항목을 별도의 좌우 카드로 분리하지 않습니다');
+  assert.match(controls, /role="switch" aria-checked=\{powerOn\}/);
+  assert.match(controls, /type="color"/);
+  assert.match(controls, /type="range" min="0" max="100"/);
+  assert.match(controls, /type="range" min="2700" max="6500"/);
+});
+
+
+test('등록 전구가 한 대여도 데스크톱에서는 반쪽 너비에 배치하고 모바일은 전체 폭을 사용한다', () => {
+  const start = page.indexOf('aria-label="등록된 전구"');
+  const end = page.indexOf('devices.map(device =>', start);
+  const inventory = page.slice(start, end);
+  assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
+  assert.doesNotMatch(inventory, /devices\.length > 1/);
+  assert.doesNotMatch(inventory, /lg:grid-cols-1/);
+  // 각 장치 카드 안에서는 전원·RGB·밝기·색온도가 하나의 카드로 유지돼야 합니다.
+  assert.match(page, /aria-label="전구 조명 제어"/);
 });
