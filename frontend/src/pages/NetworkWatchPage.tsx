@@ -98,6 +98,17 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
     }
   }
   const warnings = recentWarnings(activity);
+  // The API reports the longest-trained currently connected device, not a fleet-wide average.
+  // A missing/invalid target must never produce a broken progress width.
+  const trainingTarget = typeof data?.trainingTargetDays === 'number'
+    && Number.isFinite(data.trainingTargetDays) && data.trainingTargetDays > 0
+    ? data.trainingTargetDays : 14;
+  const trainingDays = typeof data?.trainingDays === 'number' && Number.isFinite(data.trainingDays)
+    ? Math.min(trainingTarget, Math.max(0, data.trainingDays)) : 0;
+  const trainingPercent = Math.min(100, 100 * trainingDays / trainingTarget);
+  const trainingStage = trainingDays >= trainingTarget
+    ? '기준 안정화'
+    : trainingDays >= 7 ? '기준 형성' : '학습 중';
 
   return (
     <div class="space-y-5">
@@ -130,35 +141,42 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
       {enabled && data?.phase === 'preparing' ? <p role="status" class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">첫 연결 관찰을 준비하고 있습니다. 잠시 후 자동으로 갱신됩니다.</p> : null}
       {enabled && data?.phase === 'unavailable' ? <div role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">연결 정보를 읽을 수 없습니다. OpenWrt의 conntrack 지원 여부를 확인해 주세요. 실제 감시가 수행 중인 것으로 표시하지 않습니다.</div> : null}
       {ready && data ? <>
-        <div class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-sm font-semibold text-slate-500">현재 연결 수</p>
-            <p class="mt-2 text-xl font-extrabold text-slate-900">{formatNumber(data.totalConnections)}</p>
+        <section aria-label="Network Watch 관찰 요약과 학습" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5 xl:gap-5">
+            <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
+              <p class="text-xs font-semibold text-slate-500">현재 연결 수</p>
+              <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{formatNumber(data.totalConnections)}</p>
+            </div>
+            <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
+              <p class="text-xs font-semibold text-slate-500">관찰된 기기 수</p>
+              <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{formatNumber(data.totalDevices)}<span class="ml-1 text-xs font-medium text-slate-500">대</span></p>
+            </div>
+            <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
+              <p class="text-xs font-semibold text-slate-500">마지막 갱신</p>
+              <p class="mt-2 text-xl font-extrabold text-slate-900">{data.sampledAt > 0 ? formatRelativeTime(data.sampledAt) : '—'}</p>
+              {data.sampledAt > 0 ? <p class="mt-1 text-xs text-slate-500" title="브라우저 시간대 기준">{formatTimestamp(data.sampledAt)}</p> : null}
+            </div>
+            <div class="min-w-0 sm:col-span-3 xl:col-span-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs font-semibold text-slate-500">정상 통신 패턴 학습</p>
+                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[0.68rem] font-bold text-slate-600">{trainingStage}</span>
+              </div>
+              <div class="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <p class="text-xl font-extrabold tabular-nums text-slate-900">{trainingDays}<span class="ml-1 text-xs font-semibold text-slate-500">/ {trainingTarget}일</span></p>
+                <p class="text-xs text-slate-500">최장 학습 기기 기준</p>
+              </div>
+              <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar"
+                aria-label="정상 패턴 학습 진행" aria-valuemin={0} aria-valuemax={trainingTarget} aria-valuenow={trainingDays}>
+                <div class="h-full rounded-full bg-teal-600" style={{ width: `${trainingPercent}%` }} />
+              </div>
+              <div class="mt-1 flex flex-wrap justify-between gap-x-3 text-[0.68rem] text-slate-500">
+                <span>7일 · 기준 형성</span><span>{trainingTarget}일 · 안정화</span>
+              </div>
+            </div>
           </div>
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-sm font-semibold text-slate-500">관찰된 기기 수</p>
-            <p class="mt-2 text-xl font-extrabold text-slate-900">{formatNumber(data.totalDevices)}</p>
-          </div>
-          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p class="text-sm font-semibold text-slate-500">마지막 갱신</p>
-            <p class="mt-2 text-xl font-extrabold text-slate-900">{data.sampledAt > 0 ? formatRelativeTime(data.sampledAt) : '—'}</p>
-            {data.sampledAt > 0 ? <p class="mt-1 text-xs text-slate-500" title="브라우저 시간대 기준">{formatTimestamp(data.sampledAt)}</p> : null}
-          </div>
-        </div>
+        </section>
         {data.limited ? <p role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">연결 수가 관찰 한도를 초과하여 일부 연결만 집계했습니다. 이번 결과로 이상 여부를 판단하지 않습니다.</p> : null}
         {data.alert ? <p role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{data.alert.ip} 기기의 외부 연결이 학습된 기준을 3회 연속 초과했거나 초기 학습 중 매우 높게 관찰되었습니다. 정상적인 사용일 수도 있습니다.</p> : null}
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 class="text-base font-extrabold text-slate-900">기기별 정상 패턴 학습</h2>
-          <p class="mt-1 text-xs text-slate-500">기기별 최대 14일 학습 · 7일 이상 관찰 후 평소 범위 계산 · 학습 중에는 극단적인 통신 증가만 감지</p>
-          <div class="mt-3 flex flex-wrap items-center gap-3">
-            <div class="h-2 w-full max-w-xs overflow-hidden rounded-full bg-slate-100" role="progressbar"
-              aria-label="정상 패턴 학습 진행" aria-valuemin={0} aria-valuemax={data.trainingTargetDays ?? 14} aria-valuenow={Math.min(data.trainingDays ?? 0, data.trainingTargetDays ?? 14)}>
-              <div class="h-full rounded-full bg-teal-600" style={{ width: `${Math.min(100, 100 * (data.trainingDays ?? 0) / (data.trainingTargetDays ?? 14))}%` }} />
-            </div>
-            <span class="text-xs font-semibold text-slate-600">유효 관찰일 {data.trainingDays ?? 0} / {data.trainingTargetDays ?? 14}일</span>
-          </div>
-          <p class="mt-1 text-xs text-slate-500">현재 연결된 기기 중 학습일이 가장 많은 기기를 기준으로 표시합니다.</p>
-        </section>
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 class="text-base font-extrabold text-slate-900">기기별 외부 연결 현황</h2>
           <p class="mt-1 text-xs text-slate-500">IPv4 기준 현재 연결 스냅샷 · 최대 12대 표시 · 콘텐츠 분석 없음</p>
