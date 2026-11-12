@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r6"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r6'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r7"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r7'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -32,7 +32,7 @@ test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분�
   const read = group.read.ubus.jarbis;
   const write = group.write.ubus.jarbis;
   assert.deepEqual(read, ['status', 'devices_list', 'discovery_list']);
-  for (const method of ['settings_update','device_add','device_update','device_remove','light_set','discovery_scan','broker_credentials']) {
+  for (const method of ['settings_update','device_add','device_update','device_remove','device_pair','light_set','discovery_scan','broker_credentials']) {
     assert.ok(write.includes(method), `Jarbis write ACL missing: ${method}`);
     assert.ok(!read.includes(method), `Jarbis write leaked into read: ${method}`);
     assert.match(api, new RegExp(`'${method}'`));
@@ -57,4 +57,18 @@ test('MQTT 비밀번호는 Preact에서 허용하는 고정 input type으로 표
   assert.match(page, /:\s*<input[^>]*type="password"[^>]*readOnly[^>]*aria-label="MQTT 비밀번호"/);
   assert.match(page, /onClick=\{\(\) => setReveal\(!reveal\)\}/);
   assert.doesNotMatch(page, /<label[^>]*>[\s\S]*?aria-label="MQTT 비밀번호"/);
+});
+
+
+test('스마트 전구는 사용자 승인 후 자동 연결하고 관리자 암호를 저장하지 않는다', () => {
+  assert.match(api, /pairJarbisDevice = /);
+  assert.match(api, /'device_pair'/);
+  assert.match(api, /replace_existing/);
+  assert.match(page, /추가 및 자동 연결/);
+  assert.match(page, /전구 관리자 비밀번호/);
+  assert.match(page, /기존 연결을 변경하는 데 동의/);
+  assert.match(page, /mqttConfirmed/);
+  assert.match(page, /setAdminPassword\(''\)/);
+  assert.doesNotMatch(page, /localStorage|sessionStorage/);
+  assert.doesNotMatch(api, /console\.log|console\.error/);
 });

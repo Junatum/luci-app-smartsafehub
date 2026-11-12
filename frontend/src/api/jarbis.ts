@@ -15,3 +15,10 @@ export const removeJarbisDevice = (id: string) => rpc<{ id: string; removed: boo
 export const setJarbisLight = (id: string, capability: 'power' | 'brightness', value: string) =>
   rpc<{ accepted: boolean }>('light_set', { id, capability, value });
 export const getJarbisCredentials = () => rpc<JarbisCredentials>('broker_credentials');
+
+// Pairing never exposes the managed MQTT secret to the browser. The optional
+// Tasmota web-admin password is sent only in this explicit RPC request.
+export const pairJarbisDevice = (id: string, adminPassword = '', replaceExisting = false) =>
+  rpc<{ id: string; configured: boolean; mqttConfirmed: boolean }>(
+    'device_pair', { id, admin_password: adminPassword, replace_existing: replaceExisting }, 32000,
+  );

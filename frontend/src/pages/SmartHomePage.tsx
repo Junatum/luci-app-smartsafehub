@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import {
   addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices,
   getJarbisStatus, removeJarbisDevice, scanJarbis, setJarbisEnabled,
-  setJarbisLight, updateJarbisDevice,
+  setJarbisLight, updateJarbisDevice, pairJarbisDevice,
 } from '../api/jarbis';
 import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus } from '../types/jarbis';
 
@@ -29,6 +29,9 @@ export function SmartHomePage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [brightness, setBrightness] = useState<Record<string, number>>({});
+  const [pairTarget, setPairTarget] = useState<JarbisDevice | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [replaceExisting, setReplaceExisting] = useState(false);
 
   const refresh = async () => {
     const fresh = await getJarbisStatus();
@@ -88,11 +91,47 @@ export function SmartHomePage() {
     }, '검색을 마쳤습니다. 전구가 없다면 Tasmota의 웹 관리 화면과 MQTT 설정을 확인해 주세요.');
   };
 
+  const pair = async (id: string, password = '', override = false) => {
+    setBusy(`pair:${id}`); setError(''); setMessage('');
+    try {
+      const result = await pairJarbisDevice(id, password, override);
+      setMessage(result.mqttConfirmed
+        ? '전구 MQTT 자동 연결을 확인했습니다. 이제 전원과 밝기를 제어할 수 있습니다.'
+        : '전구 MQTT 설정을 완료했습니다. 아직 온라인 응답을 확인하지 못했으므로 전구 상태를 점검해 주세요.');
+      setPairTarget(null); setAdminPassword(''); setReplaceExisting(false);
+      await refresh();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally { setBusy(''); }
+  };
+
   const add = async (candidate: JarbisCandidate) => {
     const id = deviceIdForTopic(candidate.topic);
-    if (!candidate.topic) { setError('MQTT Topic이 없습니다. Tasmota의 MQTT 설정을 완료하고 다시 검색해 주세요.'); return; }
-    if (!window.confirm(`${candidate.name} 전구를 Jarbis에 등록할까요?`)) return;
-    await run(`add:${id}`, () => addJarbisDevice(id, candidate.name, candidate.topic), '기기가 등록되었습니다. MQTT 설정이 일치하는지 확인한 후 전원을 제어해 보세요.');
+    if (!candidate.topic) { setError('MQTT Topic이 없습니다. 다시 검색해 주세요.'); return; }
+    if (!window.confirm(`${candidate.name} 전구를 등록할까요? ${candidate.source === 'http' ? '등록 후 MQTT 자동 연결을 시도합니다.' : 'MQTT 설정은 유지됩니다.'}`)) return;
+    setBusy(`add:${id}`); setError(''); setMessage('');
+    try {
+      await addJarbisDevice(id, candidate.name, candidate.topic);
+      await refresh();
+    } catch (cause) {
+      setError(errorMessage(cause)); setBusy(''); return;
+    }
+    setBusy('');
+    if (candidate.source !== 'http' || !candidate.ip) {
+      setMessage('기기 등록을 완료했습니다. MQTT Discovery로 발견된 전구의 기존 연결 설정을 유지합니다.');
+      return;
+    }
+    // Registration is durable even if pairing fails, allowing a safe retry.
+    setPairTarget({ id, name: candidate.name, kind: 'light', protocol: 'tasmota',
+      topic: candidate.topic, enabled: true, capabilities: ['power', 'brightness'] });
+    await pair(id);
+  };
+
+  const retryPair = async () => {
+    if (!pairTarget) return;
+    const pass = adminPassword;
+    await pair(pairTarget.id, pass, replaceExisting);
+    setAdminPassword('');
   };
 
   const remove = async (device: JarbisDevice) => {
@@ -108,7 +147,7 @@ export function SmartHomePage() {
   if (loading) return <div class="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">스마트홈 상태를 확인하고 있습니다.</div>;
   if (missing) return <section class="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-6" aria-label="Jarbis 미설치">
     <h2 class="m-0 text-lg font-black text-amber-950">Jarbis를 설치해야 합니다</h2>
-    <p class="m-0 text-sm leading-6 text-amber-900">현재 공유기에 Jarbis RPC가 없습니다. 공유기 모델에 맞는 Jarbis 0.1.0-r6 APK를 내부 저장소 또는 테스트 펌웨어로 설치하고 페이지를 새로고침하세요. 앱 설치 목록에 승인되지 않은 APK를 자동으로 설치하지 않습니다.</p>
+    <p class="m-0 text-sm leading-6 text-amber-900">현재 공유기에 Jarbis RPC가 없습니다. 공유기 모델에 맞는 Jarbis 0.1.0-r7 APK를 내부 저장소 또는 테스트 펌웨어로 설치하고 페이지를 새로고침하세요. 앱 설치 목록에 승인되지 않은 APK를 자동으로 설치하지 않습니다.</p>
     <button class={button} type="button" onClick={() => void retry()}>설치 후 다시 확인</button>
   </section>;
 
@@ -129,7 +168,7 @@ export function SmartHomePage() {
       <p class="mt-3 mb-0 text-xs text-slate-500">{status?.brokerMode === 'managed' ? '내장 MQTT Broker' : '외부 MQTT Broker'} · {status?.version || '-'} · 전원 명령 성공은 실제 전구 상태 수신을 의미하지 않습니다.</p>
       {status?.enabled && status.brokerMode === 'managed' ? <div class="mt-4 rounded-xl border border-slate-200 p-4">
         <div class="flex flex-wrap items-center justify-between gap-3"><strong class="text-sm text-slate-900">전구 MQTT 연결 설정</strong><button class={button} type="button" disabled={!!busy} onClick={() => void loadCredentials()}>{credentials ? '인증 정보 숨기기' : '인증 정보 확인'}</button></div>
-        <p class="mt-2 mb-0 text-xs text-slate-600">전구의 Tasmota 웹 화면 → Configuration → Configure MQTT에서 호스트와 계정을 입력하세요. 이 정보는 다른 사람과 공유하지 마세요.</p>
+        <p class="mt-2 mb-0 text-xs text-slate-600">전구를 등록하면 MQTT 연결을 자동으로 설정합니다. 필요한 경우에만 아래 인증 정보를 확인하세요.</p>
         {credentials ? <div class="mt-3 space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
           <p class="m-0 break-all">Host: <strong>{credentials.host}</strong> · Port: <strong>{credentials.port}</strong></p>
           <p class="m-0">User: <strong>{credentials.username}</strong></p>
@@ -153,19 +192,29 @@ export function SmartHomePage() {
       {candidates.length === 0 ? <p class="mt-4 mb-0 text-sm text-slate-500">검색된 기기가 없습니다. 전구가 같은 LAN에 연결되어 있는지 확인해 주세요.</p> : <ul class="mt-4 space-y-3 p-0" aria-label="검색된 기기">
         {candidates.map(candidate => <li key={`${candidate.topic}:${candidate.ip}:${candidate.source}`} class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3">
           <div class="min-w-0 flex-1"><strong class="block text-sm text-slate-900">{candidate.name}</strong><p class="mt-1 mb-0 break-all text-xs text-slate-600">{candidate.ip || 'IP 미확인'} · {candidate.source.toUpperCase()} · Topic: {candidate.topic || '미확인'}</p>{candidate.ip ? <a class="mt-1 inline-block text-xs font-bold text-teal-700 underline" href={`http://${candidate.ip}/`} target="_blank" rel="noopener noreferrer">Tasmota 관리 화면</a> : null}</div>
-          <button class={button} type="button" disabled={!!busy || !status?.enabled || candidate.registered || !candidate.topic} onClick={() => void add(candidate)}>{candidate.registered ? '등록됨' : candidate.topic ? '기기 추가' : 'Topic 필요'}</button>
+          <button class={button} type="button" disabled={!!busy || !status?.enabled || candidate.registered || !candidate.topic} onClick={() => void add(candidate)}>{candidate.registered ? '등록됨' : candidate.topic ? (candidate.source === 'http' ? '추가 및 자동 연결' : '기기 추가') : 'Topic 필요'}</button>
         </li>)}
       </ul>}
     </section>
+
+    {pairTarget ? <section class="rounded-2xl border border-teal-300 bg-white p-5" aria-label="전구 자동 연결 설정">
+      <h2 class="m-0 text-base font-black text-slate-950">{pairTarget.name} 자동 연결</h2>
+      <p class="mt-2 text-sm text-slate-600">Jarbis가 전구의 MQTT Host·계정·Topic·고유 Client ID를 자동 설정합니다. 기기 설정이 바뀔 수 있습니다.</p>
+      <label class="mt-3 block text-sm font-bold text-slate-700" for="jarbis-admin-password">전구 관리자 비밀번호 (설정된 경우에만 입력)</label>
+      <input id="jarbis-admin-password" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" type="password" autoComplete="off" value={adminPassword} onInput={event => setAdminPassword(event.currentTarget.value)} placeholder="미설정이면 비워두세요" />
+      <label class="mt-3 flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.currentTarget.checked)} />다른 MQTT Broker에 연결된 기기라도 기존 연결을 변경하는 데 동의합니다.</label>
+      <p class="mt-2 text-xs text-amber-700">Tasmota HTTP는 암호화되지 않습니다. 신뢰할 수 있는 LAN에서만 진행하세요. 비밀번호는 저장하지 않습니다.</p>
+      <div class="mt-3 flex flex-wrap gap-2"><button class={primary} type="button" disabled={!!busy} onClick={() => void retryPair()}>{busy.startsWith('pair:') ? '연결 중…' : '연결 실행'}</button><button class={button} type="button" disabled={!!busy} onClick={() => { setPairTarget(null); setAdminPassword(''); setReplaceExisting(false); }}>닫기</button></div>
+    </section> : null}
 
     <section class="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <h2 class="m-0 text-base font-black text-slate-950">등록된 전구</h2>
       {devices.length === 0 ? <p class="mt-3 mb-0 text-sm text-slate-500">아직 등록된 전구가 없습니다. 먼저 기기를 검색하고 추가해 주세요.</p> : <div class="mt-4 space-y-3">{devices.map(device => <div key={device.id} class="rounded-xl border border-slate-200 p-4">
         <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><strong class="text-sm text-slate-950">{device.name}</strong><p class="mt-1 mb-0 break-all text-xs text-slate-500">{device.id} · {device.topic}</p></div><div class="flex flex-wrap gap-2"><button class={button} type="button" disabled={!!busy} onClick={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 비활성화했습니다.' : '기기를 활성화했습니다.')}>{device.enabled ? '기기 끄기(관리)' : '기기 사용'}</button><button class={button} type="button" disabled={!!busy} onClick={() => void remove(device)}>삭제</button></div></div>
-        <div class="mt-3 flex flex-wrap items-center gap-2"><button class={primary} type="button" disabled={!!busy || !status?.enabled || !device.enabled} onClick={() => void run(`on:${device.id}`, () => setJarbisLight(device.id, 'power', 'ON'), '켜기 명령을 전송했습니다. 실제 전구 점등을 확인하세요.', false)}>켜기</button><button class={button} type="button" disabled={!!busy || !status?.enabled || !device.enabled} onClick={() => void run(`off:${device.id}`, () => setJarbisLight(device.id, 'power', 'OFF'), '끄기 명령을 전송했습니다. 실제 전구 소등을 확인하세요.', false)}>끄기</button></div>
+        <div class="mt-3 flex flex-wrap items-center gap-2"><button class={button} type="button" disabled={!!busy || !status?.enabled || !status?.brokerReady || !device.enabled} onClick={() => { setPairTarget(device); setAdminPassword(''); setReplaceExisting(false); setError(''); }}>MQTT 자동 연결</button><button class={primary} type="button" disabled={!!busy || !status?.enabled || !device.enabled} onClick={() => void run(`on:${device.id}`, () => setJarbisLight(device.id, 'power', 'ON'), '켜기 명령을 전송했습니다. 실제 전구 점등을 확인하세요.', false)}>켜기</button><button class={button} type="button" disabled={!!busy || !status?.enabled || !device.enabled} onClick={() => void run(`off:${device.id}`, () => setJarbisLight(device.id, 'power', 'OFF'), '끄기 명령을 전송했습니다. 실제 전구 소등을 확인하세요.', false)}>끄기</button></div>
         <div class="mt-4 flex flex-wrap items-center gap-3"><label class="text-sm font-bold text-slate-700" for={`brightness-${device.id}`}>밝기</label><input id={`brightness-${device.id}`} class="min-w-24 flex-1 accent-teal-700" type="range" min="0" max="100" step="10" disabled={!!busy || !status?.enabled || !device.enabled} value={brightness[device.id] ?? 50} onInput={e => setBrightness({ ...brightness, [device.id]: Number(e.currentTarget.value) })} /><span class="w-10 text-right text-sm tabular-nums">{brightness[device.id] ?? 50}%</span><button class={button} type="button" disabled={!!busy || !status?.enabled || !device.enabled} onClick={() => void run(`dim:${device.id}`, () => setJarbisLight(device.id, 'brightness', String(brightness[device.id] ?? 50)), '밝기 명령을 전송했습니다. 실제 전구 밝기를 확인하세요.', false)}>적용</button></div>
       </div>)}</div>}
     </section>
-    <p class="text-xs leading-5 text-slate-500">기기 자동 등록이나 Tasmota 설정 변경은 수행하지 않습니다. 검색한 기기는 승인 후 등록하며, MQTT 연결이 완료되지 않으면 전원·밝기 명령이 전구까지 도달하지 않을 수 있습니다.</p>
+    <p class="text-xs leading-5 text-slate-500">기기를 자동으로 등록하지 않습니다. 기기 추가를 승인하면 Tasmota의 MQTT 설정을 변경하며, MQTT 온라인 응답을 확인하지 못한 경우 실제 전구 동작을 확인해야 합니다.</p>
   </div>;
 }

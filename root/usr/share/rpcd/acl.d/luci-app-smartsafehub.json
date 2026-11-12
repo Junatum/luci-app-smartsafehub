@@ -108,6 +108,7 @@
           "device_add",
           "device_update",
           "device_remove",
+          "device_pair",
           "light_set",
           "discovery_scan",
           "broker_credentials"
