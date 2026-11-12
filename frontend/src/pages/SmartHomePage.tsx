@@ -422,7 +422,7 @@ export function SmartHomePage() {
       <AlertIcon class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1">{error}</span>
       <button class="shrink-0 font-bold underline" type="button" onClick={() => setError('')}>닫기</button>
     </div> : null}
-    {message ? <div role="status" aria-live="polite" class="flex w-full items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 sm:max-w-2xl">
+    {message ? <div role="status" aria-live="polite" class="flex w-full items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
       <CheckCircleIcon class="mt-0.5 size-4 shrink-0" />
       <span class="min-w-0 flex-1">{message}</span>
       <button class="shrink-0 rounded-lg px-1 text-xs font-bold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600" type="button" aria-label="성공 알림 닫기" onClick={() => setMessage('')}>닫기</button>
@@ -438,7 +438,7 @@ export function SmartHomePage() {
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
-      </div> : <div class="mt-4 grid grid-cols-1 gap-3">
+      </div> : <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {devices.map(device => {
           const controlsDisabled = Boolean(busy) || !ready || !device.enabled;
           const activePair = pairTarget?.id === device.id;
@@ -471,7 +471,7 @@ export function SmartHomePage() {
               <button class={secondaryButton} type="button" disabled={!!busy || !ready || !device.enabled || Boolean(checkingStates[device.id])}
                 onClick={() => void refreshLight(device.id)}>상태 새로고침</button>
             </div>
-            <div aria-label="전구 조명 제어" class="mt-4 min-w-0 space-y-3 rounded-xl bg-slate-50 p-3 sm:p-4">
+            <div aria-label="전구 조명 제어" class="mt-4 w-full min-w-0 space-y-3 rounded-xl bg-slate-50 p-3 sm:p-4">
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
                   <p class="m-0 text-sm font-extrabold text-slate-900">전구 전원</p>

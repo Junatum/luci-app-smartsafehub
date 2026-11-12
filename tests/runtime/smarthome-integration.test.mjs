@@ -79,7 +79,7 @@ test('스마트홈은 공통 화면 제목과 서비스 토글, 등록 기기 �
   assert.match(page, /aria-label="스마트홈 서비스 현황"/);
   assert.match(page, /role="switch" aria-checked=\{Boolean\(status\?\.enabled\)\}/);
   assert.match(page, /aria-label="등록된 전구"/);
-  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3"/);
+  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
   assert.match(page, /type="range" min="0" max="100" step="5"/);
   assert.match(page, /aria-label="새 전구 찾기"/);
   assert.ok(page.indexOf('aria-label="등록된 전구"') < page.indexOf('aria-label="새 전구 찾기"'));
@@ -127,7 +127,8 @@ test('스마트홈 성공 알림은 5초 후 사라지고 직접 닫을 수 있�
   assert.match(page, /\}, \[message\]\)/);
   assert.match(page, /aria-label="성공 알림 닫기" onClick=\{\(\) => setMessage\(''\)\}/);
   assert.match(page, /role="status" aria-live="polite"/);
-  assert.match(page, /sm:max-w-2xl/);
+  assert.match(page, /role="status" aria-live="polite" class="flex w-full items-start/);
+  assert.doesNotMatch(page, /sm:max-w-2xl/);
   assert.match(page, /role="alert" aria-live="assertive"/);
   assert.match(page, /onClick=\{\(\) => setError\(''\)\}/);
   assert.doesNotMatch(page, /setTimeout\(\(\) => setError/);
@@ -151,7 +152,7 @@ test('스마트홈은 전구 상태 확인과 RGB·색온도를 제공하되 응
   assert.match(page, /onPointerUp=/);
   assert.match(page, /document\.visibilityState === 'hidden'/);
   assert.match(page, /window\.setInterval\(poll, 30000\)/);
-  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3"/);
+  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
 });
 
 
@@ -174,7 +175,7 @@ test('전원·RGB·밝기·색온도를 하나의 카드로 합쳐 조작 순서
   const brightness = bulb.indexOf('for={`brightness-${device.id}`}');
   const kelvin = bulb.indexOf('for={`kelvin-${device.id}`}');
   assert.ok(power > -1 && rgb > power && brightness > rgb && kelvin > brightness);
-  assert.match(bulb, /aria-label="전구 조명 제어" class="mt-4 min-w-0 space-y-3 rounded-xl bg-slate-50/);
+  assert.match(bulb, /aria-label="전구 조명 제어" class="mt-4 w-full min-w-0 space-y-3 rounded-xl bg-slate-50/);
   assert.match(bulb, /border-t border-slate-200 pt-3/);
 });
 
@@ -182,7 +183,8 @@ test('성공 알림은 왼쪽에서 나타나고 관리 메뉴는 카드 배치�
   const notice = page.slice(page.indexOf('{message ?'), page.indexOf('aria-label="등록된 전구"'));
   assert.match(notice, /role="status" aria-live="polite"/);
   assert.doesNotMatch(notice, /justify-end/);
-  assert.match(notice, /sm:max-w-2xl/);
+  assert.match(notice, /role="status" aria-live="polite" class="flex w-full items-start/);
+  assert.doesNotMatch(notice, /sm:max-w-2xl/);
   assert.match(notice, /aria-label="성공 알림 닫기"/);
   assert.match(page, /<details ref=\{element => \{ manageMenus\.current\[device\.id\] = element; \}\}/);
   assert.match(page, /absolute left-0 top-full z-30/);
@@ -225,14 +227,28 @@ test('전구 조작은 중첩 배경 카드 없이 하나의 영역에 전원·�
 });
 
 
-test('등록 전구는 수와 관계없이 전체 너비로 배치하고 모바일에서도 동일한 카드 구조를 유지한다', () => {
-  const start = page.indexOf('aria-label="등록된 전구"');
-  const end = page.indexOf('devices.map(device =>', start);
-  const inventory = page.slice(start, end);
-  assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3"/);
-  assert.doesNotMatch(inventory, /lg:grid-cols-2/);
-  // 각 장치 카드 안에서는 전원·RGB·밝기·색온도가 하나의 카드로 유지돼야 합니다.
-  assert.match(page, /aria-label="전구 조명 제어"/);
+test('알림은 전체 너비이고 등록 전구 카드만 PC에서 두 열로 표시한다', () => {
+  const noticeStart = page.indexOf('{message ?');
+  const noticeEnd = page.indexOf('aria-label="등록된 전구"', noticeStart);
+  const notice = page.slice(noticeStart, noticeEnd);
+  assert.match(notice, /role="status" aria-live="polite" class="flex w-full items-start/);
+  assert.doesNotMatch(notice, /sm:max-w-2xl|max-w-\[760px\]|lg:grid-cols-2/, '성공 알림은 데스크톱에서도 전체 너비를 유지해야 합니다');
+
+  const inventoryStart = page.indexOf('aria-label="등록된 전구"');
+  const inventoryEnd = page.indexOf('devices.map(device =>', inventoryStart);
+  const inventory = page.slice(inventoryStart, inventoryEnd);
+  assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/, '전구 한 대는 데스크톱에서 절반 너비, 모바일에서는 전체 너비로 표시해야 합니다');
+  assert.doesNotMatch(inventory, /max-w-\[760px\]/, '개별 전구 너비는 그리드로 정하고 고정 폭을 사용하지 않아야 합니다');
+
+  const controlsStart = page.indexOf('aria-label="전구 조명 제어"');
+  const controlsEnd = page.indexOf('전구 연결 설정', controlsStart);
+  const controls = page.slice(controlsStart, controlsEnd);
+  assert.ok(controlsStart > inventoryEnd && controlsEnd > controlsStart, '전구 제어 영역이 등록 카드 안에 있어야 합니다');
+  assert.match(controls, /class="mt-4 w-full min-w-0 /, '전구 내부 제어 영역은 카드 너비를 가득 사용해야 합니다');
+  assert.doesNotMatch(controls, /max-w-\[760px\]|lg:grid-cols-2|sm:grid-cols-2/, '내부 제어 영역만 임의로 줄이거나 분리하면 안 됩니다');
+  for (const label of ['전구 전원', 'RGB 색상', '밝기 조절', '색온도']) {
+    assert.ok(controls.includes(label), `${label}: 통합 제어 항목을 유지해야 합니다`);
+  }
 });
 
 test('관리 메뉴는 바깥 클릭과 Escape로 닫고 전구 카드 조작은 유지한다', () => {
