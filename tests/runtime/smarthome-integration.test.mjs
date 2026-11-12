@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r14"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r14'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r15"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r15'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -79,7 +79,7 @@ test('스마트홈은 공통 화면 제목과 서비스 토글, 등록 기기 �
   assert.match(page, /aria-label="스마트홈 서비스 현황"/);
   assert.match(page, /role="switch" aria-checked=\{Boolean\(status\?\.enabled\)\}/);
   assert.match(page, /aria-label="등록된 전구"/);
-  assert.match(page, /lg:grid-cols-2/);
+  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3"/);
   assert.match(page, /type="range" min="0" max="100" step="5"/);
   assert.match(page, /aria-label="새 전구 찾기"/);
   assert.ok(page.indexOf('aria-label="등록된 전구"') < page.indexOf('aria-label="새 전구 찾기"'));
@@ -151,7 +151,7 @@ test('스마트홈은 전구 상태 확인과 RGB·색온도를 제공하되 응
   assert.match(page, /onPointerUp=/);
   assert.match(page, /document\.visibilityState === 'hidden'/);
   assert.match(page, /window\.setInterval\(poll, 30000\)/);
-  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
+  assert.match(page, /class="mt-4 grid grid-cols-1 gap-3"/);
 });
 
 
@@ -225,13 +225,12 @@ test('전구 조작은 중첩 배경 카드 없이 하나의 영역에 전원·�
 });
 
 
-test('등록 전구가 한 대여도 데스크톱에서는 반쪽 너비에 배치하고 모바일은 전체 폭을 사용한다', () => {
+test('등록 전구는 수와 관계없이 전체 너비로 배치하고 모바일에서도 동일한 카드 구조를 유지한다', () => {
   const start = page.indexOf('aria-label="등록된 전구"');
   const end = page.indexOf('devices.map(device =>', start);
   const inventory = page.slice(start, end);
-  assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
-  assert.doesNotMatch(inventory, /devices\.length > 1/);
-  assert.doesNotMatch(inventory, /lg:grid-cols-1/);
+  assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3"/);
+  assert.doesNotMatch(inventory, /lg:grid-cols-2/);
   // 각 장치 카드 안에서는 전원·RGB·밝기·색온도가 하나의 카드로 유지돼야 합니다.
   assert.match(page, /aria-label="전구 조명 제어"/);
 });
@@ -252,4 +251,15 @@ test('스마트홈은 상태 응답이 없으면 실제 점등으로 오인하�
   assert.match(page, /상태 응답 없음/);
   assert.match(page, /검증된 내부망 HTTP 조회/);
   assert.match(page, /const confirmedPower = observed\?\.observed === true/);
+});
+
+
+test('전구 상태 API는 HTTP 우선 결과와 실패 원인을 구분하고 지나치게 짧은 시간 제한을 사용하지 않는다', () => {
+  const types = source('frontend/src/types/jarbis.ts');
+  assert.match(types, /reason\?: 'HTTP_NO_CANDIDATE'/);
+  assert.match(api, /'light_state', \{ id \}, 11500/);
+  assert.match(page, /function statusFailureHint/);
+  assert.match(page, /HTTP_FETCH_FAILED/);
+  assert.match(page, /HTTP_INVALID_STATE/);
+  assert.match(page, /statusFailureHint\(observed\?\.reason\)/);
 });

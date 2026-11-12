@@ -31,6 +31,16 @@ function hexColor(value: string | null | undefined): string {
   return value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
 }
 
+function statusFailureHint(reason: JarbisLightState['reason']): string {
+  switch (reason) {
+    case 'HTTP_NO_CANDIDATE': return '등록된 전구의 주소를 찾지 못했습니다. 아래에서 기기를 다시 검색해 주세요.';
+    case 'HTTP_FETCH_FAILED': return '전구의 로컬 상태 API에 접근하지 못했습니다. 전구가 켜져 있는지, 웹 관리 화면이 열리는지 확인해 주세요.';
+    case 'HTTP_INVALID_STATE': return '전구가 응답했지만 현재 상태 형식이 일치하지 않습니다. 전구의 Tasmota 상태 정보를 확인해 주세요.';
+    case 'HTTP_CLIENT_MISSING': return '공유기의 HTTP 조회 도구를 사용할 수 없습니다.';
+    default: return '전구 상태를 확인하지 못했습니다. 기기 연결 설정을 확인한 뒤 다시 시도해 주세요.';
+  }
+}
+
 function deviceIdForTopic(topic: string): string {
   return `tasmota_${topic.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 32)}`;
 }
@@ -147,7 +157,7 @@ export function SmartHomePage() {
       return state;
     } catch {
       setLightStates(old => ({ ...old, [id]: { id, observed: false, power: null,
-        brightness: null, color: null, colorTemperature: null } }));
+        brightness: null, color: null, colorTemperature: null, reason: 'STATE_TIMEOUT_OR_UNAVAILABLE' } }));
       return null;
     } finally {
       setCheckingStates(old => ({ ...old, [id]: false }));
@@ -428,7 +438,7 @@ export function SmartHomePage() {
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
-      </div> : <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+      </div> : <div class="mt-4 grid grid-cols-1 gap-3">
         {devices.map(device => {
           const controlsDisabled = Boolean(busy) || !ready || !device.enabled;
           const activePair = pairTarget?.id === device.id;
@@ -457,7 +467,7 @@ export function SmartHomePage() {
               </span>
             </div>
             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-              <span>{bulbOnline ? `전구에서 확인한 현재 밝기: ${currentBrightness === null ? '미확인' : `${currentBrightness}%`}${observed?.source === 'http' ? ' · 로컬 직접 조회' : ''}` : '전구의 응답을 받지 못했습니다. 잠시 후 다시 확인해 주세요.'}</span>
+              <span>{bulbOnline ? `전구에서 확인한 현재 밝기: ${currentBrightness === null ? '미확인' : `${currentBrightness}%`}${observed?.source === 'http' ? ' · 로컬 직접 조회' : ''}` : statusFailureHint(observed?.reason)}</span>
               <button class={secondaryButton} type="button" disabled={!!busy || !ready || !device.enabled || Boolean(checkingStates[device.id])}
                 onClick={() => void refreshLight(device.id)}>상태 새로고침</button>
             </div>

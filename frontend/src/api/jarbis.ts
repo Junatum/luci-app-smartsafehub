@@ -12,7 +12,7 @@ export const setJarbisEnabled = (enabled: boolean) => rpc<{ enabled: boolean }>(
 export const addJarbisDevice = (id: string, name: string, topic: string) => rpc<{ id: string; added: boolean }>('device_add', { id, name, topic });
 export const updateJarbisDevice = (id: string, name: string, enabled: boolean) => rpc<{ id: string; updated: boolean }>('device_update', { id, name, enabled });
 export const removeJarbisDevice = (id: string) => rpc<{ id: string; removed: boolean }>('device_remove', { id });
-export const getJarbisLightState = (id: string) => rpc<JarbisLightState>('light_state', { id }, 8500);
+export const getJarbisLightState = (id: string) => rpc<JarbisLightState>('light_state', { id }, 11500);
 export const setJarbisLight = (id: string, capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) =>
   rpc<{ accepted: boolean }>('light_set', { id, capability, value });
 export const getJarbisCredentials = () => rpc<JarbisCredentials>('broker_credentials');

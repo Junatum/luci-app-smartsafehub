@@ -41,6 +41,7 @@ export interface JarbisLightState {
   id: string;
   observed: boolean;
   source?: 'mqtt' | 'http' | null;
+  reason?: 'HTTP_NO_CANDIDATE' | 'HTTP_CLIENT_MISSING' | 'HTTP_FETCH_FAILED' | 'HTTP_INVALID_STATE' | 'STATE_TIMEOUT_OR_UNAVAILABLE' | null;
   power: 'ON' | 'OFF' | null;
   brightness: number | null;
   color: string | null;
