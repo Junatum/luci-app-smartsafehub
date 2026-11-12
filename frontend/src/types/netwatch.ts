@@ -22,6 +22,10 @@ export interface NetwatchStatus {
   totalDevices: number;
   trainingDays?: number;
   trainingTargetDays?: number;
+  /** Counts are over all devices in the complete current snapshot (up to 32), not the 12 UI rows. */
+  trainingReadyDevices?: number;
+  trainingLearningDevices?: number;
+  trainingStableDevices?: number;
   devices: NetwatchDevice[];
   alert: NetwatchDevice | null;
 }

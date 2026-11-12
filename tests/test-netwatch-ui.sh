@@ -14,8 +14,11 @@ for str in 'role="switch"' 'aria-checked={enabled}' 'ssh-switch-control' 'ssh-sw
 done
 # One unified responsive summary card must include the training status, without a separate
 # full-width training section or three standalone metric cards.
-for str in 'Network Watch 관찰 요약과 학습' 'grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5' 'sm:col-span-3 xl:col-span-2' '최장 학습 기기 기준' '정상 통신 패턴 학습' 'aria-valuemax={trainingTarget}' 'aria-valuenow={trainingDays}' '7일 · 기준 형성' '{trainingTarget}일 · 안정화'; do
+for str in 'Network Watch 관찰 요약과 학습' 'grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5' 'sm:col-span-3 xl:col-span-2' '최장 학습 기기 기준' '정상 통신 패턴 학습' 'aria-valuemax={trainingTarget}' 'aria-valuenow={trainingDays}' '7일 · 기준 형성' '{trainingTarget}일 · 안정화' '기준 확보' '현재 관찰 기기 기준' '관찰된 IPv4 외부 연결' '외부 통신 기기'; do
     grep -Fq "$str" "$PAGE" || fail "통합 관찰 상태 카드의 배치·접근성 계약 누락: $str"
+done
+for str in 'sortObservedDevices' 'visibleDevices.map' 'lg:hidden' 'lg:block' 'TrafficMetric' 'data.limited ? null : (device.baselineConnections ?? null)' 'data.limited ? null : (device.baselineDestinations ?? null)'; do
+    grep -Fq "$str" "$PAGE" || fail "기기별 정렬·모바일·평소 기준 표시 누락: $str"
 done
 ! grep -Fq 'max-w-xs' "$PAGE" || fail '학습 진행률 너비가 다시 좁아지면 안 됨'
 ! grep -Fq 'grid gap-3 sm:grid-cols-3' "$PAGE" || fail '분리된 요약 카드가 남아 있음'

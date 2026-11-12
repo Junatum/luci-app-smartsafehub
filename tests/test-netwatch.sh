@@ -74,7 +74,7 @@ ipv4 2 tcp 6 430 ESTABLISHED src=192.168.8.20 dst=192.168.8.1 sport=50000 dport=
 ipv6 2 tcp 6 430 ESTABLISHED src=fd00::2 dst=2001:4860:4860::8888 sport=50000 dport=443
 DATA
 run
-jq -e '.phase=="ready" and .totalConnections==1 and .totalDevices==1 and .devices[0].ip=="192.168.8.20" and .devices[0].destinations==1 and .alert==null' "$TMP/run/status.json" >/dev/null || fail '사설→공인 IPv4만 정확히 관찰해야 함'
+jq -e '.phase=="ready" and .trainingReadyDevices==0 and .trainingLearningDevices==1 and .trainingStableDevices==0 and .totalConnections==1 and .totalDevices==1 and .devices[0].ip=="192.168.8.20" and .devices[0].destinations==1 and .alert==null' "$TMP/run/status.json" >/dev/null || fail '사설→공인 IPv4만 정확히 관찰해야 함'
 [ ! -s "$MOCK_EVENT_LOG" ] || fail '정상 통신에 오탐을 기록하면 안 됨'
 [ ! -e "$MOCK_FLOCK_LOG" ] || fail 'flock 없는 기본 환경에서도 동작해야 함'
 [ ! -e "$TMP/run/sample.lock.d" ] || fail '공통 잠금을 정상적으로 해제해야 함'
@@ -156,7 +156,7 @@ while [ "$day" -lt 7 ]; do
     day=$((day+1))
 done
 MOCK_DATE=$((DAY_START + 6*86400 + 4*3600)) MOCK_ARP="$TMP/arp" run
-jq -e '.devices[0].state=="normal" and .devices[0].trainingDays>=7 and .devices[0].baselineConnections>=100' "$TMP/run/status.json" >/dev/null || fail '7일 이상 유효 관찰 후 기기별 기준선을 생성해야 함'
+jq -e '.devices[0].state=="normal" and .trainingReadyDevices==1 and .trainingLearningDevices==0 and .trainingStableDevices==0 and .devices[0].trainingDays>=7 and .devices[0].baselineConnections>=100' "$TMP/run/status.json" >/dev/null || fail '7일 이상 유효 관찰 후 기기별 기준선을 생성해야 함'
 [ ! -s "$MOCK_EVENT_LOG" ] || fail '학습용 정상 데이터가 경고를 생성하면 안 됨'
 [ -s "$TMP/store/baseline.tsv" ] || fail '학습 데이터의 플래시 체크포인트가 필요함'
 grep -Fq 'm:02:11:22:33:44:55' "$TMP/store/baseline.tsv" || fail 'MAC 식별 기준을 유지해야 함'
@@ -243,7 +243,7 @@ while [ "$i" -le 100 ]; do
     i=$((i+1))
 done
 MOCK_DATE=$((DAY_START + 22*86400)) MOCK_ARP="$TMP/arp" run
-jq -e '.devices[0].state=="learning" and .devices[0].trainingDays==0' "$TMP/run/status.json" >/dev/null || fail '14일이 지난 학습 데이터를 기준선으로 사용하면 안 됨'
+jq -e '.devices[0].state=="learning" and .trainingReadyDevices==0 and .trainingLearningDevices==1 and .devices[0].trainingDays==0' "$TMP/run/status.json" >/dev/null || fail '14일이 지난 학습 데이터를 기준선으로 사용하면 안 됨'
 [ "$(wc -l < "$TMP/run/history.tsv")" -le 896 ] || fail '14일 히스토그램 상한을 초과하면 안 됨'
 
 # Restore a single high-count device for the fallback baseline checks.
@@ -363,6 +363,29 @@ MOCK_SOURCE="$MOCK_CONNTRACK_FILE" run
 jq -e '.phase=="ready" and .limited==true and .alert==null and .totalConnections<=2048' "$TMP/run/status.json" >/dev/null || fail '연결 2048개 제한과 부분 관찰 안전성이 필요함'
 [ ! -s "$TMP/run/previous.tsv" ] || fail '부분 관찰 결과를 다음 경고의 기준선으로 사용하면 안 됨'
 cmp -s "$TMP/run/history.tsv" "$TMP/before-limited-history.tsv" || fail '부분 관찰 결과로 기존 14일 학습을 변경하면 안 됨'
+
+# The 12-row limit must be applied AFTER ranking all observed devices.
+# A noisy device encountered 14th must not disappear behind ordinary devices.
+: > "$MOCK_CONNTRACK_FILE"
+i=1
+while [ "$i" -le 13 ]; do
+    printf 'ipv4 2 tcp 6 430 ESTABLISHED src=192.168.9.%s dst=8.8.8.8 sport=10001 dport=443\n' "$i" >> "$MOCK_CONNTRACK_FILE"
+    i=$((i+1))
+done
+i=1
+while [ "$i" -le 600 ]; do
+    printf 'ipv4 2 tcp 6 430 ESTABLISHED src=192.168.9.200 dst=8.8.4.4 sport=%s dport=443\n' "$((10000+i))" >> "$MOCK_CONNTRACK_FILE"
+    i=$((i+1))
+done
+MOCK_DATE=1800110000 run
+jq -e '.phase=="ready" and .totalDevices==14 and (.devices | length)==12 and
+    .trainingReadyDevices==0 and .trainingLearningDevices==14 and .trainingStableDevices==0 and
+    .devices[0].ip=="192.168.9.200" and .devices[0].state=="watch"' "$TMP/run/status.json" >/dev/null || fail '14번째 기기의 변화 관찰을 우선 표시하고 전체 학습 수를 집계해야 함'
+MOCK_DATE=1800110060 run
+MOCK_DATE=1800110120 run
+jq -e '.devices[0].ip=="192.168.9.200" and .devices[0].state=="anomaly" and
+    .alert.ip=="192.168.9.200" and .trainingReadyDevices + .trainingLearningDevices == .totalDevices' "$TMP/run/status.json" >/dev/null || fail '12대 표시 제한으로 이상 증가 감지 기기를 누락하면 안 됨'
+[ "$(wc -c < "$TMP/run/status.json")" -le 8192 ] || fail '정렬된 상태 정보가 RPC 크기 상한을 초과하면 안 됨'
 
 # RPC/UI/demo and packaging contract.
 grep -Fq 'ssh_lock_acquire' "$HELPER" || fail 'Network Watch는 공통 잠금 모듈을 사용해야 함'

@@ -96,6 +96,10 @@ BEGIN {
     }
     day_count[n]=days
     mature=(days>=7 && count>=28)
+    # Count all observed devices, before selecting the top 12 for the UI.
+    if (mature) training_ready++
+    else training_learning++
+    if (days>=14 && count>=56) training_stable++
     if (mature) {
         pconn=percentile(id,1,count); pdest=percentile(id,2,count)
         limit_conn[n]=high_limit(int(pconn*1.6+0.5),80)
@@ -153,9 +157,22 @@ END {
     # Generate the status in one pass; status consumer enforces 8KiB limit.
     progress=0
     for (j=1;j<=n;j++) if (day_count[j]>progress) progress=day_count[j]
-    printf "{\"schema\":1,\"phase\":\"ready\",\"sampledAt\":%d,\"intervalSeconds\":60,\"source\":\"conntrack\",\"ipv4Only\":true,\"limited\":false,\"totalConnections\":%d,\"totalDevices\":%d,\"trainingDays\":%d,\"trainingTargetDays\":14,\"devices\":[",now,total,devices,progress > status
-    for (j=1;j<=n && j<=12;j++) {
-        printf "%s{\"ip\":\"%s\",\"connections\":%d,\"destinations\":%d,\"trainingDays\":%d,\"baselineConnections\":%s,\"baselineDestinations\":%s,\"state\":\"%s\"}", (j>1?",":""),ip[j],conn[j],dest[j],day_count[j],(limit_conn[j]?limit_conn[j]:"null"),(limit_dest[j]?limit_dest[j]:"null"),flag[j] > status
+    printf "{\"schema\":1,\"phase\":\"ready\",\"sampledAt\":%d,\"intervalSeconds\":60,\"source\":\"conntrack\",\"ipv4Only\":true,\"limited\":false,\"totalConnections\":%d,\"totalDevices\":%d,\"trainingDays\":%d,\"trainingTargetDays\":14,\"trainingReadyDevices\":%d,\"trainingLearningDevices\":%d,\"trainingStableDevices\":%d,\"devices\":[",now,total,devices,progress,training_ready,training_learning,training_stable > status
+    # The conntrack parser captures up to 32 devices but the UI receives 12.
+    # Prioritize active anomaly -> watch -> learning -> normal BEFORE capping.
+    # Bounded selection (32 x 12) avoids external sort and extra tmpfs files.
+    for (j=1;j<=n;j++) priority[j]=(flag[j]=="anomaly"?4:(flag[j]=="watch"?3:(flag[j]=="learning"?2:1)))
+    for (slot=1;slot<=n && slot<=12;slot++) {
+        best=0
+        for (j=1;j<=n;j++) {
+            if (selected[j]) continue
+            if (!best || priority[j]>priority[best] ||
+                (priority[j]==priority[best] && conn[j]>conn[best]) ||
+                (priority[j]==priority[best] && conn[j]==conn[best] && dest[j]>dest[best])) best=j
+        }
+        if (!best) break
+        selected[best]=1
+        printf "%s{\"ip\":\"%s\",\"connections\":%d,\"destinations\":%d,\"trainingDays\":%d,\"baselineConnections\":%s,\"baselineDestinations\":%s,\"state\":\"%s\"}", (slot>1?",":""),ip[best],conn[best],dest[best],day_count[best],(limit_conn[best]?limit_conn[best]:"null"),(limit_dest[best]?limit_dest[best]:"null"),flag[best] > status
     }
     printf "],\"alert\":" > status
     if (alert_n) printf "{\"ip\":\"%s\",\"connections\":%d,\"destinations\":%d}",alert_ip,alert_conn,alert_dest > status

@@ -31,6 +31,37 @@ function observedState(device: NetwatchDevice, data: NetwatchStatus): { label: s
   }
 }
 
+/** Match the collector's risk-first order; older firmware may send an unsorted top-12. */
+function sortObservedDevices(devices: NetwatchDevice[]): NetwatchDevice[] {
+  const rank = (state: NetwatchDevice['state']): number => {
+    switch (state) {
+      case 'anomaly': return 4;
+      case 'watch': return 3;
+      case 'learning': return 2;
+      default: return 1;
+    }
+  };
+  return [...devices].sort((a, b) => rank(b.state) - rank(a.state)
+    || b.connections - a.connections || b.destinations - a.destinations || a.ip.localeCompare(b.ip)).slice(0, 12);
+}
+
+/** The bar compares a count with a learned statistical upper limit, not a security score. */
+function TrafficMetric({ value, limit, name, limited = false }: { value: number; limit?: number | null; name: string; limited?: boolean }) {
+  const threshold = typeof limit === 'number' && Number.isFinite(limit) && limit > 0 ? limit : null;
+  const overLimit = threshold !== null && value > threshold;
+  const percent = threshold !== null ? Math.min(100, Math.max(0, 100 * value / threshold)) : 0;
+  return <div class="min-w-0" aria-label={`${name} ${formatNumber(value)}${threshold !== null ? `, 학습된 상한 ${formatNumber(threshold)}` : limited ? ', 일부 연결만 관찰되어 판단 보류' : ', 학습 기준 없음'}`}>
+    <div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+      <span class="font-bold tabular-nums text-slate-800">{formatNumber(value)}</span>
+      {threshold !== null ? <span class="whitespace-nowrap text-xs text-slate-500">/ {formatNumber(threshold)} 상한</span> : <span class="text-xs text-slate-500">{limited ? '판단 보류' : '기준 미확보'}</span>}
+    </div>
+    {threshold !== null ? <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+      <div class={`h-full rounded-full ${overLimit ? 'bg-amber-500' : 'bg-teal-600'}`} style={{ width: `${percent}%` }} />
+    </div> : null}
+    {overLimit ? <span class="mt-1 block text-xs font-semibold text-amber-700">기준 초과</span> : null}
+  </div>;
+}
+
 function recentWarnings(activity: ActivityHistory | null | undefined): ActivityEvent[] {
   return (activity?.events ?? [])
     .filter((event) => event.eventType === 'network_watch.anomaly.warning' && event.source === 'network_watch' && Number.isFinite(event.occurredAt) && event.occurredAt > 0)
@@ -98,6 +129,11 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
     }
   }
   const warnings = recentWarnings(activity);
+  const visibleDevices = sortObservedDevices(data?.devices ?? []);
+  const learningCountsAvailable = data?.phase === 'ready' && !data.limited
+    && typeof data.trainingReadyDevices === 'number' && Number.isInteger(data.trainingReadyDevices) && data.trainingReadyDevices >= 0
+    && typeof data.trainingLearningDevices === 'number' && Number.isInteger(data.trainingLearningDevices) && data.trainingLearningDevices >= 0
+    && data.trainingReadyDevices + data.trainingLearningDevices === data.totalDevices;
   // The API reports the longest-trained currently connected device, not a fleet-wide average.
   // A missing/invalid target must never produce a broken progress width.
   const trainingTarget = typeof data?.trainingTargetDays === 'number'
@@ -144,11 +180,11 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
         <section aria-label="Network Watch 관찰 요약과 학습" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5 xl:gap-5">
             <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
-              <p class="text-xs font-semibold text-slate-500">현재 연결 수</p>
+              <p class="text-xs font-semibold text-slate-500">관찰된 IPv4 외부 연결</p>
               <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{formatNumber(data.totalConnections)}</p>
             </div>
             <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
-              <p class="text-xs font-semibold text-slate-500">관찰된 기기 수</p>
+              <p class="text-xs font-semibold text-slate-500">외부 통신 기기</p>
               <p class="mt-2 text-2xl font-extrabold tabular-nums text-slate-900">{formatNumber(data.totalDevices)}<span class="ml-1 text-xs font-medium text-slate-500">대</span></p>
             </div>
             <div class="min-w-0 border-b border-slate-200 pb-3 sm:border-b-0 sm:pb-0 xl:border-r xl:pr-4">
@@ -172,6 +208,16 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
               <div class="mt-1 flex flex-wrap justify-between gap-x-3 text-[0.68rem] text-slate-500">
                 <span>7일 · 기준 형성</span><span>{trainingTarget}일 · 안정화</span>
               </div>
+              {learningCountsAvailable ? <p class="mt-2 text-xs text-slate-600">
+                기준 확보 <strong class="font-extrabold text-teal-700">{data.trainingReadyDevices}대</strong>
+                <span class="mx-2 text-slate-300" aria-hidden="true">·</span>
+                학습 중 <strong class="font-extrabold text-slate-700">{data.trainingLearningDevices}대</strong>
+                {typeof data.trainingStableDevices === 'number' && Number.isInteger(data.trainingStableDevices)
+                  && data.trainingStableDevices >= 0 && typeof data.trainingReadyDevices === 'number'
+                  && data.trainingStableDevices <= data.trainingReadyDevices
+                  ? <span class="ml-2 text-slate-500">(14일 안정화 {data.trainingStableDevices}대)</span> : null}
+                <span class="ml-1 text-slate-500">· 현재 관찰 기기 기준</span>
+              </p> : null}
             </div>
           </div>
         </section>
@@ -179,26 +225,52 @@ export function NetworkWatchPage({ data, error, loading, onRetry, onSetEnabled, 
         {data.alert ? <p role="status" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{data.alert.ip} 기기의 외부 연결이 학습된 기준을 3회 연속 초과했거나 초기 학습 중 매우 높게 관찰되었습니다. 정상적인 사용일 수도 있습니다.</p> : null}
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 class="text-base font-extrabold text-slate-900">기기별 외부 연결 현황</h2>
-          <p class="mt-1 text-xs text-slate-500">IPv4 기준 현재 연결 스냅샷 · 최대 12대 표시 · 콘텐츠 분석 없음</p>
-          {data.devices.length ? <div class="mt-4 overflow-x-auto"><table class="w-full text-left text-sm">
-            <thead class="text-slate-500"><tr><th class="pb-3">기기</th><th class="pb-3 text-right">연결 수</th><th class="pb-3 text-right">외부 목적지 수</th><th class="pb-3 text-right">평소 기준</th><th class="pb-3 text-right">관찰 상태</th></tr></thead>
-            <tbody>{data.devices.map(device => {
-              const state = observedState(device, data);
-              const hostname = hostnames.get(device.ip);
-              return <tr class="border-t border-slate-100 text-slate-700" key={device.ip}>
-                <td class="py-3"><div class="font-semibold">{hostname || device.ip}</div>{hostname ? <div class="mt-0.5 text-xs text-slate-500">{device.ip}</div> : null}</td>
-                <td class="py-3 text-right">{formatNumber(device.connections)}</td>
-                <td class="py-3 text-right">{formatNumber(device.destinations)}</td>
-                <td class="py-3 text-right text-xs text-slate-600">
-                  {device.baselineConnections != null && device.baselineDestinations != null
-                    ? <><div>연결 ≤{formatNumber(device.baselineConnections)}</div><div>목적지 ≤{formatNumber(device.baselineDestinations)}</div></>
-                    : `학습 ${device.trainingDays ?? 0}일`}
-                </td>
-                <td class="py-3 text-right"><span class={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${state.tone}`}>{state.label}</span></td>
-              </tr>;
-            })}</tbody>
-          </table></div> : <p class="mt-4 text-sm text-slate-500">현재 확인된 외부 연결이 없습니다.</p>}
-          <p class="mt-3 text-xs text-slate-500">‘정상 범위’는 학습된 연결 수의 통계적 범위이며 보안 안전 판정이 아닙니다. 기기 이름을 확인할 수 없으면 IP만 표시합니다.</p>
+          <p class="mt-1 text-xs text-slate-500">IPv4 외부 연결 스냅샷 · 이상 감지 우선 최대 12대 표시 · 통신 내용 분석 없음</p>
+          {visibleDevices.length ? <>
+            <div class="mt-4 hidden overflow-x-auto lg:block">
+              <table class="w-full min-w-[44rem] text-left text-sm">
+                <thead class="text-slate-500"><tr>
+                  <th scope="col" class="pb-3 pr-4">기기</th>
+                  <th scope="col" class="w-[22%] pb-3 pr-4">외부 연결 / 평소 기준</th>
+                  <th scope="col" class="w-[22%] pb-3 pr-4">목적지 / 평소 기준</th>
+                  <th scope="col" class="pb-3 text-right">관찰 상태</th>
+                </tr></thead>
+                <tbody>{visibleDevices.map(device => {
+                  const state = observedState(device, data);
+                  const hostname = hostnames.get(device.ip);
+                  return <tr class="border-t border-slate-100 text-slate-700" key={device.ip}>
+                    <td class="py-3 pr-4"><div class="font-semibold">{hostname || device.ip}</div>{hostname ? <div class="mt-0.5 text-xs text-slate-500">{device.ip}</div> : null}</td>
+                    <td class="py-3 pr-4"><TrafficMetric name="외부 연결" value={device.connections} limit={data.limited ? null : (device.baselineConnections ?? null)} limited={data.limited} /></td>
+                    <td class="py-3 pr-4"><TrafficMetric name="외부 목적지" value={device.destinations} limit={data.limited ? null : (device.baselineDestinations ?? null)} limited={data.limited} /></td>
+                    <td class="py-3 text-right">
+                      <span class={`inline-block whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${state.tone}`}>{state.label}</span>
+                      {!data.limited ? <div class="mt-1 text-xs text-slate-500">학습 {device.trainingDays ?? 0}일</div> : null}
+                    </td>
+                  </tr>;
+                })}</tbody>
+              </table>
+            </div>
+            <div class="mt-4 grid gap-3 lg:hidden" aria-label="모바일 기기별 외부 연결 현황">
+              {visibleDevices.map(device => {
+                const state = observedState(device, data);
+                const hostname = hostnames.get(device.ip);
+                return <article key={device.ip} class="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="min-w-0"><p class="break-all text-sm font-bold text-slate-800">{hostname || device.ip}</p>
+                      {hostname ? <p class="mt-0.5 text-xs text-slate-500">{device.ip}</p> : null}
+                      {!data.limited ? <p class="mt-1 text-xs text-slate-500">학습 {device.trainingDays ?? 0}일</p> : null}
+                    </div>
+                    <span class={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${state.tone}`}>{state.label}</span>
+                  </div>
+                  <div class="mt-3 grid grid-cols-2 gap-4 border-t border-slate-200 pt-3">
+                    <div><p class="mb-1 text-xs font-semibold text-slate-500">외부 연결 / 기준</p><TrafficMetric name="외부 연결" value={device.connections} limit={data.limited ? null : (device.baselineConnections ?? null)} limited={data.limited} /></div>
+                    <div><p class="mb-1 text-xs font-semibold text-slate-500">목적지 / 기준</p><TrafficMetric name="외부 목적지" value={device.destinations} limit={data.limited ? null : (device.baselineDestinations ?? null)} limited={data.limited} /></div>
+                  </div>
+                </article>;
+              })}
+            </div>
+          </> : <p class="mt-4 text-sm text-slate-500">현재 확인된 외부 연결이 없습니다.</p>}
+          <p class="mt-3 text-xs text-slate-500">표시된 기준은 최근 학습으로 계산한 통계적 상한이며 보안 안전 판정이 아닙니다. 기기 이름을 확인할 수 없으면 IP만 표시합니다.</p>
         </section>
         <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div class="flex flex-wrap items-center justify-between gap-3">
