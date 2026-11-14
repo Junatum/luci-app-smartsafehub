@@ -29,6 +29,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It 'curl HTTPS 요청이 리다이렉트를 따르거나 인증 정보를 다른 주소로 보내지 않는지 검증한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-http-transport.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'OpenWrt 25.12 BusyBox 기본 명령과 의존성 호환성을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-openwrt-commands.sh"
     The status should be success

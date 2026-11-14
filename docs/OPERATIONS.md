@@ -28,6 +28,17 @@ ubus list | grep smartsafehub
 ubus call smartsafehub system_root_password_status '{}'
 ```
 
+## HTTPS 전송 및 리다이렉트 정책
+
+SmartSafeHub의 서버 통신(장치 등록, 활동·진단 업로드, Apps 카탈로그·패키지, 업데이트 확인·펌웨어 다운로드)은 `curl`을 사용합니다. `luci-app-smartsafehub`의 패키지 의존성이 `curl`을 설치하며, 모든 요청은 `/usr/lib/smartsafehub/http.sh`에서 HTTPS와 인증서 검증을 적용합니다. HTTP 리다이렉트(301/302/307/308 등)는 따라가지 않고 오류로 처리하며, HTTP 2xx가 아닌 응답과 중간에 실패한 다운로드는 성공으로 취급하지 않습니다. 인증 헤더가 다른 호스트로 전달되는 것을 막기 위해 프록시 환경 변수도 사용하지 않습니다.
+
+```sh
+apk info -e curl
+curl --version
+```
+
+서버에서 3xx를 반환하면 실제 컨텐츠를 **원래 요청한 HTTPS 주소에서 직접 2xx로 제공**하도록 gateway/repository 구성을 수정해야 합니다. 앱·펌웨어 해시 검증 및 재시도 규칙은 기존대로 유지됩니다. 최초 설치 이전에 서명 키를 가져오는 README의 `uclient-fetch` 명령은 패키지 설치 전 부트스트랩용으로 별개입니다.
+
 ## 설치 후 확인
 
 ### 패키지와 정적 자산

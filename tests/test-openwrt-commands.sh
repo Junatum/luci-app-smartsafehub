@@ -107,27 +107,14 @@ EOF
 check_blocked xxd
 rm "$TMP/root/etc/init.d/smartsafehub-fixture"
 
-# `curl` is NOT a default. A single legacy guarded fallback is documented in
-# the checker; a new unguarded use must fail even in that same script.
-cat > "$TMP/root/usr/libexec/smartsafehub-device" <<'EOF'
+# curl is guaranteed by LUCI_DEPENDS. The shared HTTP helper enforces
+# no-redirect and TLS policy (verified by test-http-transport.sh).
+grep -Eq '^curl$' "$POLICY" || fail 'curl must be in the required package command policy'
+cat > "$FILE" <<'EOF'
 #!/bin/sh
-curl -fsS https://example.invalid
+curl --version >/dev/null
 EOF
-check_blocked curl
-
-# An extra unguarded call must not be allowed merely because the same script
-# contains the previously reviewed guarded curl fallback.
-cat > "$TMP/root/usr/libexec/smartsafehub-device" <<'EOF'
-#!/bin/sh
-post_json() {
- if command -v curl >/dev/null 2>&1; then
-  curl -fsS https://example.invalid
- fi
-}
-curl -fsS https://example.invalid
-EOF
-check_blocked curl
-rm "$TMP/root/usr/libexec/smartsafehub-device"
+check_allowed
 
 cat > "$TMP/root/usr/libexec/smartsafehub-bad-interpreter" <<'EOF'
 #!/bin/bash

@@ -3,6 +3,9 @@
 # Privileged, opt-in APK adapter for SmartSafeHub Apps fixed-release protocol.
 # No caller-supplied package, URL, shell command or repository is accepted.
 set -eu
+HTTP_LIB="${SMARTSAFEHUB_HTTP_LIB:-$(dirname "$0")/../lib/smartsafehub/http.sh}"
+[ -r "$HTTP_LIB" ] || exit 1
+. "$HTTP_LIB"
 
 SELF="${SMARTSAFEHUB_APPS_MANAGER_BIN:-/usr/libexec/smartsafehub-apps-manager}"
 CATALOG_HELPER="${SMARTSAFEHUB_APPS_HELPER_BIN:-/usr/libexec/smartsafehub-apps}"
@@ -11,7 +14,6 @@ OWNED="${SMARTSAFEHUB_APPS_OWNED_DIR:-/etc/smartsafehub/apps-installed}"
 # Fixed first-party host. Only the Hub-approved channel/architecture determine
 # the repository path; callers cannot submit a repository URL.
 REPO_BASE="${SMARTSAFEHUB_APPS_REPO_BASE:-https://repo.smartsafehub.com}"
-UCLIENT="${SMARTSAFEHUB_APPS_UCLIENT_BIN:-uclient-fetch}"
 OVERLAY="${SMARTSAFEHUB_APPS_OVERLAY_PATH:-/overlay}"
 # OpenWrt uses /proc/meminfo; tests on non-Linux hosts supply a fixture.
 MEMINFO="${SMARTSAFEHUB_APPS_MEMINFO_PATH:-/proc/meminfo}"
@@ -585,7 +587,7 @@ preflight_install() {
  index_url="$repo_url/packages.adb"
  # Always fetch the current published index. If a channel is republished after
  # review, fail closed until Hub has reviewed the new index hash.
- "$UCLIENT" -q -T 15 -O "$stage/packages.adb" "$index_url" > "$stage/index-fetch.log" 2>&1 || return 25
+ ssh_http_request GET "$stage/packages.adb" 15 "$index_url" "" > "$stage/index-fetch.log" 2>&1 || return 25
  [ -s "$stage/packages.adb" ] || return 25
  index_bytes="$(wc -c < "$stage/packages.adb" | tr -d ' ')"
  [ "$index_bytes" -le 8388608 ] || return 25
@@ -632,7 +634,7 @@ fetch_approved_archives() {
  mkdir -p "$stage/packages" || return 30
  while IFS="$(printf '\t')" read -r name version hash; do
   archive="$stage/packages/$name-$version.apk"
-  "$UCLIENT" -q -T 30 -O "$archive" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
+  ssh_http_request GET "$archive" 30 "$repo_url/$name-$version.apk" "" > "$stage/fetch.log" 2>&1 || return 31
   [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
   archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
   [ "$archive_bytes" -le 33554432 ] || return 32

@@ -131,7 +131,7 @@ export SMARTSAFEHUB_APPS_ROM_METADATA="$TMP/firmware.json"
 export SMARTSAFEHUB_APPS_METADATA="$TMP/firmware.json"
 export SMARTSAFEHUB_APPS_RUNTIME_DIR="$TMP/runtime"
 export SMARTSAFEHUB_APPS_JSONFILTER_BIN="$TMP/bin/jsonfilter"
-export SMARTSAFEHUB_APPS_UCLIENT_BIN="$TMP/bin/uclient-fetch"
+export SMARTSAFEHUB_HTTP_CURL_BIN="$ROOT/tests/support/mock-curl" MOCK_CURL_BACKEND="$TMP/bin/uclient-fetch"
 export APPS_TEST_RESPONSE="$TMP/response.json"
 export APPS_TEST_URL_FILE="$TMP/url"
 "$HELPER" || fail 'valid pinned catalog fetch failed'

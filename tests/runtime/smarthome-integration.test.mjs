@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r15"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r15'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r16"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r16'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {

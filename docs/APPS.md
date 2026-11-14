@@ -31,7 +31,7 @@
 3. 공유기에는 OpenWrt 공식 패키지 관리자(`apk`)와 필요한 시스템 의존성이 설치되어 있어야 합니다. SmartSafeHub가 사용하는 APK 서명 공개 키도 신뢰 저장소에 등록되어 있어야 합니다.
 4. 설치기는 고정된 릴리스 ID, 승인된 채널(`beta`/`stable`)과 공유기 아키텍처로 `https://repo.smartsafehub.com/<채널>/packages/<아키텍처>/smartsafehub/<릴리스 ID>/packages.adb`를 조회합니다. 이 인덱스를 새로 다운로드한 뒤 Hub 승인 SHA-256과 비교합니다. 펌웨어에 별도 인덱스 파일을 복사할 필요가 없습니다.
 5. 실제 APK는 위 고정 도메인/경로에서 이름과 버전으로만 내려받아 SHA-256을 검증합니다. 임의 URL 입력이나 `--allow-untrusted`는 허용되지 않습니다.
-6. `apk`, `sha256sum`, `start-stop-daemon`, `jsonfilter`, `uclient-fetch`가 공유기에 있어야 하며 RAM/overlay 용량이 충분해야 합니다.
+6. `apk`, `sha256sum`, `start-stop-daemon`, `jsonfilter`, `curl`가 공유기에 있어야 하며 RAM/overlay 용량이 충분해야 합니다.
 
 **주의:** 모든 승인은 고정된 SmartSafeHub 릴리스에서 설치합니다. 릴리스 파일 또는 인덱스의 SHA-256이 승인값과 다르면 설치를 차단합니다.
 
