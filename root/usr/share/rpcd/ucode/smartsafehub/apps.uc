@@ -91,12 +91,21 @@ export function read_apps_catalog(request) {
 				item?.web_ui?.package == 'luci-app-wol')
 				path = '/cgi-bin/luci/admin/services/wol';
 		}
+		else if (id == 'jarbis') {
+			// Never let an alternate LuCI/static path override Jarbis' fixed
+			// internal SmartSafeHub route, even when catalog data changes.
+			if (item?.web_ui?.type == 'smartsafehub' &&
+				item?.web_ui?.path == '#smarthome' && item?.web_ui?.package == 'jarbis')
+				path = '#smarthome';
+		}
+		else if (id == 'retro-arcade') {
+			if (item?.web_ui?.type == 'static' &&
+				item?.web_ui?.path == '/retro-arcade/' &&
+				item?.web_ui?.package == 'smartsafehub-app-retro-arcade')
+				path = '/retro-arcade/';
+		}
 		else if (item?.web_ui?.type == 'luci')
 			path = luci_web_ui_path(item.web_ui.path);
-		else if (id == 'retro-arcade' && item?.web_ui?.type == 'static' &&
-			item?.web_ui?.path == '/retro-arcade/' &&
-			item?.web_ui?.package == 'smartsafehub-app-retro-arcade')
-			path = '/retro-arcade/';
 		else if (id == 'network-usage-monitor')
 			path = '/cgi-bin/luci/admin/services/nlbw/display';
 		// Only UI copy crosses into the unprivileged browser. All package hashes,
@@ -111,7 +120,7 @@ export function read_apps_catalog(request) {
 			// An older or unexpected catalog must never imply first-party ownership.
 			publisherType: item?.publisher_type == 'first_party' ? 'first_party' : 'third_party',
 			version: text(item?.version, 64),
-			webUi: length(path) ? { type: id == 'retro-arcade' && path == '/retro-arcade/' ? 'static' : 'luci', path: path } : null,
+			webUi: length(path) ? { type: id == 'jarbis' && path == '#smarthome' ? 'smartsafehub' : (id == 'retro-arcade' && path == '/retro-arcade/' ? 'static' : 'luci'), path: path } : null,
 		});
 	}
 	return success({

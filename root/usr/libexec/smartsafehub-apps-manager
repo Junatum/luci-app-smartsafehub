@@ -198,8 +198,12 @@ travelmate_pins_match_arch() {
 # These are independent OpenWrt packages, never Apps-owned. They must never
 # be upgraded or uninstalled by the app manager, even after Travelmate removal.
 shared_travelmate_dep() {
- [ "$app" = travelmate ] || return 1
- case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys|libopenssl3|libatomic1) return 0;; esac
+ if [ "$app" = travelmate ]; then
+  case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys|libopenssl3|libatomic1) return 0;; esac
+ elif [ "$app" = jarbis ]; then
+  # Never uninstall or adopt a shared MQTT broker or system TLS stack.
+  case "$1" in mosquitto-ssl|mosquitto-client-ssl|libmosquitto-ssl|curl|libcurl4|libnghttp2-14|libopenssl3|libatomic1) return 0;; esac
+ fi
  return 1
 }
 installed() { "$APK" info -e "$1" >/dev/null 2>&1; }
@@ -391,11 +395,16 @@ web_ui_package() {
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /cgi-bin/luci/admin/services/wol ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = luci-app-wol ] || return 1
  fi
+ if [ "$id" = jarbis ]; then
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = smartsafehub ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = '#smarthome' ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = jarbis ] || return 1
+ fi
  if [ "$id" = retro-arcade ]; then
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = static ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /retro-arcade/ ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = smartsafehub-app-retro-arcade ] || return 1
- else
+ elif [ "$id" != jarbis ]; then
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
  fi
  name="$(field "$CATALOG" "@.apps[$idx].web_ui.package")"
@@ -482,6 +491,9 @@ status() {
   # either application APK or an Apps-owned recovery manifest, those system
   # libraries do not mean that Travelmate is partially installed. Keep real
   # interrupted installs and manually installed app components visible.
+  if [ "$id" = jarbis ] && [ "$managed" -eq 0 ] && ! installed jarbis; then
+   partial=0
+  fi
   if [ "$id" = travelmate ] && [ "$managed" -eq 0 ] &&
      ! installed travelmate && ! installed luci-app-travelmate; then
    partial=0
@@ -618,6 +630,19 @@ preflight_install() {
   [ "$(wc -l < "$pins" | tr -d ' ')" -eq 2 ] || return 27
   for required in etherwake luci-app-wol; do
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
+  done
+ elif [ "$app" = jarbis ]; then
+  # Fixed first-party Smart Home backend and approved dependencies.
+  [ "$(wc -l < "$pins" | tr -d ' ')" -eq "$( [ "$arch" = mipsel_24kc ] && echo 9 || echo 8 )" ] || return 27
+  for required in jarbis mosquitto-ssl mosquitto-client-ssl libmosquitto-ssl curl libcurl4 libnghttp2-14 libopenssl3; do
+   grep -q "^${required}$(printf '\t')" "$pins" || return 27
+  done
+  if [ "$arch" = mipsel_24kc ]; then
+   grep -q "^libatomic1$(printf '\t')" "$pins" || return 27
+  fi
+  # Jarbis relies on these protected firmware-owned prerequisites.
+  for required in rpcd-mod-ucode ucode-mod-uci ucode-mod-fs jsonfilter; do
+   installed "$required" || return 27
   done
  elif [ "$app" = retro-arcade ]; then
   # The approved first-party game app owns exactly one APK. Keep the
@@ -764,6 +789,8 @@ update_app() {
  # the new pins. Never record an update as a first-time download receipt.
  if [ "$app" = travelmate ]; then
   awk -F '\t' '$1=="travelmate" || $1=="luci-app-travelmate"' "$pins" > "$manifest.new" || return 55
+ elif [ "$app" = jarbis ]; then
+  awk -F '\t' '$1=="jarbis"' "$pins" > "$manifest.new" || return 55
  else
   cp "$pins" "$manifest.new" || return 55
  fi
