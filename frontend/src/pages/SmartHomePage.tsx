@@ -10,7 +10,7 @@ import {
   SearchIcon, SettingsIcon,
 } from '../components/Icons';
 import { SectionHeading } from '../components/SectionHeading';
-import { LoadingPanel } from '../components/StatePanels';
+import { ErrorPanel } from '../components/StatePanels';
 import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus, JarbisLightState } from '../types/jarbis';
 
 const secondaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
@@ -52,14 +52,31 @@ function pairFeedback(confirmed: boolean): string {
     : '전구 연결 정보를 저장했습니다. 온라인 응답은 아직 확인되지 않았습니다. 잠시 후 전원을 조작해 확인해 주세요.';
 }
 
-export function SmartHomePage() {
-  const [status, setStatus] = useState<JarbisStatus | null>(null);
-  const [devices, setDevices] = useState<JarbisDevice[]>([]);
-  const [candidates, setCandidates] = useState<JarbisCandidate[]>([]);
+// The authenticated App owns these resources so revisiting this route can
+// display the last successful snapshot immediately. No secrets are cached.
+interface SmartHomeResource<T> {
+  data: T | null;
+  error: string | null;
+  loading: boolean;
+  replaceData: (value: T) => void;
+}
+
+interface SmartHomePageProps {
+  statusResource: SmartHomeResource<JarbisStatus>;
+  devicesResource: SmartHomeResource<{ devices: JarbisDevice[] }>;
+  candidatesResource: SmartHomeResource<{ devices: JarbisCandidate[] }>;
+}
+
+export function SmartHomePage({ statusResource, devicesResource, candidatesResource }: SmartHomePageProps) {
+  const status = statusResource.data;
+  const deviceData = devicesResource.data;
+  const candidateData = candidatesResource.data;
+  const devices = deviceData?.devices ?? [];
+  const candidates = candidateData?.devices ?? [];
+  const missing = status === null && /UBUS_[34]|not found|요청한 (?:메서드|리소스)를 찾을 수 없습니다/i.test(statusResource.error ?? '');
+  // MQTT credentials are sensitive: retain them only while this page is mounted.
   const [credentials, setCredentials] = useState<JarbisCredentials | null>(null);
   const [reveal, setReveal] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -105,41 +122,21 @@ export function SmartHomePage() {
     return () => window.clearTimeout(timeout);
   }, [message]);
 
+  // Independent requests: slow discovery must not delay service status or
+  // the registered bulbs. Each successful result updates its own snapshot.
   const refresh = async () => {
-    const fresh = await getJarbisStatus();
-    const [deviceData, candidateData] = await Promise.all([getJarbisDevices(), getJarbisCandidates()]);
-    setStatus(fresh);
-    setDevices(deviceData.devices);
-    setCandidates(candidateData.devices);
+    const [fresh] = await Promise.all([
+      getJarbisStatus().then(result => { statusResource.replaceData(result); return result; }),
+      getJarbisDevices().then(result => { devicesResource.replaceData(result); }),
+      getJarbisCandidates().then(result => { candidatesResource.replaceData(result); }),
+    ]);
     return fresh;
   };
 
-  useEffect(() => {
-    let alive = true;
-    void getJarbisStatus().then(async fresh => {
-      if (!alive) return;
-      const [deviceData, candidateData] = await Promise.all([getJarbisDevices(), getJarbisCandidates()]);
-      if (!alive) return;
-      setStatus(fresh);
-      setDevices(deviceData.devices);
-      setCandidates(candidateData.devices);
-    }).catch((cause: unknown) => {
-      if (!alive) return;
-      const msg = errorMessage(cause);
-      if (/UBUS_4|UBUS_3|not found|object not found|method not found/i.test(msg) ||
-        (cause instanceof Error && /UBUS_[34]/.test(String((cause as { code?: string }).code)))) {
-        setMissing(true);
-      } else {
-        setError(msg);
-      }
-    }).finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-
-  const refreshLight = async (id: string): Promise<JarbisLightState | null> => {
+  const refreshLight = async (id: string, background = false): Promise<JarbisLightState | null> => {
     setCheckingStates(old => ({ ...old, [id]: true }));
     try {
-      const state = await getJarbisLightState(id);
+      const state = await getJarbisLightState(id, background ? 'low' : 'high');
       setLightStates(old => ({ ...old, [id]: state }));
       if (state.observed && state.power !== null) {
         setRequestedPower(old => {
@@ -178,7 +175,7 @@ export function SmartHomePage() {
       try {
         // At most two simultaneous MQTT queries on low-memory routers.
         for (let i = 0; i < ids.length && seq === stateRequest.current; i += 2) {
-          await Promise.all(ids.slice(i, i + 2).map(id => refreshLight(id)));
+          await Promise.all(ids.slice(i, i + 2).map(id => refreshLight(id, true)));
         }
       } finally { polling = false; }
     };
@@ -251,7 +248,6 @@ export function SmartHomePage() {
     setError('');
     try {
       await refresh();
-      setMissing(false);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -272,8 +268,8 @@ export function SmartHomePage() {
   const scan = async () => {
     await run('scan', async () => {
       const result = await scanJarbis();
-      setCandidates(result.devices);
-    }, '기기 검색을 마쳤습니다.');
+      candidatesResource.replaceData(result);
+    }, '기기 검색을 마쳤습니다.', false);
   };
 
   const closePair = () => {
@@ -365,7 +361,6 @@ export function SmartHomePage() {
   const ready = Boolean(status?.enabled && status.brokerReady);
   const availableCandidates = candidates.filter(candidate => !candidate.registered);
 
-  if (loading) return <LoadingPanel />;
   if (missing) return <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6" aria-label="Jarbis 미설치">
     <h2 class="m-0 text-lg font-extrabold text-amber-950">Jarbis를 설치해야 합니다</h2>
     <p class="mt-2 mb-0 text-sm leading-6 text-amber-900">이 공유기에는 스마트홈 기능이 아직 설치되지 않았습니다. 해당 공유기 모델용 Jarbis 패키지를 설치한 후 다시 확인해 주세요. 다른 SmartSafeHub 기능은 계속 사용할 수 있습니다.</p>
@@ -378,7 +373,12 @@ export function SmartHomePage() {
         <ReloadIcon class={`size-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />새로고침
       </button>} />
 
-    <section aria-label="스마트홈 서비스 현황" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    {!status && statusResource.error ? <ErrorPanel message={statusResource.error}
+      onRetry={() => void retry()} /> : !status ? <section aria-label="스마트홈 서비스 현황"
+        aria-busy="true" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+        <h2 class="m-0 text-base font-extrabold text-slate-950">스마트홈 사용</h2>
+        <p role="status" class="mt-2 mb-0 text-sm text-slate-500">스마트홈 서비스 상태를 확인하고 있습니다…</p>
+      </section> : <section aria-label="스마트홈 서비스 현황" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
       <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div class="flex min-w-0 items-center gap-3">
           <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"><SettingsIcon class="size-5" /></span>
@@ -409,18 +409,24 @@ export function SmartHomePage() {
         </div>
         <div class="rounded-xl bg-slate-50 p-3">
           <p class="m-0 text-xs font-semibold text-slate-500">등록된 전구</p>
-          <p class="mt-1 mb-0 text-lg font-extrabold text-slate-900">{devices.length}<span class="ml-1 text-sm font-semibold text-slate-500">대</span></p>
+          <p class="mt-1 mb-0 text-lg font-extrabold text-slate-900">{deviceData ? devices.length : '—'}{deviceData ? <span class="ml-1 text-sm font-semibold text-slate-500">대</span> : null}</p>
         </div>
       </div>
       {status?.enabled && !status.brokerReady ? <div role="alert" class="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
         <AlertIcon class="mt-0.5 size-4 shrink-0" />전구 제어 연결을 확인하지 못했습니다. 잠시 후 새로고침하거나 고급 설정의 MQTT 연결 상태를 확인해 주세요.
       </div> : null}
       {!status?.enabled ? <p role="status" class="mt-3 mb-0 text-xs text-slate-500">스마트홈 기능을 켜면 기기를 검색하고 제어할 수 있습니다.</p> : null}
-    </section>
+    </section>}
 
     {error ? <div role="alert" aria-live="assertive" class="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
       <AlertIcon class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1">{error}</span>
       <button class="shrink-0 font-bold underline" type="button" onClick={() => setError('')}>닫기</button>
+    </div> : null}
+    {((status && statusResource.error) || devicesResource.error || candidatesResource.error) ? <div role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      {devicesResource.error ? `등록된 전구 목록: ${devicesResource.error} ` : ''}
+      {candidatesResource.error ? `발견된 전구 목록: ${candidatesResource.error} ` : ''}
+      {status && statusResource.error ? `서비스 상태 갱신: ${statusResource.error}` : ''}
+      <button class="ml-2 font-bold underline" type="button" disabled={!!busy} onClick={() => void retry()}>다시 확인</button>
     </div> : null}
     {message ? <div role="status" aria-live="polite" class="flex w-full items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
       <CheckCircleIcon class="mt-0.5 size-4 shrink-0" />
@@ -432,9 +438,11 @@ export function SmartHomePage() {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="m-0 text-base font-extrabold text-slate-950">내 전구</h2>
           <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">등록된 전구의 전원을 켜고 끄거나 밝기를 조절합니다.</p></div>
-        <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{devices.length}대 등록</span>
+        <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{deviceData ? `${devices.length}대 등록` : '확인 중'}</span>
       </div>
-      {devices.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+      {!deviceData ? <div aria-busy={devicesResource.loading} role="status" class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        {devicesResource.error ? '전구 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '등록된 전구를 확인하고 있습니다…'}
+      </div> : devices.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
@@ -592,7 +600,9 @@ export function SmartHomePage() {
           <SearchIcon class={`size-4 ${busy === 'scan' ? 'animate-pulse' : ''}`} />{busy === 'scan' ? '검색 중…' : '기기 검색'}
         </button>
       </div>
-      {availableCandidates.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      {!candidateData ? <div role="status" aria-busy={candidatesResource.loading} class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        {candidatesResource.error ? '발견된 전구 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '검색된 전구 목록을 확인하고 있습니다…'}
+      </div> : availableCandidates.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
         {busy === 'scan' ? '근처에서 Tasmota 전구를 찾고 있습니다…' : candidates.length > 0 ? '발견된 전구는 모두 등록되어 있습니다.' : '아직 발견된 전구가 없습니다. 기기가 같은 네트워크에 연결돼 있는지 확인해 주세요.'}
       </div> : <ul class="mt-4 space-y-3 p-0" aria-label="검색된 기기">
         {availableCandidates.map(candidate => <li key={`${candidate.topic}:${candidate.ip}:${candidate.source}`} class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3 sm:p-4">

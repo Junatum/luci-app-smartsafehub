@@ -49,8 +49,12 @@ test('통합 UI는 기존 다크 모드 토큰을 재사용하며 패키지 revi
   assert.match(overview, /bg-slate-100/);
   assert.match(css, /\.ssh-app\[data-theme='dark'\] \[class~='border-slate-200'\]/);
   assert.match(css, /\.ssh-app\[data-theme='dark'\] \[class~='bg-slate-100'\]/);
-  assert.match(makefile, /PKG_RELEASE:=15/);
-  assert.match(main, /assetVersion: host\.dataset\.assetVersion \?\? '0\.2\.33-r15'/);
+  // The version contract must track later revisions, not pin the release
+  // from the original Network Watch layout change forever.
+  const release = makefile.match(/^PKG_RELEASE:=(\d+)$/m)?.[1];
+  const version = makefile.match(/^PKG_VERSION:=(.+)$/m)?.[1];
+  assert.ok(release && version, 'package version/revision must be present');
+  assert.ok(main.includes(`assetVersion: host.dataset.assetVersion ?? '${version}-r${release}'`));
 });
 
 test('Network Watch는 수집기에서 선별한 위험 기기를 우선 보여주고 모바일 목록을 별도로 제공한다', () => {

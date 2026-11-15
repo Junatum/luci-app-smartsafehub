@@ -49,6 +49,8 @@ import type { NetwatchStatus } from '../types/netwatch';
 import type { ActivityHistory } from '../types/activity';
 import { NetworkWatchPage } from '../pages/NetworkWatchPage';
 import { SmartHomePage } from '../pages/SmartHomePage';
+import { getJarbisStatus, getJarbisDevices, getJarbisCandidates } from '../api/jarbis';
+import type { JarbisCandidate, JarbisDevice, JarbisStatus } from '../types/jarbis';
 
 interface AppProps {
   onAdministratorPasswordChanged: () => void;
@@ -112,6 +114,26 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const dashboardSafeShield = safeshield;
   const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
+  // Keep Smart Home snapshots across route changes, just as SafeShield/rules
+  // do. Separate resources avoid a slow discovery RPC holding back the bulbs.
+  const jarbisStatus = useAsyncResource<JarbisStatus>({
+    active: route === 'smarthome',
+    fallbackError: '스마트홈 서비스 상태를 확인하지 못했습니다.',
+    loader: getJarbisStatus,
+    staleTimeMs: 15_000,
+  });
+  const jarbisDevices = useAsyncResource<{ devices: JarbisDevice[] }>({
+    active: route === 'smarthome',
+    fallbackError: '등록된 전구를 불러오지 못했습니다.',
+    loader: getJarbisDevices,
+    staleTimeMs: 15_000,
+  });
+  const jarbisCandidates = useAsyncResource<{ devices: JarbisCandidate[] }>({
+    active: route === 'smarthome',
+    fallbackError: '검색된 전구를 불러오지 못했습니다.',
+    loader: getJarbisCandidates,
+    staleTimeMs: 30_000,
+  });
   const deviceRegistration = useDeviceRegistration(route === 'account');
   const dashboardAccountRegistered = useDashboardAccountStatus(
     route === 'account',
@@ -192,7 +214,8 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
 
   switch (route) {
     case 'smarthome':
-      content = <SmartHomePage />;
+      content = <SmartHomePage statusResource={jarbisStatus}
+        devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} />;
       break;
 
     case 'netwatch':

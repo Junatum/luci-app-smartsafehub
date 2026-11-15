@@ -23,8 +23,8 @@ test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 �
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /Jarbis를 설치해야 합니다/);
-  assert.ok(login.includes('data-asset-version="0.2.33-r16"'));
-  assert.ok(login.includes('app.js?v=0.2.33-r16'));
+  assert.ok(login.includes('data-asset-version="0.2.33-r17"'));
+  assert.ok(login.includes('app.js?v=0.2.33-r17'));
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -49,6 +49,14 @@ test('명시적으로 승인한 기기만 등록하고 전원 명령을 실제 �
   assert.match(page, /credentials \? '인증 정보 숨기기'/);
   assert.doesNotMatch(page, /localStorage|sessionStorage/);
   assert.doesNotMatch(api, /console\.log/);
+});
+
+test('스마트홈 MQTT 인증 정보는 컴포넌트 상태에 선언하고 화면을 떠나면 보관하지 않는다', () => {
+  assert.match(page, /const \[credentials, setCredentials\] = useState<JarbisCredentials \| null>\(null\)/);
+  assert.match(page, /setCredentials\(await getJarbisCredentials\(\)\)/);
+  assert.match(page, /setCredentials\(null\)/);
+  assert.doesNotMatch(app, /useAsyncResource<JarbisCredentials>/);
+  assert.doesNotMatch(page, /localStorage|sessionStorage/);
 });
 
 test('MQTT 비밀번호는 Preact에서 허용하는 고정 input type으로 표시·숨기기를 전환한다', () => {
@@ -278,4 +286,46 @@ test('전구 상태 API는 HTTP 우선 결과와 실패 원인을 구분하고 �
   assert.match(page, /HTTP_FETCH_FAILED/);
   assert.match(page, /HTTP_INVALID_STATE/);
   assert.match(page, /statusFailureHint\(observed\?\.reason\)/);
+});
+
+
+test('스마트홈은 세 자원을 독립적으로 준비하고 재방문에서 기존 데이터를 즉시 재사용한다', () => {
+  const resource = source('frontend/src/hooks/useAsyncResource.ts');
+  for (const declaration of [
+    'const jarbisStatus = useAsyncResource<JarbisStatus>',
+    'const jarbisDevices = useAsyncResource<{ devices: JarbisDevice[] }>',
+    'const jarbisCandidates = useAsyncResource<{ devices: JarbisCandidate[] }>',
+  ]) {
+    assert.ok(app.includes(declaration), declaration);
+  }
+  assert.equal((app.match(/active: route === 'smarthome'/g) ?? []).length, 3);
+  assert.match(app, /<SmartHomePage statusResource=\{jarbisStatus\}/);
+  assert.match(app, /devicesResource=\{jarbisDevices\} candidatesResource=\{jarbisCandidates\}/);
+  assert.match(resource, /const fresh = state\.data !== null/);
+  assert.match(resource, /if \(!fresh\) void load\(\);/);
+  assert.doesNotMatch(page, /if \(loading\) return <LoadingPanel \/>/);
+  assert.doesNotMatch(page, /getJarbisStatus\(\)\.then\(async fresh/);
+});
+
+test('스마트홈의 느린 검색 API는 등록 전구를 가리지 않고 비어 있다고 오인하지 않는다', () => {
+  assert.match(page, /!deviceData \? <div aria-busy=\{devicesResource\.loading\}/);
+  assert.match(page, /!candidateData \? <div role="status" aria-busy=\{candidatesResource\.loading\}/);
+  assert.match(page, /deviceData \? devices\.length : '—'/);
+  assert.match(page, /const \[fresh\] = await Promise\.all\(\[/);
+  assert.match(page, /statusResource\.replaceData\(result\)/);
+  assert.match(page, /devicesResource\.replaceData\(result\)/);
+  assert.match(page, /candidatesResource\.replaceData\(result\)/);
+  assert.match(page, /onRetry=\{\(\) => void retry\(\)\}/);
+  assert.ok(page.includes('요청한 (?:메서드|리소스)'));
+});
+
+test('사용자의 전구 명령이 느린 상태 폴링보다 먼저 처리되고 늦게 도착한 응답을 방지한다', () => {
+  const resource = source('frontend/src/hooks/useAsyncResource.ts');
+  assert.match(api, /getJarbisStatus = \(signal\?: AbortSignal\).*'normal', signal/);
+  assert.match(api, /getJarbisDevices = \(signal\?: AbortSignal\).*'normal', signal/);
+  assert.match(api, /getJarbisCandidates = \(signal\?: AbortSignal\).*'normal', signal/);
+  assert.match(page, /getJarbisLightState\(id, background \? 'low' : 'high'\)/);
+  assert.match(page, /map\(id => refreshLight\(id, true\)\)/);
+  assert.match(page, /candidatesResource\.replaceData\(result\);/);
+  assert.match(resource, /const replaceData = useCallback[\s\S]*generation\.current \+= 1;[\s\S]*controller\.current\?\.abort\(\)/);
 });
