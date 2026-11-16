@@ -204,11 +204,10 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
             <p class="mt-2 text-xs leading-5 text-slate-600">
               앱에서 제공하던 기능을 더 이상 사용할 수 없습니다. 제거하는 동안 공유기를 재부팅하지 마세요.
             </p>
-            {removeTarget.id === 'travelmate' ? (
-              <p class="mt-2 text-xs leading-5 text-slate-600">
-                다른 공유기 기능에서도 사용하는 공용 패키지는 안전을 위해 유지됩니다.
-              </p>
-            ) : null}
+            <p class="mt-2 text-xs leading-5 text-slate-600">
+              이전에 직접 설치한 패키지는 Apps가 제거하지 않습니다. 다른 앱이나 공유기 기능에
+              필요한 패키지가 영향을 받는다면 안전을 위해 제거가 중단될 수 있습니다.
+            </p>
             <div class="mt-5 flex justify-end gap-2">
               <button
                 class="min-h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
@@ -337,7 +336,9 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const sizeLabel = installed && typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
                     ? formatStorageBytes(bytes) : null;
                   const managed = state?.managed ?? false;
-                  const updateAvailable = Boolean(installed && managed && state?.updateAvailable);
+                  // A new approved dependency may be missing while the existing app is
+                  // still Apps-owned. Allow the reviewed update to complete it.
+                  const updateAvailable = Boolean(managed && state?.updateAvailable);
                   const installedVersion = installed ? state?.installedVersion : null;
                   const showOfferedVersion = Boolean(installed && installedVersion && (updateAvailable || installedVersion !== app.version));
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
@@ -383,7 +384,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                         )}
                         {activeAction ? <OperationIndicator action={activeAction} /> : (
                           <span class="flex flex-wrap items-center gap-2">
-                            {managed && state?.partial && !installed ? (
+                            {managed && state?.partial && !installed && !updateAvailable ? (
                               <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
                             ) : null}
                             {updateAvailable ? <button class="ssh-apps-update-button min-h-9 rounded-lg border px-3 text-xs font-bold transition disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}

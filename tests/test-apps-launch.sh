@@ -40,9 +40,9 @@ assert "item?.web_ui?.path == '/cgi-bin/luci/admin/services/wol'" in catalog
 assert '[ "$id" = wake-on-lan ]' in manager
 assert 'web_ui.package")" = luci-app-wol' in manager
 assert 'web_ui.path")" = /cgi-bin/luci/admin/services/wol' in manager
-assert '[ "$app" = wake-on-lan ]' in manager
-assert 'for required in etherwake luci-app-wol' in manager
-assert 'primary_package=luci-app-wol' in manager
+assert 'rm -f "$LUCI_INDEX_CACHE"' in manager
+assert 'approved_primary_package' in manager
+assert 'reported="$(field "$CATALOG" "@.apps[$idx].web_ui.package")"' in manager
 assert 'rm -f "$LUCI_INDEX_CACHE"' in manager
 category = (root/'frontend/src/components/AppsCategoryIcon.tsx').read_text()
 page = (root/'frontend/src/pages/AppsPage.tsx').read_text()

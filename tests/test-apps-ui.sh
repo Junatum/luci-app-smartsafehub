@@ -27,6 +27,9 @@ check('ssh-apps-installed-badge' in page and 'ssh-apps-update-badge' in page and
       'installed, update notice and update action need distinct styles')
 check('.ssh-apps-update-button' in styles and ".ssh-app[data-theme='dark'] .ssh-apps-update-button" in styles,
       'update action must have a distinct dark-mode style')
+check('const updateAvailable = Boolean(managed && state?.updateAvailable);' in page and
+      'managed && state?.partial && !installed && !updateAvailable' in page,
+      '새 승인 의존성이 추가된 기존 앱은 설치 마무리 대신 업데이트를 제공해야 합니다')
 
 
 # App installation storage must refer to the writable APK filesystem.
