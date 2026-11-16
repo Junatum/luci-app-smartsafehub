@@ -72,7 +72,12 @@ app_index() {
  done
  return 1
 }
+# Running this read-only catalog parser in a subshell prevents its temporary
+# loop counter (and package fields) from clobbering status()'s app index.
+# In POSIX sh, function variables are otherwise global; one Apps-owned app
+# with several dependencies could make all following apps look uninstalled.
 extract_pins() {
+ (
  index="$1"; out="$2"
  : > "$out"; n=0
  while :; do
@@ -90,6 +95,7 @@ extract_pins() {
   [ "$n" -le 32 ] || return 1
  done
  [ "$n" -gt 0 ]
+ )
 }
 # A dry-run may install only explicitly reviewed packages. Never allow any
 # upgrades, downgrades, removals or automatic dependency additions. Missing

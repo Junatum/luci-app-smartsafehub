@@ -56,6 +56,25 @@ awk 'BEGIN { print "xxd is a literal" }'
 EOF
 check_allowed
 
+# A POSIX function with a nested subshell keeps temporary variables isolated
+# while remaining visible as a shell function to the OpenWrt command audit.
+# This catches the status-parser regression where the audit previously read a
+# `name() (` function declaration as an unsupported external command.
+cat > "$FILE" <<'EOF'
+#!/bin/sh
+count=7
+parse_catalog() {
+    (
+        count=12
+        printf '%s\n' "$count" > /dev/null
+    )
+}
+parse_catalog
+[ "$count" -eq 7 ]
+EOF
+check_allowed
+sh "$FILE" || fail 'subshell helper changed the caller variables'
+
 cat >> "$FILE" <<'EOF'
 od -An -tx1 /dev/urandom
 EOF

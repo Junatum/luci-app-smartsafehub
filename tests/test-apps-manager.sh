@@ -981,3 +981,74 @@ grep -Fxq new-signed-helper "$APPS_TEST_INSTALLED" || fail 'future app package m
 grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'future app removal did not succeed'
 [ ! -s "$APPS_TEST_INSTALLED" ] || fail 'future app left behind an APK'
 printf 'PASS: 신규 앱도 공유기 코드 변경 없이 서명된 패키지를 설치하고 제거함\n'
+
+# App catalog enumeration must not be corrupted by the pin parser's counters.
+# This reproduces a real 5-app catalog with Jarbis first (12 approved APKs).
+# Earlier builds reset the outer status() index to 12 while scanning Jarbis,
+# causing all four already-installed apps to incorrectly show "재설치".
+python3 - "$TMP/catalog.json" "$APPS_TEST_INSTALLED" "$APPS_TEST_VERSION_DB" "$TMP/owned" <<'PY_STATUS_INDEX'
+import json
+import pathlib
+import sys
+
+catalog_path, installed_path, versions_path, owned_dir = map(pathlib.Path, sys.argv[1:])
+sha = "a" * 64
+names = ["jarbis"] + [f"jar-dependency-{i:02}" for i in range(1, 12)]
+apps = [
+    ("jarbis", names, {"type": "smartsafehub", "path": "#smarthome", "package": "jarbis"}),
+    ("retro-arcade", ["smartsafehub-app-retro-arcade"], {"type": "static", "path": "/retro-arcade/", "package": "smartsafehub-app-retro-arcade"}),
+    ("travelmate", ["travelmate", "luci-app-travelmate"], {"type": "luci", "path": "/cgi-bin/luci/admin/services/travelmate", "package": "luci-app-travelmate"}),
+    ("wake-on-lan", ["etherwake", "luci-app-wol"], {"type": "luci", "path": "/cgi-bin/luci/admin/services/wol", "package": "luci-app-wol"}),
+    ("network-usage-monitor", ["nlbwmon", "luci-app-nlbwmon", "luci-lib-chartjs"], {"type": "luci", "path": "/cgi-bin/luci/admin/status/nlbwmon", "package": "luci-app-nlbwmon"}),
+]
+entries = []
+all_names = []
+for app_id, packages, web_ui in apps:
+    entries.append({
+        "id": app_id,
+        "version": "1.0-r1",
+        "runtime": "router",
+        "installer": "apk",
+        "package_arch": "aarch64_cortex-a53",
+        "repository_release_id": "20261027T123000",
+        "repository_index_sha256": sha,
+        "web_ui": web_ui,
+        "packages": [{"name": name, "version": "1.0-r1", "sha256": sha} for name in packages],
+        "requirements": {"min_memory_mb": 1, "min_storage_mb": 1},
+    })
+    all_names.extend(packages)
+    # Only the app's primary is Apps-owned; shared runtimes are not adopted.
+    (owned_dir / app_id).write_text(f"{packages[0]}\t1.0-r1\t{sha}\n")
+catalog_path.write_text(json.dumps({
+    "schema": 1,
+    "device_code": "iptime-ax3000sm",
+    "firmware_build_id": "mock-build-1",
+    "channel": "stable",
+    "apps": entries,
+}))
+installed_path.write_text("\n".join(all_names) + "\n")
+versions_path.write_text("".join(f"{name} 1.0-r1\n" for name in all_names))
+PY_STATUS_INDEX
+"$TMP/bin/fetch-catalog"
+for order in original reversed; do
+    if [ "$order" = reversed ]; then
+        python3 - "$TMP/catalog.json" <<'PY_REVERSE_STATUS'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    data = json.load(source)
+data["apps"].reverse()
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump(data, output)
+PY_REVERSE_STATUS
+        "$TMP/bin/fetch-catalog"
+    fi
+    "$MANAGER" status
+    [ "$(wc -l < "$TMP/runtime/apps-status.tsv" | tr -d ' ')" -eq 5 ] || fail '설치 상태 조회에서 승인 앱 5개가 누락되었습니다'
+    for app in jarbis retro-arcade travelmate wake-on-lan network-usage-monitor; do
+        grep -Fq "$(printf '%s\t1\t1\t1\t' "$app")" "$TMP/runtime/apps-status.tsv" ||
+            fail "설치된 앱 $app 가 다른 앱의 의존성 개수 때문에 재설치로 표시됩니다 ($order)"
+    done
+done
+printf 'PASS: Jarbis 12개 의존성 조회 후에도 나머지 승인 앱 4개의 설치 상태와 소유권이 유지됨\n'
