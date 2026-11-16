@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 import {
-  addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState,
-  getJarbisStatus, pairJarbisDevice, removeJarbisDevice, scanJarbis,
-  setJarbisEnabled, setJarbisLight, updateJarbisDevice,
-} from '../api/jarbis';
-import {
   AlertIcon, CheckCircleIcon, DevicesIcon, KeyIcon, PowerIcon, ReloadIcon,
   SearchIcon, SettingsIcon,
 } from '../components/Icons';
@@ -61,13 +56,46 @@ interface SmartHomeResource<T> {
   replaceData: (value: T) => void;
 }
 
+// Inject operations: the authenticated router supplies RPC functions, while the
+// public demo supplies only local fixture readers. This view never imports RPC.
+export interface SmartHomeOperations {
+  getJarbisStatus: () => Promise<JarbisStatus>;
+  getJarbisDevices: () => Promise<{ devices: JarbisDevice[] }>;
+  getJarbisCandidates: () => Promise<{ devices: JarbisCandidate[] }>;
+  getJarbisLightState: (id: string, priority?: 'low' | 'normal' | 'high') => Promise<JarbisLightState>;
+  scanJarbis: () => Promise<{ devices: JarbisCandidate[] }>;
+  setJarbisEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>;
+  addJarbisDevice: (id: string, name: string, topic: string) => Promise<{ id: string; added: boolean }>;
+  updateJarbisDevice: (id: string, name: string, enabled: boolean) => Promise<{ id: string; updated: boolean }>;
+  removeJarbisDevice: (id: string) => Promise<{ id: string; removed: boolean }>;
+  setJarbisLight: (id: string, capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) => Promise<{ accepted: boolean }>;
+  pairJarbisDevice: (id: string, adminPassword?: string, replaceExisting?: boolean) => Promise<{ id: string; configured: boolean; mqttConfirmed: boolean }>;
+  getJarbisCredentials: () => Promise<JarbisCredentials>;
+}
+
 interface SmartHomePageProps {
+  operations: SmartHomeOperations;
+  /** Demo never executes a router action, not even a fixture mutation. */
+  demo?: boolean;
+  onDemoAction?: () => void;
+  demoLightStates?: Readonly<Record<string, JarbisLightState>>;
   statusResource: SmartHomeResource<JarbisStatus>;
   devicesResource: SmartHomeResource<{ devices: JarbisDevice[] }>;
   candidatesResource: SmartHomeResource<{ devices: JarbisCandidate[] }>;
 }
 
-export function SmartHomePage({ statusResource, devicesResource, candidatesResource }: SmartHomePageProps) {
+export function SmartHomePage({ statusResource, devicesResource, candidatesResource,
+  operations, demo = false, onDemoAction, demoLightStates }: SmartHomePageProps) {
+  const {
+    addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState,
+    getJarbisStatus, pairJarbisDevice, removeJarbisDevice, scanJarbis,
+    setJarbisEnabled, setJarbisLight, updateJarbisDevice,
+  } = operations;
+  const demoAction = (): boolean => {
+    if (!demo) return false;
+    onDemoAction?.();
+    return true;
+  };
   const status = statusResource.data;
   const deviceData = devicesResource.data;
   const candidateData = candidatesResource.data;
@@ -86,7 +114,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [requestedPower, setRequestedPower] = useState<Record<string, 'ON' | 'OFF'>>({});
   const [colors, setColors] = useState<Record<string, string>>({});
   const [kelvins, setKelvins] = useState<Record<string, number>>({});
-  const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>({});
+  const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>(() => ({ ...demoLightStates }));
   const [checkingStates, setCheckingStates] = useState<Record<string, boolean>>({});
   const stateRequest = useRef(0);
   const manageMenus = useRef<Record<string, HTMLDetailsElement | null>>({});
@@ -134,6 +162,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const refreshLight = async (id: string, background = false): Promise<JarbisLightState | null> => {
+    if (demoAction()) return null;
     setCheckingStates(old => ({ ...old, [id]: true }));
     try {
       const state = await getJarbisLightState(id, background ? 'low' : 'high');
@@ -165,7 +194,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   // this page is mounted. No background polling daemon or raw MQTT stream.
   const stateIds = devices.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
   useEffect(() => {
-    if (!status?.enabled || !status.brokerReady || !stateIds) return;
+    if (demo || !status?.enabled || !status.brokerReady || !stateIds) return;
     const seq = ++stateRequest.current;
     const ids = stateIds.split('|');
     let polling = false;
@@ -186,6 +215,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
   const sendLight = async (device: JarbisDevice,
     capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string): Promise<boolean> => {
+    if (demoAction()) return false;
     editingDevice.current = null;
     // A skipped request is not a successful MQTT command.
     if (busy) return false;
@@ -212,6 +242,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const toggleBulbPower = async (device: JarbisDevice, currentlyOn: boolean) => {
+    if (demoAction()) return;
     if (busy) return;
     const nextPower = currentlyOn ? 'OFF' : 'ON';
     const previous = requestedPower[device.id];
@@ -229,6 +260,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const run = async (key: string, action: () => Promise<unknown>, ok: string, reload = true) => {
+    if (demoAction()) return;
     setBusy(key);
     setError('');
     setMessage('');
@@ -244,6 +276,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const retry = async () => {
+    if (demoAction()) return;
     setBusy('refresh');
     setError('');
     try {
@@ -256,6 +289,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const toggleEnabled = async () => {
+    if (demoAction()) return;
     if (!status) return;
     const next = !status.enabled;
     await run('enabled', () => setJarbisEnabled(next), next
@@ -266,6 +300,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const scan = async () => {
+    if (demoAction()) return;
     await run('scan', async () => {
       const result = await scanJarbis();
       candidatesResource.replaceData(result);
@@ -280,6 +315,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const openPair = (device: JarbisDevice) => {
+    if (demoAction()) return;
     setPairTarget(device);
     setAdminPassword('');
     setReplaceExisting(false);
@@ -289,6 +325,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const pair = async (id: string, password = '', override = false) => {
+    if (demoAction()) return;
     setBusy(`pair:${id}`);
     setError('');
     setMessage('');
@@ -311,6 +348,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const add = async (candidate: JarbisCandidate) => {
+    if (demoAction()) return;
     const id = deviceIdForTopic(candidate.topic);
     if (!candidate.topic) { setError('기기 연결 정보를 확인할 수 없습니다. 다시 검색해 주세요.'); return; }
     if (!window.confirm(`${candidate.name} 전구를 추가할까요? ${candidate.source === 'http' ? '추가 후 자동 연결을 시도합니다.' : '기존 MQTT 설정은 유지됩니다.'}`)) return;
@@ -345,12 +383,14 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   };
 
   const remove = async (device: JarbisDevice) => {
+    if (demoAction()) return;
     if (!window.confirm(`${device.name}을(를) 목록에서 삭제할까요? 실제 전구 설정은 변경하지 않습니다.`)) return;
     await run(`remove:${device.id}`, () => removeJarbisDevice(device.id), '등록된 기기를 삭제했습니다.');
     if (pairTarget?.id === device.id) closePair();
   };
 
   const loadCredentials = async () => {
+    if (demoAction()) return;
     if (credentials) { setCredentials(null); setReveal(false); return; }
     await run('credentials', async () => {
       setCredentials(await getJarbisCredentials());
@@ -368,6 +408,9 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   </section>;
 
   return <div class="space-y-5">
+    {demo ? <p role="status" class="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
+      스마트홈 체험 · 전구와 MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
+    </p> : null}
     <SectionHeading eyebrow="Smart Home" title="스마트 전구" description="같은 Wi-Fi에 연결된 전구의 상태를 확인하고, 전원·밝기·색상·색온도를 조절합니다."
       action={<button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void retry()}>
         <ReloadIcon class={`size-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />새로고침
@@ -506,7 +549,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
                 <label class="text-xs font-bold text-slate-700" for={`color-${device.id}`}>RGB 색상</label>
                 <div class="flex items-center gap-2">
                   <input id={`color-${device.id}`} type="color" class="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1"
-                    disabled={controlsDisabled} value={chosenColor}
+                    disabled={controlsDisabled || demo} value={chosenColor}
                     onInput={event => setColors(old => ({ ...old, [device.id]: event.currentTarget.value }))}
                     onChange={event => void sendLight(device, 'color', event.currentTarget.value.slice(1).toUpperCase())} />
                   <span class="font-mono text-xs text-slate-500">{chosenColor.toUpperCase()}</span>
@@ -518,7 +561,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
                   <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenBrightness}%</span>
                 </div>
                 <input id={`brightness-${device.id}`} type="range" min="0" max="100" step="5"
-                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
+                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled || demo}
                   value={chosenBrightness} onPointerDown={() => { editingDevice.current = device.id; }}
                   onInput={event => setBrightness(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
                   onPointerUp={event => void sendLight(device, 'brightness', event.currentTarget.value)}
@@ -530,7 +573,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
                   <span class="text-sm font-extrabold tabular-nums text-slate-900">{chosenKelvin}K</span>
                 </div>
                 <input id={`kelvin-${device.id}`} type="range" min="2700" max="6500" step="100"
-                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled}
+                  class="mt-2 w-full min-w-0 accent-teal-700" disabled={controlsDisabled || demo}
                   value={chosenKelvin} onPointerDown={() => { editingDevice.current = device.id; }}
                   onInput={event => setKelvins(old => ({ ...old, [device.id]: Number(event.currentTarget.value) }))}
                   onPointerUp={event => void sendLight(device, 'color_temperature', miredFromKelvin(Number(event.currentTarget.value)))}
@@ -630,7 +673,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           <div class="rounded-xl bg-slate-50 p-3"><p class="m-0 text-xs text-slate-500">홈 자동화 엔진</p><p class="mt-1 mb-0 font-bold">Jarbis {status?.version || '-'}</p></div>
           <div class="rounded-xl bg-slate-50 p-3"><p class="m-0 text-xs text-slate-500">메시지 서버</p><p class="mt-1 mb-0 font-bold">{status?.brokerMode === 'managed' ? '공유기 내장 MQTT' : '외부 MQTT'} · {ready ? '연결 준비됨' : '상태 확인 필요'}</p></div>
         </div>
-        {status?.enabled && status.brokerMode === 'managed' ? <div class="rounded-xl border border-slate-200 p-3">
+        {!demo && status?.enabled && status.brokerMode === 'managed' ? <div class="rounded-xl border border-slate-200 p-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <strong class="text-sm text-slate-900">수동 MQTT 인증 정보</strong>
             <button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void loadCredentials()}>

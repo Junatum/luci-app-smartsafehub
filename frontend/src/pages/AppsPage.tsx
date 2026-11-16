@@ -388,9 +388,11 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                               <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
                             ) : null}
                             {updateAvailable ? <button class="ssh-apps-update-button min-h-9 rounded-lg border px-3 text-xs font-bold transition disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
-                            {launchPath ? (demo ? (
-                              <button aria-label={`${app.name} 데모 실행 안내`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" onClick={onDemoAction} type="button">열기 ↗</button>
+                            {launchPath ? (demo ? (launchPath === '#smarthome' ? (
+                              <a aria-label="Jarbis 스마트홈 체험" class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href="#smarthome">스마트홈 체험</a>
                             ) : (
+                              <button aria-label={`${app.name} 데모 실행 안내`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" onClick={onDemoAction} type="button">열기 ↗</button>
+                            )) : (
                               <a aria-label={`${app.name} ${app.id === 'jarbis' ? '스마트홈으로 이동' : '새 탭에서 열기'}`} class="inline-flex min-h-9 items-center rounded-lg border border-teal-700 bg-teal-700 px-3 text-xs font-bold text-white transition hover:bg-teal-800" href={launchPath} rel="noopener noreferrer" target={app.id === 'jarbis' ? '_self' : '_blank'}>{app.id === 'jarbis' ? '스마트홈 열기' : '열기 ↗'}</a>
                             )) : installed && app.webUi ? (
                               <span class="text-xs text-amber-700" title="이 앱의 웹 UI 패키지를 설치해야 열 수 있습니다.">웹 UI 미설치</span>

@@ -13,6 +13,7 @@ import type { SoftwareUpdateStatus } from '../types/updates';
 import type { DeviceRegistrationStatus } from '../api/smartsafehub';
 import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps';
 import type { NetwatchStatus } from '../types/netwatch';
+import type { JarbisCandidate, JarbisDevice, JarbisLightState, JarbisStatus } from '../types/jarbis';
 
 const now = Math.floor(Date.now() / 1000);
 const hour = 3600;
@@ -41,6 +42,16 @@ export const demoApps: AppsCatalog = {
   channel: 'stable',
   apps: [
     {
+      id: 'jarbis',
+      name: 'Jarbis',
+      summary: '로컬 Wi-Fi 스마트 전구를 연결하고 제어합니다.',
+      description: 'SmartSafeHub 공식 오픈소스 스마트홈 엔진입니다. 현재 Tasmota 전구를 지원합니다.',
+      category: 'iot',
+      publisherType: 'first_party',
+      version: '0.2.3-r1',
+      webUi: { type: 'smartsafehub', path: '#smarthome' },
+    },
+    {
       id: 'retro-arcade',
       name: '레트로 아케이드',
       summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
@@ -67,7 +78,7 @@ export const demoApps: AppsCatalog = {
       description: '다른 Wi-Fi에 연결하고 저장된 Wi-Fi에 자동으로 재연결합니다. 설치 후 연결 설정이 필요합니다.',
       category: 'network',
       publisherType: 'third_party',
-      version: '2.4.9-r6',
+      version: '2.4.9-r5',
       webUi: null, // Demo never exposes actual LuCI administration routes.
     },
     {
@@ -86,6 +97,14 @@ export const demoApps: AppsCatalog = {
 export const demoAppsStatus: AppsInstallStatus = {
   job: { phase: 'idle', action: '', appId: '', code: 'NONE' },
   installed: {
+    jarbis: {
+      installed: true,
+      partial: false,
+      managed: true,
+      updateAvailable: false,
+      installedVersion: '0.2.3-r1',
+      webUiReady: true,
+    },
     'retro-arcade': {
       installed: true,
       partial: false,
@@ -103,19 +122,19 @@ export const demoAppsStatus: AppsInstallStatus = {
       webUiReady: false,
     },
     'travelmate': {
-      installed: false,
+      installed: true,
       partial: false,
-      managed: false,
+      managed: true,
       updateAvailable: false,
-      installedVersion: null,
+      installedVersion: '2.4.9-r5',
       webUiReady: false,
     },
     'wake-on-lan': {
-      installed: false,
+      installed: true,
       partial: false,
-      managed: false,
+      managed: true,
       updateAvailable: false,
-      installedVersion: null,
+      installedVersion: '26.288.56989~75a306d',
       webUiReady: false,
     },
   },
@@ -124,7 +143,33 @@ export const demoAppsStatus: AppsInstallStatus = {
 export const demoAppsMetrics: AppsMetrics = {
   storage: { mount: '/overlay', totalBytes: 256 * 1024 * 1024, availableBytes: 185 * 1024 * 1024 },
   // Installed APK metadata; neither app cache nor runtime data is included.
-  installedSizes: { 'retro-arcade': 1394688, 'network-usage-monitor': 117760 },
+  installedSizes: { jarbis: 215040, 'retro-arcade': 1394688, 'network-usage-monitor': 117760, travelmate: 285696, 'wake-on-lan': 65536 },
+};
+
+// Fictional Tasmota devices: reserved addresses, no credentials or real broker.
+export const demoJarbisStatus: JarbisStatus = {
+  apiVersion: 1, version: '0.2.3-r1', enabled: true, mqttConfigured: true,
+  brokerMode: 'managed', brokerHost: '192.0.2.1', brokerPort: '1883', brokerReady: true,
+};
+export const demoJarbisDevices: { devices: JarbisDevice[] } = {
+  devices: [
+    { id: 'tasmota_demo_living', name: '거실 전구', kind: 'light', protocol: 'tasmota',
+      topic: 'demo_living', enabled: true, capabilities: ['power', 'brightness', 'color', 'color_temperature'] },
+    { id: 'tasmota_demo_bedroom', name: '침실 전구', kind: 'light', protocol: 'tasmota',
+      topic: 'demo_bedroom', enabled: true, capabilities: ['power', 'brightness', 'color_temperature'] },
+  ],
+};
+export const demoJarbisCandidates: { devices: JarbisCandidate[] } = {
+  devices: [
+    { protocol: 'tasmota', source: 'http', ip: '192.0.2.203', mac: '02:00:00:00:00:13',
+      topic: 'demo_kitchen', name: '주방 전구', registered: false },
+  ],
+};
+export const demoJarbisLightStates: Record<string, JarbisLightState> = {
+  tasmota_demo_living: { id: 'tasmota_demo_living', observed: true, source: 'mqtt',
+    power: 'ON', brightness: 72, color: '#f5d6a1', colorTemperature: 370 },
+  tasmota_demo_bedroom: { id: 'tasmota_demo_bedroom', observed: true, source: 'mqtt',
+    power: 'OFF', brightness: 30, color: null, colorTemperature: 400 },
 };
 
 export const demoDevices: ConnectedDevicesSummary = {
@@ -164,7 +209,7 @@ export const demoLan: LanSettings = {
 };
 
 export const demoSafeShield: SafeShieldStatus = {
-  available: true, version: '0.3.26', enabled: true, active: true, status: 'idle', stage: null,
+  available: true, version: '0.3.27', enabled: true, active: true, status: 'idle', stage: null,
   summary: { label: '보호 중', message: 'DNS 보호가 정상적으로 동작하고 있습니다.', severity: 'info' },
   runtime: { refreshdRunning: true, dnsmasqRunning: true, dnsRuntimeOk: true, lastResult: 'success', lastErrorCode: null },
   entitlement: { plan: 'free', status: 'active' },

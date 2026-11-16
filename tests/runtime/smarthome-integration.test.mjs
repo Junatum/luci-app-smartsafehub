@@ -14,9 +14,9 @@ const nav = source('frontend/src/components/ProductNavigation.tsx');
 const page = source('frontend/src/pages/SmartHomePage.tsx');
 const api = source('frontend/src/api/jarbis.ts');
 
-test('스마트홈 메뉴는 실기기 화면에만 노출하고 Jarbis 없을 때도 다른 메뉴는 유지한다', () => {
+test('스마트홈 메뉴는 실제 공유기와 안전한 데모에 노출하고 Jarbis 미설치 시 안내한다', () => {
   assert.equal(ROUTE_BY_NAME.smarthome.hash, '#smarthome');
-  assert.ok(!DEMO_ROUTES.includes('smarthome'));
+  assert.ok(DEMO_ROUTES.includes('smarthome'));
   assert.match(nav, /\{ label: 'Smart Home', routes: \['smarthome'\] \}/);
   assert.match(nav, /\{ label: 'Explore', routes: \['apps'\] \}/);
   assert.ok(nav.indexOf("{ label: 'Smart Home'") < nav.indexOf("{ label: 'Explore'"), '스마트홈은 Apps 앞에 독립 그룹으로 표시해야 합니다');

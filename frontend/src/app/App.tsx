@@ -49,8 +49,10 @@ import type { NetwatchStatus } from '../types/netwatch';
 import type { ActivityHistory } from '../types/activity';
 import { NetworkWatchPage } from '../pages/NetworkWatchPage';
 import { SmartHomePage } from '../pages/SmartHomePage';
-import { getJarbisStatus, getJarbisDevices, getJarbisCandidates } from '../api/jarbis';
+import * as jarbisApi from '../api/jarbis';
 import type { JarbisCandidate, JarbisDevice, JarbisStatus } from '../types/jarbis';
+
+const { getJarbisStatus, getJarbisDevices, getJarbisCandidates } = jarbisApi;
 
 interface AppProps {
   onAdministratorPasswordChanged: () => void;
@@ -215,7 +217,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   switch (route) {
     case 'smarthome':
       content = <SmartHomePage statusResource={jarbisStatus}
-        devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} />;
+        devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} operations={jarbisApi} />;
       break;
 
     case 'netwatch':

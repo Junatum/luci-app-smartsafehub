@@ -3,15 +3,21 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 python3 - "$ROOT" <<'PY'
 from pathlib import Path
+import re
 import sys
 root=Path(sys.argv[1])
 demo=(root/'frontend/src/demo/data.ts').read_text()
-assert "id: 'travelmate'" in demo
-assert "version: '2.4.9-r6'" in demo
-assert "webUi: null, // Demo never exposes actual LuCI administration routes." in demo
-assert "'travelmate': {" in demo
-assert "installed: false" in demo
-assert "category: 'network'" in demo
+# Scope each assertion to Travelmate; the demo also contains other Apps.
+app = demo.split("      id: 'travelmate',", 1)[1].split("\n    },", 1)[0]
+status = demo.split("    'travelmate': {", 1)[1].split("\n    },", 1)[0]
+assert "webUi: null, // Demo never exposes actual LuCI administration routes." in app
+assert "category: 'network'" in app
+assert "installed: true" in status
+assert "managed: true" in status
+app_version = re.search(r"\bversion: '([^']+)'", app)
+installed_version = re.search(r"\binstalledVersion: '([^']+)'", status)
+assert app_version is not None and installed_version is not None
+assert app_version.group(1) == installed_version.group(1)
 assert "luci-app-travelmate" in (root/'docs/APPS.md').read_text()
 assert "case 'network': return 'network'" in (root/'frontend/src/components/AppsCategoryIcon.tsx').read_text()
 manager = (root/'root/usr/libexec/smartsafehub-apps-manager').read_text()

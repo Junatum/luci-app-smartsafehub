@@ -129,5 +129,5 @@ export const ROUTE_BY_NAME = Object.fromEntries(
 
 // Public demo exposes only these read-only, fixture-backed screens.
 export const DEMO_ROUTES: readonly AppRoute[] = [
-  'home', 'activity', 'network', 'wifi', 'devices', 'safeshield', 'netwatch', 'rules', 'account', 'apps', 'system',
+  'home', 'activity', 'network', 'wifi', 'devices', 'safeshield', 'netwatch', 'smarthome', 'rules', 'account', 'apps', 'system',
 ];
