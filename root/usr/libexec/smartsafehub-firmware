@@ -26,7 +26,6 @@ EVENTS_BIN="${SMARTSAFEHUB_FIRMWARE_EVENTS_BIN:-/usr/libexec/smartsafehub-events
 APPS_RESTORE_BIN="${SMARTSAFEHUB_APPS_RESTORE_BIN:-/usr/libexec/smartsafehub-apps-restore}"
 DEFAULT_API_BASE_URL="https://www.smartsafehub.com/api/v1"
 CHECK_TIMEOUT_S=20
-DOWNLOAD_TIMEOUT_S=180
 DEFAULT_CHECK_INTERVAL_S=21600
 MIN_CHECK_INTERVAL_S=900
 MAX_CHECK_INTERVAL_S=604800
@@ -485,7 +484,7 @@ perform_prepare_online() {
 	clear_error
 	save_state
 
-	if ! ssh_http_request GET "${IMAGE_FILE}.part" "$DOWNLOAD_TIMEOUT_S" "$download_url" ""; then
+	if ! ssh_http_download "${IMAGE_FILE}.part" "$download_url"; then
 		rm -f "${IMAGE_FILE}.part"
 		set_error 'FIRMWARE_DOWNLOAD_FAILED' '펌웨어 파일을 다운로드하지 못했습니다.'
 		return 1

@@ -36,6 +36,13 @@ Describe 'SmartSafeHub 셸 계약 테스트'
     The error should be blank
   End
 
+  It '펌웨어와 Apps 파일은 uclient-fetch 30초로 다운로드하고 실패 시 임시 파일을 제거한다'
+    When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-download-transport.sh"
+    The status should be success
+    The output should start with 'PASS:'
+    The error should be blank
+  End
+
   It 'OpenWrt 25.12 BusyBox 기본 명령과 의존성 호환성을 검증한다'
     When run command sh "$SHELLSPEC_PROJECT_ROOT/tests/test-openwrt-commands.sh"
     The status should be success

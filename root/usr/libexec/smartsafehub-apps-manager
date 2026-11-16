@@ -599,7 +599,7 @@ preflight_install() {
  index_url="$repo_url/packages.adb"
  # Always fetch the current published index. If a channel is republished after
  # review, fail closed until Hub has reviewed the new index hash.
- ssh_http_request GET "$stage/packages.adb" 15 "$index_url" "" > "$stage/index-fetch.log" 2>&1 || return 25
+ ssh_http_download "$stage/packages.adb" "$index_url" > "$stage/index-fetch.log" 2>&1 || return 25
  [ -s "$stage/packages.adb" ] || return 25
  index_bytes="$(wc -c < "$stage/packages.adb" | tr -d ' ')"
  [ "$index_bytes" -le 8388608 ] || return 25
@@ -659,7 +659,7 @@ fetch_approved_archives() {
  mkdir -p "$stage/packages" || return 30
  while IFS="$(printf '\t')" read -r name version hash; do
   archive="$stage/packages/$name-$version.apk"
-  ssh_http_request GET "$archive" 30 "$repo_url/$name-$version.apk" "" > "$stage/fetch.log" 2>&1 || return 31
+  ssh_http_download "$archive" "$repo_url/$name-$version.apk" > "$stage/fetch.log" 2>&1 || return 31
   [ -s "$archive" ] && [ ! -L "$archive" ] || return 32
   archive_bytes="$(wc -c < "$archive" | tr -d ' ')"
   [ "$archive_bytes" -le 33554432 ] || return 32

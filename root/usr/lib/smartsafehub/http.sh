@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Single outbound HTTP policy for SmartSafeHub cloud and package requests.
+# Outbound HTTP policies for SmartSafeHub API calls and verified file downloads.
 # --location --max-redirs 0 rejects 3xx redirects, including non-Location 3xx
 # (also checked via HTTP status), before any credentials or body reach a new host.
 # --disable must be the first curl argument to ignore user-supplied curlrc.
@@ -9,7 +9,7 @@
 # ssh_http_request METHOD OUTPUT TIMEOUT URL BODY [HEADER ...]
 # METHOD is GET or POST, BODY is a local path for POST and '' for GET.
 ssh_http_request() {
- local method="$1" output="$2" timeout="$3" url="$4" body="$5" status
+ local method="$1" output="$2" timeout="${3:-20}" url="$4" body="$5" status
  shift 5
  case "$url" in https://*) ;; *) return 2 ;; esac
  case "$timeout" in ''|0|*[!0-9]*) return 2 ;; esac
@@ -37,4 +37,26 @@ ssh_http_request() {
    --write-out '%{http_code}' -- "$url")" || { [ "$output" = /dev/null ] || rm -f "$output"; return 1; }
  fi
  case "$status" in 2??) return 0 ;; *) [ "$output" = /dev/null ] || rm -f "$output"; return 1 ;; esac
+}
+
+# ssh_http_download OUTPUT URL
+# Firmware, Apps APK and pinned index transfers use the OpenWrt downloader's
+# 30-second network inactivity timeout (not curl's whole-transfer deadline).
+# No API authorization header or request body is supplied to this client.
+# Callers must check size and verified SHA256 before applying any file.
+ssh_http_download() {
+ local output="$1" url="$2" rc
+ case "$url" in https://*) ;; *) return 2 ;; esac
+ [ -n "$output" ] && [ "$output" != /dev/null ] || return 2
+ rm -f "$output"
+ # -q suppresses signed URLs and server redirects from diagnostic output.
+ # Never forward raw stderr from uclient-fetch; it can contain signed tokens.
+ if "${SMARTSAFEHUB_HTTP_UCLIENT_BIN:-uclient-fetch}" -q \
+  --timeout=30 -O "$output" "$url" 2>/dev/null; then
+  rc=0
+ else
+  rc=$?
+  rm -f "$output"
+ fi
+ return "$rc"
 }

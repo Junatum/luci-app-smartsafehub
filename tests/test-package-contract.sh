@@ -186,6 +186,8 @@ grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+safeshield([[:space:]]|$)' "$MAKEFIL
 	fail 'LUCI_DEPENDS must include +safeshield'
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+curl([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +curl for secured outbound HTTP'
+grep -Eq '^LUCI_DEPENDS:=.*[[:space:]]\+uclient-fetch([[:space:]]|$)' "$MAKEFILE" || \
+ fail 'LUCI_DEPENDS must include +uclient-fetch for verified file downloads'
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+jsonfilter([[:space:]]|$)' "$MAKEFILE" || \
 	fail 'LUCI_DEPENDS must include +jsonfilter for firmware metadata validation'
 grep -Eq '^LUCI_DEPENDS:=.*(^|[[:space:]])\+igmpproxy([[:space:]]|$)' "$MAKEFILE" || \
