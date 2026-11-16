@@ -195,6 +195,28 @@ travelmate_pins_match_arch() {
  [ "$(wc -l < "$2" | tr -d ' ')" -eq "$tm_check_count" ]
 }
 
+# Jarbis uses the Hub's reviewed exact APK set. Keep this list in sync with
+# hub/app_store/policies.py JARBIS_PACKAGES and JARBIS_MIPS_EXTRA. Do not
+# accept unknown additions: a new dependency requires an explicit review.
+jarbis_required_packages() {
+ case "$1" in
+  aarch64_cortex-a53|x86_64)
+   printf '%s\n' 'jarbis mosquitto-ssl mosquitto-client-ssl libmosquitto-ssl libcares cJSON libpthread librt curl libcurl4 libnghttp2-14 libopenssl3';;
+  mipsel_24kc)
+   printf '%s\n' 'jarbis mosquitto-ssl mosquitto-client-ssl libmosquitto-ssl libcares cJSON libpthread librt curl libcurl4 libnghttp2-14 libopenssl3 libatomic1';;
+  *) return 1;;
+ esac
+}
+jarbis_pins_match_arch() {
+ jb_names="$(jarbis_required_packages "$1")" || return 1
+ jb_count=0
+ for jb_name in $jb_names; do
+  awk -F '\t' -v name="$jb_name" '$1 == name {found=1} END {exit !found}' "$2" || return 1
+  jb_count=$((jb_count + 1))
+ done
+ [ "$(wc -l < "$2" | tr -d ' ')" -eq "$jb_count" ]
+}
+
 # These are independent OpenWrt packages, never Apps-owned. They must never
 # be upgraded or uninstalled by the app manager, even after Travelmate removal.
 shared_travelmate_dep() {
@@ -202,7 +224,7 @@ shared_travelmate_dep() {
   case "$1" in curl|libcurl4|libnghttp2-14|iwinfo|rpcd-mod-rpcsys|libopenssl3|libatomic1) return 0;; esac
  elif [ "$app" = jarbis ]; then
   # Never uninstall or adopt a shared MQTT broker or system TLS stack.
-  case "$1" in mosquitto-ssl|mosquitto-client-ssl|libmosquitto-ssl|curl|libcurl4|libnghttp2-14|libopenssl3|libatomic1) return 0;; esac
+  case "$1" in mosquitto-ssl|mosquitto-client-ssl|libmosquitto-ssl|libcares|cJSON|libpthread|librt|curl|libcurl4|libnghttp2-14|libopenssl3|libatomic1) return 0;; esac
  fi
  return 1
 }
@@ -632,14 +654,9 @@ preflight_install() {
    grep -q "^${required}$(printf '\t')" "$pins" || return 27
   done
  elif [ "$app" = jarbis ]; then
-  # Fixed first-party Smart Home backend and approved dependencies.
-  [ "$(wc -l < "$pins" | tr -d ' ')" -eq "$( [ "$arch" = mipsel_24kc ] && echo 9 || echo 8 )" ] || return 27
-  for required in jarbis mosquitto-ssl mosquitto-client-ssl libmosquitto-ssl curl libcurl4 libnghttp2-14 libopenssl3; do
-   grep -q "^${required}$(printf '\t')" "$pins" || return 27
-  done
-  if [ "$arch" = mipsel_24kc ]; then
-   grep -q "^libatomic1$(printf '\t')" "$pins" || return 27
-  fi
+  # Include all 12 signed dependencies (13 on MIPS) without permitting
+  # arbitrary extra packages. Missing firmware prerequisites remain E27.
+  jarbis_pins_match_arch "$arch" "$pins" || return 27
   # Jarbis relies on these protected firmware-owned prerequisites.
   for required in rpcd-mod-ucode ucode-mod-uci ucode-mod-fs jsonfilter; do
    installed "$required" || return 27

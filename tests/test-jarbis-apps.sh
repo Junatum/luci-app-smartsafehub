@@ -13,6 +13,8 @@ pages = (r / 'frontend/src/pages/AppsPage.tsx').read_text()
 assert 'if [ "$id" = jarbis ]' in manager
 assert '[ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = \'#smarthome\' ] || return 1' in manager
 assert 'if [ "$app" = jarbis ]' in manager
+assert 'jarbis_pins_match_arch "$arch" "$pins" || return 27' in manager
+assert 'libcares cJSON libpthread librt curl' in manager
 assert 'for required in rpcd-mod-ucode ucode-mod-uci ucode-mod-fs jsonfilter' in manager
 assert 'if [ "$id" = jarbis ] && [ "$managed" -eq 0 ] && ! installed jarbis' in manager
 assert "item?.web_ui?.package == 'jarbis'" in rpc

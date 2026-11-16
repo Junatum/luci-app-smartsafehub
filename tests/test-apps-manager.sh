@@ -86,7 +86,8 @@ while [ "$#" -gt 0 ]; do
  esac
 done
 case "$url" in
- https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb)
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/packages.adb|\
+ https://repo.smartsafehub.com/stable/packages/mipsel_24kc/smartsafehub/20261027T123000/packages.adb)
    cp "$APPS_TEST_REPO/packages.adb" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/nlbwmon-2025.06.02~29236be6-r1.apk)
    cp "$APPS_TEST_REPO/nlbwmon-2025.06.02~29236be6-r1.apk" "$dest";;
@@ -814,3 +815,96 @@ PY_WOL_MISSING
 "$MANAGER" start install wake-on-lan || fail 'incomplete WOL catalog not queued'
 grep -Fqx "$(printf 'code\tE27')" "$TMP/runtime/apps-operation.state" || fail 'missing WOL LuCI APK was not rejected'
 printf 'PASS: Wake-on-LAN signed dual-APK lifecycle, LuCI route and corrupt approvals\n'
+
+# Jarbis must accept the current Hub release closure (12 APKs / MIPS 13),
+# even after a manually installed older jarbis and its unused dependencies
+# were removed using apk del. It must still reject unknown/partial pins.
+# Mock download intentionally fails AFTER preflight to prove the failure is
+# not E27/E29; no actual APKs or firmware packages are modified by this test.
+: > "$APPS_TEST_INSTALLED"
+: > "$APPS_TEST_VERSION_DB"
+for name in rpcd-mod-ucode ucode-mod-uci ucode-mod-fs jsonfilter libpthread; do
+ printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
+done
+printf 'libpthread 1.0-r1\n' > "$APPS_TEST_VERSION_DB"
+jarbis_catalog() {
+ python3 - "$TMP/catalog.json" "$INDEX_SHA" "$1" "$2" <<'PY_JARBIS_FIXTURE'
+import json
+import sys
+
+path, index_hash, arch, variant = sys.argv[1:]
+packages = (
+    'jarbis', 'mosquitto-ssl', 'mosquitto-client-ssl', 'libmosquitto-ssl',
+    'libcares', 'cJSON', 'libpthread', 'librt', 'curl', 'libcurl4',
+    'libnghttp2-14', 'libopenssl3',
+)
+if arch == 'mipsel_24kc':
+    packages += ('libatomic1',)
+if variant == 'missing':
+    packages = tuple(name for name in packages if name != 'cJSON')
+elif variant == 'extra':
+    packages += ('unreviewed-package',)
+elif variant == 'no_atomic':
+    packages = tuple(name for name in packages if name != 'libatomic1')
+elif variant == 'spoof':
+    packages = tuple('notjarbis' if name == 'jarbis' else name for name in packages)
+catalog = {
+    'schema': 1, 'channel': 'stable', 'apps': [
+        {
+            'id': 'jarbis', 'version': '0.2.3-r1',
+            'runtime': 'router', 'installer': 'apk', 'package_arch': arch,
+            'repository_release_id': '20261027T123000',
+            'repository_index_sha256': index_hash,
+            'packages': [
+                {'name': name, 'version': '1.0-r1', 'sha256': 'a' * 64}
+                for name in packages
+            ],
+            'requirements': {'min_memory_mb': 1, 'min_storage_mb': 1},
+        }
+    ],
+}
+with open(path, 'w', encoding='utf-8') as stream:
+    json.dump(catalog, stream)
+PY_JARBIS_FIXTURE
+}
+assert_jarbis_code() {
+ expected="$1"
+ "$MANAGER" start install jarbis || fail 'Jarbis install did not queue'
+ grep -Fqx "$(printf 'code\t%s' "$expected")" "$TMP/runtime/apps-operation.state" ||
+  fail "Jarbis preflight expected $expected"
+ [ ! -e "$TMP/owned/jarbis" ] || fail 'Jarbis failure adopted an unrelated APK'
+ [ "$(wc -l < "$APPS_TEST_INSTALLED" | tr -d ' ')" -eq 5 ] ||
+  fail 'Jarbis preflight modified firmware dependencies'
+}
+jarbis_catalog aarch64_cortex-a53 valid
+# A manually installed Jarbis package may not be silently adopted by Apps.
+printf 'jarbis\n' >> "$APPS_TEST_INSTALLED"
+"$MANAGER" start install jarbis || fail 'manual Jarbis install did not queue'
+grep -Fqx "$(printf 'code\tE29')" "$TMP/runtime/apps-operation.state" ||
+ fail 'manually installed Jarbis was adopted'
+grep -vxF jarbis "$APPS_TEST_INSTALLED" > "$APPS_TEST_INSTALLED.next" || :
+mv "$APPS_TEST_INSTALLED.next" "$APPS_TEST_INSTALLED"
+assert_jarbis_code E31
+jarbis_catalog aarch64_cortex-a53 missing
+assert_jarbis_code E27
+jarbis_catalog aarch64_cortex-a53 extra
+assert_jarbis_code E27
+jarbis_catalog aarch64_cortex-a53 spoof
+assert_jarbis_code E27
+# A previously installed shared package must have exactly the reviewed
+# version: reject drift instead of adopting it, upgrading it or uninstalling it.
+jarbis_catalog aarch64_cortex-a53 valid
+printf 'libpthread 0.9-r1\n' > "$APPS_TEST_VERSION_DB"
+assert_jarbis_code E34
+printf 'libpthread 1.0-r1\n' > "$APPS_TEST_VERSION_DB"
+# MIPS is an independent contract; libatomic1 is mandatory only on MIPS.
+printf 'all\nmipsel_24kc\n' > "$TMP/apk-arch"
+jarbis_catalog mipsel_24kc valid
+assert_jarbis_code E31
+jarbis_catalog mipsel_24kc missing
+assert_jarbis_code E27
+jarbis_catalog mipsel_24kc extra
+assert_jarbis_code E27
+jarbis_catalog mipsel_24kc no_atomic
+assert_jarbis_code E27
+printf 'PASS: Jarbis 12/13 signed APK pins, manual-install cleanup and shared libraries\n'
