@@ -19,6 +19,7 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
   '#smarthome': 'smarthome',
   '#account': 'account',
   '#apps': 'apps',
+  '#apps/jarbis': 'apps',
   '#system': 'system',
   '#settings': 'settings',
   '#settings/diagnostics': 'settings',
@@ -27,7 +28,9 @@ const HASH_ROUTES: Readonly<Record<string, AppRoute>> = {
 };
 
 function routeFromHash(): AppRoute {
-  return HASH_ROUTES[window.location.hash] ?? 'home';
+  // Query parameters after #apps are UI hints, not a distinct route.
+  const hash = window.location.hash;
+  return HASH_ROUTES[hash.startsWith('#apps?') ? '#apps' : hash] ?? 'home';
 }
 
 export function useHashRoute(): AppRoute {

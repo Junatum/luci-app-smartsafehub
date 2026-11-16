@@ -6,6 +6,9 @@ import {
 } from '../components/Icons';
 import { SectionHeading } from '../components/SectionHeading';
 import { ErrorPanel } from '../components/StatePanels';
+import { SmartHomeWelcome } from '../components/SmartHomeWelcome';
+import { smartHomeEntry } from '../utils/smartHomeEntry';
+import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
 import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus, JarbisLightState } from '../types/jarbis';
 
 const secondaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
@@ -82,10 +85,18 @@ interface SmartHomePageProps {
   statusResource: SmartHomeResource<JarbisStatus>;
   devicesResource: SmartHomeResource<{ devices: JarbisDevice[] }>;
   candidatesResource: SmartHomeResource<{ devices: JarbisCandidate[] }>;
+  /** Only used if the Jarbis service RPC failed; distinguishes missing and broken services. */
+  appsStatus?: AppsInstallStatus | null;
+  appsCatalog?: AppsCatalog | null;
+  appsStatusError?: string | null;
+  appsCatalogError?: string | null;
+  onCheckInstallation?: () => void;
 }
 
 export function SmartHomePage({ statusResource, devicesResource, candidatesResource,
-  operations, demo = false, onDemoAction, demoLightStates }: SmartHomePageProps) {
+  operations, demo = false, onDemoAction, demoLightStates,
+  appsStatus = null, appsCatalog = null, appsStatusError = null, appsCatalogError = null,
+  onCheckInstallation }: SmartHomePageProps) {
   const {
     addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState,
     getJarbisStatus, pairJarbisDevice, removeJarbisDevice, scanJarbis,
@@ -101,7 +112,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const candidateData = candidatesResource.data;
   const devices = deviceData?.devices ?? [];
   const candidates = candidateData?.devices ?? [];
-  const missing = status === null && /UBUS_[34]|not found|요청한 (?:메서드|리소스)를 찾을 수 없습니다/i.test(statusResource.error ?? '');
+  const entry = demo ? 'ready' : smartHomeEntry(status, statusResource.error, appsStatus, appsCatalog, appsStatusError, appsCatalogError);
   // MQTT credentials are sensitive: retain them only while this page is mounted.
   const [credentials, setCredentials] = useState<JarbisCredentials | null>(null);
   const [reveal, setReveal] = useState(false);
@@ -117,6 +128,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>(() => ({ ...demoLightStates }));
   const [checkingStates, setCheckingStates] = useState<Record<string, boolean>>({});
   const stateRequest = useRef(0);
+  const discoverySection = useRef<HTMLElement | null>(null);
   const manageMenus = useRef<Record<string, HTMLDetailsElement | null>>({});
   const editingDevice = useRef<string | null>(null);
   const [pairTarget, setPairTarget] = useState<JarbisDevice | null>(null);
@@ -401,16 +413,28 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const ready = Boolean(status?.enabled && status.brokerReady);
   const availableCandidates = candidates.filter(candidate => !candidate.registered);
 
-  if (missing) return <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6" aria-label="Jarbis 미설치">
-    <h2 class="m-0 text-lg font-extrabold text-amber-950">Jarbis를 설치해야 합니다</h2>
-    <p class="mt-2 mb-0 text-sm leading-6 text-amber-900">이 공유기에는 스마트홈 기능이 아직 설치되지 않았습니다. 해당 공유기 모델용 Jarbis 패키지를 설치한 후 다시 확인해 주세요. 다른 SmartSafeHub 기능은 계속 사용할 수 있습니다.</p>
-    <button class={`${secondaryButton} mt-4`} type="button" onClick={() => void retry()}>설치 후 다시 확인</button>
-  </section>;
+  if (entry !== 'ready') return <SmartHomeWelcome stage={entry} onRetry={() => {
+    if (onCheckInstallation) onCheckInstallation();
+    else void retry();
+  }} />;
 
   return <div class="space-y-5">
     {demo ? <p role="status" class="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
       스마트홈 체험 · 전구와 MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
     </p> : null}
+    {status && deviceData && devices.length === 0 ? <section aria-label="첫 스마트 전구 연결 안내" class="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+      <p class="m-0 text-xs font-extrabold tracking-widest text-teal-700">스마트홈 시작하기 · 2단계</p>
+      <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">첫 번째 스마트 전구를 연결해 보세요</h2>
+      <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">Jarbis 설치가 완료되었습니다. Tasmota 전구를 공유기와 같은 Wi-Fi에 연결한 다음, 아래에서 검색하고 추가할 수 있습니다.</p>
+      <div class="mt-4 grid gap-2 text-xs leading-5 text-slate-700 sm:grid-cols-3">
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">1. 전구 준비</strong>전원을 켜고 공유기 Wi-Fi에 연결</div>
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">2. 기기 검색</strong>검색된 전구의 이름 확인</div>
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">3. 연결 승인</strong>직접 추가한 전구만 제어</div>
+      </div>
+      <button class={`${primaryButton} mt-4`} type="button"
+        onClick={() => discoverySection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>전구 찾으러 가기</button>
+      {!status.enabled ? <p class="mt-2 mb-0 text-xs text-slate-500">기기를 검색하려면 아래에서 스마트홈 사용을 먼저 켜 주세요.</p> : null}
+    </section> : null}
     <SectionHeading eyebrow="Smart Home" title="스마트 전구" description="같은 Wi-Fi에 연결된 전구의 상태를 확인하고, 전원·밝기·색상·색온도를 조절합니다."
       action={<button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void retry()}>
         <ReloadIcon class={`size-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />새로고침
@@ -632,7 +656,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">전원·밝기·색상은 전구에서 직접 확인한 상태만 실제 값으로 표시합니다. MQTT 응답이 없을 때는 검증된 내부망 HTTP 조회를 시도합니다. 확인되지 않은 값은 실제 상태로 표시하지 않습니다.</p>
     </section>
 
-    <section aria-label="새 전구 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    <section ref={discoverySection} aria-label="새 전구 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-base font-extrabold text-slate-950">새 전구 찾기</h2>

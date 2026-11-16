@@ -63,15 +63,35 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const tabs = usePageTabs();
   const configurationBackup = useConfigurationBackup();
   const activity = useActivityHistory(route === 'activity');
+  // Keep Smart Home snapshots across route changes, just as SafeShield/rules
+  // do. Separate resources avoid a slow discovery RPC holding back the bulbs.
+  const jarbisStatus = useAsyncResource<JarbisStatus>({
+    active: route === 'smarthome',
+    fallbackError: '스마트홈 서비스 상태를 확인하지 못했습니다.',
+    loader: getJarbisStatus,
+    staleTimeMs: 15_000,
+  });
+  const jarbisDevices = useAsyncResource<{ devices: JarbisDevice[] }>({
+    active: route === 'smarthome',
+    fallbackError: '등록된 전구를 불러오지 못했습니다.',
+    loader: getJarbisDevices,
+    staleTimeMs: 15_000,
+  });
+  const jarbisCandidates = useAsyncResource<{ devices: JarbisCandidate[] }>({
+    active: route === 'smarthome',
+    fallbackError: '검색된 전구를 불러오지 못했습니다.',
+    loader: getJarbisCandidates,
+    staleTimeMs: 30_000,
+  });
   const apps = useAsyncResource<AppsCatalog>({
-    active: route === 'apps',
+    active: route === 'apps' || (route === 'smarthome' && !jarbisStatus.data && Boolean(jarbisStatus.error)),
     fallbackError: '검증된 앱 목록을 불러오지 못했습니다.',
     loader: fetchAppsCatalog,
     pollInterval: (data) => data?.refreshing ? 2_000 : !data?.ready ? (data?.refreshFailed ? 15_000 : 2_000) : 60_000,
     staleTimeMs: 2_000,
   });
   const appsStatus = useAsyncResource<AppsInstallStatus>({
-    active: route === 'apps',
+    active: route === 'apps' || (route === 'smarthome' && !jarbisStatus.data && Boolean(jarbisStatus.error)),
     fallbackError: '앱 설치 상태를 불러오지 못했습니다.',
     loader: fetchAppsStatus,
     pollInterval: (data) => !data?.ready || data?.refreshing ? 2_000 : data?.job.phase === 'running' || data?.job.phase === 'starting' || data?.restore?.phase === 'running' || data?.restore?.phase === 'starting' ? 3000 : 12000,
@@ -116,26 +136,6 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   const dashboardSafeShield = safeshield;
   const dashboardSafeShieldStatistics = safeshieldStatistics;
   const rules = useSafeShieldRules(route === 'rules');
-  // Keep Smart Home snapshots across route changes, just as SafeShield/rules
-  // do. Separate resources avoid a slow discovery RPC holding back the bulbs.
-  const jarbisStatus = useAsyncResource<JarbisStatus>({
-    active: route === 'smarthome',
-    fallbackError: '스마트홈 서비스 상태를 확인하지 못했습니다.',
-    loader: getJarbisStatus,
-    staleTimeMs: 15_000,
-  });
-  const jarbisDevices = useAsyncResource<{ devices: JarbisDevice[] }>({
-    active: route === 'smarthome',
-    fallbackError: '등록된 전구를 불러오지 못했습니다.',
-    loader: getJarbisDevices,
-    staleTimeMs: 15_000,
-  });
-  const jarbisCandidates = useAsyncResource<{ devices: JarbisCandidate[] }>({
-    active: route === 'smarthome',
-    fallbackError: '검색된 전구를 불러오지 못했습니다.',
-    loader: getJarbisCandidates,
-    staleTimeMs: 30_000,
-  });
   const deviceRegistration = useDeviceRegistration(route === 'account');
   const dashboardAccountRegistered = useDashboardAccountStatus(
     route === 'account',
@@ -217,7 +217,10 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   switch (route) {
     case 'smarthome':
       content = <SmartHomePage statusResource={jarbisStatus}
-        devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} operations={jarbisApi} />;
+        devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} operations={jarbisApi}
+        appsStatus={appsStatus.data} appsCatalog={apps.data}
+        appsStatusError={appsStatus.error} appsCatalogError={apps.error}
+        onCheckInstallation={() => { void Promise.all([jarbisStatus.refresh(), appsStatus.refresh(), apps.refresh()]); }} />;
       break;
 
     case 'netwatch':

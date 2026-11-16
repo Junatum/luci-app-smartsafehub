@@ -11,6 +11,7 @@ import { approvedAppPath } from '../utils/appsWebUi';
 import { formatStorageBytes } from '../utils/appsStorage';
 import { isFirstPartyPublisher } from '../utils/appsPublisher';
 import { appsJobNoticeKey, readDismissedAppsJob, saveDismissedAppsJob } from '../utils/appsJobNotice';
+import { appsHighlightFromHash } from '../utils/appsHighlight';
 
 interface AppsPageProps {
   data: AppsCatalog | null;
@@ -84,14 +85,32 @@ function OperationIndicator({ action }: { action: AppAction }) {
 
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, metrics, statusError,
   onRefreshStatus, onInstall, onRepair, onUpdate, onRemove, demo = false, onDemoAction }: AppsPageProps) {
+  const [highlightedAppId, setHighlightedAppId] = useState(() => demo ? null : appsHighlightFromHash(window.location.hash));
   const [category, setCategory] = useState<AppsCategory>('all');
   const [query, setQuery] = useState('');
+  const highlightedCardRef = useRef<HTMLElement | null>(null);
+  const scrolledHighlightRef = useRef<string | null>(null);
   const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<VerifiedApp | null>(null);
   const cancelRemoveRef = useRef<HTMLButtonElement>(null);
   const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [dismissedJob, setDismissedJob] = useState<string | null>(readDismissedAppsJob);
+  // The optional highlight is only a visual guide; never filter or implicitly
+  // install apps. Support the legacy #apps/jarbis link for old entry points.
+  // The Apps route can remain mounted while only its hash changes.
+  useEffect(() => {
+    if (demo) return;
+    const syncHighlight = () => {
+      const highlighted = appsHighlightFromHash(window.location.hash);
+      scrolledHighlightRef.current = null;
+      setHighlightedAppId(highlighted);
+      setCategory('all');
+      setQuery('');
+    };
+    window.addEventListener('hashchange', syncHighlight);
+    return () => window.removeEventListener('hashchange', syncHighlight);
+  }, [demo]);
   // Keep the last successful catalog while a refresh fails. A separate status
   // request may describe a different catalog generation, so a missing ID
   // alone is NOT proof that an app has been discontinued.
@@ -101,6 +120,8 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
     ? Object.entries(installStatus?.installed ?? {}).filter(([id, state]) =>
       state.retired === true && state.managed && !apps.some((app) => app.id === id))
     : [];
+  const guidedJarbis = apps.find(app => app.id === 'jarbis');
+  const guidedState = installStatus?.installed?.jarbis;
   const restore = installStatus?.restore;
   const job = installStatus?.job;
   const running = job?.phase === 'starting' || job?.phase === 'running';
@@ -119,8 +140,21 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
   const jobAction: AppAction | null = job?.action === 'install' || job?.action === 'update' || job?.action === 'remove' ? job.action : null;
   const filtered = useMemo(() => apps.filter((app) =>
     (category === 'all' || appsCategoryOf(app.category) === category) &&
-    `${app.name} ${app.summary}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+    `${app.id} ${app.name} ${app.summary}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   ), [apps, category, query]);
+
+  // Wait for the approved catalog to render before scrolling. A catalog
+  // arriving asynchronously must still receive its first highlight, without
+  // repeated jumps on every status poll or background refresh.
+  useEffect(() => {
+    if (!highlightedAppId || !filtered.some(app => app.id === highlightedAppId)) return;
+    if (scrolledHighlightRef.current === highlightedAppId) return;
+    const card = highlightedCardRef.current;
+    if (!card) return;
+    scrolledHighlightRef.current = highlightedAppId;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    card.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+  }, [highlightedAppId, filtered]);
 
   useEffect(() => {
     if (!removeTarget) return;
@@ -229,6 +263,21 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
           </div>
         </div>
       ) : null}
+      {highlightedAppId === 'jarbis' ? <section aria-label="Jarbis 설치 안내" class="ssh-apps-guide flex flex-col gap-2 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <p class="m-0 text-xs font-extrabold tracking-widest text-teal-700">스마트홈 시작하기 · 1단계</p>
+          <h2 class="mt-1 mb-1 text-base font-black text-slate-950">Jarbis 설치 및 확인</h2>
+        {!data || loading || !installStatus || installStatus.ready === false ?
+          <p role="status" class="m-0 text-sm text-slate-600">승인된 Jarbis와 공유기 설치 상태를 확인하고 있습니다.</p>
+          : !guidedJarbis ? <p class="m-0 text-sm text-slate-600">현재 펌웨어에 승인된 Jarbis가 없습니다. 목록을 새로고침하거나 지원 여부를 확인해 주세요.</p>
+          : guidedState?.installed && !running && !restoring ? <>
+            <p role="status" class="m-0 text-sm text-slate-600">Jarbis가 설치되어 있습니다. 스마트홈으로 돌아가 첫 전구를 연결해 보세요.</p>
+            <a class="ssh-apps-guide-return mt-2 inline-flex min-h-9 items-center rounded-lg bg-teal-700 px-3 py-2 text-xs font-bold text-white hover:bg-teal-800" href="#smarthome">스마트홈 시작하기</a>
+          </> : running || restoring ? <p role="status" class="m-0 text-sm text-slate-600">앱 작업을 진행 중입니다. 완료되면 이 화면에서 설치 상태를 확인할 수 있습니다.</p>
+          : <p class="m-0 text-sm text-slate-600">아래 Jarbis 카드에서 <strong>{guidedState?.managed || guidedState?.partial ? '재설치 또는 설치 마무리' : '설치'}</strong>를 눌러 주세요. 설치는 직접 확인한 후에만 진행됩니다.</p>}
+        </div>
+        <p class="ssh-apps-guide-caption m-0 text-xs text-slate-500 sm:max-w-60">다른 검증 앱도 함께 둘러보실 수 있습니다.</p>
+      </section> : null}
       <div class="min-w-0">
         <SectionHeading
           eyebrow="SmartSafeHub Apps"
@@ -333,6 +382,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
               </div>
               <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {filtered.map((app) => {
+                  const isHighlighted = app.id === highlightedAppId;
                   const state = installStatus?.installed[app.id];
                   const installed = state?.installed ?? false;
                   const bytes = metrics?.installedSizes?.[app.id];
@@ -349,12 +399,18 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const removable = managed && (installed || Boolean(state?.partial));
                   const launchPath = installed && state?.webUiReady ? approvedAppPath(app.webUi) : null;
                   return (
-                    <article class="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" key={app.id}>
+                    <article
+                      class={`flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${isHighlighted ? 'ssh-apps-highlight-card' : ''}`}
+                      data-highlighted={isHighlighted ? 'true' : undefined}
+                      key={app.id}
+                      ref={isHighlighted ? highlightedCardRef : null}
+                    >
                       <div class="flex min-w-0 items-start gap-3">
                         <span class="grid size-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" /></span>
                         <div class="min-w-0 flex-1">
                           <div class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
                             <h3 class="m-0 min-w-0 flex-1 break-words text-sm font-black text-slate-950">{app.name}</h3>
+                            {isHighlighted ? <span class="ssh-apps-highlight-label shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">설치 안내</span> : null}
                             {installed && managed ? <span class="ssh-apps-installed-badge shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold">✓ 설치됨</span> : null}
                           </div>
                           <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">

@@ -22,7 +22,8 @@ test('스마트홈 메뉴는 실제 공유기와 안전한 데모에 노출하�
   assert.ok(nav.indexOf("{ label: 'Smart Home'") < nav.indexOf("{ label: 'Explore'"), '스마트홈은 Apps 앞에 독립 그룹으로 표시해야 합니다');
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
-  assert.match(page, /Jarbis를 설치해야 합니다/);
+  assert.match(page, /SmartHomeWelcome/);
+  assert.match(source('frontend/src/components/SmartHomeWelcome.tsx'), /우리 집 조명을, 더 스마트하게/);
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {
@@ -314,7 +315,7 @@ test('스마트홈의 느린 검색 API는 등록 전구를 가리지 않고 비
   assert.match(page, /devicesResource\.replaceData\(result\)/);
   assert.match(page, /candidatesResource\.replaceData\(result\)/);
   assert.match(page, /onRetry=\{\(\) => void retry\(\)\}/);
-  assert.ok(page.includes('요청한 (?:메서드|리소스)'));
+  assert.match(page, /smartHomeEntry\(status, statusResource.error, appsStatus, appsCatalog/);
 });
 
 test('사용자의 전구 명령이 느린 상태 폴링보다 먼저 처리되고 늦게 도착한 응답을 방지한다', () => {
