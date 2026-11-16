@@ -53,8 +53,14 @@ protected_package() {
 }
 write_state() {
  phase="$1"; action="$2"; app="$3"; code="$4"; operation_id="$5"; source="${6:-user}"
+ detail="${7:-}"
  tmp="$(mktemp "$RUNTIME/apps-state.XXXXXXXX")" || return 1
  printf 'phase\t%s\naction\t%s\napp_id\t%s\ncode\t%s\noperation_id\t%s\nsource\t%s\n' "$phase" "$action" "$app" "$code" "$operation_id" "$source" > "$tmp"
+ # Only bounded, fixed diagnostic labels. Never persist APK logs or URLs.
+ case "$detail" in
+  apk_index|apk_simulate|plan_rejected|dependency_mismatch)
+   printf 'detail\t%s\n' "$detail" >> "$tmp";;
+ esac
  mv -f "$tmp" "$STATE"
 }
 # Persist *ownership*, not merely an installed flag, so removal never deletes
@@ -656,13 +662,20 @@ prepare_signed_index() {
  cp "$stage/packages.adb" "$stage/packages/packages.adb" || return 34
  [ "$("$SHA256" "$stage/packages/packages.adb" | cut -d ' ' -f 1)" = "$approved_hash" ] || return 34
  local_index="file://$stage/packages/packages.adb"
+ error_detail=apk_index
  "$APK" --repositories-file /dev/null -X "$local_index" update > "$stage/repo-update.log" 2>&1 || return 34
+ error_detail=''
 }
 
 # All packages come from one SmartSafeHub-signed immutable release.
 install_app() {
  preflight_install || return $?
  manifest="$(owned_manifest "$app")"
+ # A manual repair must never create a new installation without a preserved
+ # Apps-owned receipt; the old receipt only authorizes *missing* APKs.
+ if [ "$source" = restore ]; then
+  [ -f "$manifest" ] && [ ! -L "$manifest" ] && [ -s "$manifest" ] || return 28
+ fi
  # Old sysupgrade ownership proves which package *names* Apps managed,
  # not which version/hash a newly published firmware has approved. A restore
  # may re-pin missing owned APKs only after validating the exact new catalog.
@@ -708,7 +721,10 @@ install_app() {
    # happens to match. Other installed (shared) dependencies remain unmanaged
    # and may not be silently upgraded or replaced.
    [ "$name" != "$primary_package" ] || return 29
-   [ "$(installed_version "$name")" = "$version" ] || return 34
+   if [ "$(installed_version "$name")" != "$version" ]; then
+    error_detail=dependency_mismatch
+    return 34
+   fi
   else
    need_install=1
   fi
@@ -723,8 +739,11 @@ install_app() {
  if [ "$#" -gt 0 ]; then
   # Only the verified immutable index can supply packages.
   prepare_signed_index || return $?
+  error_detail=apk_simulate
   "$APK" --repositories-file /dev/null -X "$local_index" add --simulate "$@" > "$stage/plan.log" 2>&1 || return 34
+  error_detail=plan_rejected
   review_install_plan "$stage/plan.log" "$base_names" || return 34
+  error_detail=''
   # Only after index, archive hash and simulated install are validated may
   # missing packages be re-pinned. Keep the change atomic and retry-safe.
   if [ "$owned_repin" -eq 1 ]; then
@@ -846,6 +865,7 @@ worker() {
  trap 'rm -rf "$stage"; rmdir "$LOCK" 2>/dev/null || true' EXIT HUP INT TERM
  stage="$(mktemp -d "$RUNTIME/apps-work.XXXXXXXX")" || exit 1
  pins="$stage/pins"
+ error_detail=''
  # Never expose error text from a previous install as the current result.
  rm -f "$RUNTIME/apps-last-error.log"
  write_state running "$action" "$app" NONE "$operation_id" "$source"
@@ -877,7 +897,7 @@ worker() {
     tail -c 4096 "$log" > "$RUNTIME/apps-last-error.log" 2>/dev/null || :
    fi
   done
-  write_state failed "$action" "$app" "E$rc" "$operation_id" "$source"
+  write_state failed "$action" "$app" "E$rc" "$operation_id" "$source" "$error_detail"
  fi
 }
 

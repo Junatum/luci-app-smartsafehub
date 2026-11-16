@@ -23,6 +23,7 @@ interface AppsPageProps {
   statusError: string | null;
   onRefreshStatus: () => void;
   onInstall: (id: string) => Promise<void>;
+  onRepair: (id: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onUpdate: (id: string) => Promise<void>;
   /** All public demo actions are local-only; no installs or real app launch. */
@@ -66,7 +67,7 @@ const TABS: readonly { id: AppsCategory; label: string }[] = [
   { id: 'other', label: '기타' },
 ];
 
-type AppAction = 'install' | 'update' | 'remove';
+type AppAction = 'install' | 'repair' | 'update' | 'remove';
 
 function OperationIndicator({ action }: { action: AppAction }) {
   const removing = action === 'remove';
@@ -76,13 +77,13 @@ function OperationIndicator({ action }: { action: AppAction }) {
         <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" opacity="0.25" />
         <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
       </svg>
-      {removing ? '제거 중…' : action === 'update' ? '업데이트 중…' : '설치 중…'}
+      {removing ? '제거 중…' : action === 'update' ? '업데이트 중…' : action === 'repair' ? '복원 중…' : '설치 중…'}
     </span>
   );
 }
 
 export function AppsPage({ data, error, loading, refreshing, onRetry, installStatus, metrics, statusError,
-  onRefreshStatus, onInstall, onUpdate, onRemove, demo = false, onDemoAction }: AppsPageProps) {
+  onRefreshStatus, onInstall, onRepair, onUpdate, onRemove, demo = false, onDemoAction }: AppsPageProps) {
   const [category, setCategory] = useState<AppsCategory>('all');
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState<{ appId: string; action: AppAction } | null>(null);
@@ -155,11 +156,13 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
     }
     if (action === 'update' && !window.confirm(`${app.name} 앱을 최신 승인 버전으로 업데이트하시겠습니까?\n\n업데이트 중 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
+    if (action === 'repair' && !window.confirm(`${app.name} 앱의 누락된 패키지를 복원하시겠습니까?\n\n기존 설치 기록과 최신 승인 패키지를 검증합니다. 복원 중 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
     setActionError(null);
     setPending({ appId: app.id, action });
     try {
       if (action === 'install') await onInstall(app.id);
+      else if (action === 'repair') await onRepair(app.id);
       else if (action === 'update') await onUpdate(app.id);
       else await onRemove(app.id);
       onRefreshStatus();
@@ -274,7 +277,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
         <div aria-live="polite" class={`rounded-2xl border p-4 text-sm ${restore.phase === 'failed' ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-teal-200 bg-teal-50 text-teal-900'}`} role="status">
           <strong>{restore.phase === 'failed' ? 'Apps 자동 복원을 완료하지 못했습니다.' : '펌웨어 업데이트 후 Apps를 복원하는 중입니다.'}</strong>
           {restore.appId ? <span> · {restore.appId}</span> : null}
-          {restore.phase === 'failed' ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[restore.code] ?? '승인·연결·설치 상태를 확인해 주세요.'} 필요한 경우 앱 카드에서 설치 마무리를 진행할 수 있습니다.</p> : <p class="mb-0 mt-1 text-xs">검증된 패키지만 다시 설치합니다. 완료될 때까지 앱 설치·제거를 시작하지 마세요.</p>}
+          {restore.phase === 'failed' ? <p class="mb-0 mt-1 text-xs">{OPERATION_MESSAGES[restore.code] ?? '승인·연결·설치 상태를 확인해 주세요.'} 필요한 경우 앱 카드에서 재설치 또는 설치 마무리를 진행할 수 있습니다.</p> : <p class="mb-0 mt-1 text-xs">검증된 패키지만 다시 설치합니다. 완료될 때까지 앱 설치·제거를 시작하지 마세요.</p>}
         </div>
       ) : null}
       {showJob && job ? (
@@ -385,7 +388,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                         {activeAction ? <OperationIndicator action={activeAction} /> : (
                           <span class="flex flex-wrap items-center gap-2">
                             {managed && state?.partial && !installed && !updateAvailable ? (
-                              <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'install')} type="button">설치 마무리</button>
+                              <button class="min-h-9 rounded-lg border border-teal-300 bg-white px-3 text-xs font-bold text-teal-800 hover:bg-teal-50 disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'repair')} type="button">설치 마무리</button>
                             ) : null}
                             {updateAvailable ? <button class="ssh-apps-update-button min-h-9 rounded-lg border px-3 text-xs font-bold transition disabled:opacity-50" disabled={disabled} onClick={() => void requestOperation(app, 'update')} type="button">업데이트</button> : null}
                             {launchPath ? (demo ? (launchPath === '#smarthome' ? (
@@ -402,7 +405,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                           : <button
                               class={`min-h-9 rounded-lg border bg-white px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${removable ? 'border-red-300 text-red-700 hover:bg-red-50 focus-visible:ring-red-100' : 'border-teal-300 text-teal-800 hover:bg-teal-50 focus-visible:ring-teal-200'}`}
                               disabled={disabled || (Boolean(state?.partial) && !managed)}
-                              onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget) : void requestOperation(app, 'install')}
+                              onClick={(event) => removable ? openRemoveDialog(app, event.currentTarget) : void requestOperation(app, managed ? 'repair' : 'install')}
                               type="button"
                             >{removable ? '제거' : managed ? '재설치' : '설치'}</button>}
                           </span>

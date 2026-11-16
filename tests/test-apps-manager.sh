@@ -560,6 +560,8 @@ printf 'PASS: multi-app lookup, E22 regression and manual package protection\n'
 : > "$APPS_TEST_INSTALLED"
 : > "$APPS_TEST_VERSION_DB"
 rm -f "$TMP/owned/retro-arcade" "$TMP/owned/network-usage-monitor"
+"$MANAGER" start install retro-arcade restore || fail 'repair without ownership did not queue'
+grep -Fqx "$(printf 'code\tE28')" "$TMP/runtime/apps-operation.state" || fail 'restore without ownership was not blocked'
 printf 'new signed Retro payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk"
 RESTORE_NEW_SHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk" | cut -d ' ' -f 1)"
 cat > "$TMP/catalog.json" <<EOF_RESTORE_NEW
@@ -581,6 +583,7 @@ grep -Fqx "$(printf 'code\tE28')" "$TMP/runtime/apps-operation.state" || fail 'r
 export APPS_TEST_MISSING_DEP=1
 "$MANAGER" start install retro-arcade restore || fail 'dependency simulation failure did not queue'
 grep -Fqx "$(printf 'code\tE34')" "$TMP/runtime/apps-operation.state" || fail 'restore bypassed solver guard'
+grep -Fqx "$(printf 'detail\tapk_simulate')" "$TMP/runtime/apps-operation.state" || fail 'simulator failure detail missing'
 [ "$(cat "$TMP/owned/retro-arcade")" = "$RESTORE_OLD_MANIFEST" ] || fail 'failed solver changed ownership'
 unset APPS_TEST_MISSING_DEP
 printf 'tampered new Retro payload\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.1.0-r1.apk"

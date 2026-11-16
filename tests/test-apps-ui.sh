@@ -220,8 +220,8 @@ check("if (!installStatus || statusError || pending !== null || running || resto
 # Installing still uses the existing confirmation and neither action bypasses RPC guards.
 check("action === 'install' && !window.confirm" in page, 'existing install confirmation must remain')
 check("<OperationIndicator action={activeAction} />" in page, 'loading must show on app and orphan entries')
-check("{removing ? '제거 중…' : action === 'update' ? '업데이트 중…' : '설치 중…'}" in page,
-      'install, update and remove must show distinct spinner states')
+check("{removing ? '제거 중…' : action === 'update' ? '업데이트 중…' : action === 'repair' ? '복원 중…' : '설치 중…'}" in page,
+      'install, repair, update and remove must show distinct spinner states')
 check("job.action === 'remove' ? '앱 제거 중' : job.action === 'update' ? '앱 업데이트 중' : '앱 설치 중'" in page,
       'running job status must use the action name')
 check("job.phase === 'failed' ? 'border-rose-200 bg-rose-50 text-rose-800'" in page,

@@ -83,6 +83,7 @@ function DemoApp() {
         installStatus={demoAppsStatus} metrics={demoAppsMetrics} statusError={null}
         demo onDemoAction={readonlyNotice} onRefreshStatus={reset} onRetry={reset}
         onInstall={async () => { readonlyNotice(); }}
+        onRepair={async () => { readonlyNotice(); }}
         onRemove={async () => { readonlyNotice(); }}
         onUpdate={async () => { readonlyNotice(); }} />;
       break;

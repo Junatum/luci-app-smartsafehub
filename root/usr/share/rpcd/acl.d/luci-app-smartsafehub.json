@@ -61,6 +61,7 @@
           "updates_check",
           "updates_install",
           "apps_install",
+          "apps_repair",
           "apps_update",
           "apps_remove",
           "updates_settings_update",
