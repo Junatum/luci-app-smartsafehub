@@ -129,7 +129,12 @@ test('demo showcases verified Apps versions, upgrade badge, and installed sizes 
   assert.match(metrics, /jarbis: 215040/);
   assert.match(metrics, /'retro-arcade': 1394688/);
   assert.match(metrics, /'network-usage-monitor': 117760/);
-  assert.match(fixtures, /version: '0\.3\.27', enabled: true/, 'SafeShield demo should meet current minimum supported version');
+  const makefile = readFileSync(resolve(root, '../../Makefile'), 'utf8');
+  const minimumSafeShield = makefile.match(/^LUCI_EXTRA_DEPENDS:=safeshield \(>=(\d+\.\d+\.\d+)\)$/m)?.[1];
+  const demoSafeShield = fixtures.match(/available: true, version: '(\d+\.\d+\.\d+)', enabled: true/)?.[1];
+  assert.ok(minimumSafeShield && demoSafeShield, 'SafeShield minimum and demo versions must be defined');
+  assert.ok(new Intl.Collator('en', { numeric: true }).compare(demoSafeShield, minimumSafeShield) >= 0,
+    'SafeShield demo should meet current minimum supported version');
   assert.match(fixtures, /storage: demoAppsMetrics\.storage/,
     'dashboard disk and Apps donut must share the same fictional storage');
 

@@ -55,9 +55,19 @@ test('다크·라이트 테마, 모바일 레이아웃 및 모션 감소 설정�
   assert.match(css, /\.ssh-home-secondary:focus-visible/);
 });
 
-test('버전과 Changelog는 0.2.33-r27로 맞춘다', () => {
-  assert.match(read('Makefile'), /PKG_RELEASE:=27/);
-  assert.match(read('CHANGELOG.md'), /^## \[0\.2\.33-r27\]/m);
-  assert.match(read('frontend/src/main.tsx'), /assetVersion: host\.dataset\.assetVersion \?\? '0\.2\.33-r27'/);
-  assert.match(read('root/usr/share/ucode/luci/template/smartsafehub/login.ut'), /data-asset-version="0\.2\.33-r27"/);
+test('패키지·Changelog·화면 자산 버전은 현재 revision과 일치한다', () => {
+  const makefile = read('Makefile');
+  const version = makefile.match(/^PKG_VERSION:=(\d+\.\d+\.\d+)$/m)?.[1];
+  const release = makefile.match(/^PKG_RELEASE:=(\d+)$/m)?.[1];
+  assert.ok(version && release, 'Makefile must declare a version and revision');
+  const assetVersion = `${version}-r${release}`;
+
+  const changelogVersion = read('CHANGELOG.md').match(/^## \[([^\]]+)\]/m)?.[1];
+  assert.equal(changelogVersion, assetVersion, 'latest changelog entry must match Makefile');
+  assert.ok(read('frontend/src/main.tsx').includes(`assetVersion: host.dataset.assetVersion ?? '${assetVersion}'`));
+
+  const login = read('root/usr/share/ucode/luci/template/smartsafehub/login.ut');
+  assert.ok(login.includes(`data-asset-version="${assetVersion}"`));
+  assert.ok(login.includes(`favicon.svg?v=${assetVersion}"`));
+  assert.ok(login.includes(`app.js?v=${assetVersion}"`));
 });
