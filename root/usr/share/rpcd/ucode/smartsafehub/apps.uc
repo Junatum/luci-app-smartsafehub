@@ -98,6 +98,12 @@ export function read_apps_catalog(request) {
 				item?.web_ui?.path == '#smarthome' && item?.web_ui?.package == 'jarbis')
 				path = '#smarthome';
 		}
+		else if (id == 'arcdrop') {
+			if (item?.web_ui?.type == 'static' &&
+				item?.web_ui?.path == '/arcdrop/' &&
+				item?.web_ui?.package == 'smartsafehub-app-arcdrop')
+				path = '/arcdrop/';
+		}
 		else if (id == 'retro-arcade') {
 			if (item?.web_ui?.type == 'static' &&
 				item?.web_ui?.path == '/retro-arcade/' &&
@@ -120,7 +126,7 @@ export function read_apps_catalog(request) {
 			// An older or unexpected catalog must never imply first-party ownership.
 			publisherType: item?.publisher_type == 'first_party' ? 'first_party' : 'third_party',
 			version: text(item?.version, 64),
-			webUi: length(path) ? { type: id == 'jarbis' && path == '#smarthome' ? 'smartsafehub' : (id == 'retro-arcade' && path == '/retro-arcade/' ? 'static' : 'luci'), path: path } : null,
+			webUi: length(path) ? { type: id == 'jarbis' && path == '#smarthome' ? 'smartsafehub' : ((id == 'retro-arcade' && path == '/retro-arcade/' || id == 'arcdrop' && path == '/arcdrop/') ? 'static' : 'luci'), path: path } : null,
 		});
 	}
 	return success({

@@ -99,6 +99,7 @@ test('SmartSafeHub Account and Apps use fictional fixtures, not live APIs', () =
   assert.match(fixtures, /pairingCode: null/);
   assert.match(fixtures, /id: 'network-usage-monitor'/);
   assert.match(fixtures, /id: 'retro-arcade'/);
+  assert.match(fixtures, /id: 'arcdrop'/);
   assert.match(fixtures, /id: 'wake-on-lan'/);
   assert.match(fixtures, /category: 'entertainment'/);
   const newFixtures = fixtures.slice(fixtures.indexOf('export const demoAccount:'), fixtures.indexOf('export const demoDevices:'));

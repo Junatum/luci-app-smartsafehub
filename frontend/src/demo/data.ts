@@ -52,6 +52,16 @@ export const demoApps: AppsCatalog = {
       webUi: { type: 'smartsafehub', path: '#smarthome' },
     },
     {
+      id: 'arcdrop',
+      name: 'ArcDrop',
+      summary: '같은 Wi-Fi 네트워크의 기기로 파일을 직접 전송합니다.',
+      description: 'SmartSafeHub 공식 LAN 전용 파일 전송 앱입니다. 기기 간 직접 전송하며 신뢰할 수 있는 HTTPS 연결이 필요합니다.',
+      category: 'utilities',
+      publisherType: 'first_party',
+      version: '0.1.0-r21',
+      webUi: { type: 'static', path: '/arcdrop/' },
+    },
+    {
       id: 'retro-arcade',
       name: '레트로 아케이드',
       summary: '브라우저에서 레트로 게임을 즐기는 엔터테인먼트 앱입니다.',
@@ -105,6 +115,14 @@ export const demoAppsStatus: AppsInstallStatus = {
       installedVersion: '0.2.3-r1',
       webUiReady: true,
     },
+    arcdrop: {
+      installed: true,
+      partial: false,
+      managed: true,
+      updateAvailable: false,
+      installedVersion: '0.1.0-r21',
+      webUiReady: true,
+    },
     'retro-arcade': {
       installed: true,
       partial: false,
@@ -143,7 +161,7 @@ export const demoAppsStatus: AppsInstallStatus = {
 export const demoAppsMetrics: AppsMetrics = {
   storage: { mount: '/overlay', totalBytes: 256 * 1024 * 1024, availableBytes: 185 * 1024 * 1024 },
   // Installed APK metadata; neither app cache nor runtime data is included.
-  installedSizes: { jarbis: 215040, 'retro-arcade': 1394688, 'network-usage-monitor': 117760, travelmate: 285696, 'wake-on-lan': 65536 },
+  installedSizes: { arcdrop: 131072, jarbis: 215040, 'retro-arcade': 1394688, 'network-usage-monitor': 117760, travelmate: 285696, 'wake-on-lan': 65536 },
 };
 
 // Fictional Tasmota devices: reserved addresses, no credentials or real broker.

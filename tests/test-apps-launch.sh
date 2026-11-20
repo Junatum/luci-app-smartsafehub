@@ -53,7 +53,10 @@ assert "case 'other': return <CircleEllipsisIcon" in category
 assert "default: return <CircleEllipsisIcon" in category
 assert "{ id: 'other', label: '기타' }" in page
 
-assert "id == 'retro-arcade'" in catalog and "id == 'retro-arcade' && path == '/retro-arcade/' ? 'static'" in catalog
+assert "id == 'retro-arcade'" in catalog and "id == 'retro-arcade' && path == '/retro-arcade/'" in catalog
+assert "id == 'arcdrop'" in catalog and "item?.web_ui?.path == '/arcdrop/'" in catalog
+assert "smartsafehub-app-arcdrop" in manager and '/arcdrop/index.html' in manager
+assert "webUi.type === 'static'" in route and "'/arcdrop/'" in route
 assert "id == 'jarbis' && path == '#smarthome' ? 'smartsafehub'" in catalog
 assert "'/retro-arcade/'" in route and "webUi.type === 'static'" in route
 assert 'smartsafehub-app-retro-arcade' in manager

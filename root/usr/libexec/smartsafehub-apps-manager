@@ -424,11 +424,17 @@ web_ui_package() {
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = '#smarthome' ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = jarbis ] || return 1
  fi
+ if [ "$id" = arcdrop ]; then
+  # This is a trusted static page with an independent native CGI, not a LuCI app.
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = static ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /arcdrop/ ] || return 1
+  [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = smartsafehub-app-arcdrop ] || return 1
+ fi
  if [ "$id" = retro-arcade ]; then
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = static ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.path")" = /retro-arcade/ ] || return 1
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.package")" = smartsafehub-app-retro-arcade ] || return 1
- elif [ "$id" != jarbis ]; then
+ elif [ "$id" != jarbis ] && [ "$id" != arcdrop ]; then
   [ "$(field "$CATALOG" "@.apps[$idx].web_ui.type")" = luci ] || return 1
  fi
  name="$(field "$CATALOG" "@.apps[$idx].web_ui.package")"
@@ -482,9 +488,17 @@ status() {
   ui_ready=0
   ui_package="$(web_ui_package "$id" "$idx" || :)"
   if [ -n "$ui_package" ] && installed "$ui_package"; then
-   if [ "$id" != retro-arcade ] || [ -r "${SMARTSAFEHUB_APPS_WEB_ROOT:-/www}/retro-arcade/index.html" ]; then
-    ui_ready=1
-   fi
+   case "$id" in
+    retro-arcade)
+     [ -r "${SMARTSAFEHUB_APPS_WEB_ROOT:-/www}/retro-arcade/index.html" ] && ui_ready=1
+     ;;
+    arcdrop)
+     # Do not advertise a runnable app without both the HTTPS page and CGI.
+     [ -r "${SMARTSAFEHUB_APPS_WEB_ROOT:-/www}/arcdrop/index.html" ] &&
+      [ -x "${SMARTSAFEHUB_APPS_WEB_ROOT:-/www}/cgi-bin/arcdrop" ] && ui_ready=1
+     ;;
+    *) ui_ready=1 ;;
+   esac
   fi
   # Update availability requires a complete Apps-owned install and a newer
   # Hub-approved exact package set; it never uses an untrusted URL or version.
