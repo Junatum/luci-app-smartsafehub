@@ -17,6 +17,8 @@ export const addJarbisDevice = (id: string, name: string, topic: string, protoco
   rpc<{ id: string; added: boolean }>('device_add', protocol
     ? { id, name, topic, protocol, kind: 'sensor' } : { id, name, topic });
 export const updateJarbisDevice = (id: string, name: string, enabled: boolean) => rpc<{ id: string; updated: boolean }>('device_update', { id, name, enabled });
+export const setJarbisDeviceRoom = (id: string, room: string) =>
+  rpc<{ id: string; room: string; updated: boolean }>('device_room_set', { id, room });
 export const removeJarbisDevice = (id: string) => rpc<{ id: string; removed: boolean }>('device_remove', { id });
 export const getJarbisLightState = (id: string, priority: RpcPriority = 'high') => rpc<JarbisLightState>('light_state', { id }, 11500, priority);
 // An optional Jarbis v2 method. Never query battery sensors at the 30s bulb cadence.

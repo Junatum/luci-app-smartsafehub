@@ -8,7 +8,7 @@ export interface JarbisStatus {
   brokerPort: string;
   brokerReady: boolean;
   /** True only when the installed Jarbis implements the Shelly H&T Gen3 contract. */
-  features?: { shellyHtg3?: boolean; shellyQuickPair?: boolean };
+  features?: { shellyHtg3?: boolean; shellyQuickPair?: boolean; rooms?: boolean };
 }
 
 export interface JarbisDevice {
@@ -18,6 +18,8 @@ export interface JarbisDevice {
   protocol: string;
   topic: string;
   enabled: boolean;
+  /** Stored by Jarbis; absent on older installations. */
+  room?: string;
   capabilities: string[];
 }
 

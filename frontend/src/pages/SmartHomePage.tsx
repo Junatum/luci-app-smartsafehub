@@ -8,6 +8,9 @@ import { SectionHeading } from '../components/SectionHeading';
 import { ErrorPanel } from '../components/StatePanels';
 import { SmartHomeWelcome } from '../components/SmartHomeWelcome';
 import { SmartHomeSensorCard } from '../components/SmartHomeSensorCard';
+import { CustomSelect } from '../components/CustomSelect';
+import { SmartHomeRoomPicker } from '../components/SmartHomeRoomPicker';
+import { HOME_ROOMS, groupHomeDevices, nextHomePollBatch, normalizeHomeRoom, type HomeRoom } from '../utils/smartHomeGroups';
 import { hasRecentSensorMqttReading, isSensorWakeRequired } from '../utils/shellySensor';
 import { smartHomeEntry } from '../utils/smartHomeEntry';
 import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
@@ -17,6 +20,11 @@ import { isShellyHtg3 } from '../types/jarbis';
 const secondaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
 const dangerButton = 'inline-flex min-h-10 items-center justify-center rounded-xl border border-rose-200 px-3 py-2 text-sm font-bold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600 disabled:cursor-not-allowed disabled:opacity-50';
+const panelCard = 'ssh-home-panel p-4 sm:p-5';
+const ROOM_FILTER_OPTIONS = [
+  { value: 'all', label: '모든 공간' },
+  ...HOME_ROOMS.map(option => ({ value: option.id, label: option.label })),
+];
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
@@ -74,6 +82,7 @@ export interface SmartHomeOperations {
   setJarbisEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>;
   addJarbisDevice: (id: string, name: string, topic: string, protocol?: 'shelly_htg3') => Promise<{ id: string; added: boolean }>;
   updateJarbisDevice: (id: string, name: string, enabled: boolean) => Promise<{ id: string; updated: boolean }>;
+  setJarbisDeviceRoom: (id: string, room: string) => Promise<{ id: string; room: string; updated: boolean }>;
   removeJarbisDevice: (id: string) => Promise<{ id: string; removed: boolean }>;
   setJarbisLight: (id: string, capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) => Promise<{ accepted: boolean }>;
   pairJarbisDevice: (id: string, adminPassword?: string, replaceExisting?: boolean) => Promise<{ id: string; configured: boolean; mqttConfirmed: boolean; observed?: boolean; rebootPending?: boolean }>;
@@ -105,7 +114,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const {
     addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState, getJarbisSensorState,
     getJarbisStatus, pairJarbisDevice, removeJarbisDevice, scanJarbis,
-    setJarbisEnabled, setJarbisLight, updateJarbisDevice,
+    setJarbisEnabled, setJarbisLight, updateJarbisDevice, setJarbisDeviceRoom,
   } = operations;
   const demoAction = (): boolean => {
     if (!demo) return false;
@@ -120,6 +129,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const sensors = devices.filter(isShellyHtg3);
   const candidates = candidateData?.devices ?? [];
   const supportsShelly = status?.features?.shellyHtg3 === true;
+  const supportsRooms = status?.features?.rooms === true;
   const supportsShellyQuickPair = status?.features?.shellyQuickPair === true && status?.brokerMode === 'managed';
   const entry = demo ? 'ready' : smartHomeEntry(status, statusResource.error, appsStatus, appsCatalog, appsStatusError, appsCatalogError);
   // MQTT credentials are sensitive: retain them only while this page is mounted.
@@ -128,6 +138,14 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [displayMode, setDisplayMode] = useState<'auto' | 'detail' | 'compact'>('auto');
+  const [roomFilter, setRoomFilter] = useState<'all' | HomeRoom>('all');
+  const compact = displayMode === 'compact' || (displayMode === 'auto' && devices.length >= 5);
+  const filteredSensors = sensors.filter(device => roomFilter === 'all' || normalizeHomeRoom(device.room) === roomFilter);
+  const filteredLights = lights.filter(device => roomFilter === 'all' || normalizeHomeRoom(device.room) === roomFilter);
+  const sensorGroups = groupHomeDevices(filteredSensors);
+  const lightGroups = groupHomeDevices(filteredLights);
+  const showRoomHeadings = supportsRooms && devices.some(device => normalizeHomeRoom(device.room) !== 'unassigned');
   const [sensorNotice, setSensorNotice] = useState<{ id: string; text: string } | null>(null);
   const [brightness, setBrightness] = useState<Record<string, number>>({});
   // A switch is still operable when the bulb has not reported its state.
@@ -216,22 +234,23 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     }
   };
 
-  // One bounded on-demand MQTT query per registered bulb, refreshed only while
-  // this page is mounted. No background polling daemon or raw MQTT stream.
-  const stateIds = lights.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
+  // Rotate through the full enabled set, two RPC calls per 30s tick.
+  // A 20-light home completes a round in about five minutes instead of
+  // silently ignoring bulbs after the sixth. Hidden tabs never poll.
+  const stateIds = lights.filter(device => device.enabled).map(device => device.id).join('|');
   useEffect(() => {
     if (demo || !status?.enabled || !status.brokerReady || !stateIds) return;
     const seq = ++stateRequest.current;
     const ids = stateIds.split('|');
     let polling = false;
+    let cursor = 0;
     const poll = async () => {
       if (polling || seq !== stateRequest.current || document.visibilityState === 'hidden') return;
       polling = true;
       try {
-        // At most two simultaneous MQTT queries on low-memory routers.
-        for (let i = 0; i < ids.length && seq === stateRequest.current; i += 2) {
-          await Promise.all(ids.slice(i, i + 2).map(id => refreshLight(id, true)));
-        }
+        const batch = nextHomePollBatch(ids, cursor, 2);
+        cursor = batch.nextCursor;
+        await Promise.all(batch.ids.map(id => refreshLight(id, true)));
       } finally { polling = false; }
     };
     void poll();
@@ -242,7 +261,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   // Battery-operated H&T Gen3 sleeps between reports. Jarbis must keep the
   // last verified MQTT reading; the UI re-reads the cache every 5 minutes,
   // without waking the sensor or treating an HTTP timeout as offline.
-  const sensorIds = sensors.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
+  const sensorIds = sensors.filter(device => device.enabled).map(device => device.id).join('|');
   const refreshSensor = async (id: string, background = false): Promise<void> => {
     if (demoAction() || !supportsShelly) return;
     setCheckingSensors(old => ({ ...old, [id]: true }));
@@ -266,18 +285,29 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     const seq = ++sensorRequest.current;
     const ids = sensorIds.split('|');
     let polling = false;
+    let cursor = 0;
+    // <=6 sensors retain the prior five-minute cache cadence. For larger
+    // homes, rotate pairs every 30s so every cache gets a turn without
+    // waking any sleeping device or flooding a low-memory router.
+    const largeHome = ids.length > 6;
     const poll = async () => {
       if (polling || seq !== sensorRequest.current || document.visibilityState === 'hidden') return;
       polling = true;
       try {
-        for (const id of ids) {
-          if (seq !== sensorRequest.current) break;
-          await refreshSensor(id, true);
+        const batch = nextHomePollBatch(ids, cursor, largeHome ? 2 : ids.length);
+        cursor = batch.nextCursor;
+        if (largeHome) {
+          await Promise.all(batch.ids.map(id => refreshSensor(id, true)));
+        } else {
+          for (const id of batch.ids) {
+            if (seq !== sensorRequest.current) break;
+            await refreshSensor(id, true);
+          }
         }
       } finally { polling = false; }
     };
     void poll();
-    const timer = window.setInterval(poll, 300000);
+    const timer = window.setInterval(poll, largeHome ? 30000 : 300000);
     return () => { sensorRequest.current++; window.clearInterval(timer); };
   }, [sensorIds, status?.enabled, supportsShelly]);
 
@@ -354,6 +384,21 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     } finally {
       setBusy('');
     }
+  };
+
+  const changeRoom = async (device: JarbisDevice, room: HomeRoom) => {
+    if (demoAction() || !supportsRooms || busy || normalizeHomeRoom(device.room) === room) return;
+    setBusy(`room:${device.id}`);
+    setError('');
+    setMessage('');
+    try {
+      const result = await setJarbisDeviceRoom(device.id, room);
+      if (result.id !== device.id || !result.updated || result.room !== room)
+        throw new Error('공간 설정 결과를 확인하지 못했습니다.');
+      devicesResource.replaceData(await getJarbisDevices());
+      setMessage('기기의 공간을 변경했습니다.');
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setBusy(''); }
   };
 
   const toggleEnabled = async () => {
@@ -543,7 +588,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     else void retry();
   }} />;
 
-  return <div class="space-y-5">
+  return <div class="ssh-smart-home space-y-5">
     {demo ? <p role="status" class="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
       스마트홈 체험 · 전구와 온습도 센서, MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
     </p> : null}
@@ -567,47 +612,55 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
     {!status && statusResource.error ? <ErrorPanel message={statusResource.error}
       onRetry={() => void retry()} /> : !status ? <section aria-label="스마트홈 서비스 현황"
-        aria-busy="true" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+        aria-busy="true" class={panelCard}>
         <h2 class="m-0 text-base font-extrabold text-slate-950">스마트홈 사용</h2>
         <p role="status" class="mt-2 mb-0 text-sm text-slate-500">스마트홈 서비스 상태를 확인하고 있습니다…</p>
-      </section> : <section aria-label="스마트홈 서비스 현황" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div class="flex min-w-0 items-center gap-3">
-          <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"><SettingsIcon class="size-5" /></span>
+      </section> : <section aria-label="스마트홈 서비스 현황" class="ssh-home-hero p-4 sm:p-5">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div class="flex min-w-0 items-start gap-3">
+          <span class="ssh-home-hero-icon grid size-12 shrink-0 place-items-center rounded-2xl"><SettingsIcon class="size-5" /></span>
           <div class="min-w-0">
-            <h2 class="m-0 text-base font-extrabold text-slate-950">스마트홈 사용</h2>
-            <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기에서 스마트 전구를 제어하고 온습도 센서를 확인합니다.</p>
+            <p class="ssh-home-kicker m-0 text-[0.72rem] font-extrabold tracking-[0.18em]">SMART HOME CONTROL</p>
+            <h2 class="ssh-home-hero-title mt-1 mb-0 text-xl font-black">스마트홈 관리 센터</h2>
+            <p class="ssh-home-hero-copy mt-1 mb-0 max-w-2xl text-sm leading-6">공유기에서 스마트 전구를 제어하고 Shelly H&T Gen3의 온도·습도 현황을 한 화면에서 관리합니다.</p>
           </div>
         </div>
-        <div class="flex items-center gap-3 sm:justify-end">
-          <span class="text-sm font-extrabold text-slate-700">{status?.enabled ? '켜짐' : '꺼짐'}</span>
+        <div class="flex items-center gap-3 lg:justify-end">
+          <div class="ssh-home-switch-meta rounded-xl px-3 py-2 text-right">
+            <p class="ssh-home-hero-copy m-0 text-[0.68rem] font-bold tracking-wide">기능 상태</p>
+            <p class="ssh-home-hero-title mt-1 mb-0 text-sm font-extrabold">{status?.enabled ? '켜짐' : '꺼짐'}</p>
+          </div>
           <button type="button" role="switch" aria-checked={Boolean(status?.enabled)} aria-label="스마트홈 기능 사용"
             disabled={!!busy || !status} onClick={() => void toggleEnabled()}
-            class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50 ${status?.enabled ? 'bg-teal-600' : 'bg-slate-300'}`}>
+            class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300 disabled:cursor-not-allowed disabled:opacity-50 ${status?.enabled ? 'bg-teal-500' : 'bg-slate-500'}`}>
             <span aria-hidden="true" class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${status?.enabled ? 'left-6' : 'left-1'}`} />
           </button>
         </div>
       </div>
-      <div class="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
-        <div class="rounded-xl bg-slate-50 p-3">
-          <p class="m-0 text-xs font-semibold text-slate-500">서비스 상태</p>
-          <p class="mt-1 mb-0 text-lg font-extrabold text-slate-900">{status?.enabled ? '사용 중' : '중지됨'}</p>
+      <div class="ssh-home-overview mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="ssh-home-overview-stat p-3">
+          <p class="ssh-home-hero-copy m-0 text-xs font-semibold">서비스 상태</p>
+          <p class="ssh-home-hero-title mt-1 mb-0 text-lg font-extrabold">{status?.enabled ? '사용 중' : '중지됨'}</p>
         </div>
-        <div class="rounded-xl bg-slate-50 p-3">
-          <p class="m-0 text-xs font-semibold text-slate-500">전구 제어 연결</p>
-          <p class={`mt-1 mb-0 text-lg font-extrabold ${ready ? 'text-teal-700' : status?.enabled ? 'text-rose-700' : 'text-slate-700'}`}>
+        <div class="ssh-home-overview-stat p-3">
+          <p class="ssh-home-hero-copy m-0 text-xs font-semibold">전구 제어 연결</p>
+          <p class={`mt-2 mb-0 text-lg font-extrabold ${ready ? 'ssh-home-healthy' : status?.enabled ? 'ssh-home-warning' : 'ssh-home-hero-copy'}`}>
             {!status?.enabled ? '대기 중' : status.brokerReady ? '연결 준비됨' : '연결 문제'}
           </p>
         </div>
-        <div class="rounded-xl bg-slate-50 p-3">
-          <p class="m-0 text-xs font-semibold text-slate-500">등록된 기기</p>
-          <p class="mt-1 mb-0 text-lg font-extrabold text-slate-900">{deviceData ? devices.length : '—'}{deviceData ? <span class="ml-1 text-sm font-semibold text-slate-500">대</span> : null}</p>
+        <div class="ssh-home-overview-stat p-3">
+          <p class="ssh-home-hero-copy m-0 text-xs font-semibold">등록된 기기</p>
+          <p class="ssh-home-hero-title mt-1 mb-0 text-lg font-extrabold">{deviceData ? devices.length : '—'}{deviceData ? <span class="ssh-home-hero-copy ml-1 text-sm font-semibold">대</span> : null}</p>
+        </div>
+        <div class="ssh-home-overview-stat p-3">
+          <p class="ssh-home-hero-copy m-0 text-xs font-semibold">온습도 센서</p>
+          <p class="ssh-home-hero-title mt-1 mb-0 text-lg font-extrabold">{deviceData ? sensors.length : '—'}{deviceData ? <span class="ssh-home-hero-copy ml-1 text-sm font-semibold">대</span> : null}</p>
         </div>
       </div>
-      {status?.enabled && !status.brokerReady ? <div role="alert" class="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+      {status?.enabled && !status.brokerReady ? <div role="alert" class="mt-4 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
         <AlertIcon class="mt-0.5 size-4 shrink-0" />전구 제어 연결을 확인하지 못했습니다. 잠시 후 새로고침하거나 고급 설정의 MQTT 연결 상태를 확인해 주세요.
       </div> : null}
-      {!status?.enabled ? <p role="status" class="mt-3 mb-0 text-xs text-slate-500">스마트홈 기능을 켜면 기기를 검색하고 제어할 수 있습니다.</p> : null}
+      {!status?.enabled ? <p role="status" class="ssh-home-hero-copy mt-3 mb-0 text-xs">스마트홈 기능을 켜면 기기를 검색하고 제어할 수 있습니다.</p> : null}
     </section>}
 
     {sensorNotice && sensors.some(device => device.id === sensorNotice.id) ? <div role="status" aria-live="polite" class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -630,34 +683,70 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <button class="shrink-0 rounded-lg px-1 text-xs font-bold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600" type="button" aria-label="성공 알림 닫기" onClick={() => setMessage('')}>닫기</button>
     </div> : null}
 
-    {sensors.length > 0 ? <section aria-label="등록된 온습도 센서" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <div><h2 class="m-0 text-base font-extrabold text-slate-950">내 온습도 센서</h2>
+    {deviceData && devices.length > 0 ? <div class="ssh-home-collection-tools" aria-label="스마트홈 기기 보기 설정">
+      <div class="ssh-home-collection-heading">
+        <strong>내 기기</strong>
+        <span>{devices.length}대 · {compact ? '간단히 보기' : '상세 보기'}</span>
+      </div>
+      <div class="ssh-home-collection-controls">
+        {supportsRooms ? <div class="ssh-home-room-filter">
+          <span>공간</span>
+          <CustomSelect
+            ariaLabel="공간별 기기 필터"
+            id="smart-home-room-filter"
+            onChange={value => setRoomFilter(value as HomeRoom | 'all')}
+            options={ROOM_FILTER_OPTIONS}
+            value={roomFilter}
+          />
+        </div> : null}
+        <div class="ssh-home-view-switch" role="group" aria-label="기기 카드 보기 방식">
+          <button type="button" aria-pressed={displayMode === 'auto'} onClick={() => setDisplayMode('auto')}>자동</button>
+          <button type="button" aria-pressed={displayMode === 'detail'} onClick={() => setDisplayMode('detail')}>상세</button>
+          <button type="button" aria-pressed={displayMode === 'compact'} onClick={() => setDisplayMode('compact')}>간단히</button>
+        </div>
+      </div>
+    </div> : null}
+    <div class="ssh-home-device-grid grid gap-5 xl:grid-cols-2">
+    {sensors.length > 0 ? <section aria-label="등록된 온습도 센서" class={panelCard}>
+      <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="m-0 text-base font-extrabold text-slate-950">온습도 센서</h2>
         <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">센서는 배터리 절약을 위해 잠들 수 있습니다. 마지막으로 수신된 값과 시간을 표시합니다.</p></div>
-      <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {sensors.map(device => <SmartHomeSensorCard key={device.id} device={device}
+        <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{sensors.length}대 등록</span></div>
+      <div class="mt-4 space-y-4">
+        {sensorGroups.length === 0 ? <p class="ssh-home-group-empty">선택한 공간에 온습도 센서가 없습니다.</p> : null}
+        {sensorGroups.map(group => <div key={group.room} class="ssh-home-room-group">
+          {showRoomHeadings ? <h3 class="ssh-home-room-heading">{group.label}<span>{group.devices.length}대</span></h3> : null}
+          <div class="grid grid-cols-1 gap-3">
+        {group.devices.map(device => <SmartHomeSensorCard key={device.id} device={device}
           state={sensorStates[device.id]} checking={Boolean(checkingSensors[device.id])}
           busy={Boolean(busy)} supported={supportsShelly} quickPair={supportsShellyQuickPair}
+          compact={compact} roomsSupported={supportsRooms} onRoomChange={room => void changeRoom(device, room)}
           onRefresh={() => void refreshSensor(device.id)}
           onConnect={() => void pairSensor(device.id)}
           onToggle={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}
           onRemove={() => void remove(device)} />)}
+          </div>
+        </div>)}
       </div>
     </section> : null}
 
-    {(!deviceData || lights.length > 0 || sensors.length === 0) ? <section aria-label="등록된 전구" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    {(!deviceData || lights.length > 0 || sensors.length === 0) ? <section aria-label="등록된 전구" class={panelCard}>
       <div class="flex flex-wrap items-start justify-between gap-3">
-        <div><h2 class="m-0 text-base font-extrabold text-slate-950">내 전구</h2>
+        <div><h2 class="m-0 text-base font-extrabold text-slate-950">스마트 전구</h2>
           <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">등록된 전구의 전원을 켜고 끄거나 밝기를 조절합니다.</p></div>
         <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{deviceData ? `${lights.length}대 등록` : '확인 중'}</span>
       </div>
-      {!deviceData ? <div aria-busy={devicesResource.loading} role="status" class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      {!deviceData ? <div aria-busy={devicesResource.loading} role="status" class="ssh-home-empty mt-4 rounded-2xl p-4 text-sm">
         {devicesResource.error ? '전구 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '등록된 전구를 확인하고 있습니다…'}
       </div> : lights.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
-      </div> : <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {lights.map(device => {
+      </div> : <div class="mt-4 space-y-4">
+        {lightGroups.length === 0 ? <p class="ssh-home-group-empty">선택한 공간에 스마트 전구가 없습니다.</p> : null}
+        {lightGroups.map(group => <div key={group.room} class="ssh-home-room-group">
+          {showRoomHeadings ? <h3 class="ssh-home-room-heading">{group.label}<span>{group.devices.length}대</span></h3> : null}
+          <div class="grid grid-cols-1 gap-3">
+        {group.devices.map(device => {
           const controlsDisabled = Boolean(busy) || !ready || !device.enabled;
           const activePair = pairTarget?.id === device.id;
           const observed = lightStates[device.id];
@@ -671,7 +760,35 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           const chosenBrightness = brightness[device.id] ?? currentBrightness ?? 50;
           const chosenKelvin = kelvins[device.id] ?? (observed?.colorTemperature ? kelvinFromMired(observed.colorTemperature) : 4000);
           const chosenColor = colors[device.id] ?? hexColor(observed?.color);
-          return <article key={device.id} class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          if (compact) return <article key={device.id} class="ssh-home-device-card ssh-home-light-compact" data-density="compact" aria-label={`${device.name} 스마트 전구`}>
+            <div class="ssh-home-light-compact-main">
+              <span class="ssh-home-device-icon" aria-hidden="true"><PowerIcon class="size-5" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="ssh-home-device-title" title={device.name}>{device.name}</h3>
+                <p class="ssh-home-device-subtitle">{!device.enabled ? '사용 중지' : bulbOnline ? `응답 확인 · ${observed.power === 'ON' ? '켜짐' : observed.power === 'OFF' ? '꺼짐' : '전원 미확인'}` : '상태 응답 없음'}{bulbOnline && currentBrightness !== null ? ` · 밝기 ${currentBrightness}%` : ''}</p>
+              </div>
+              <button type="button" role="switch" aria-checked={powerOn} aria-label={`${device.name} 전원`}
+                disabled={controlsDisabled || demo} onClick={() => void toggleBulbPower(device, powerOn)}
+                class={`ssh-switch-control relative inline-flex shrink-0 items-center rounded-full border-0 p-0 transition ${powerOn ? 'bg-teal-600' : 'bg-slate-300'}`}>
+                <span aria-hidden="true" class={`ssh-switch-thumb absolute top-1 shadow-sm transition-[left] ${powerOn ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+            <div class="ssh-home-light-compact-actions">
+              <span class="ssh-home-light-compact-status">{powerNeedsConfirmation ? '전원 변경 확인 중' : bulbOnline ? '확인된 상태' : '응답 대기 중'}</span>
+              <button class={secondaryButton} type="button" disabled={!!busy || !device.enabled || !ready || Boolean(checkingStates[device.id])}
+                onClick={() => void refreshLight(device.id)}>상태 확인</button>
+              <button class={secondaryButton} type="button" onClick={() => setDisplayMode('detail')}>상세 설정</button>
+              <details class="relative z-20 text-sm text-slate-600">
+                <summary class={`${secondaryButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>관리</summary>
+                <div class="absolute right-0 top-full z-30 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                  <SmartHomeRoomPicker room={device.room} supported={supportsRooms} disabled={!!busy} onChange={room => void changeRoom(device, room)} />
+                  <button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}>{device.enabled ? '기기 사용 중지' : '기기 다시 사용'}</button>
+                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => void remove(device)}>기기 삭제</button>
+                </div>
+              </details>
+            </div>
+          </article>;
+          return <article key={device.id} class="ssh-home-device-card min-w-0 p-4 sm:p-5">
             <div class="flex min-w-0 items-start gap-3">
               <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"><PowerIcon class="size-5" /></span>
               <div class="min-w-0 flex-1">
@@ -758,6 +875,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
                 <summary class={`${secondaryButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>관리</summary>
                 <div class="absolute left-0 top-full z-30 mt-2 flex w-64 max-w-[calc(100vw-3rem)] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <p class="m-0 break-all text-xs text-slate-500">기기 ID: {device.id}<br />Topic: {device.topic}</p>
+                  <SmartHomeRoomPicker room={device.room} supported={supportsRooms} disabled={!!busy} onChange={room => void changeRoom(device, room)} />
                   <button class={secondaryButton} type="button" disabled={!!busy}
                     onClick={() => { manageMenus.current[device.id]!.open = false; void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}>
                     {device.enabled ? '기기 사용 중지' : '기기 다시 사용'}
@@ -795,22 +913,30 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
             </div> : null}
           </article>;
         })}
+          </div>
+        </div>)}
       </div>}
       <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">전원·밝기·색상은 전구에서 직접 확인한 상태만 실제 값으로 표시합니다. MQTT 응답이 없을 때는 검증된 내부망 HTTP 조회를 시도합니다. 확인되지 않은 값은 실제 상태로 표시하지 않습니다.</p>
     </section> : null}
 
-    <section ref={discoverySection} aria-label="새 스마트홈 기기 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    </div>
+
+    <section ref={discoverySection} aria-label="새 스마트홈 기기 찾기" class={panelCard}>
+      <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="m-0 text-base font-extrabold text-slate-950">새 기기 찾기</h2>
+          <p class="m-0 text-[0.72rem] font-extrabold tracking-[0.16em] text-teal-700">PAIR & DISCOVERY</p>
+          <h2 class="mt-2 mb-0 text-base font-extrabold text-slate-950">새 기기 찾기</h2>
           <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">지원 기기를 같은 Wi-Fi에 연결한 뒤 검색하세요. Shelly 센서는 절전 중에도 DHCP 목록에서 발견될 수 있습니다.</p>
         </div>
-        <button class={primaryButton} type="button" disabled={!!busy || !status?.enabled}
-          onClick={() => void scan()} aria-busy={busy === 'scan'}>
-          <SearchIcon class={`size-4 ${busy === 'scan' ? 'animate-pulse' : ''}`} />{busy === 'scan' ? '검색 중…' : '기기 검색'}
-        </button>
+        <div class="flex items-center gap-2">
+          {availableCandidates.length > 0 ? <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{availableCandidates.length}개 발견</span> : null}
+          <button class={primaryButton} type="button" disabled={!!busy || !status?.enabled}
+            onClick={() => void scan()} aria-busy={busy === 'scan'}>
+            <SearchIcon class={`size-4 ${busy === 'scan' ? 'animate-pulse' : ''}`} />{busy === 'scan' ? '검색 중…' : '기기 검색'}
+          </button>
+        </div>
       </div>
-      <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+      <details class="ssh-home-discovery-guide mt-4 rounded-2xl p-3 text-sm">
         <summary class="cursor-pointer font-bold text-slate-800">Shelly H&T Gen3 연결 안내</summary>
         <ol class="mt-3 mb-0 list-decimal space-y-2 pl-5 text-xs leading-5">
           <li>Shelly 센서를 공유기 Wi-Fi에 연결하고 이 화면에서 기기를 검색합니다.</li>
@@ -820,12 +946,12 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
         {!supportsShellyQuickPair && supportsShelly ? <p class="mt-2 mb-0 text-xs font-semibold text-amber-800">이 Jarbis 버전은 자동 연결을 지원하지 않습니다. 고급 설정의 MQTT 정보를 Shelly 관리 화면에 수동 입력해 주세요.</p> : null}
         {!supportsShelly ? <p class="mt-3 mb-0 text-xs font-semibold text-amber-800">현재 Jarbis는 Shelly 센서를 지원하지 않습니다. 센서 연동 기능이 포함된 Jarbis가 설치되어야 검색·등록할 수 있습니다.</p> : null}
       </details>
-      {!candidateData ? <div role="status" aria-busy={candidatesResource.loading} class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      {!candidateData ? <div role="status" aria-busy={candidatesResource.loading} class="ssh-home-empty mt-4 rounded-2xl p-4 text-sm">
         {candidatesResource.error ? '발견된 기기 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '검색된 기기 목록을 확인하고 있습니다…'}
-      </div> : availableCandidates.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+      </div> : availableCandidates.length === 0 ? <div class="ssh-home-empty mt-4 rounded-2xl p-4 text-sm">
         {busy === 'scan' ? '같은 네트워크에서 기기를 검색하고 있습니다…' : candidates.length > 0 ? '발견된 기기는 모두 등록되어 있습니다.' : '아직 발견된 기기가 없습니다. 기기가 같은 네트워크에 연결돼 있는지 확인해 주세요.'}
       </div> : <ul class="mt-4 space-y-3 p-0" aria-label="검색된 기기">
-        {availableCandidates.map(candidate => <li key={`${candidate.topic}:${candidate.ip}:${candidate.source}`} class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3 sm:p-4">
+        {availableCandidates.map(candidate => <li key={`${candidate.topic}:${candidate.ip}:${candidate.source}`} class="ssh-home-candidate flex flex-wrap items-center gap-3 rounded-2xl p-3 sm:p-4">
           <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><DevicesIcon class="size-5" /></span>
           <div class="min-w-0 flex-1">
             <strong class="block text-sm text-slate-900">{candidate.name}</strong>
@@ -841,7 +967,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       </ul>}
     </section>
 
-    <details class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    <details class={panelCard}>
       <summary class="flex cursor-pointer items-center gap-2 text-sm font-extrabold text-slate-800 focus-visible:outline-2 focus-visible:outline-teal-600">
         <KeyIcon class="size-4 text-slate-500" />고급 설정 · 연결 진단
       </summary>

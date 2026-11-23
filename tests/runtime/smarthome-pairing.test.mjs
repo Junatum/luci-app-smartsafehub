@@ -28,13 +28,13 @@ test('절전/최초 측정 대기 시 재시도 UI가 나오고 5분마다 캐�
   assert.match(card, /첫 측정 대기/);
   assert.match(card, /연결 다시 시도/);
   assert.match(card, /onClick=\{onConnect\}/);
-  assert.match(page, /setInterval\(poll, 300000\)/);
+  assert.match(page, /largeHome \? 30000 : 300000/);
   assert.match(api, /getJarbisSensorState.*\n[\s\S]*'sensor_state'/);
 });
 test('RPC 비밀번호는 프론트엔드가 읽지 않고 자동 설정에 전달하지 않는다', () => {
   assert.match(api, /device_pair.*admin_password:/);
   assert.match(page, /pairJarbisDevice\(id, '', replace\)/);
   assert.match(page, /getJarbisCredentials\(\)/); // 고급 수동 진단만
-  assert.match(notes, /0\.2\.34-r4/);
-  assert.match(mk, /PKG_RELEASE:=4/);
+  assert.match(notes, /0\.2\.34-r6/);
+  assert.match(mk, /PKG_RELEASE:=6/);
 });

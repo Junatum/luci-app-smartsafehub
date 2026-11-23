@@ -28,7 +28,8 @@ test('전구 30초 조회와 달리 센서는 5분 간격으로만 캐시 조회
   assert.match(page, /const stateIds = lights\.filter/);
   assert.match(page, /const sensorIds = sensors\.filter/);
   assert.match(page, /setInterval\(poll, 30000\)/);
-  assert.match(page, /setInterval\(poll, 300000\)/);
+  assert.match(page, /largeHome \? 30000 : 300000/);
+  assert.match(page, /nextHomePollBatch\(ids, cursor, largeHome \? 2 : ids.length\)/);
   assert.match(page, /getJarbisSensorState\(id, background \? 'low' : 'normal'\)/);
   assert.match(page, /if \(demo \|\| !status\?\.enabled \|\| !supportsShelly \|\| !sensorIds\) return/);
   assert.match(page, /if \(!background\) setError\(errorMessage\(cause\)\)/);

@@ -19,6 +19,7 @@ export const demoJarbisOperations: SmartHomeOperations = {
   setJarbisEnabled: blocked,
   addJarbisDevice: blocked,
   updateJarbisDevice: blocked,
+  setJarbisDeviceRoom: blocked,
   removeJarbisDevice: blocked,
   setJarbisLight: blocked,
   pairJarbisDevice: blocked,

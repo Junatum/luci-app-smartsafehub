@@ -110,6 +110,7 @@
           "settings_update",
           "device_add",
           "device_update",
+          "device_room_set",
           "device_remove",
           "device_pair",
           "light_set",
