@@ -23,7 +23,7 @@ test('스마트홈 메뉴는 실제 공유기와 안전한 데모에 노출하�
   assert.doesNotMatch(nav, /routes: \['smarthome', 'apps'\]/);
   assert.match(app, /case 'smarthome':[\s\S]*<SmartHomePage/);
   assert.match(page, /SmartHomeWelcome/);
-  assert.match(source('frontend/src/components/SmartHomeWelcome.tsx'), /우리 집 조명을, 더 스마트하게/);
+  assert.match(source('frontend/src/components/SmartHomeWelcome.tsx'), /우리 집 기기를, 더 스마트하게/);
 });
 
 test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분리한다', () => {

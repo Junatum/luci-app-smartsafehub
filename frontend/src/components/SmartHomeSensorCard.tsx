@@ -42,7 +42,7 @@ export function SmartHomeSensorCard({ device, state, checking, busy, supported, 
           <h3 class="ssh-home-device-title" title={device.name}>{device.name}</h3>
           <span class="ssh-home-status-pill" data-tone={stateTone}>{stateLabel}</span>
         </div>
-        <p class="ssh-home-device-subtitle">Shelly H&T Gen3 · Wi-Fi 온습도 센서</p>
+        <p class="ssh-home-device-subtitle">Wi-Fi 온습도 센서</p>
       </div>
     </div>
 

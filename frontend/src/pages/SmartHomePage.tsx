@@ -8,6 +8,7 @@ import { SectionHeading } from '../components/SectionHeading';
 import { ErrorPanel } from '../components/StatePanels';
 import { SmartHomeWelcome } from '../components/SmartHomeWelcome';
 import { SmartHomeSensorCard } from '../components/SmartHomeSensorCard';
+import { SmartHomeVersionNotice } from '../components/SmartHomeVersionNotice';
 import { CustomSelect } from '../components/CustomSelect';
 import { SmartHomeRoomPicker } from '../components/SmartHomeRoomPicker';
 import { HOME_ROOMS, groupHomeDevices, nextHomePollBatch, normalizeHomeRoom, type HomeRoom } from '../utils/smartHomeGroups';
@@ -624,7 +625,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     {demo ? <p role="status" class="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
       스마트홈 체험 · 전구와 온습도 센서, MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
     </p> : null}
-    {status && deviceData && devices.length === 0 ? <section aria-label="첫 스마트 전구 연결 안내" class="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
+    {status && deviceData && devices.length === 0 ? <section aria-label="첫 스마트홈 기기 연결 안내" class="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
       <p class="m-0 text-xs font-extrabold tracking-widest text-teal-700">스마트홈 시작하기 · 2단계</p>
       <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">첫 번째 스마트홈 기기를 연결해 보세요</h2>
       <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">Jarbis 설치가 완료되었습니다. 지원 기기를 공유기와 같은 Wi-Fi에 연결한 다음 아래에서 검색하고 추가해 보세요.</p>
@@ -637,10 +638,13 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
         onClick={() => discoverySection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>기기 찾으러 가기</button>
       {!status.enabled ? <p class="mt-2 mb-0 text-xs text-slate-500">기기를 검색하려면 아래에서 스마트홈 사용을 먼저 켜 주세요.</p> : null}
     </section> : null}
-    <SectionHeading eyebrow="Smart Home" title="스마트홈" description="스마트 전구를 제어하고 Shelly H&T Gen3의 온도·습도 측정값을 확인합니다."
+    <SectionHeading eyebrow="Smart Home" title="스마트홈" description="스마트 전구를 제어하고 온습도 센서의 측정값을 확인합니다."
       action={<button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void retry()}>
         <ReloadIcon class={`size-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />새로고침
       </button>} />
+
+    {status ? <SmartHomeVersionNotice status={status} catalog={appsCatalog}
+      installation={appsStatus} catalogError={appsCatalogError} installError={appsStatusError} demo={demo} /> : null}
 
     {!status && statusResource.error ? <ErrorPanel message={statusResource.error}
       onRetry={() => void retry()} /> : !status ? <section aria-label="스마트홈 서비스 현황"
@@ -654,7 +658,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           <div class="min-w-0">
             <p class="ssh-home-kicker m-0 text-[0.72rem] font-extrabold tracking-[0.18em]">SMART HOME CONTROL</p>
             <h2 class="ssh-home-hero-title mt-1 mb-0 text-xl font-black">스마트홈 관리 센터</h2>
-            <p class="ssh-home-hero-copy mt-1 mb-0 max-w-2xl text-sm leading-6">공유기에서 스마트 전구를 제어하고 Shelly H&T Gen3의 온도·습도 현황을 한 화면에서 관리합니다.</p>
+            <p class="ssh-home-hero-copy mt-1 mb-0 max-w-2xl text-sm leading-6">공유기에서 스마트 전구를 제어하고 온습도 센서의 측정값을 한눈에 확인합니다.</p>
           </div>
         </div>
         <div class="flex items-center gap-3 lg:justify-end">
@@ -828,7 +832,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
               <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"><PowerIcon class="size-5" /></span>
               <div class="min-w-0 flex-1">
                 <h3 class="m-0 truncate text-sm font-extrabold text-slate-950" title={device.name}>{device.name}</h3>
-                <p class="mt-1 mb-0 break-all text-xs text-slate-500">Tasmota 스마트 전구</p>
+                <p class="mt-1 mb-0 break-all text-xs text-slate-500">Wi-Fi 스마트 전구</p>
               </div>
               <span class={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-bold ${!device.enabled ? 'bg-slate-100 text-slate-600' : bulbOnline ? 'bg-teal-50 text-teal-800' : 'bg-amber-50 text-amber-800'}`}>
                 {!device.enabled ? '사용 중지' : bulbOnline
@@ -972,7 +976,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
         </div>
       </div>
       <details class="ssh-home-discovery-guide mt-4 rounded-2xl p-3 text-sm">
-        <summary class="cursor-pointer font-bold text-slate-800">Shelly H&T Gen3 연결 안내</summary>
+        <summary class="cursor-pointer font-bold text-slate-800">온습도 센서 연결 안내</summary>
         <ol class="mt-3 mb-0 list-decimal space-y-2 pl-5 text-xs leading-5">
           <li>Shelly 센서를 공유기 Wi-Fi에 연결하고 이 화면에서 기기를 검색합니다.</li>
           <li><strong>연결 및 추가</strong>를 누릅니다. 센서가 잠들어 있다면 버튼을 짧게 누른 후 <strong>연결 다시 시도</strong>를 누르세요.</li>
@@ -990,7 +994,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><DevicesIcon class="size-5" /></span>
           <div class="min-w-0 flex-1">
             <strong class="block text-sm text-slate-900">{candidate.name}</strong>
-            <p class="mt-1 mb-0 break-all text-xs text-slate-500">{candidate.ip || '주소 미확인'} · {candidate.protocol === 'shelly_htg3' ? 'Shelly H&T Gen3' : 'Tasmota'}</p>
+            <p class="mt-1 mb-0 break-all text-xs text-slate-500">{candidate.ip || '주소 미확인'} · {candidate.protocol === 'shelly_htg3' ? 'Wi-Fi 온습도 센서' : 'Wi-Fi 스마트 전구'}</p>
             <p class="mt-1 mb-0 text-xs text-slate-500">{candidate.source === 'http' ? '기기 확인 완료' : candidate.source === 'dhcp' ? 'Wi-Fi 연결 기록에서 발견 · 연결 시 기기 확인' : 'MQTT에서 발견'}</p>
           </div>
           <button class={primaryButton} type="button"

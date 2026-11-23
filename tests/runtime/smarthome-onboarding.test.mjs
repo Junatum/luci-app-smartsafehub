@@ -52,7 +52,7 @@ test('스마트홈 설치 안내는 승인된 Apps 화면만 연결하고 자동
   assert.match(app, /appsStatus=\{appsStatus.data\} appsCatalog=\{apps.data\}/);
   assert.match(app, /route === 'apps' \|\| \(route === 'smarthome' && !jarbisStatus.data/);
   assert.match(appsPage, /appsHighlightFromHash\(window.location.hash\)/);
-  assert.match(appsPage, /href="#smarthome">스마트홈 시작하기/);
+  assert.match(appsPage, /href="#smarthome">스마트홈으로 돌아가기/);
   assert.match(appsPage, /requestOperation\(app, managed \? 'repair' : 'install'\)/);
   assert.doesNotMatch(welcome, /installVerifiedApp|repairVerifiedApp|callApi/);
 });

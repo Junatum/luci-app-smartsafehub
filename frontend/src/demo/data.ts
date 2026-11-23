@@ -44,11 +44,11 @@ export const demoApps: AppsCatalog = {
     {
       id: 'jarbis',
       name: 'Jarbis',
-      summary: '로컬 Wi-Fi 스마트 전구를 연결하고 제어합니다.',
-      description: 'SmartSafeHub 공식 오픈소스 스마트홈 엔진입니다. 현재 Tasmota 전구를 지원합니다.',
+      summary: '로컬 Wi-Fi 스마트 전구와 온습도 센서를 관리합니다.',
+      description: 'SmartSafeHub 공식 스마트홈 엔진으로 지원 전구와 온습도 센서를 연결합니다.',
       category: 'iot',
       publisherType: 'first_party',
-      version: '0.2.3-r1',
+      version: '0.2.4-r1',
       webUi: { type: 'smartsafehub', path: '#smarthome' },
     },
     {
@@ -112,7 +112,7 @@ export const demoAppsStatus: AppsInstallStatus = {
       partial: false,
       managed: true,
       updateAvailable: false,
-      installedVersion: '0.2.3-r1',
+      installedVersion: '0.2.4-r1',
       webUiReady: true,
     },
     arcdrop: {
@@ -166,8 +166,8 @@ export const demoAppsMetrics: AppsMetrics = {
 
 // Fictional Tasmota devices: reserved addresses, no credentials or real broker.
 export const demoJarbisStatus: JarbisStatus = {
-  apiVersion: 1, version: '0.2.3-r1', enabled: true, mqttConfigured: true,
-  brokerMode: 'managed', brokerHost: '192.0.2.1', brokerPort: '1883', brokerReady: true, features: { shellyHtg3: true },
+  apiVersion: 1, version: '0.2.4-r1', enabled: true, mqttConfigured: true,
+  brokerMode: 'managed', brokerHost: '192.0.2.1', brokerPort: '1883', brokerReady: true, features: { shellyHtg3: true, shellyQuickPair: true, rooms: true },
 };
 export const demoJarbisDevices: { devices: JarbisDevice[] } = {
   devices: [

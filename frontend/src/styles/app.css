@@ -3217,3 +3217,40 @@
 .ssh-app[data-theme='dark'] .ssh-header-sensor-icon { color: #5eead4; }
 .ssh-app[data-theme='dark'] .ssh-header-sensor-divider { background: #475569; }
 @media (min-width: 768px) { .ssh-header-sensor { display: inline-flex; } }
+
+/* Smart Home Jarbis compatibility guide: same semantic colors in both themes. */
+.ssh-smart-home .ssh-home-version-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--home-border);
+  border-left: 3px solid var(--home-accent);
+  border-radius: 1rem;
+  background-color: var(--home-surface);
+  color: var(--home-foreground);
+}
+.ssh-smart-home .ssh-home-version-heading { margin: 0; font-size: 0.9rem; font-weight: 800; }
+.ssh-smart-home .ssh-home-version-copy { margin: 0.4rem 0 0; font-size: 0.8rem; line-height: 1.6; }
+.ssh-smart-home .ssh-home-version-features,
+.ssh-smart-home .ssh-home-version-detail { margin: 0.35rem 0 0; color: var(--home-muted); font-size: 0.75rem; line-height: 1.55; }
+.ssh-smart-home .ssh-home-version-action {
+  display: inline-flex;
+  min-height: 2.5rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--home-badge-border);
+  border-radius: 0.75rem;
+  background-color: var(--home-soft-accent);
+  color: var(--home-accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.ssh-smart-home .ssh-home-version-action:hover { text-decoration: underline; }
+.ssh-smart-home .ssh-home-version-action:focus-visible { outline: 2px solid var(--home-accent); outline-offset: 3px; }

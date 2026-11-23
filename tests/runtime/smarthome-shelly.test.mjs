@@ -15,7 +15,7 @@ test('Shelly 센서는 등록 feature gate가 있고 MQTT 값 수신은 읽기 R
   assert.match(page, /if \(isSensor && !supportsShelly\)/);
   assert.match(page, /\(candidate\.protocol === 'shelly_htg3' && !supportsShelly\)/);
   assert.match(page, /isShellyHtg3\(device\)/);
-  assert.match(page, /Shelly H&T Gen3 연결 안내/);
+  assert.match(page, /온습도 센서 연결 안내/);
   assert.match(page, /현재 Jarbis는 Shelly 센서를 지원하지 않습니다/);
   assert.match(page, /!listed\.devices\.some\(device => device\.id === id && isShellyHtg3\(device\)\)/);
   assert.match(api, /'device_add', protocol[\s\S]*kind: 'sensor'/);

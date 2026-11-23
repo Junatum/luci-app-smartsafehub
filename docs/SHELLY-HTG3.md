@@ -2,13 +2,15 @@
 
 이 문서는 `luci-app-smartsafehub`의 센서 UI와 **별도 패키지인 Jarbis**가 충족해야 할 연결 계약을 정의합니다. LuCI 패치만 설치하면 Shelly 기기가 검색·등록·수신되는 것은 **아닙니다**. Jarbis 센서 수신기 구현과 검증이 완료될 때만 아래 feature flag를 활성화해야 합니다.
 
+**프로덕션 안내 기준 (SmartSafeHub 0.2.34-r9):** 온습도 측정값·자동 연결·공간별 기기 관리에 대해 Jarbis `0.2.4` 이상을 권장/요구하는 안내를 표시합니다. `0.2.4-r1`처럼 패키지 revision이 붙어도 충족합니다. 실제 지원 여부는 `status.features`를 추가로 확인하며, 기존에 동작하는 전구 제어를 버전 안내 때문에 중지하지 않습니다. 이 버전 정책은 해당 Jarbis 패키지의 프로덕션 배포 또는 실제 호환성 검증을 대신하지 않습니다.
+
 ## 기기 특성
 
 - Shelly H&T Gen3 (`S3SN-0U12A`, `ShellyHTG3-...`)는 온도·습도를 측정하는 배터리/USB 전원 기기입니다.
 - 배터리 모드에서는 측정·보고 후 잠듭니다. 변화 보고 기준(기본 온도 0.5°C/습도 5%RH)에 미달하면 약 2시간 동안 새 보고가 없을 수 있습니다. USB 모드에서는 보통 5분 간격으로 보고합니다.
 - 따라서 **고정 간격 IP/HTTP 폴링으로 온·오프라인을 판단하지 않습니다.** 관리 화면은 Jarbis에 저장된 마지막으로 검증된 측정값과 측정 시각만 표시합니다.
 - Shelly Gen3의 표준 MQTT 토픽 예: `<topic_prefix>/status/temperature:0`, `<topic_prefix>/status/humidity:0`, `<topic_prefix>/status/devicepower:0` (`status_ntf` 필요). 온도 `tC`, 습도 `rh`, 전원 `battery.percent`를 각 구성요소에서 파싱합니다. 부분 보고를 받아도 이전의 다른 센서 값을 초기화하지 않습니다.
-- 처음 Wi-Fi 연결은 Shelly에서 수행합니다. Jarbis 0.2.3-r3 이상의 관리형 MQTT 환경에서는 사용자가 승인하면 `device_pair`로 MQTT 설정을 자동 전달할 수 있으며, 다른 Broker의 기존 연결은 승인 없이 변경하지 않습니다.
+- 처음 Wi-Fi 연결은 Shelly에서 수행합니다. Jarbis 0.2.4 이상을 권장하는 관리형 MQTT 환경에서는 사용자가 승인하면 `device_pair`로 MQTT 설정을 자동 전달할 수 있으며, 다른 Broker의 기존 연결은 승인 없이 변경하지 않습니다.
 
 ## Jarbis가 충족해야 할 RPC 계약
 
@@ -27,7 +29,7 @@
 
 참고: [Shelly H&T Gen3 API](https://shelly-api-docs.shelly.cloud/gen2/Devices/Gen3/ShellyHTG3/), [Shelly MQTT](https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Mqtt/), [Shelly H&T Gen3 안내](https://kb.shelly.cloud/knowledge-base/shelly-h-t-gen3).
 
-## 여러 기기 관리 (0.2.34-r6 / Jarbis 0.2.3-r5)
+## 여러 기기 관리 (0.2.34-r6 도입 / 프로덕션 안내 기준 Jarbis 0.2.4)
 
 - 기기 5대 이상에서는 자동으로 간단한 카드로 표시하며, 화면에서 `자동/상세/간단히` 보기를 전환할 수 있습니다.
 - `거실`, `침실`, `서재`, `주방`, `기타`, `공간 미지정`은 기기별 공간 코드로 저장됩니다. Jarbis의 `device_room_set` 쓰기 RPC를 통해 변경하며 브라우저 저장소에는 보관하지 않습니다.
