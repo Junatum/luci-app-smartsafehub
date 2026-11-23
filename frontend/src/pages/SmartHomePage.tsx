@@ -8,6 +8,7 @@ import { SectionHeading } from '../components/SectionHeading';
 import { ErrorPanel } from '../components/StatePanels';
 import { SmartHomeWelcome } from '../components/SmartHomeWelcome';
 import { SmartHomeSensorCard } from '../components/SmartHomeSensorCard';
+import { hasRecentSensorMqttReading, isSensorWakeRequired } from '../utils/shellySensor';
 import { smartHomeEntry } from '../utils/smartHomeEntry';
 import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
 import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus, JarbisLightState, JarbisSensorState } from '../types/jarbis';
@@ -127,6 +128,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [sensorNotice, setSensorNotice] = useState<{ id: string; text: string } | null>(null);
   const [brightness, setBrightness] = useState<Record<string, number>>({});
   // A switch is still operable when the bulb has not reported its state.
   // Pending values represent the user's last request, never an observed state.
@@ -248,6 +250,9 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       const result = await getJarbisSensorState(id, background ? 'low' : 'normal');
       if (result.id !== id) throw new Error('센서의 응답 ID가 일치하지 않습니다.');
       setSensorStates(old => ({ ...old, [id]: result }));
+      if (hasRecentSensorMqttReading(result, id, Math.floor(Date.now() / 1000))) {
+        setSensorNotice(old => old?.id === id ? null : old);
+      }
     } catch (cause) {
       // Preserve the last verified measurement rather than replacing it with
       // empty data when a single read fails.
@@ -417,6 +422,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     setBusy(`sensor-pair:${id}`);
     setError('');
     setMessage('');
+    setSensorNotice(null);
     try {
       const result = await pairJarbisDevice(id, '', replace);
       if (result.id !== id) throw new Error('센서 연결 응답을 확인할 수 없습니다.');
@@ -430,6 +436,23 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           : '연결 설정을 마쳤습니다. 첫 측정값은 센서가 다음 보고를 보내면 나타납니다.');
       await refresh();
     } catch (cause) {
+      // WAKE_REQUIRED describes a sleeping sensor's HTTP API. It must not
+      // remain a red error after the independent MQTT listener received data.
+      // Recheck the backend cache once to handle the pairing/polling race.
+      if (isSensorWakeRequired(cause)) {
+        try {
+          const reading = await getJarbisSensorState(id, 'normal');
+          if (reading.id === id) {
+            setSensorStates(old => ({ ...old, [id]: reading }));
+            if (hasRecentSensorMqttReading(reading, id, Math.floor(Date.now() / 1000))) {
+              setMessage('센서의 온습도 측정값이 정상적으로 수신되고 있습니다. 추가 연결은 필요하지 않습니다.');
+              return;
+            }
+          }
+        } catch { /* The sensor state can be temporarily unavailable. */ }
+        setSensorNotice({ id, text: '센서가 절전 중이라 연결을 아직 확인하지 못했습니다. 센서 버튼을 짧게 누른 뒤 다시 연결해 주세요. 기존 측정값은 유지됩니다.' });
+        return;
+      }
       const explanation = errorMessage(cause);
       if (/다른 MQTT 서버|기존 연결|BROKER_CONFLICT/i.test(explanation) && !replace &&
         window.confirm('센서가 다른 MQTT 서버를 사용합니다. 기존 스마트홈 연결이 끊길 수 있습니다. SmartSafeHub 연결로 변경하시겠습니까?')) {
@@ -454,6 +477,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     setBusy(`add:${id}`);
     setError('');
     setMessage('');
+    setSensorNotice(null);
     try {
       const added = await addJarbisDevice(id, candidate.name, candidate.topic, isSensor ? 'shelly_htg3' : undefined);
       if (!added.added || added.id !== id) throw new Error('기기 등록 응답을 확인할 수 없습니다.');
@@ -586,6 +610,10 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       {!status?.enabled ? <p role="status" class="mt-3 mb-0 text-xs text-slate-500">스마트홈 기능을 켜면 기기를 검색하고 제어할 수 있습니다.</p> : null}
     </section>}
 
+    {sensorNotice && sensors.some(device => device.id === sensorNotice.id) ? <div role="status" aria-live="polite" class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <AlertIcon class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1">{sensorNotice.text}</span>
+      <button class="shrink-0 font-bold underline" type="button" onClick={() => setSensorNotice(null)}>닫기</button>
+    </div> : null}
     {error ? <div role="alert" aria-live="assertive" class="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
       <AlertIcon class="mt-0.5 size-4 shrink-0" /><span class="min-w-0 flex-1">{error}</span>
       <button class="shrink-0 font-bold underline" type="button" onClick={() => setError('')}>닫기</button>

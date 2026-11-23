@@ -35,6 +35,6 @@ test('RPC 비밀번호는 프론트엔드가 읽지 않고 자동 설정에 전�
   assert.match(api, /device_pair.*admin_password:/);
   assert.match(page, /pairJarbisDevice\(id, '', replace\)/);
   assert.match(page, /getJarbisCredentials\(\)/); // 고급 수동 진단만
-  assert.match(notes, /0\.2\.34-r3/);
-  assert.match(mk, /PKG_RELEASE:=3/);
+  assert.match(notes, /0\.2\.34-r4/);
+  assert.match(mk, /PKG_RELEASE:=4/);
 });
