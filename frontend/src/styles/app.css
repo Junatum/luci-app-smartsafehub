@@ -3182,3 +3182,38 @@
 /* Management menu must remain visible outside a compact battery-sensor card. */
 .ssh-smart-home .ssh-home-sensor { overflow: visible; }
 .ssh-smart-home .ssh-home-sensor-header { border-radius: 1.2rem 1.2rem 0 0; }
+
+/* Global Smart Home quick-reading: the icon/text colors are owned by the
+ * component, not Tailwind's broad dark-mode utility remapping. */
+.ssh-header-sensor {
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 160ms, background-color 160ms;
+}
+.ssh-header-sensor:hover { border-color: #5eead4; background: #f0fdfa; }
+.ssh-header-sensor:focus-visible { outline: 2px solid #0d9488; outline-offset: 3px; }
+.ssh-header-sensor-icon { width: 1rem; height: 1rem; color: #0f9488; flex: none; }
+.ssh-header-sensor-number { font-variant-numeric: tabular-nums; }
+.ssh-header-sensor-divider { width: 1px; height: 1rem; margin: 0 0.3rem; background: #cbd5e1; }
+.ssh-header-sensor[data-stale='true'] { opacity: 0.65; }
+.ssh-app[data-theme='dark'] .ssh-header-sensor {
+  border-color: #334155;
+  background: #1e293b;
+  color: #f1f5f9;
+}
+.ssh-app[data-theme='dark'] .ssh-header-sensor:hover { border-color: #14b8a6; background: #24364a; }
+.ssh-app[data-theme='dark'] .ssh-header-sensor-icon { color: #5eead4; }
+.ssh-app[data-theme='dark'] .ssh-header-sensor-divider { background: #475569; }
+@media (min-width: 768px) { .ssh-header-sensor { display: inline-flex; } }

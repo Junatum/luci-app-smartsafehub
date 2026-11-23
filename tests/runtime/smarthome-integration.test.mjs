@@ -299,7 +299,10 @@ test('스마트홈은 세 자원을 독립적으로 준비하고 재방문에서
   ]) {
     assert.ok(app.includes(declaration), declaration);
   }
-  assert.equal((app.match(/active: route === 'smarthome'/g) ?? []).length, 3);
+  // Header reads the device list once on entry, even off the Smart Home route.
+  // Status and discovery stay route-scoped and are never polled by the header.
+  assert.equal((app.match(/active: route === 'smarthome'/g) ?? []).length, 2);
+  assert.match(app, /const jarbisDevices = useAsyncResource<\{ devices: JarbisDevice\[\] \}>\(\{\s*active: true/);
   assert.match(app, /<SmartHomePage statusResource=\{jarbisStatus\}/);
   assert.match(app, /devicesResource=\{jarbisDevices\} candidatesResource=\{jarbisCandidates\}/);
   assert.match(resource, /const fresh = state\.data !== null/);

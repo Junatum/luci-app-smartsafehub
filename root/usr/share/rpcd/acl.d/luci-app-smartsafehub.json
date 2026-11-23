@@ -7,6 +7,7 @@
           "system_root_password_status",
           "status",
           "connected_devices",
+          "smarthome_featured_sensor",
           "wifi_summary",
           "updates_status",
           "firmware_status",
@@ -52,6 +53,7 @@
         "smartsafehub": [
           "system_root_password_set",
           "system_root_password_change",
+          "smarthome_featured_sensor_set",
           "wifi_update",
           "wifi_qr",
           "system_timezone_initialize",

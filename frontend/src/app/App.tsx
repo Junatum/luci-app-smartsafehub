@@ -12,6 +12,7 @@ import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps'
 import { useConfigurationBackup } from '../hooks/useConfigurationBackup';
 import { useConnectedDevices } from '../hooks/useConnectedDevices';
 import { useFirmwareUpdates } from '../hooks/useFirmwareUpdates';
+import { useFeaturedSensor } from '../hooks/useFeaturedSensor';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { usePageTabs } from '../hooks/usePageTabs';
 import { useHealth } from '../hooks/useHealth';
@@ -72,11 +73,22 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
     staleTimeMs: 15_000,
   });
   const jarbisDevices = useAsyncResource<{ devices: JarbisDevice[] }>({
-    active: route === 'smarthome',
+    active: true, // One small list fetch; no polling or sensor RPC when no sensor exists.
     fallbackError: '등록된 전구를 불러오지 못했습니다.',
     loader: getJarbisDevices,
     staleTimeMs: 15_000,
   });
+  const featuredSensor = useFeaturedSensor(jarbisDevices.data?.devices ?? null, route === 'smarthome');
+  // The header performs only one initial list fetch. Re-entering Smart Home
+  // explicitly refreshes the list so newly installed Jarbis, deleted devices
+  // and external registrations are reflected without a global polling timer.
+  const previousSmartHomeRoute = useRef(route);
+  useEffect(() => {
+    if (route === 'smarthome' && previousSmartHomeRoute.current !== 'smarthome') {
+      void jarbisDevices.refresh();
+    }
+    previousSmartHomeRoute.current = route;
+  }, [route]);
   const jarbisCandidates = useAsyncResource<{ devices: JarbisCandidate[] }>({
     active: route === 'smarthome',
     fallbackError: '검색된 전구를 불러오지 못했습니다.',
@@ -217,6 +229,9 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
   switch (route) {
     case 'smarthome':
       content = <SmartHomePage statusResource={jarbisStatus}
+        featuredSensorId={featuredSensor.selectedId}
+        onFeaturedSensorChange={featuredSensor.select}
+        onSensorReading={featuredSensor.acceptReading}
         devicesResource={jarbisDevices} candidatesResource={jarbisCandidates} operations={jarbisApi}
         appsStatus={appsStatus.data} appsCatalog={apps.data}
         appsStatusError={appsStatus.error} appsCatalogError={apps.error}
@@ -632,6 +647,7 @@ export function App({ onAdministratorPasswordChanged }: AppProps) {
 
   return (
     <AppShell
+      featuredSensor={featuredSensor.view}
       accountRegistered={dashboardAccountRegistered}
       loading={route === 'network' ? wan.loading || lan.loading : current.loading}
       onRefresh={refreshCurrent}

@@ -105,10 +105,15 @@ interface SmartHomePageProps {
   appsStatusError?: string | null;
   appsCatalogError?: string | null;
   onCheckInstallation?: () => void;
+  /** Header shares Jarbis's cached MQTT readings without a second RPC. */
+  onSensorReading?: (reading: JarbisSensorState) => void;
+  featuredSensorId?: string | null;
+  onFeaturedSensorChange?: (id: string) => Promise<void>;
 }
 
 export function SmartHomePage({ statusResource, devicesResource, candidatesResource,
   operations, demo = false, onDemoAction, demoLightStates, demoSensorStates,
+  featuredSensorId = null, onFeaturedSensorChange, onSensorReading,
   appsStatus = null, appsCatalog = null, appsStatusError = null, appsCatalogError = null,
   onCheckInstallation }: SmartHomePageProps) {
   const {
@@ -281,6 +286,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       const result = await getJarbisSensorState(id, background ? 'low' : 'normal');
       if (result.id !== id) throw new Error('센서의 응답 ID가 일치하지 않습니다.');
       setSensorStates(old => ({ ...old, [id]: result }));
+      onSensorReading?.(result);
       if (hasRecentSensorMqttReading(result, id, Math.floor(Date.now() / 1000))) {
         setSensorNotice(old => old?.id === id ? null : old);
       }
@@ -398,6 +404,19 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     }
   };
 
+  const setFeatured = async (device: JarbisDevice) => {
+    if (demoAction() || busy || !device.enabled || !onFeaturedSensorChange || featuredSensorId === device.id) return;
+    setBusy(`featured:${device.id}`);
+    setError('');
+    setMessage('');
+    try {
+      await onFeaturedSensorChange(device.id);
+      closeManageMenu(device.id);
+      setMessage(`${device.name} 센서를 헤더에 표시합니다.`);
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setBusy(''); }
+  };
+
   const changeRoom = async (device: JarbisDevice, room: HomeRoom) => {
     if (demoAction() || !supportsRooms || busy || normalizeHomeRoom(device.room) === room) return;
     setBusy(`room:${device.id}`);
@@ -501,6 +520,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           const reading = await getJarbisSensorState(id, 'normal');
           if (reading.id === id) {
             setSensorStates(old => ({ ...old, [id]: reading }));
+            onSensorReading?.(reading);
             if (hasRecentSensorMqttReading(reading, id, Math.floor(Date.now() / 1000))) {
               setMessage('센서의 온습도 측정값이 정상적으로 수신되고 있습니다. 추가 연결은 필요하지 않습니다.');
               return;
@@ -732,6 +752,8 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           state={sensorStates[device.id]} checking={Boolean(checkingSensors[device.id])}
           busy={Boolean(busy)} supported={supportsShelly} quickPair={supportsShellyQuickPair}
           compact={compact} roomsSupported={supportsRooms} onRoomChange={room => void changeRoom(device, room)}
+          featured={featuredSensorId === device.id}
+          {...(onFeaturedSensorChange ? { onMakeFeatured: () => void setFeatured(device) } : {})}
           onManageMenuRef={element => { manageMenus.current[device.id] = element; }}
           onRefresh={() => void refreshSensor(device.id)}
           onConnect={() => void pairSensor(device.id)}

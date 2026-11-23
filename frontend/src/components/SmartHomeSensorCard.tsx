@@ -18,6 +18,8 @@ interface Props {
   compact?: boolean;
   roomsSupported?: boolean;
   onRoomChange?: (room: HomeRoom) => void;
+  featured?: boolean;
+  onMakeFeatured?: () => void;
   onManageMenuRef: (element: HTMLDetailsElement | null) => void;
   onConnect: () => void;
   onRefresh: () => void;
@@ -25,7 +27,7 @@ interface Props {
   onRemove: () => void;
 }
 
-export function SmartHomeSensorCard({ device, state, checking, busy, supported, quickPair, compact = false, roomsSupported = false, onRoomChange, onManageMenuRef, onConnect, onRefresh, onToggle, onRemove }: Props) {
+export function SmartHomeSensorCard({ device, state, checking, busy, supported, quickPair, compact = false, roomsSupported = false, onRoomChange, featured = false, onMakeFeatured, onManageMenuRef, onConnect, onRefresh, onToggle, onRemove }: Props) {
   const report = sensorReportLabel(state?.lastSeen, Math.floor(Date.now() / 1000));
   const observed = state?.observed === true && state.id === device.id && !report.label.includes('미확인');
   const stateLabel = !device.enabled ? '사용 중지' : !supported ? 'Jarbis 업데이트 필요' : !observed ? '첫 측정 대기'
@@ -85,6 +87,10 @@ export function SmartHomeSensorCard({ device, state, checking, busy, supported, 
           <div class="absolute left-0 top-full z-30 mt-2 flex w-64 max-w-[calc(100vw-3rem)] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
             <p class="m-0 break-all text-xs text-slate-500">기기 ID: {device.id}</p>
             <SmartHomeRoomPicker room={device.room} supported={roomsSupported} disabled={busy} onChange={room => onRoomChange?.(room)} />
+            {onMakeFeatured && device.enabled ? <button class={secondaryButton} type="button"
+              aria-pressed={featured} disabled={busy || featured} onClick={onMakeFeatured}>
+              {featured ? '헤더에 표시 중' : '대표 센서로 지정'}
+            </button> : null}
             <button class={secondaryButton} type="button" disabled={busy} onClick={onToggle}>{device.enabled ? '기기 사용 중지' : '기기 다시 사용'}</button>
             <button class={dangerButton} type="button" disabled={busy} onClick={onRemove}>기기 삭제</button>
           </div>
