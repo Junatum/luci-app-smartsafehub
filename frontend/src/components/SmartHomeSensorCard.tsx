@@ -10,15 +10,17 @@ interface Props {
   checking: boolean;
   busy: boolean;
   supported: boolean;
+  quickPair: boolean;
+  onConnect: () => void;
   onRefresh: () => void;
   onToggle: () => void;
   onRemove: () => void;
 }
 
-export function SmartHomeSensorCard({ device, state, checking, busy, supported, onRefresh, onToggle, onRemove }: Props) {
+export function SmartHomeSensorCard({ device, state, checking, busy, supported, quickPair, onConnect, onRefresh, onToggle, onRemove }: Props) {
   const report = sensorReportLabel(state?.lastSeen, Math.floor(Date.now() / 1000));
   const observed = state?.observed === true && state.id === device.id && !report.label.includes('미확인');
-  const stateLabel = !device.enabled ? '사용 중지' : !supported ? 'Jarbis 업데이트 필요' : !observed ? '측정값 없음'
+  const stateLabel = !device.enabled ? '사용 중지' : !supported ? 'Jarbis 업데이트 필요' : !observed ? '첫 측정 대기'
     : report.stale ? '오래된 측정값' : '최근 측정값';
   return <article class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-label={`${device.name} 온습도 센서`}>
     <div class="flex flex-wrap items-start gap-3">
@@ -34,10 +36,14 @@ export function SmartHomeSensorCard({ device, state, checking, busy, supported, 
       <div class="rounded-xl bg-teal-50 p-4"><p class="m-0 text-xs font-semibold text-teal-800">습도</p><p class="mt-1 mb-0 text-2xl font-black tabular-nums text-slate-900">{observed ? sensorReading(state?.humidityPercent, '%', 0, 100) : '—'}</p></div>
     </div>
     <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-      <span>{observed ? report.label : '기기에서 수신된 측정 정보가 없습니다.'}{observed && report.stale ? ' · 최신 값이 아닙니다' : ''}</span>
+      <span>{observed ? report.label : '아직 첫 측정값을 받지 못했습니다.'}{observed && report.stale ? ' · 최신 값이 아닙니다' : ''}</span>
       <span>배터리 {observed ? sensorReading(state?.batteryPercent, '%', 0, 100) : '—'}</span>
     </div>
-    <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">배터리 사용 시 센서는 측정 후 잠듭니다. 현재 Wi-Fi 접속 상태가 아닌 마지막 수신값이며, 새로고침으로 기기를 깨울 수는 없습니다.</p>
+    {!observed && supported && quickPair && device.enabled ? <div class="mt-3 rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs leading-5 text-teal-950 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-100">
+      <strong>연결을 마무리해 주세요.</strong> 센서의 버튼을 짧게 누른 뒤 아래 <strong>연결 다시 시도</strong>를 누르면 공유기가 설정하고 첫 측정값을 확인합니다.
+      <button class={`${button} mt-2 border-teal-200 dark:border-teal-700`} type="button" disabled={busy} onClick={onConnect}>연결 다시 시도</button>
+    </div> : null}
+    <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">센서는 측정 후 절전합니다. 표시된 값은 마지막 수신값이며 화면 새로고침으로 센서를 깨울 수는 없습니다.</p>
     {!supported ? <p class="mt-3 mb-0 text-xs text-amber-800">설치된 Jarbis에 Shelly 센서 상태 조회 기능이 없습니다. 지원 버전으로 업데이트해 주세요.</p> : null}
     <div class="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
       <button class={button} type="button" disabled={busy || checking || !device.enabled || !supported} onClick={onRefresh}><ReloadIcon class="size-4" />{checking ? '확인 중…' : '측정값 다시 확인'}</button>

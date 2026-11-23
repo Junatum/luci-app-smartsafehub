@@ -75,7 +75,7 @@ export interface SmartHomeOperations {
   updateJarbisDevice: (id: string, name: string, enabled: boolean) => Promise<{ id: string; updated: boolean }>;
   removeJarbisDevice: (id: string) => Promise<{ id: string; removed: boolean }>;
   setJarbisLight: (id: string, capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) => Promise<{ accepted: boolean }>;
-  pairJarbisDevice: (id: string, adminPassword?: string, replaceExisting?: boolean) => Promise<{ id: string; configured: boolean; mqttConfirmed: boolean }>;
+  pairJarbisDevice: (id: string, adminPassword?: string, replaceExisting?: boolean) => Promise<{ id: string; configured: boolean; mqttConfirmed: boolean; observed?: boolean; rebootPending?: boolean }>;
   getJarbisCredentials: () => Promise<JarbisCredentials>;
 }
 
@@ -119,6 +119,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const sensors = devices.filter(isShellyHtg3);
   const candidates = candidateData?.devices ?? [];
   const supportsShelly = status?.features?.shellyHtg3 === true;
+  const supportsShellyQuickPair = status?.features?.shellyQuickPair === true && status?.brokerMode === 'managed';
   const entry = demo ? 'ready' : smartHomeEntry(status, statusResource.error, appsStatus, appsCatalog, appsStatusError, appsCatalogError);
   // MQTT credentials are sensitive: retain them only while this page is mounted.
   const [credentials, setCredentials] = useState<JarbisCredentials | null>(null);
@@ -409,13 +410,46 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     }
   };
 
+  // Shelly MQTT credentials never pass through the browser. The router sends
+  // them only to the user's explicitly approved local sensor over HTTP.
+  const pairSensor = async (id: string, replace = false): Promise<void> => {
+    if (demoAction() || !supportsShellyQuickPair) return;
+    setBusy(`sensor-pair:${id}`);
+    setError('');
+    setMessage('');
+    try {
+      const result = await pairJarbisDevice(id, '', replace);
+      if (result.id !== id) throw new Error('센서 연결 응답을 확인할 수 없습니다.');
+      // The device may have rebooted for MQTT, but its HTTP status is already
+      // cached when available. Read once now, without waking the sensor.
+      await refreshSensor(id);
+      setMessage(result.observed
+        ? '센서를 연결하고 첫 측정값을 확인했습니다. 이후에는 자동으로 갱신됩니다.'
+        : result.rebootPending
+          ? '센서에 연결 정보를 저장했습니다. 센서가 재시작되지 않았다면 버튼을 짧게 눌러 주세요.'
+          : '연결 설정을 마쳤습니다. 첫 측정값은 센서가 다음 보고를 보내면 나타납니다.');
+      await refresh();
+    } catch (cause) {
+      const explanation = errorMessage(cause);
+      if (/다른 MQTT 서버|기존 연결|BROKER_CONFLICT/i.test(explanation) && !replace &&
+        window.confirm('센서가 다른 MQTT 서버를 사용합니다. 기존 스마트홈 연결이 끊길 수 있습니다. SmartSafeHub 연결로 변경하시겠습니까?')) {
+        setBusy('');
+        await pairSensor(id, true);
+        return;
+      }
+      setError(explanation);
+    } finally {
+      setBusy('');
+    }
+  };
+
   const add = async (candidate: JarbisCandidate) => {
     if (demoAction()) return;
     const isSensor = candidate.protocol === 'shelly_htg3';
     const id = deviceIdForTopic(candidate.topic, candidate.protocol);
     if (!candidate.topic) { setError('기기 연결 정보를 확인할 수 없습니다. 다시 검색해 주세요.'); return; }
     if (isSensor && !supportsShelly) { setError('Shelly H&T Gen3를 추가하려면 센서 지원 Jarbis가 필요합니다.'); return; }
-    if (!window.confirm(isSensor ? `${candidate.name} 온습도 센서를 등록할까요? 기기의 기존 MQTT 연결 설정은 변경하지 않습니다.`
+    if (!window.confirm(isSensor ? `${candidate.name} 센서를 추가할까요? 연결 설정을 공유기가 자동으로 도와줍니다. (센서가 깨어 있어야 합니다.)`
       : `${candidate.name} 전구를 추가할까요? ${candidate.source === 'http' ? '추가 후 자동 연결을 시도합니다.' : '기존 MQTT 설정은 유지됩니다.'}`)) return;
     setBusy(`add:${id}`);
     setError('');
@@ -439,7 +473,8 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     }
     setBusy('');
     if (isSensor) {
-      setMessage('온습도 센서를 등록했습니다. Shelly의 MQTT 서버 연결이 설정되면 측정값이 표시됩니다.');
+      if (supportsShellyQuickPair) await pairSensor(id);
+      else setMessage('센서를 등록했습니다. 기존 Jarbis에서는 MQTT 연결 정보를 수동으로 설정해야 합니다.');
       return;
     }
     if (candidate.source !== 'http' || !candidate.ip) {
@@ -573,8 +608,9 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
         {sensors.map(device => <SmartHomeSensorCard key={device.id} device={device}
           state={sensorStates[device.id]} checking={Boolean(checkingSensors[device.id])}
-          busy={Boolean(busy)} supported={supportsShelly}
+          busy={Boolean(busy)} supported={supportsShelly} quickPair={supportsShellyQuickPair}
           onRefresh={() => void refreshSensor(device.id)}
+          onConnect={() => void pairSensor(device.id)}
           onToggle={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}
           onRemove={() => void remove(device)} />)}
       </div>
@@ -739,7 +775,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-base font-extrabold text-slate-950">새 기기 찾기</h2>
-          <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">지원 기기를 같은 Wi-Fi에 연결한 뒤 검색하세요. 센서는 깨어 있을 때만 검색될 수 있습니다.</p>
+          <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">지원 기기를 같은 Wi-Fi에 연결한 뒤 검색하세요. Shelly 센서는 절전 중에도 DHCP 목록에서 발견될 수 있습니다.</p>
         </div>
         <button class={primaryButton} type="button" disabled={!!busy || !status?.enabled}
           onClick={() => void scan()} aria-busy={busy === 'scan'}>
@@ -749,11 +785,11 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
         <summary class="cursor-pointer font-bold text-slate-800">Shelly H&T Gen3 연결 안내</summary>
         <ol class="mt-3 mb-0 list-decimal space-y-2 pl-5 text-xs leading-5">
-          <li>센서를 공유기와 같은 Wi-Fi에 연결합니다.</li>
-          <li>Shelly 기기 관리 화면에서 MQTT를 활성화하고, 아래 고급 설정의 공유기 MQTT 서버·인증 정보를 등록합니다. 상태 알림도 사용해야 합니다.</li>
-          <li>센서를 깨운 상태에서 기기 검색을 누르고 원하는 센서만 등록합니다.</li>
-          <li>값은 센서가 측정 결과를 보낼 때 갱신되며, 절전 중에는 마지막 측정값이 유지됩니다.</li>
+          <li>Shelly 센서를 공유기 Wi-Fi에 연결하고 이 화면에서 기기를 검색합니다.</li>
+          <li><strong>연결 및 추가</strong>를 누릅니다. 센서가 잠들어 있다면 버튼을 짧게 누른 후 <strong>연결 다시 시도</strong>를 누르세요.</li>
         </ol>
+        <p class="mt-2 mb-0 text-xs text-slate-600">공유기가 MQTT 연결 정보를 자동 설정하고 가능하면 첫 온습도 값을 바로 가져옵니다. 기존 MQTT 설정이 다른 서버를 가리키면 변경 여부를 먼저 확인합니다.</p>
+        {!supportsShellyQuickPair && supportsShelly ? <p class="mt-2 mb-0 text-xs font-semibold text-amber-800">이 Jarbis 버전은 자동 연결을 지원하지 않습니다. 고급 설정의 MQTT 정보를 Shelly 관리 화면에 수동 입력해 주세요.</p> : null}
         {!supportsShelly ? <p class="mt-3 mb-0 text-xs font-semibold text-amber-800">현재 Jarbis는 Shelly 센서를 지원하지 않습니다. 센서 연동 기능이 포함된 Jarbis가 설치되어야 검색·등록할 수 있습니다.</p> : null}
       </details>
       {!candidateData ? <div role="status" aria-busy={candidatesResource.loading} class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
@@ -766,12 +802,12 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           <div class="min-w-0 flex-1">
             <strong class="block text-sm text-slate-900">{candidate.name}</strong>
             <p class="mt-1 mb-0 break-all text-xs text-slate-500">{candidate.ip || '주소 미확인'} · {candidate.protocol === 'shelly_htg3' ? 'Shelly H&T Gen3' : 'Tasmota'}</p>
-            <p class="mt-1 mb-0 text-xs text-slate-500">{candidate.source === 'http' ? 'Wi-Fi에서 발견' : 'MQTT에서 발견'}</p>
+            <p class="mt-1 mb-0 text-xs text-slate-500">{candidate.source === 'http' ? '기기 확인 완료' : candidate.source === 'dhcp' ? 'Wi-Fi 연결 기록에서 발견 · 연결 시 기기 확인' : 'MQTT에서 발견'}</p>
           </div>
           <button class={primaryButton} type="button"
             disabled={!!busy || !status?.enabled || candidate.registered || !candidate.topic || (candidate.protocol === 'shelly_htg3' && !supportsShelly)}
             onClick={() => void add(candidate)}>
-            {candidate.registered ? '등록됨' : candidate.protocol === 'shelly_htg3' && !supportsShelly ? 'Jarbis 업데이트 필요' : candidate.topic ? (candidate.protocol === 'shelly_htg3' ? '센서 추가' : candidate.source === 'http' ? '추가 및 자동 연결' : '기기 추가') : '추가 불가'}
+            {candidate.registered ? '등록됨' : candidate.protocol === 'shelly_htg3' && !supportsShelly ? 'Jarbis 업데이트 필요' : candidate.topic ? (candidate.protocol === 'shelly_htg3' ? (supportsShellyQuickPair ? '연결 및 추가' : '센서 추가') : candidate.source === 'http' ? '추가 및 자동 연결' : '기기 추가') : '추가 불가'}
           </button>
         </li>)}
       </ul>}
@@ -807,7 +843,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
             <p class="m-0 text-xs text-slate-500">이 비밀번호는 전구 웹 관리자 비밀번호와 다릅니다. 다른 사람과 공유하지 마세요.</p>
           </div> : null}
         </div> : null}
-        <p class="m-0 text-xs leading-5 text-slate-500">기기 설정을 자동 변경하지 않고, 기기 추가와 연결 작업은 사용자가 승인한 경우에만 실행합니다. Shelly H&T Gen3는 기기 자체에서 MQTT 연결을 설정해야 합니다.</p>
+        <p class="m-0 text-xs leading-5 text-slate-500">센서를 연결할 때만 사용자 승인 후 공유기 내장 MQTT 설정을 기기에 전달합니다. 기기가 잠들어 있거나 관리자 인증이 설정된 경우에는 수동 연결을 사용할 수 있습니다. 로컬 HTTP는 암호화되지 않으므로 신뢰할 수 있는 Wi-Fi에서만 이용하세요.</p>
       </div>
     </details>
   </div>;
