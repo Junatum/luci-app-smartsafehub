@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { AlertIcon, DevicesIcon, ReloadIcon } from './Icons';
+import { AlertIcon, ReloadIcon, ThermometerIcon } from './Icons';
 import { SmartHomeRoomPicker } from './SmartHomeRoomPicker';
 import type { HomeRoom } from '../utils/smartHomeGroups';
 import type { JarbisDevice, JarbisSensorState } from '../types/jarbis';
@@ -36,7 +36,7 @@ export function SmartHomeSensorCard({ device, state, checking, busy, supported, 
 
   return <article class="ssh-home-device-card ssh-home-sensor" data-density={compact ? 'compact' : 'detail'} aria-label={`${device.name} 온습도 센서`}>
     <div class="ssh-home-sensor-header">
-      <span class="ssh-home-device-icon" aria-hidden="true"><DevicesIcon class="size-5" /></span>
+      <span class="ssh-home-device-icon" aria-hidden="true"><ThermometerIcon class="size-5" /></span>
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <h3 class="ssh-home-device-title" title={device.name}>{device.name}</h3>

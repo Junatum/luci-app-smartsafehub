@@ -43,8 +43,10 @@ test('데모는 외부 RPC 없이 로컬 측정값만 사용한다', () => {
 });
 
 test('NaN, 비정상 온습도, 미래/오래된 보고를 측정값으로 꾸미지 않는다', () => {
-  assert.equal(sensorReading(23.46, '°C', -40, 125), '23.5°C');
-  assert.equal(sensorReading(0, '%', 0, 100), '0%');
+  assert.equal(sensorReading(23.46, '°C', -40, 125), '23.5 °C');
+  assert.equal(sensorReading(0, '%', 0, 100), '0 %');
+  assert.equal(sensorReading(100, '%', 0, 100), '100 %');
+  assert.equal(sensorReading(-2.5, '°C', -40, 125), '-2.5 °C');
   for (const n of [NaN, Infinity, -Infinity, 101, null]) {
     assert.equal(sensorReading(n, '%', 0, 100), '—');
   }

@@ -30,8 +30,8 @@ test('저장된 대표 센서를 우선 사용하고 삭제·중지 후 활성 �
 
 test('신뢰 가능한 측정값만 표시하며 3시간 지난 값은 오래됨으로 구분한다', () => {
   const view = featuredSensorView(a, reading, now);
-  assert.equal(view?.temperature, '24.3°C');
-  assert.equal(view?.humidity, '54%');
+  assert.equal(view?.temperature, '24.3 °C');
+  assert.equal(view?.humidity, '54 %');
   assert.equal(view?.stale, false);
   assert.equal(featuredSensorView(a, { ...reading, lastSeen: now - 11_000 }, now)?.stale, true);
   assert.equal(featuredSensorView(a, { ...reading, id: b.id }, now), null);

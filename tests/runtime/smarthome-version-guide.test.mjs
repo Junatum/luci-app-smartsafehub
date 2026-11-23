@@ -65,6 +65,8 @@ test('기기 종류는 센서와 전구에 동일한 규칙을 사용하고, 이
   const demo = read('frontend/src/demo/data.ts');
   assert.match(sensor, /<h3[^>]+>\{device\.name\}<\/h3>/);
   assert.match(sensor, /ssh-home-device-subtitle">Wi-Fi 온습도 센서/);
+  assert.match(sensor, /ThermometerIcon class=\"size-5\"/);
+  assert.doesNotMatch(sensor, /DevicesIcon class=\"size-5\"/);
   assert.match(page, /Wi-Fi 스마트 전구<\/p>/);
   assert.match(page, /온습도 센서의 측정값/);
   assert.doesNotMatch(page, /Shelly H&T Gen3의 온도·습도/);

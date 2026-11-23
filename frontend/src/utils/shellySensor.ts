@@ -5,7 +5,7 @@ const STALE_AFTER_SECONDS = 3 * 60 * 60;
 /** Avoid displaying stale, impossible, or unverified values as live readings. */
 export function sensorReading(value: number | null | undefined, unit: '°C' | '%', min: number, max: number): string {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) return '—';
-  return `${unit === '°C' ? value.toFixed(1) : Math.round(value)}${unit}`;
+  return `${unit === '°C' ? value.toFixed(1) : Math.round(value)} ${unit}`;
 }
 
 export function sensorReportLabel(lastSeen: number | null | undefined, nowSeconds: number): { label: string; stale: boolean } {
