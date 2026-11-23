@@ -265,7 +265,7 @@ test('관리 메뉴는 바깥 클릭과 Escape로 닫고 전구 카드 조작은
   assert.match(page, /document\.removeEventListener\('pointerdown', onOutside\)/);
   assert.match(page, /document\.addEventListener\('keydown', onEscape\)/);
   assert.match(page, /event\.key === 'Escape'/);
-  assert.match(page, /!menu\.contains\(target\)/);
+  assert.match(page, /if \(path\?\.includes\(menu\)\) continue/);
   assert.match(page, /manageMenus\.current\[device\.id\]/);
 });
 

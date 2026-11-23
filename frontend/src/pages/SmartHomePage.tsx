@@ -168,15 +168,22 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [adminPassword, setAdminPassword] = useState('');
   const [replaceExisting, setReplaceExisting] = useState(false);
 
-  // Native <details> does not close on outside clicks. Keep the menu as a
-  // small popup, but dismiss it on outside pointer interaction and Escape.
+  // All bulb/sensor menus share the same outside-click and Escape behavior.
+  // Use the composed path because the app can run inside a ShadowRoot. The
+  // shared CustomSelect renders its options through a portal outside <details>.
   useEffect(() => {
-    const dismiss = (target: Node | null) => {
+    const dismiss = (path: EventTarget[] | null) => {
+      const selectMenu = path?.find(target => target instanceof Element && target.classList.contains('ssh-custom-select-menu'));
       for (const menu of Object.values(manageMenus.current)) {
-        if (menu?.open && (!target || !menu.contains(target))) menu.open = false;
+        if (!menu?.open) continue;
+        if (path?.includes(menu)) continue;
+        // A click on the portaled room options still belongs to this menu.
+        if (selectMenu instanceof HTMLElement && Array.from(menu.querySelectorAll('[aria-controls]'))
+          .some(trigger => trigger.getAttribute('aria-controls') === selectMenu.id)) continue;
+        menu.open = false;
       }
     };
-    const onOutside = (event: PointerEvent) => dismiss(event.target instanceof Node ? event.target : null);
+    const onOutside = (event: PointerEvent) => dismiss(event.composedPath());
     const onEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(null); };
     document.addEventListener('pointerdown', onOutside);
     document.addEventListener('keydown', onEscape);
@@ -185,6 +192,11 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       document.removeEventListener('keydown', onEscape);
     };
   }, []);
+
+  const closeManageMenu = (id: string) => {
+    const menu = manageMenus.current[id];
+    if (menu) menu.open = false;
+  };
 
   // Match the other SmartSafeHub pages: transient successes must not keep
   // pushing device controls down, while errors remain until acknowledged.
@@ -720,10 +732,11 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           state={sensorStates[device.id]} checking={Boolean(checkingSensors[device.id])}
           busy={Boolean(busy)} supported={supportsShelly} quickPair={supportsShellyQuickPair}
           compact={compact} roomsSupported={supportsRooms} onRoomChange={room => void changeRoom(device, room)}
+          onManageMenuRef={element => { manageMenus.current[device.id] = element; }}
           onRefresh={() => void refreshSensor(device.id)}
           onConnect={() => void pairSensor(device.id)}
-          onToggle={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}
-          onRemove={() => void remove(device)} />)}
+          onToggle={() => { closeManageMenu(device.id); void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}
+          onRemove={() => { closeManageMenu(device.id); void remove(device); }} />)}
           </div>
         </div>)}
       </div>
@@ -778,12 +791,12 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
               <button class={secondaryButton} type="button" disabled={!!busy || !device.enabled || !ready || Boolean(checkingStates[device.id])}
                 onClick={() => void refreshLight(device.id)}>상태 확인</button>
               <button class={secondaryButton} type="button" onClick={() => setDisplayMode('detail')}>상세 설정</button>
-              <details class="relative z-20 text-sm text-slate-600">
+              <details ref={element => { manageMenus.current[device.id] = element; }} class="relative z-20 text-sm text-slate-600">
                 <summary class={`${secondaryButton} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}>관리</summary>
                 <div class="absolute right-0 top-full z-30 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
                   <SmartHomeRoomPicker room={device.room} supported={supportsRooms} disabled={!!busy} onChange={room => void changeRoom(device, room)} />
-                  <button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}>{device.enabled ? '기기 사용 중지' : '기기 다시 사용'}</button>
-                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => void remove(device)}>기기 삭제</button>
+                  <button class={secondaryButton} type="button" disabled={!!busy} onClick={() => { closeManageMenu(device.id); void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}>{device.enabled ? '기기 사용 중지' : '기기 다시 사용'}</button>
+                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => { closeManageMenu(device.id); void remove(device); }}>기기 삭제</button>
                 </div>
               </details>
             </div>
@@ -877,10 +890,10 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
                   <p class="m-0 break-all text-xs text-slate-500">기기 ID: {device.id}<br />Topic: {device.topic}</p>
                   <SmartHomeRoomPicker room={device.room} supported={supportsRooms} disabled={!!busy} onChange={room => void changeRoom(device, room)} />
                   <button class={secondaryButton} type="button" disabled={!!busy}
-                    onClick={() => { manageMenus.current[device.id]!.open = false; void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}>
+                    onClick={() => { closeManageMenu(device.id); void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.'); }}>
                     {device.enabled ? '기기 사용 중지' : '기기 다시 사용'}
                   </button>
-                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => { manageMenus.current[device.id]!.open = false; void remove(device); }}>기기 삭제</button>
+                  <button class={dangerButton} type="button" disabled={!!busy} onClick={() => { closeManageMenu(device.id); void remove(device); }}>기기 삭제</button>
                 </div>
               </details>
             </div>
