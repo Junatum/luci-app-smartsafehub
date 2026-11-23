@@ -25,7 +25,7 @@ import {
   demoSafeShield, demoStatistics, demoStatus, demoUpdates,
   demoWan, demoWifi, demoRules, demoWifiQr, demoGuestWifiQr,
   demoAccount, demoApps, demoAppsStatus, demoAppsMetrics, demoNetwatch,
-  demoJarbisStatus, demoJarbisDevices, demoJarbisCandidates, demoJarbisLightStates,
+  demoJarbisStatus, demoJarbisDevices, demoJarbisCandidates, demoJarbisLightStates, demoJarbisSensorStates,
 } from './data';
 import '../styles/app.css';
 
@@ -70,7 +70,7 @@ function DemoApp() {
         statusResource={{ data: demoJarbisStatus, error: null, loading: false, replaceData: () => {} }}
         devicesResource={{ data: demoJarbisDevices, error: null, loading: false, replaceData: () => {} }}
         candidatesResource={{ data: demoJarbisCandidates, error: null, loading: false, replaceData: () => {} }}
-        demoLightStates={demoJarbisLightStates} />;
+        demoLightStates={demoJarbisLightStates} demoSensorStates={demoJarbisSensorStates} />;
       break;
     case 'account':
       content = <SmartSafeHubAccountPage data={demoAccount} error={null} loading={false}

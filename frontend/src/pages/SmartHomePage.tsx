@@ -7,9 +7,11 @@ import {
 import { SectionHeading } from '../components/SectionHeading';
 import { ErrorPanel } from '../components/StatePanels';
 import { SmartHomeWelcome } from '../components/SmartHomeWelcome';
+import { SmartHomeSensorCard } from '../components/SmartHomeSensorCard';
 import { smartHomeEntry } from '../utils/smartHomeEntry';
 import type { AppsCatalog, AppsInstallStatus } from '../types/apps';
-import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus, JarbisLightState } from '../types/jarbis';
+import type { JarbisCandidate, JarbisCredentials, JarbisDevice, JarbisStatus, JarbisLightState, JarbisSensorState } from '../types/jarbis';
+import { isShellyHtg3 } from '../types/jarbis';
 
 const secondaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:cursor-not-allowed disabled:opacity-50';
@@ -39,8 +41,8 @@ function statusFailureHint(reason: JarbisLightState['reason']): string {
   }
 }
 
-function deviceIdForTopic(topic: string): string {
-  return `tasmota_${topic.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 32)}`;
+function deviceIdForTopic(topic: string, protocol = 'tasmota'): string {
+  return `${protocol === 'shelly_htg3' ? 'shelly_' : 'tasmota_'}${topic.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 32)}`;
 }
 
 // MQTT publish acknowledgements do not prove that a bulb has physically changed.
@@ -66,9 +68,10 @@ export interface SmartHomeOperations {
   getJarbisDevices: () => Promise<{ devices: JarbisDevice[] }>;
   getJarbisCandidates: () => Promise<{ devices: JarbisCandidate[] }>;
   getJarbisLightState: (id: string, priority?: 'low' | 'normal' | 'high') => Promise<JarbisLightState>;
+  getJarbisSensorState: (id: string, priority?: 'low' | 'normal' | 'high') => Promise<JarbisSensorState>;
   scanJarbis: () => Promise<{ devices: JarbisCandidate[] }>;
   setJarbisEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>;
-  addJarbisDevice: (id: string, name: string, topic: string) => Promise<{ id: string; added: boolean }>;
+  addJarbisDevice: (id: string, name: string, topic: string, protocol?: 'shelly_htg3') => Promise<{ id: string; added: boolean }>;
   updateJarbisDevice: (id: string, name: string, enabled: boolean) => Promise<{ id: string; updated: boolean }>;
   removeJarbisDevice: (id: string) => Promise<{ id: string; removed: boolean }>;
   setJarbisLight: (id: string, capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string) => Promise<{ accepted: boolean }>;
@@ -82,6 +85,7 @@ interface SmartHomePageProps {
   demo?: boolean;
   onDemoAction?: () => void;
   demoLightStates?: Readonly<Record<string, JarbisLightState>>;
+  demoSensorStates?: Readonly<Record<string, JarbisSensorState>>;
   statusResource: SmartHomeResource<JarbisStatus>;
   devicesResource: SmartHomeResource<{ devices: JarbisDevice[] }>;
   candidatesResource: SmartHomeResource<{ devices: JarbisCandidate[] }>;
@@ -94,11 +98,11 @@ interface SmartHomePageProps {
 }
 
 export function SmartHomePage({ statusResource, devicesResource, candidatesResource,
-  operations, demo = false, onDemoAction, demoLightStates,
+  operations, demo = false, onDemoAction, demoLightStates, demoSensorStates,
   appsStatus = null, appsCatalog = null, appsStatusError = null, appsCatalogError = null,
   onCheckInstallation }: SmartHomePageProps) {
   const {
-    addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState,
+    addJarbisDevice, getJarbisCandidates, getJarbisCredentials, getJarbisDevices, getJarbisLightState, getJarbisSensorState,
     getJarbisStatus, pairJarbisDevice, removeJarbisDevice, scanJarbis,
     setJarbisEnabled, setJarbisLight, updateJarbisDevice,
   } = operations;
@@ -111,7 +115,10 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const deviceData = devicesResource.data;
   const candidateData = candidatesResource.data;
   const devices = deviceData?.devices ?? [];
+  const lights = devices.filter(device => !isShellyHtg3(device) && device.kind === 'light');
+  const sensors = devices.filter(isShellyHtg3);
   const candidates = candidateData?.devices ?? [];
+  const supportsShelly = status?.features?.shellyHtg3 === true;
   const entry = demo ? 'ready' : smartHomeEntry(status, statusResource.error, appsStatus, appsCatalog, appsStatusError, appsCatalogError);
   // MQTT credentials are sensitive: retain them only while this page is mounted.
   const [credentials, setCredentials] = useState<JarbisCredentials | null>(null);
@@ -126,8 +133,12 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
   const [colors, setColors] = useState<Record<string, string>>({});
   const [kelvins, setKelvins] = useState<Record<string, number>>({});
   const [lightStates, setLightStates] = useState<Record<string, JarbisLightState>>(() => ({ ...demoLightStates }));
+  // Sensor measurements are cached by Jarbis, not by the browser across visits.
+  const [sensorStates, setSensorStates] = useState<Record<string, JarbisSensorState>>(() => ({ ...demoSensorStates }));
+  const [checkingSensors, setCheckingSensors] = useState<Record<string, boolean>>({});
   const [checkingStates, setCheckingStates] = useState<Record<string, boolean>>({});
   const stateRequest = useRef(0);
+  const sensorRequest = useRef(0);
   const discoverySection = useRef<HTMLElement | null>(null);
   const manageMenus = useRef<Record<string, HTMLDetailsElement | null>>({});
   const editingDevice = useRef<string | null>(null);
@@ -204,7 +215,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
   // One bounded on-demand MQTT query per registered bulb, refreshed only while
   // this page is mounted. No background polling daemon or raw MQTT stream.
-  const stateIds = devices.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
+  const stateIds = lights.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
   useEffect(() => {
     if (demo || !status?.enabled || !status.brokerReady || !stateIds) return;
     const seq = ++stateRequest.current;
@@ -224,6 +235,45 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
     const timer = window.setInterval(poll, 30000);
     return () => { stateRequest.current++; window.clearInterval(timer); };
   }, [stateIds, status?.enabled, status?.brokerReady]);
+
+  // Battery-operated H&T Gen3 sleeps between reports. Jarbis must keep the
+  // last verified MQTT reading; the UI re-reads the cache every 5 minutes,
+  // without waking the sensor or treating an HTTP timeout as offline.
+  const sensorIds = sensors.filter(device => device.enabled).slice(0, 6).map(device => device.id).join('|');
+  const refreshSensor = async (id: string, background = false): Promise<void> => {
+    if (demoAction() || !supportsShelly) return;
+    setCheckingSensors(old => ({ ...old, [id]: true }));
+    try {
+      const result = await getJarbisSensorState(id, background ? 'low' : 'normal');
+      if (result.id !== id) throw new Error('센서의 응답 ID가 일치하지 않습니다.');
+      setSensorStates(old => ({ ...old, [id]: result }));
+    } catch (cause) {
+      // Preserve the last verified measurement rather than replacing it with
+      // empty data when a single read fails.
+      if (!background) setError(errorMessage(cause));
+    } finally {
+      setCheckingSensors(old => ({ ...old, [id]: false }));
+    }
+  };
+  useEffect(() => {
+    if (demo || !status?.enabled || !supportsShelly || !sensorIds) return;
+    const seq = ++sensorRequest.current;
+    const ids = sensorIds.split('|');
+    let polling = false;
+    const poll = async () => {
+      if (polling || seq !== sensorRequest.current || document.visibilityState === 'hidden') return;
+      polling = true;
+      try {
+        for (const id of ids) {
+          if (seq !== sensorRequest.current) break;
+          await refreshSensor(id, true);
+        }
+      } finally { polling = false; }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 300000);
+    return () => { sensorRequest.current++; window.clearInterval(timer); };
+  }, [sensorIds, status?.enabled, supportsShelly]);
 
   const sendLight = async (device: JarbisDevice,
     capability: 'power' | 'brightness' | 'color' | 'color_temperature', value: string): Promise<boolean> => {
@@ -361,21 +411,37 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
   const add = async (candidate: JarbisCandidate) => {
     if (demoAction()) return;
-    const id = deviceIdForTopic(candidate.topic);
+    const isSensor = candidate.protocol === 'shelly_htg3';
+    const id = deviceIdForTopic(candidate.topic, candidate.protocol);
     if (!candidate.topic) { setError('기기 연결 정보를 확인할 수 없습니다. 다시 검색해 주세요.'); return; }
-    if (!window.confirm(`${candidate.name} 전구를 추가할까요? ${candidate.source === 'http' ? '추가 후 자동 연결을 시도합니다.' : '기존 MQTT 설정은 유지됩니다.'}`)) return;
+    if (isSensor && !supportsShelly) { setError('Shelly H&T Gen3를 추가하려면 센서 지원 Jarbis가 필요합니다.'); return; }
+    if (!window.confirm(isSensor ? `${candidate.name} 온습도 센서를 등록할까요? 기기의 기존 MQTT 연결 설정은 변경하지 않습니다.`
+      : `${candidate.name} 전구를 추가할까요? ${candidate.source === 'http' ? '추가 후 자동 연결을 시도합니다.' : '기존 MQTT 설정은 유지됩니다.'}`)) return;
     setBusy(`add:${id}`);
     setError('');
     setMessage('');
     try {
-      await addJarbisDevice(id, candidate.name, candidate.topic);
+      const added = await addJarbisDevice(id, candidate.name, candidate.topic, isSensor ? 'shelly_htg3' : undefined);
+      if (!added.added || added.id !== id) throw new Error('기기 등록 응답을 확인할 수 없습니다.');
       await refresh();
+      if (isSensor) {
+        // A legacy backend might ignore protocol and silently create a bulb.
+        const listed = await getJarbisDevices();
+        devicesResource.replaceData(listed);
+        if (!listed.devices.some(device => device.id === id && isShellyHtg3(device))) {
+          throw new Error('Jarbis가 온습도 센서 유형으로 등록하지 않았습니다. Jarbis 업데이트가 필요합니다.');
+        }
+      }
     } catch (cause) {
       setError(errorMessage(cause));
       setBusy('');
       return;
     }
     setBusy('');
+    if (isSensor) {
+      setMessage('온습도 센서를 등록했습니다. Shelly의 MQTT 서버 연결이 설정되면 측정값이 표시됩니다.');
+      return;
+    }
     if (candidate.source !== 'http' || !candidate.ip) {
       setMessage('전구를 등록했습니다. 이미 설정된 MQTT 연결은 변경하지 않았습니다.');
       return;
@@ -396,7 +462,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
   const remove = async (device: JarbisDevice) => {
     if (demoAction()) return;
-    if (!window.confirm(`${device.name}을(를) 목록에서 삭제할까요? 실제 전구 설정은 변경하지 않습니다.`)) return;
+    if (!window.confirm(`${device.name}을(를) 목록에서 삭제할까요? 실제 기기의 설정은 변경하지 않습니다.`)) return;
     await run(`remove:${device.id}`, () => removeJarbisDevice(device.id), '등록된 기기를 삭제했습니다.');
     if (pairTarget?.id === device.id) closePair();
   };
@@ -420,22 +486,22 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
 
   return <div class="space-y-5">
     {demo ? <p role="status" class="rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800">
-      스마트홈 체험 · 전구와 MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
+      스마트홈 체험 · 전구와 온습도 센서, MQTT 상태는 모두 가상 예시이며 실제 제어·검색·연결은 실행되지 않습니다.
     </p> : null}
     {status && deviceData && devices.length === 0 ? <section aria-label="첫 스마트 전구 연결 안내" class="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm shadow-slate-900/5 sm:p-6">
       <p class="m-0 text-xs font-extrabold tracking-widest text-teal-700">스마트홈 시작하기 · 2단계</p>
-      <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">첫 번째 스마트 전구를 연결해 보세요</h2>
-      <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">Jarbis 설치가 완료되었습니다. Tasmota 전구를 공유기와 같은 Wi-Fi에 연결한 다음, 아래에서 검색하고 추가할 수 있습니다.</p>
+      <h2 class="mt-2 mb-0 text-xl font-black text-slate-950">첫 번째 스마트홈 기기를 연결해 보세요</h2>
+      <p class="mt-2 mb-0 text-sm leading-6 text-slate-600">Jarbis 설치가 완료되었습니다. 지원 기기를 공유기와 같은 Wi-Fi에 연결한 다음 아래에서 검색하고 추가해 보세요.</p>
       <div class="mt-4 grid gap-2 text-xs leading-5 text-slate-700 sm:grid-cols-3">
-        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">1. 전구 준비</strong>전원을 켜고 공유기 Wi-Fi에 연결</div>
-        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">2. 기기 검색</strong>검색된 전구의 이름 확인</div>
-        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">3. 연결 승인</strong>직접 추가한 전구만 제어</div>
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">1. 기기 준비</strong>전원을 켜고 공유기 Wi-Fi에 연결</div>
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">2. 기기 검색</strong>검색된 기기의 이름 확인</div>
+        <div class="rounded-lg bg-slate-50 p-3"><strong class="block text-slate-900">3. 연결 승인</strong>직접 추가한 기기만 관리</div>
       </div>
       <button class={`${primaryButton} mt-4`} type="button"
-        onClick={() => discoverySection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>전구 찾으러 가기</button>
+        onClick={() => discoverySection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>기기 찾으러 가기</button>
       {!status.enabled ? <p class="mt-2 mb-0 text-xs text-slate-500">기기를 검색하려면 아래에서 스마트홈 사용을 먼저 켜 주세요.</p> : null}
     </section> : null}
-    <SectionHeading eyebrow="Smart Home" title="스마트 전구" description="같은 Wi-Fi에 연결된 전구의 상태를 확인하고, 전원·밝기·색상·색온도를 조절합니다."
+    <SectionHeading eyebrow="Smart Home" title="스마트홈" description="스마트 전구를 제어하고 Shelly H&T Gen3의 온도·습도 측정값을 확인합니다."
       action={<button class={secondaryButton} type="button" disabled={!!busy} onClick={() => void retry()}>
         <ReloadIcon class={`size-4 ${busy === 'refresh' ? 'animate-spin' : ''}`} />새로고침
       </button>} />
@@ -451,7 +517,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-teal-50 text-teal-700"><SettingsIcon class="size-5" /></span>
           <div class="min-w-0">
             <h2 class="m-0 text-base font-extrabold text-slate-950">스마트홈 사용</h2>
-            <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기에서 전구를 검색하고 제어합니다.</p>
+            <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">공유기에서 스마트 전구를 제어하고 온습도 센서를 확인합니다.</p>
           </div>
         </div>
         <div class="flex items-center gap-3 sm:justify-end">
@@ -475,7 +541,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
           </p>
         </div>
         <div class="rounded-xl bg-slate-50 p-3">
-          <p class="m-0 text-xs font-semibold text-slate-500">등록된 전구</p>
+          <p class="m-0 text-xs font-semibold text-slate-500">등록된 기기</p>
           <p class="mt-1 mb-0 text-lg font-extrabold text-slate-900">{deviceData ? devices.length : '—'}{deviceData ? <span class="ml-1 text-sm font-semibold text-slate-500">대</span> : null}</p>
         </div>
       </div>
@@ -490,8 +556,8 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <button class="shrink-0 font-bold underline" type="button" onClick={() => setError('')}>닫기</button>
     </div> : null}
     {((status && statusResource.error) || devicesResource.error || candidatesResource.error) ? <div role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-      {devicesResource.error ? `등록된 전구 목록: ${devicesResource.error} ` : ''}
-      {candidatesResource.error ? `발견된 전구 목록: ${candidatesResource.error} ` : ''}
+      {devicesResource.error ? `등록된 기기 목록: ${devicesResource.error} ` : ''}
+      {candidatesResource.error ? `발견된 기기 목록: ${candidatesResource.error} ` : ''}
       {status && statusResource.error ? `서비스 상태 갱신: ${statusResource.error}` : ''}
       <button class="ml-2 font-bold underline" type="button" disabled={!!busy} onClick={() => void retry()}>다시 확인</button>
     </div> : null}
@@ -501,20 +567,33 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
       <button class="shrink-0 rounded-lg px-1 text-xs font-bold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600" type="button" aria-label="성공 알림 닫기" onClick={() => setMessage('')}>닫기</button>
     </div> : null}
 
-    <section aria-label="등록된 전구" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    {sensors.length > 0 ? <section aria-label="등록된 온습도 센서" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+      <div><h2 class="m-0 text-base font-extrabold text-slate-950">내 온습도 센서</h2>
+        <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">센서는 배터리 절약을 위해 잠들 수 있습니다. 마지막으로 수신된 값과 시간을 표시합니다.</p></div>
+      <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {sensors.map(device => <SmartHomeSensorCard key={device.id} device={device}
+          state={sensorStates[device.id]} checking={Boolean(checkingSensors[device.id])}
+          busy={Boolean(busy)} supported={supportsShelly}
+          onRefresh={() => void refreshSensor(device.id)}
+          onToggle={() => void run(`update:${device.id}`, () => updateJarbisDevice(device.id, device.name, !device.enabled), device.enabled ? '기기를 사용 중지했습니다.' : '기기를 다시 사용합니다.')}
+          onRemove={() => void remove(device)} />)}
+      </div>
+    </section> : null}
+
+    {(!deviceData || lights.length > 0 || sensors.length === 0) ? <section aria-label="등록된 전구" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div><h2 class="m-0 text-base font-extrabold text-slate-950">내 전구</h2>
           <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">등록된 전구의 전원을 켜고 끄거나 밝기를 조절합니다.</p></div>
-        <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{deviceData ? `${devices.length}대 등록` : '확인 중'}</span>
+        <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">{deviceData ? `${lights.length}대 등록` : '확인 중'}</span>
       </div>
       {!deviceData ? <div aria-busy={devicesResource.loading} role="status" class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
         {devicesResource.error ? '전구 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '등록된 전구를 확인하고 있습니다…'}
-      </div> : devices.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+      </div> : lights.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
         <DevicesIcon class="mx-auto size-8 text-slate-400" />
         <p class="mt-3 mb-1 text-sm font-extrabold text-slate-900">아직 등록된 전구가 없습니다</p>
         <p class="m-0 text-xs text-slate-500">아래에서 기기를 검색한 뒤 추가해 주세요.</p>
       </div> : <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {devices.map(device => {
+        {lights.map(device => {
           const controlsDisabled = Boolean(busy) || !ready || !device.enabled;
           const activePair = pairTarget?.id === device.id;
           const observed = lightStates[device.id];
@@ -654,35 +733,45 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
         })}
       </div>}
       <p class="mt-3 mb-0 text-xs leading-5 text-slate-500">전원·밝기·색상은 전구에서 직접 확인한 상태만 실제 값으로 표시합니다. MQTT 응답이 없을 때는 검증된 내부망 HTTP 조회를 시도합니다. 확인되지 않은 값은 실제 상태로 표시하지 않습니다.</p>
-    </section>
+    </section> : null}
 
-    <section ref={discoverySection} aria-label="새 전구 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
+    <section ref={discoverySection} aria-label="새 스마트홈 기기 찾기" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="m-0 text-base font-extrabold text-slate-950">새 전구 찾기</h2>
-          <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">전구를 같은 Wi-Fi에 연결한 뒤 검색하세요. 검색에 최대 25초 정도 걸릴 수 있습니다.</p>
+          <h2 class="m-0 text-base font-extrabold text-slate-950">새 기기 찾기</h2>
+          <p class="mt-1 mb-0 text-xs leading-5 text-slate-500">지원 기기를 같은 Wi-Fi에 연결한 뒤 검색하세요. 센서는 깨어 있을 때만 검색될 수 있습니다.</p>
         </div>
         <button class={primaryButton} type="button" disabled={!!busy || !status?.enabled}
           onClick={() => void scan()} aria-busy={busy === 'scan'}>
           <SearchIcon class={`size-4 ${busy === 'scan' ? 'animate-pulse' : ''}`} />{busy === 'scan' ? '검색 중…' : '기기 검색'}
         </button>
       </div>
+      <details class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+        <summary class="cursor-pointer font-bold text-slate-800">Shelly H&T Gen3 연결 안내</summary>
+        <ol class="mt-3 mb-0 list-decimal space-y-2 pl-5 text-xs leading-5">
+          <li>센서를 공유기와 같은 Wi-Fi에 연결합니다.</li>
+          <li>Shelly 기기 관리 화면에서 MQTT를 활성화하고, 아래 고급 설정의 공유기 MQTT 서버·인증 정보를 등록합니다. 상태 알림도 사용해야 합니다.</li>
+          <li>센서를 깨운 상태에서 기기 검색을 누르고 원하는 센서만 등록합니다.</li>
+          <li>값은 센서가 측정 결과를 보낼 때 갱신되며, 절전 중에는 마지막 측정값이 유지됩니다.</li>
+        </ol>
+        {!supportsShelly ? <p class="mt-3 mb-0 text-xs font-semibold text-amber-800">현재 Jarbis는 Shelly 센서를 지원하지 않습니다. 센서 연동 기능이 포함된 Jarbis가 설치되어야 검색·등록할 수 있습니다.</p> : null}
+      </details>
       {!candidateData ? <div role="status" aria-busy={candidatesResource.loading} class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-        {candidatesResource.error ? '발견된 전구 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '검색된 전구 목록을 확인하고 있습니다…'}
+        {candidatesResource.error ? '발견된 기기 목록을 읽을 수 없습니다. 위에서 다시 확인해 주세요.' : '검색된 기기 목록을 확인하고 있습니다…'}
       </div> : availableCandidates.length === 0 ? <div class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-        {busy === 'scan' ? '근처에서 Tasmota 전구를 찾고 있습니다…' : candidates.length > 0 ? '발견된 전구는 모두 등록되어 있습니다.' : '아직 발견된 전구가 없습니다. 기기가 같은 네트워크에 연결돼 있는지 확인해 주세요.'}
+        {busy === 'scan' ? '같은 네트워크에서 기기를 검색하고 있습니다…' : candidates.length > 0 ? '발견된 기기는 모두 등록되어 있습니다.' : '아직 발견된 기기가 없습니다. 기기가 같은 네트워크에 연결돼 있는지 확인해 주세요.'}
       </div> : <ul class="mt-4 space-y-3 p-0" aria-label="검색된 기기">
         {availableCandidates.map(candidate => <li key={`${candidate.topic}:${candidate.ip}:${candidate.source}`} class="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-3 sm:p-4">
           <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><DevicesIcon class="size-5" /></span>
           <div class="min-w-0 flex-1">
             <strong class="block text-sm text-slate-900">{candidate.name}</strong>
-            <p class="mt-1 mb-0 break-all text-xs text-slate-500">{candidate.ip || '주소 미확인'} · Tasmota</p>
+            <p class="mt-1 mb-0 break-all text-xs text-slate-500">{candidate.ip || '주소 미확인'} · {candidate.protocol === 'shelly_htg3' ? 'Shelly H&T Gen3' : 'Tasmota'}</p>
             <p class="mt-1 mb-0 text-xs text-slate-500">{candidate.source === 'http' ? 'Wi-Fi에서 발견' : 'MQTT에서 발견'}</p>
           </div>
           <button class={primaryButton} type="button"
-            disabled={!!busy || !status?.enabled || candidate.registered || !candidate.topic}
+            disabled={!!busy || !status?.enabled || candidate.registered || !candidate.topic || (candidate.protocol === 'shelly_htg3' && !supportsShelly)}
             onClick={() => void add(candidate)}>
-            {candidate.registered ? '등록됨' : candidate.topic ? (candidate.source === 'http' ? '추가 및 자동 연결' : '기기 추가') : '추가 불가'}
+            {candidate.registered ? '등록됨' : candidate.protocol === 'shelly_htg3' && !supportsShelly ? 'Jarbis 업데이트 필요' : candidate.topic ? (candidate.protocol === 'shelly_htg3' ? '센서 추가' : candidate.source === 'http' ? '추가 및 자동 연결' : '기기 추가') : '추가 불가'}
           </button>
         </li>)}
       </ul>}
@@ -718,7 +807,7 @@ export function SmartHomePage({ statusResource, devicesResource, candidatesResou
             <p class="m-0 text-xs text-slate-500">이 비밀번호는 전구 웹 관리자 비밀번호와 다릅니다. 다른 사람과 공유하지 마세요.</p>
           </div> : null}
         </div> : null}
-        <p class="m-0 text-xs leading-5 text-slate-500">기기 설정을 자동 변경하지 않고, 기기 추가와 연결 작업은 사용자가 승인한 경우에만 실행합니다.</p>
+        <p class="m-0 text-xs leading-5 text-slate-500">기기 설정을 자동 변경하지 않고, 기기 추가와 연결 작업은 사용자가 승인한 경우에만 실행합니다. Shelly H&T Gen3는 기기 자체에서 MQTT 연결을 설정해야 합니다.</p>
       </div>
     </details>
   </div>;

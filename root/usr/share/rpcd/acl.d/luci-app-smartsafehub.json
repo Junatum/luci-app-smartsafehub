@@ -38,7 +38,8 @@
         "jarbis": [
           "status",
           "devices_list",
-        "light_state",
+          "light_state",
+          "sensor_state",
           "discovery_list"
         ]
       },

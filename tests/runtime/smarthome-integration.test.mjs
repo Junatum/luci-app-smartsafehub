@@ -30,7 +30,7 @@ test('Jarbis RPC는 기존 세션 ACL로 전원·등록·검색·설정을 분�
   const group = acl['luci-app-smartsafehub'];
   const read = group.read.ubus.jarbis;
   const write = group.write.ubus.jarbis;
-  assert.deepEqual(read, ['status', 'devices_list', 'light_state', 'discovery_list']);
+  assert.deepEqual(read, ['status', 'devices_list', 'light_state', 'sensor_state', 'discovery_list']);
   for (const method of ['settings_update','device_add','device_update','device_remove','device_pair','light_set','discovery_scan','broker_credentials']) {
     assert.ok(write.includes(method), `Jarbis write ACL missing: ${method}`);
     assert.ok(!read.includes(method), `Jarbis write leaked into read: ${method}`);
@@ -82,14 +82,14 @@ test('스마트 전구는 사용자 승인 후 자동 연결하고 관리자 암
 
 
 test('스마트홈은 공통 화면 제목과 서비스 토글, 등록 기기 중심의 반응형 카드로 표시한다', () => {
-  assert.match(page, /<SectionHeading eyebrow="Smart Home" title="스마트 전구"/);
+  assert.match(page, /<SectionHeading eyebrow="Smart Home" title="스마트홈"/);
   assert.match(page, /aria-label="스마트홈 서비스 현황"/);
   assert.match(page, /role="switch" aria-checked=\{Boolean\(status\?\.enabled\)\}/);
   assert.match(page, /aria-label="등록된 전구"/);
   assert.match(page, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/);
   assert.match(page, /type="range" min="0" max="100" step="5"/);
-  assert.match(page, /aria-label="새 전구 찾기"/);
-  assert.ok(page.indexOf('aria-label="등록된 전구"') < page.indexOf('aria-label="새 전구 찾기"'));
+  assert.match(page, /aria-label="새 스마트홈 기기 찾기"/);
+  assert.ok(page.indexOf('aria-label="등록된 전구"') < page.indexOf('aria-label="새 스마트홈 기기 찾기"'));
   assert.match(page, /availableCandidates = candidates.filter\(candidate => !candidate.registered\)/);
   assert.match(page, /aria-busy=\{busy === 'scan'\}/);
 });
@@ -236,13 +236,13 @@ test('전구 조작은 중첩 배경 카드 없이 하나의 영역에 전원·�
 
 test('알림은 전체 너비이고 등록 전구 카드만 PC에서 두 열로 표시한다', () => {
   const noticeStart = page.indexOf('{message ?');
-  const noticeEnd = page.indexOf('aria-label="등록된 전구"', noticeStart);
+  const noticeEnd = page.indexOf('{sensors.length > 0 ?', noticeStart);
   const notice = page.slice(noticeStart, noticeEnd);
   assert.match(notice, /role="status" aria-live="polite" class="flex w-full items-start/);
   assert.doesNotMatch(notice, /sm:max-w-2xl|max-w-\[760px\]|lg:grid-cols-2/, '성공 알림은 데스크톱에서도 전체 너비를 유지해야 합니다');
 
   const inventoryStart = page.indexOf('aria-label="등록된 전구"');
-  const inventoryEnd = page.indexOf('devices.map(device =>', inventoryStart);
+  const inventoryEnd = page.indexOf('lights.map(device =>', inventoryStart);
   const inventory = page.slice(inventoryStart, inventoryEnd);
   assert.match(inventory, /class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2"/, '전구 한 대는 데스크톱에서 절반 너비, 모바일에서는 전체 너비로 표시해야 합니다');
   assert.doesNotMatch(inventory, /max-w-\[760px\]/, '개별 전구 너비는 그리드로 정하고 고정 폭을 사용하지 않아야 합니다');

@@ -13,7 +13,7 @@ import type { SoftwareUpdateStatus } from '../types/updates';
 import type { DeviceRegistrationStatus } from '../api/smartsafehub';
 import type { AppsCatalog, AppsInstallStatus, AppsMetrics } from '../types/apps';
 import type { NetwatchStatus } from '../types/netwatch';
-import type { JarbisCandidate, JarbisDevice, JarbisLightState, JarbisStatus } from '../types/jarbis';
+import type { JarbisCandidate, JarbisDevice, JarbisLightState, JarbisStatus, JarbisSensorState } from '../types/jarbis';
 
 const now = Math.floor(Date.now() / 1000);
 const hour = 3600;
@@ -167,7 +167,7 @@ export const demoAppsMetrics: AppsMetrics = {
 // Fictional Tasmota devices: reserved addresses, no credentials or real broker.
 export const demoJarbisStatus: JarbisStatus = {
   apiVersion: 1, version: '0.2.3-r1', enabled: true, mqttConfigured: true,
-  brokerMode: 'managed', brokerHost: '192.0.2.1', brokerPort: '1883', brokerReady: true,
+  brokerMode: 'managed', brokerHost: '192.0.2.1', brokerPort: '1883', brokerReady: true, features: { shellyHtg3: true },
 };
 export const demoJarbisDevices: { devices: JarbisDevice[] } = {
   devices: [
@@ -175,14 +175,23 @@ export const demoJarbisDevices: { devices: JarbisDevice[] } = {
       topic: 'demo_living', enabled: true, capabilities: ['power', 'brightness', 'color', 'color_temperature'] },
     { id: 'tasmota_demo_bedroom', name: '침실 전구', kind: 'light', protocol: 'tasmota',
       topic: 'demo_bedroom', enabled: true, capabilities: ['power', 'brightness', 'color_temperature'] },
+    { id: 'shelly_demo_study', name: '서재 온습도', kind: 'sensor', protocol: 'shelly_htg3',
+      topic: 'shellyhtg3-demo00000001', enabled: true, capabilities: ['temperature', 'humidity', 'battery'] },
   ],
 };
 export const demoJarbisCandidates: { devices: JarbisCandidate[] } = {
   devices: [
     { protocol: 'tasmota', source: 'http', ip: '192.0.2.203', mac: '02:00:00:00:00:13',
       topic: 'demo_kitchen', name: '주방 전구', registered: false },
+    { protocol: 'shelly_htg3', kind: 'sensor', source: 'mqtt', ip: '192.0.2.205', mac: '02:00:00:00:00:15',
+      topic: 'shellyhtg3-demo00000002', name: '거실 온습도', registered: false },
   ],
 };
+export const demoJarbisSensorStates: Record<string, JarbisSensorState> = {
+  shelly_demo_study: { id: 'shelly_demo_study', observed: true, source: 'mqtt',
+    temperatureC: 23.4, humidityPercent: 51, batteryPercent: 85, lastSeen: now - 360 },
+};
+
 export const demoJarbisLightStates: Record<string, JarbisLightState> = {
   tasmota_demo_living: { id: 'tasmota_demo_living', observed: true, source: 'mqtt',
     power: 'ON', brightness: 72, color: '#f5d6a1', colorTemperature: 370 },
