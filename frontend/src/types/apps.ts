@@ -7,6 +7,10 @@ export interface VerifiedApp {
   category: string;
   /** Approved Hub publishing relationship; absent on older catalogs. */
   publisherType?: 'first_party' | 'third_party';
+  /** Optional, approved display-only developer metadata. */
+  developerName?: string;
+  developerWebsiteUrl?: string;
+  iconImageUrl?: string;
   version: string;
   /** Approved same-origin LuCI page or first-party static app; never a remote URL. */
   webUi?: { type: 'luci' | 'static' | 'smartsafehub'; path: string } | null;

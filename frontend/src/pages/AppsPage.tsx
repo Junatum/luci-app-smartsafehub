@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 import { AppsIcon, ReloadIcon } from '../components/Icons';
 import { AppsStorageCard } from '../components/AppsStorageCard';
+import { AppsArtwork } from '../components/AppsArtwork';
 import { AppsCategoryIcon, appsCategoryOf } from '../components/AppsCategoryIcon';
+import { safeDeveloperUrl } from '../utils/appsDeveloper';
 import type { AppsCategory } from '../components/AppsCategoryIcon';
 import { SectionHeading } from '../components/SectionHeading';
 import type { AppsCatalog, AppsInstallStatus, AppsMetrics, VerifiedApp } from '../types/apps';
@@ -417,7 +419,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                       ref={isHighlighted ? highlightedCardRef : null}
                     >
                       <div class="flex min-w-0 items-start gap-3">
-                        <span class="grid size-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" /></span>
+                        <AppsArtwork app={app} key={`${app.id}:${app.iconImageUrl ?? ''}`} />
                         <div class="min-w-0 flex-1">
                           <div class="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
                             <h3 class="m-0 min-w-0 flex-1 break-words text-sm font-black text-slate-950">{app.name}</h3>
@@ -430,6 +432,14 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             </span>
                             {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
                           </div>
+                          {app.developerName || safeDeveloperUrl(app.developerWebsiteUrl) ? (
+                            <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                              {app.developerName ? <span class="min-w-0 break-words">개발자 <strong class="font-semibold text-slate-700">{app.developerName}</strong></span> : null}
+                              {safeDeveloperUrl(app.developerWebsiteUrl) ? <a class="font-semibold text-teal-700 underline-offset-2 hover:underline focus-visible:underline"
+                                href={safeDeveloperUrl(app.developerWebsiteUrl)!} rel="noopener noreferrer" referrerPolicy="no-referrer"
+                                target="_blank" aria-label={`${app.name} 개발자 홈페이지 (새 탭)`}>홈페이지 ↗</a> : null}
+                            </div>
+                          ) : null}
                           {showOfferedVersion || sizeLabel !== null ? (
                             <p class="mb-0 mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
                               {showOfferedVersion ? (

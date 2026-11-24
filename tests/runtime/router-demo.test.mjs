@@ -151,7 +151,9 @@ test('Apps 카테고리 아이콘은 공유기와 데모에서 동일하고 도�
   const demo = readFileSync(resolve(root, 'demo/main.tsx'), 'utf8');
   assert.match(demo, /<AppsPage data=\{demoApps\}/);
   assert.match(page, /<AppsCategoryIcon category=\{tab\.id\}/);
-  assert.match(page, /<AppsCategoryIcon category=\{appsCategoryOf\(app\.category\)\}/);
+  const artwork = readFileSync(resolve(root, 'components/AppsArtwork.tsx'), 'utf8');
+  assert.match(page, /<AppsArtwork app=\{app\}/);
+  assert.match(artwork, /<AppsCategoryIcon category=\{appsCategoryOf\(app\.category\)\}/);
   assert.match(page, /\{ id: 'utilities', label: '도구' \}/);
   assert.match(page, /\{ id: 'other', label: '기타' \}/);
   assert.match(category, /case 'utilities': return <WrenchIcon/);

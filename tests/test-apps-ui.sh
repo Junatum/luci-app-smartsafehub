@@ -130,20 +130,22 @@ check('설치 v${installedVersion}' in page and '제공 v{app.version}' in page,
 check('업데이트 가능</span>' in page and '설치 버전 확인 불가' in page,
       'updates must be distinguished from unknown installed versions')
 
-# Category icons are local, consistent across cards and filters, and safe
-# for unknown/future catalog categories. No external icon service or assets.
+# The catalog may contain approved raster artwork. Failed or missing images
+# must still use the same local category icon as the filter tabs.
 icon_source = (root / 'frontend/src/components/AppsCategoryIcon.tsx').read_text()
+artwork = (root / 'frontend/src/components/AppsArtwork.tsx').read_text()
 shared_icons = (root / 'frontend/src/components/Icons.tsx').read_text()
-check('AppsCategoryIcon, appsCategoryOf' in page and
-      '<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page and
-      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in page,
-      'filters and cards must share category-specific icons in appropriately sized frames')
+check('<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page and
+      '<AppsArtwork app={app}' in page and
+      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in artwork,
+      'filters and cards must share category-specific icons on image fallback')
 
-check('class="grid size-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"' in page,
-      'app card category icon frame must be 56px and align with the installed size row')
-check('<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in page and
-      'class="grid size-11 shrink-0 place-items-center' not in page,
-      'app category icon itself must be 28px while retaining the 56px frame')
+check('size-14 shrink-0 place-items-center' in artwork and
+      'class="size-12 rounded-lg object-contain"' in artwork,
+      'app icon frame must be 56px while loaded raster artwork remains contained')
+check('class="size-7" />' in artwork and
+      'class="grid size-11 shrink-0 place-items-center' not in artwork,
+      'category icon itself must remain 28px while retaining the 56px frame')
 check('<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page,
       'category filter icons must remain compact and not change touch targets')
 check('appsCategoryOf(app.category) === category' in page,
