@@ -9,7 +9,6 @@ const card = read('frontend/src/components/SmartHomeSensorCard.tsx');
 const api = read('frontend/src/api/jarbis.ts');
 const types = read('frontend/src/types/jarbis.ts');
 const notes = read('CHANGELOG.md');
-const mk = read('Makefile');
 
 test('Shelly 연결 도우미는 백엔드 capability를 확인하고 기존 버전과 호환된다', () => {
   assert.match(types, /shellyQuickPair\?: boolean/);
@@ -36,5 +35,5 @@ test('RPC 비밀번호는 프론트엔드가 읽지 않고 자동 설정에 전�
   assert.match(page, /pairJarbisDevice\(id, '', replace\)/);
   assert.match(page, /getJarbisCredentials\(\)/); // 고급 수동 진단만
   assert.match(notes, /0\.2\.34-r7/);
-  assert.match(mk, /PKG_RELEASE:=10/);
+  // Package revision consistency is checked by test-package-contract.sh.
 });

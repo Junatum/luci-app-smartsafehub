@@ -140,12 +140,22 @@ check('<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page a
       '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in artwork,
       'filters and cards must share category-specific icons on image fallback')
 
-check('size-14 shrink-0 place-items-center' in artwork and
-      'class="size-12 rounded-lg object-contain"' in artwork,
-      'app icon frame must be 56px while loaded raster artwork remains contained')
-check('class="size-7" />' in artwork and
-      'class="grid size-11 shrink-0 place-items-center' not in artwork,
-      'category icon itself must remain 28px while retaining the 56px frame')
+# Uploaded artwork must fill the frame without showing the fallback tile.
+frame = 'grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl'
+check('if (url && !failed) {' in artwork, 'only valid, non-failed images use the full frame')
+custom_artwork, fallback_artwork = artwork.split('if (url && !failed) {', 1)[1].split('\n  }', 1)
+check(f'<span class="{frame}">' in custom_artwork and
+      'class="size-full rounded-xl object-contain"' in custom_artwork and
+      'bg-slate-100' not in custom_artwork,
+      'uploaded artwork must fill the 56px frame without a fallback background or inset')
+check('onError={() => setFailed(true)}' in custom_artwork and
+      'referrerPolicy="no-referrer"' in custom_artwork,
+      'image failure and referrer protection must remain intact')
+check(f'<span class="{frame} bg-slate-100 text-slate-600">' in fallback_artwork and
+      '<AppsCategoryIcon category={appsCategoryOf(app.category)} class="size-7" />' in fallback_artwork,
+      'missing or failed artwork must keep the 28px category icon and original 56px themed tile')
+check('size-12 rounded-lg object-contain' not in artwork,
+      'uploaded artwork must not reintroduce the old 48px inset')
 check('<AppsCategoryIcon category={tab.id} class="size-4 shrink-0" />' in page,
       'category filter icons must remain compact and not change touch targets')
 check('appsCategoryOf(app.category) === category' in page,
