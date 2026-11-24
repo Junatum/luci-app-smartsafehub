@@ -101,6 +101,8 @@ case "$url" in
    cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.0.0-r1.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.1.0-r1.apk)
    cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.1.0-r1.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-retro-arcade-1.3.0-r6.apk)
+   cp "$APPS_TEST_REPO/smartsafehub-app-retro-arcade-1.3.0-r6.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/etherwake-1.09-r5.apk)
    cp "$APPS_TEST_REPO/etherwake-1.09-r5.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-app-wol-26.288.56989~75a306d.apk)
@@ -121,6 +123,8 @@ case "$1" in
    case "$3:$4" in
     1.0.0-r1:1.1.0-r1) echo '<';;
     1.1.0-r1:1.0.0-r1) echo '>';;
+    1.2.0-r4:1.3.0-r4|1.2.0-r4:1.3.0-r6|1.3.0-r4:1.3.0-r6) echo '<';;
+    1.3.0-r6:1.3.0-r4|1.3.0-r4:1.2.0-r4) echo '>';;
     *) [ "$3" = "$4" ] && echo '=' || exit 2;;
    esac
    exit 0;;
@@ -284,6 +288,13 @@ for pin in "$@"; do
   *) exit 2;;
  esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
+ # Model apk add's exact-name replacement of world constraints on commit.
+ # Simulations and rejected operations never write the fixture.
+ if [ -n "${APPS_TEST_WORLD:-}" ]; then
+   awk -v n="$name" 'index($0, n "><Q") != 1 && index($0, n "=") != 1 && $0 != n' "$APPS_TEST_WORLD" > "$APPS_TEST_WORLD.new"
+   printf '%s\n' "$pin" >> "$APPS_TEST_WORLD.new"
+   mv -f "$APPS_TEST_WORLD.new" "$APPS_TEST_WORLD"
+ fi
  # Mock APK must record exact versions even on the first installation.
  awk -v n="$name" '$1 != n' "$APPS_TEST_VERSION_DB" > "$APPS_TEST_VERSION_DB.tmp"
  printf '%s %s\n' "$name" "${pin#*=}" >> "$APPS_TEST_VERSION_DB.tmp"
@@ -714,7 +725,7 @@ PY_DOWNGRADE
 grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t1.1.0-r1')" "$TMP/runtime/apps-status.tsv" || fail 'downgrade must not be advertised'
 "$MANAGER" start update retro-arcade || fail 'downgrade did not queue'
 grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'downgrade was not refused'
-# Installed APK changed outside Apps ownership: never perform another upgrade.
+# A manual downgrade below the recorded approved version remains blocked.
 python3 - "$TMP/catalog.json" "$NEWRETROSHA" <<'PY_NEW'
 import json,sys
 p=sys.argv[1]; data=json.load(open(p)); app=data['apps'][0]
@@ -1055,3 +1066,86 @@ PY_REVERSE_STATUS
     done
 done
 printf 'PASS: Jarbis 12개 의존성 조회 후에도 나머지 승인 앱 4개의 설치 상태와 소유권이 유지됨\n'
+
+# Device regression: Apps recorded 1.2.0-r4; manual APK 1.3.0-r4 left a
+# world identity pin; the server now offers 1.3.0-r6.
+rm -f "$TMP/owned/"*
+printf 'smartsafehub-app-retro-arcade\n' > "$APPS_TEST_INSTALLED"
+printf 'smartsafehub-app-retro-arcade 1.3.0-r4\n' > "$APPS_TEST_VERSION_DB"
+printf 'signed approved Retro r6\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.3.0-r6.apk"
+DRIFT_SHA="$(sha256sum "$TMP/repo/smartsafehub-app-retro-arcade-1.3.0-r6.apk" | cut -d ' ' -f 1)"
+cat > "$TMP/catalog.json" <<EOF_DRIFT
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"retro-arcade","version":"1.3.0-r6","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","packages":[{"name":"smartsafehub-app-retro-arcade","version":"1.3.0-r6","sha256":"$DRIFT_SHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_DRIFT
+"$TMP/bin/fetch-catalog"
+export APPS_TEST_WORLD="$TMP/world"
+printf 'smartsafehub-app-retro-arcade><Qlocal-test=\nother-app><Qunrelated=\n' > "$APPS_TEST_WORLD"
+cp "$APPS_TEST_WORLD" "$TMP/world-before"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0\t0\t1.3.0-r4')" "$TMP/runtime/apps-status.tsv" || fail 'manual app was adopted'
+"$MANAGER" start update retro-arcade || fail 'unmanaged update not queued'
+grep -Fqx "$(printf 'code\tE51')" "$TMP/runtime/apps-operation.state" || fail 'unmanaged update accepted'
+printf 'smartsafehub-app-retro-arcade\t1.2.0-r4\t%s\n' "$RETROSHA" > "$TMP/owned/retro-arcade"
+cp "$TMP/owned/retro-arcade" "$TMP/manifest-before"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t1\t1.3.0-r4')" "$TMP/runtime/apps-status.tsv" || fail 'forward manual drift hid update'
+cmp -s "$TMP/manifest-before" "$TMP/owned/retro-arcade" || fail 'status blessed local APK'
+cp "$TMP/manifest-before" "$TMP/owned/other-app"
+"$MANAGER" status
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t1.3.0-r4\t0\treview_required')" "$TMP/runtime/apps-status.tsv" || fail 'missing blocked reason'
+"$MANAGER" start update retro-arcade || fail 'conflicting ownership not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'conflicting owner upgrade accepted'
+rm "$TMP/owned/other-app"
+printf 'smartsafehub-app-retro-arcade 1.3.0-r6\n' > "$APPS_TEST_VERSION_DB"
+"$MANAGER" start update retro-arcade || fail 'equal version not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'equal local build accepted'
+cp "$TMP/catalog.json" "$TMP/drift-catalog"
+python3 - "$TMP/catalog.json" <<'PY_DRIFT_DOWN'
+import json, sys
+p = sys.argv[1]
+with open(p) as f:
+    data = json.load(f)
+data['apps'][0]['packages'][0]['version'] = '1.3.0-r4'
+with open(p, 'w') as f:
+    json.dump(data, f)
+PY_DRIFT_DOWN
+"$MANAGER" start update retro-arcade || fail 'drift downgrade not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'drift downgrade accepted'
+cp "$TMP/drift-catalog" "$TMP/catalog.json"
+printf 'smartsafehub-app-retro-arcade 1.3.0-r4\n' > "$APPS_TEST_VERSION_DB"
+printf 'tampered\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.3.0-r6.apk"
+"$MANAGER" start update retro-arcade || fail 'tampered drift update not queued'
+grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'tampered drift update accepted'
+printf 'signed approved Retro r6\n' > "$TMP/repo/smartsafehub-app-retro-arcade-1.3.0-r6.apk"
+export APPS_TEST_UPGRADE=1
+"$MANAGER" start update retro-arcade || fail 'unsafe drift update not queued'
+grep -Fqx "$(printf 'code\tE53')" "$TMP/runtime/apps-operation.state" || fail 'unsafe drift plan accepted'
+unset APPS_TEST_UPGRADE
+export APPS_TEST_INSTALL_FAIL=1
+"$MANAGER" start update retro-arcade || fail 'failed drift update not queued'
+grep -Fqx "$(printf 'code\tE54')" "$TMP/runtime/apps-operation.state" || fail 'failed drift update not reported'
+unset APPS_TEST_INSTALL_FAIL
+cmp -s "$TMP/world-before" "$APPS_TEST_WORLD" || fail 'failed update changed world constraints'
+cmp -s "$TMP/manifest-before" "$TMP/owned/retro-arcade" || fail 'failed update changed receipt'
+"$MANAGER" start update retro-arcade || fail 'drift retry not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'forward drift retry failed'
+grep -Fqx 'smartsafehub-app-retro-arcade=1.3.0-r6' "$APPS_TEST_WORLD" || fail 'exact APK world pin not committed'
+grep -Fqx 'other-app><Qunrelated=' "$APPS_TEST_WORLD" || fail 'unrelated pin changed'
+grep -Fqx "$(printf 'smartsafehub-app-retro-arcade\t1.3.0-r6\t%s' "$DRIFT_SHA")" "$TMP/owned/retro-arcade" || fail 'approved receipt not committed'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t1\t0\t0\t1.3.0-r6')" "$TMP/runtime/apps-status.tsv" || fail 'post-update status not refreshed'
+python3 - "$TMP/catalog.json" <<'PY_DRIFT_HASH'
+import json, sys
+p = sys.argv[1]
+with open(p) as f:
+    data = json.load(f)
+data['apps'][0]['packages'][0]['sha256'] = 'b' * 64
+with open(p, 'w') as f:
+    json.dump(data, f)
+PY_DRIFT_HASH
+"$MANAGER" start update retro-arcade || fail 'same version different hash not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'same version different hash accepted'
+"$MANAGER" start remove retro-arcade || fail 'removal after reconciliation not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'removal after signed update failed'
+[ ! -e "$TMP/owned/retro-arcade" ] || fail 'reconciled ownership not cleared'
+unset APPS_TEST_WORLD
+printf 'PASS: forward manual APK drift, identity pin, safe retry, ownership and same-version guards\n'

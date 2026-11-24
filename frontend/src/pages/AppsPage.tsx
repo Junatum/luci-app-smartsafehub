@@ -57,6 +57,7 @@ const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
   E54: '앱 업데이트에 실패했습니다. 일부 패키지가 변경되었을 수 있으니 관리자에게 확인해 주세요.',
   E55: '업데이트 후 설치 기록을 저장하지 못했습니다. 관리자에게 확인해 주세요.',
   E41: 'SmartSafeHub Apps에서 설치한 앱만 여기서 제거할 수 있습니다.',
+  E42: '설치 관리 기록과 실제 패키지가 일치하지 않아 제거할 수 없습니다. 승인된 업데이트를 먼저 적용해 주세요.',
   E44: '기존 시스템에 영향을 줄 수 있어 앱 제거가 차단됐습니다.',
   E45: '앱 제거에 실패했습니다.',
 };
@@ -440,6 +441,9 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             </span>
                             {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
                           </div>
+                          {managed && !updateAvailable && state?.updateBlocked ? (
+                            <p class="mb-0 mt-1 text-xs text-amber-700">설치된 패키지의 상태가 승인된 업데이트 조건과 맞지 않습니다.</p>
+                          ) : null}
                           {showOfferedVersion || sizeLabel !== null ? (
                             <p class="mb-0 mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
                               {showOfferedVersion ? (

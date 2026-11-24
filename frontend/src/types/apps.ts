@@ -67,6 +67,8 @@ export interface AppsInstallStatus {
     /** Verified by a local Apps-owned manifest, not inferred by comparing asynchronous RPC replies. */
     retired?: boolean;
     updateAvailable?: boolean;
+    /** A newer approved APK exists, but the local package checks did not pass. */
+    updateBlocked?: boolean;
     /** Actual installed version of the first approved APK; not the catalog version. */
     installedVersion?: string | null;
     webUiReady?: boolean;

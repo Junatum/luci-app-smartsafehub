@@ -32,8 +32,13 @@ check('const updateAvailable = Boolean(managed && state?.updateAvailable);' in p
       '새 승인 의존성이 추가된 기존 앱은 설치 마무리 대신 업데이트를 제공해야 합니다')
 
 
+check('state?.updateBlocked' in page and '설치된 패키지의 상태가 승인된 업데이트 조건과 맞지 않습니다.' in page,
+      'blocked approved update should explain the local validation failure')
+
 # App installation storage must refer to the writable APK filesystem.
 backend = (root / 'root/usr/share/rpcd/ucode/smartsafehub/apps-manager.uc').read_text()
+check('updateBlocked: length(fields) == 9' in backend and "fields[8] == 'review_required'" in backend,
+      'RPC must support the optional bounded blocked reason without breaking legacy status rows')
 card = (root / 'frontend/src/components/AppsStorageCard.tsx').read_text()
 utils = (root / 'frontend/src/utils/appsStorage.ts').read_text()
 check("safe_call('system', 'info', {})" in backend and
