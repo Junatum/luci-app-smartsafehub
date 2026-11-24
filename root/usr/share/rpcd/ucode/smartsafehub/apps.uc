@@ -15,11 +15,18 @@ function text(value, max_length) {
 // non-standard ports, whitespace, SVG or scheme-relative content.
 function public_https_url(value, image) {
     const url = text(value, 500);
-    if (!length(url) ||
-        match(url, /^https:\/\/[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}(:443)?(\/[^\s<>"'@#]*)?(\?[^\s<>"'@#]*)?$/) == null ||
-        match(url, /\.localhost\b|\.internal\b|\.local\b/i) != null)
+    if (!length(url))
         return '';
-    if (image && match(url, /^https:\/\/www\.smartsafehub\.com\/media\/app-icons\/[a-f0-9]{32}\.png$/) == null)
+
+    // Icon URLs have a single trusted origin and exact path format. Validate
+    // these directly: the generic URL expression must never discard /app-icons/.
+    if (image)
+        return match(url, /^https:\/\/www\.smartsafehub\.com\/media\/app-icons\/[a-f0-9]{32}\.png$/) != null ? url : '';
+
+    // ucode uses POSIX extended regular expressions, not JavaScript RegExp.
+    // Use the POSIX space class instead of \s and avoid non-portable \b.
+    if (match(url, /^https:\/\/[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}(:443)?(\/[^[:space:]<>"'@#]*)?(\?[^[:space:]<>"'@#]*)?$/) == null ||
+        match(url, /^https:\/\/[a-zA-Z0-9.-]*\.(localhost|internal|local)(:443)?(\/|\?|$)/i) != null)
         return '';
     return url;
 }

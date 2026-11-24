@@ -426,20 +426,20 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             {isHighlighted ? <span class="ssh-apps-highlight-label shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">설치 안내</span> : null}
                             {installed && managed ? <span class="ssh-apps-installed-badge shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold">✓ 설치됨</span> : null}
                           </div>
-                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span class="text-xs text-slate-500" title={installed ? '공유기에 설치된 대표 APK 패키지 버전입니다.' : '현재 제공 중인 승인 버전입니다.'}>
-                              {installed ? installedVersion ? `설치 v${installedVersion}` : '설치 버전 확인 불가' : `v${app.version}`}
-                            </span>
-                            {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
-                          </div>
                           {app.developerName || safeDeveloperUrl(app.developerWebsiteUrl) ? (
-                            <div class="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                            <div class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                               {app.developerName ? <span class="min-w-0 break-words">개발자 <strong class="font-semibold text-slate-700">{app.developerName}</strong></span> : null}
                               {safeDeveloperUrl(app.developerWebsiteUrl) ? <a class="font-semibold text-teal-700 underline-offset-2 hover:underline focus-visible:underline"
                                 href={safeDeveloperUrl(app.developerWebsiteUrl)!} rel="noopener noreferrer" referrerPolicy="no-referrer"
                                 target="_blank" aria-label={`${app.name} 개발자 홈페이지 (새 탭)`}>홈페이지 ↗</a> : null}
                             </div>
                           ) : null}
+                          <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span class="text-xs text-slate-500" title={installed ? '공유기에 설치된 대표 APK 패키지 버전입니다.' : '현재 제공 중인 승인 버전입니다.'}>
+                              {installed ? installedVersion ? `설치 v${installedVersion}` : '설치 버전 확인 불가' : `v${app.version}`}
+                            </span>
+                            {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
+                          </div>
                           {showOfferedVersion || sizeLabel !== null ? (
                             <p class="mb-0 mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500">
                               {showOfferedVersion ? (

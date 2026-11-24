@@ -6,6 +6,17 @@ import { safeAppIconUrl, safeDeveloperUrl } from '../../frontend/src/utils/appsD
 
 const file = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
+test('Apps 카드는 개발자 정보를 설치 버전보다 먼저 보여준다', () => {
+  const card = file('frontend/src/pages/AppsPage.tsx');
+  const start = card.indexOf('<AppsArtwork app={app}');
+  const developer = card.indexOf('개발자 <strong', start);
+  const installedVersion = card.indexOf('설치 v${installedVersion}', start);
+  assert.ok(start >= 0 && developer > start && installedVersion > developer,
+    '개발자 정보가 설치 버전보다 위에 있어야 합니다.');
+  assert.match(card, /<AppsArtwork app=\{app\}/);
+  assert.match(card, /<span class="text-xs text-slate-500" title=\{installed/);
+});
+
 test('Apps 개발자 및 이미지 URL은 HTTPS 공개 호스트만 사용한다', () => {
   assert.equal(safeDeveloperUrl('https://example.org/dev'), 'https://example.org/dev');
   assert.equal(safeAppIconUrl('https://www.smartsafehub.com/media/app-icons/' + 'a'.repeat(32) + '.png'), 'https://www.smartsafehub.com/media/app-icons/' + 'a'.repeat(32) + '.png');
