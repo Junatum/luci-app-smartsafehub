@@ -249,10 +249,23 @@ case "$1" in
    if [ "$2" = --simulate ]; then
      [ "${APPS_TEST_DEL_CORE:-0}" = 1 ] && echo 'Purging kmod-nf-conntrack-netlink (mock)'
      [ "${APPS_TEST_DEL_SHARED:-0}" = 1 ] && echo 'Purging luci-lib-chartjs (mock)'
+     shift 2
+     for item in "$@"; do
+       [ "${APPS_TEST_DEL_KEEP:-}" = "$item" ] || printf 'Purging %s (mock)\n' "$item"
+     done
      exit 0
    fi
    shift
-   for item in "$@"; do grep -vxF "$item" "$APPS_TEST_INSTALLED" > "$APPS_TEST_INSTALLED.new" || :; mv "$APPS_TEST_INSTALLED.new" "$APPS_TEST_INSTALLED"; done
+   [ "${APPS_TEST_DEL_FAIL:-0}" != 1 ] || exit 1
+   for item in "$@"; do
+     [ "${APPS_TEST_DEL_COMMIT_KEEP:-}" != "$item" ] || continue
+     grep -vxF "$item" "$APPS_TEST_INSTALLED" > "$APPS_TEST_INSTALLED.new" || :
+     mv "$APPS_TEST_INSTALLED.new" "$APPS_TEST_INSTALLED"
+     if [ -n "${APPS_TEST_WORLD:-}" ]; then
+       awk -v n="$item" 'index($0, n "><Q") != 1 && index($0, n "=") != 1 && $0 != n' "$APPS_TEST_WORLD" > "$APPS_TEST_WORLD.new"
+       mv -f "$APPS_TEST_WORLD.new" "$APPS_TEST_WORLD"
+     fi
+   done
    exit 0;;
  *) exit 2;;
 esac
@@ -1149,3 +1162,69 @@ grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fa
 [ ! -e "$TMP/owned/retro-arcade" ] || fail 'reconciled ownership not cleared'
 unset APPS_TEST_WORLD
 printf 'PASS: forward manual APK drift, identity pin, safe retry, ownership and same-version guards\n'
+
+# Jarbis device regression: a local build has the same version as the
+# current approval, but the Apps ownership receipt predates that build.
+rm -f "$TMP/owned/"*
+cat > "$TMP/catalog.json" <<EOF_JARBIS_REMOVE
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"jarbis","version":"0.2.4-r1","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"smartsafehub","path":"#smarthome","package":"jarbis"},"packages":[{"name":"jarbis","version":"0.2.4-r1","sha256":"$DRIFT_SHA"},{"name":"mosquitto-ssl","version":"1.0-r1","sha256":"$RETROSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_JARBIS_REMOVE
+"$TMP/bin/fetch-catalog"
+printf 'jarbis\nmosquitto-ssl\nother-app\n' > "$APPS_TEST_INSTALLED"
+printf 'jarbis 0.2.4-r1\nmosquitto-ssl 1.0-r1\nother-app 1.0-r1\n' > "$APPS_TEST_VERSION_DB"
+export APPS_TEST_WORLD="$TMP/world"
+printf 'jarbis><Qlocal-test=\nmosquitto-ssl\nother-app><Qunrelated=\n' > "$APPS_TEST_WORLD"
+cp "$APPS_TEST_WORLD" "$TMP/world-before-remove"
+"$MANAGER" start remove jarbis || fail 'unmanaged removal not queued'
+grep -Fqx "$(printf 'code\tE41')" "$TMP/runtime/apps-operation.state" || fail 'manual-only Jarbis removal accepted'
+printf 'jarbis\t0.2.3-r1\t%s\n' "$RETROSHA" > "$TMP/owned/jarbis"
+cp "$TMP/owned/jarbis" "$TMP/jarbis-receipt"
+"$MANAGER" status
+grep -Fqx "$(printf 'jarbis\t1\t1\t1\t1\t0\t0.2.4-r1')" "$TMP/runtime/apps-status.tsv" || fail 'same-version Jarbis incorrectly offered update'
+"$MANAGER" start update jarbis || fail 'same-version update not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'same-version local Jarbis approved'
+cp "$TMP/jarbis-receipt" "$TMP/owned/other-app"
+"$MANAGER" start remove jarbis || fail 'conflicting remove not queued'
+grep -Fqx "$(printf 'code\tE43')" "$TMP/runtime/apps-operation.state" || fail 'other owner removal accepted'
+rm "$TMP/owned/other-app"
+# Truncated and duplicate receipts must not authorize removal.
+printf 'jarbis\t0.2.3-r1\t%s' "$RETROSHA" > "$TMP/owned/jarbis"
+"$MANAGER" start remove jarbis || fail 'truncated receipt remove not queued'
+grep -Fqx "$(printf 'code\tE42')" "$TMP/runtime/apps-operation.state" || fail 'truncated removal receipt accepted'
+cat "$TMP/jarbis-receipt" "$TMP/jarbis-receipt" > "$TMP/owned/jarbis"
+"$MANAGER" start remove jarbis || fail 'duplicate receipt remove not queued'
+grep -Fqx "$(printf 'code\tE42')" "$TMP/runtime/apps-operation.state" || fail 'duplicate removal receipt accepted'
+cp "$TMP/jarbis-receipt" "$TMP/owned/jarbis"
+printf 'mosquitto-ssl\t1.0-r1\t%s\n' "$RETROSHA" >> "$TMP/owned/jarbis"
+"$MANAGER" start remove jarbis || fail 'shared runtime remove not queued'
+grep -Fqx "$(printf 'code\tE42')" "$TMP/runtime/apps-operation.state" || fail 'shared runtime ownership accepted'
+cp "$TMP/jarbis-receipt" "$TMP/owned/jarbis"
+export APPS_TEST_DEL_CORE=1
+"$MANAGER" start remove jarbis || fail 'unsafe remove not queued'
+grep -Fqx "$(printf 'code\tE44')" "$TMP/runtime/apps-operation.state" || fail 'core removal accepted with drift'
+unset APPS_TEST_DEL_CORE
+export APPS_TEST_DEL_KEEP=jarbis
+"$MANAGER" start remove jarbis || fail 'retained package remove not queued'
+grep -Fqx "$(printf 'code\tE44')" "$TMP/runtime/apps-operation.state" || fail 'incomplete removal plan accepted'
+unset APPS_TEST_DEL_KEEP
+export APPS_TEST_DEL_FAIL=1
+"$MANAGER" start remove jarbis || fail 'failed remove not queued'
+grep -Fqx "$(printf 'code\tE45')" "$TMP/runtime/apps-operation.state" || fail 'failed removal not reported'
+unset APPS_TEST_DEL_FAIL
+export APPS_TEST_DEL_COMMIT_KEEP=jarbis
+"$MANAGER" start remove jarbis || fail 'incomplete commit not queued'
+grep -Fqx "$(printf 'code\tE45')" "$TMP/runtime/apps-operation.state" || fail 'retained package reported as removed'
+unset APPS_TEST_DEL_COMMIT_KEEP
+cmp -s "$TMP/jarbis-receipt" "$TMP/owned/jarbis" || fail 'failed removal changed receipt'
+cmp -s "$TMP/world-before-remove" "$APPS_TEST_WORLD" || fail 'failed removal changed world'
+"$MANAGER" start remove jarbis || fail 'Jarbis removal retry not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'same-version manual Jarbis removal failed'
+[ ! -e "$TMP/owned/jarbis" ] || fail 'Jarbis receipt not cleared'
+if grep -Fxq jarbis "$APPS_TEST_INSTALLED"; then fail 'Jarbis still installed'; fi
+grep -Fxq mosquitto-ssl "$APPS_TEST_INSTALLED" || fail 'MQTT broker removed'
+grep -Fxq other-app "$APPS_TEST_INSTALLED" || fail 'unrelated package removed'
+if grep -q '^jarbis' "$APPS_TEST_WORLD"; then fail 'Jarbis identity pin remained'; fi
+grep -Fxq 'other-app><Qunrelated=' "$APPS_TEST_WORLD" || fail 'unrelated pin removed'
+grep -Fqx "$(printf 'jarbis\t0\t0\t0\t0\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'post-removal status stale'
+unset APPS_TEST_WORLD
+printf 'PASS: same-version manual Jarbis removal, ownership, solver and safe retry\n'

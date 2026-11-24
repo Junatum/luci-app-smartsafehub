@@ -167,10 +167,13 @@ review_remove_plan() {
    sub(/^\([0-9]+\/[0-9]+\) /, "", line)
    if (line ~ /^(Purging|Removing|Upgrading|Downgrading|Installing|Replacing) /) {
     split(line, fields, " ")
-    if ((fields[1] != "Purging" && fields[1] != "Removing") || !(fields[2] in ok)) bad=1
+    if ((fields[1] != "Purging" && fields[1] != "Removing") || !(fields[2] in ok) || ++seen[fields[2]] != 1) bad=1
    }
   }
-  END { exit bad ? 1 : 0 }
+  END {
+   for (name in ok) if (seen[name] != 1) bad=1
+   exit bad ? 1 : 0
+  }
  ' "$plan"
 }
 
@@ -886,21 +889,22 @@ remove_app() {
   for other in "$OWNED"/*; do
    [ -f "$other" ] || continue
    [ "$other" = "$manifest" ] && continue
-   grep -Fq "${name}$(printf '\t')" "$other" && return 43
+   if awk -F '\t' -v n="$name" '$1 == n {found=1} END {exit !found}' "$other"; then return 43; fi
   done
   # A failed transaction may have recorded ownership before apk completed.
   # Only pass actually installed packages to apk del; still clear the
   # manifest once all remaining owned packages are safely removed.
   if installed "$name"; then
-   [ "$(installed_version "$name")" = "$version" ] || return 42
+   # Ownership authorizes removal of the package name, not approval of a
+   # later local build. Version drift must not trap an app at the same
+   # release as the catalog. Never rewrite the old version/hash receipt.
+   valid_version "$(installed_version "$name")" || return 42
    set -- "$@" "$name"
   fi
   count=$((count + 1)); [ "$count" -le 32 ] || return 42
  done < "$manifest"
- [ "$count" -gt 0 ] || return 42
- any_installed=0
- for name in "$@"; do installed "$name" && any_installed=1; done
- if [ "$any_installed" -eq 1 ]; then
+ [ "$count" -gt 0 ] && [ "$count" -eq "$(awk 'END {print NR+0}' "$manifest")" ] || return 42
+ if [ "$#" -gt 0 ]; then
   "$APK" del --simulate "$@" > "$stage/plan.log" 2>&1 || return 44
   # Removing an optional app must never implicitly remove system/network,
   # SafeShield or firmware kernel-module packages.
@@ -909,6 +913,11 @@ remove_app() {
   fi
   review_remove_plan "$stage/plan.log" "$*" || return 44
   "$APK" del "$@" > "$stage/remove.log" 2>&1 || return 45
+  # apk del can succeed while retaining a package required by another app.
+  # Keep ownership for recovery unless every selected package is absent.
+  for name in "$@"; do
+   if installed "$name"; then return 45; fi
+  done
  fi
  rm -f "$manifest"
  return 0
@@ -937,7 +946,7 @@ worker() {
  # Refresh local APK status after success or a partial failure, before
  # publishing the terminal operation state. A scan error must not change
  # the result of the package transaction.
- if [ "$action" = update ]; then ( status ) || :; fi
+ if [ "$action" = update ] || [ "$action" = remove ]; then ( status ) || :; fi
  if [ "$rc" -eq 0 ]; then
   # The LuCI menu tree may be cached before an optional UI is installed.
   # Invalidate the cache only after a successful package transaction.
