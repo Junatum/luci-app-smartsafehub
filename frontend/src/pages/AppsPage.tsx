@@ -51,12 +51,12 @@ const OPERATION_MESSAGES: Readonly<Record<string, string>> = {
   E35: '패키지를 설치하지 못했습니다.',
   E37: '공식 OpenWrt LuCI 저장소가 승인 당시와 다릅니다. 관리자에게 확인해 주세요.',
   E38: '기존 공유 라이브러리의 버전이 승인된 버전과 달라 설치할 수 없습니다.',
-  E51: 'SmartSafeHub Apps에서 관리하는 앱만 업데이트할 수 있습니다.',
+  E51: '앱 설치 관리 기록을 안전하게 확인할 수 없습니다. 관리자에게 확인해 주세요.',
   E52: '현재 설치 버전과 승인된 업데이트가 일치하지 않습니다. 앱 구성과 업데이트 버전을 확인해 주세요.',
   E53: '다른 시스템 패키지 변경이 필요하여 앱 업데이트를 중단했습니다.',
   E54: '앱 업데이트에 실패했습니다. 일부 패키지가 변경되었을 수 있으니 관리자에게 확인해 주세요.',
   E55: '업데이트 후 설치 기록을 저장하지 못했습니다. 관리자에게 확인해 주세요.',
-  E41: 'SmartSafeHub Apps에서 설치한 앱만 여기서 제거할 수 있습니다.',
+  E41: 'SmartSafeHub Apps에서 관리하는 앱만 여기서 제거할 수 있습니다.',
   E42: '설치 관리 기록을 안전하게 확인할 수 없어 앱을 제거할 수 없습니다. 관리자에게 확인해 주세요.',
   E43: '다른 앱이 관리하는 패키지가 포함되어 있어 제거할 수 없습니다.',
   E44: '기존 시스템에 영향을 줄 수 있어 앱 제거가 차단됐습니다.',
@@ -196,7 +196,10 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
       onDemoAction?.();
       return;
     }
-    if (action === 'update' && !window.confirm(`${app.name} 앱을 최신 승인 버전으로 업데이트하시겠습니까?\n\n업데이트 중 공유기를 재부팅하지 마세요.`)) return;
+    if (action === 'update') {
+      const adoptionNotice = installStatus.installed[app.id]?.managed ? '' : '\n\n업데이트가 완료되면 SmartSafeHub Apps에서 이 앱을 관리하고 제거할 수 있습니다.';
+      if (!window.confirm(`${app.name} 앱을 최신 승인 버전으로 업데이트하시겠습니까?${adoptionNotice}\n\n업데이트 중 공유기를 재부팅하지 마세요.`)) return;
+    }
     if (action === 'install' && !window.confirm(`${app.name} 앱을 설치하시겠습니까?\n\n앱을 변경하는 동안 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'repair' && !window.confirm(`${app.name} 앱의 누락된 패키지를 복원하시겠습니까?\n\n기존 설치 기록과 최신 승인 패키지를 검증합니다. 복원 중 공유기를 재부팅하지 마세요.`)) return;
     if (action === 'remove') closeRemoveDialog();
@@ -404,9 +407,8 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                   const sizeLabel = installed && typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
                     ? formatStorageBytes(bytes) : null;
                   const managed = state?.managed ?? false;
-                  // A new approved dependency may be missing while the existing app is
-                  // still Apps-owned. Allow the reviewed update to complete it.
-                  const updateAvailable = Boolean(managed && state?.updateAvailable);
+                  // The backend authorizes both managed updates and explicit adoption.
+                  const updateAvailable = Boolean(state?.updateAvailable);
                   const installedVersion = installed ? state?.installedVersion : null;
                   const showOfferedVersion = Boolean(installed && installedVersion && (updateAvailable || installedVersion !== app.version));
                   const activeAction = pending?.appId === app.id ? pending.action : running && job?.appId === app.id ? jobAction : null;
@@ -442,7 +444,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             </span>
                             {updateAvailable ? <span class="ssh-apps-update-badge rounded-full border px-2 py-0.5 text-[11px] font-bold">업데이트 가능</span> : null}
                           </div>
-                          {managed && !updateAvailable && state?.updateBlocked ? (
+                          {!updateAvailable && state?.updateBlocked ? (
                             <p class="mb-0 mt-1 text-xs text-amber-700">설치된 패키지의 상태가 승인된 업데이트 조건과 맞지 않습니다.</p>
                           ) : null}
                           {showOfferedVersion || sizeLabel !== null ? (
@@ -482,7 +484,7 @@ export function AppsPage({ data, error, loading, refreshing, onRetry, installSta
                             )) : installed && app.webUi ? (
                               <span class="text-xs text-amber-700" title="이 앱의 웹 UI 패키지를 설치해야 열 수 있습니다.">웹 UI 미설치</span>
                             ) : null}
-                            {installed && !managed ? <span class="text-xs text-slate-500" title="공유기 소프트웨어 메뉴 또는 SSH로 설치한 앱은 Apps에서 제거하지 않습니다.">기존에 설치됨</span>
+                            {installed && !managed ? <span class="text-xs text-slate-500" title={updateAvailable ? "승인된 버전으로 업데이트하면 Apps에서 관리할 수 있습니다." : "Apps 관리 대상으로 전환하기 전에는 제거할 수 없습니다."}>기존에 설치됨</span>
                           : state?.partial && !managed ? <span class="text-xs text-amber-700">일부 패키지 설치됨</span>
                           : <button
                               class={`min-h-9 rounded-lg border bg-white px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${removable ? 'border-red-300 text-red-700 hover:bg-red-50 focus-visible:ring-red-100' : 'border-teal-300 text-teal-800 hover:bg-teal-50 focus-visible:ring-teal-200'}`}

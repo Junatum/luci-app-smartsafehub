@@ -27,11 +27,14 @@ check('ssh-apps-installed-badge' in page and 'ssh-apps-update-badge' in page and
       'installed, update notice and update action need distinct styles')
 check('.ssh-apps-update-button' in styles and ".ssh-app[data-theme='dark'] .ssh-apps-update-button" in styles,
       'update action must have a distinct dark-mode style')
-check('const updateAvailable = Boolean(managed && state?.updateAvailable);' in page and
+check('const updateAvailable = Boolean(state?.updateAvailable);' in page and
       'managed && state?.partial && !installed && !updateAvailable' in page,
       '새 승인 의존성이 추가된 기존 앱은 설치 마무리 대신 업데이트를 제공해야 합니다')
 
 
+check('const removable = managed &&' in page and 'adoptionNotice' in page and
+      '업데이트가 완료되면 SmartSafeHub Apps에서 이 앱을 관리하고 제거할 수 있습니다.' in page,
+      'external app update must explain adoption without enabling removal before success')
 check('state?.updateBlocked' in page and '설치된 패키지의 상태가 승인된 업데이트 조건과 맞지 않습니다.' in page,
       'blocked approved update should explain the local validation failure')
 

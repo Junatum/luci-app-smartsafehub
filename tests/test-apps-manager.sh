@@ -107,6 +107,8 @@ case "$url" in
    cp "$APPS_TEST_REPO/etherwake-1.09-r5.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/luci-app-wol-26.288.56989~75a306d.apk)
    cp "$APPS_TEST_REPO/luci-app-wol-26.288.56989~75a306d.apk" "$dest";;
+ https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/smartsafehub-app-arcdrop-1.0.0-r1.apk)
+   cp "$APPS_TEST_REPO/smartsafehub-app-arcdrop-1.0.0-r1.apk" "$dest";;
  https://repo.smartsafehub.com/stable/packages/aarch64_cortex-a53/smartsafehub/20261027T123000/new-signed-helper-1.0-r1.apk)
    cp "$APPS_TEST_REPO/new-signed-helper-1.0-r1.apk" "$dest";;
  *) exit 2;;
@@ -121,8 +123,8 @@ case "$1" in
  version)
    [ "$2" = -t ] || exit 2
    case "$3:$4" in
-    1.0.0-r1:1.1.0-r1) echo '<';;
-    1.1.0-r1:1.0.0-r1) echo '>';;
+    0.1.0-r17:1.0.0-r1|1.0.0-r1:1.1.0-r1) echo '<';;
+    1.0.0-r1:0.1.0-r17|1.1.0-r1:1.0.0-r1) echo '>';;
     1.2.0-r4:1.3.0-r4|1.2.0-r4:1.3.0-r6|1.3.0-r4:1.3.0-r6) echo '<';;
     1.3.0-r6:1.3.0-r4|1.3.0-r4:1.2.0-r4) echo '>';;
     *) [ "$3" = "$4" ] && echo '=' || exit 2;;
@@ -277,7 +279,7 @@ if [ "${1:-}" = --simulate ]; then
  for pin in "$@"; do
   name="${pin%%=*}"
   case "$repo:$name" in
-   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol|hub:new-signed-helper) ;;
+   hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol|hub:new-signed-helper|hub:smartsafehub-app-arcdrop) ;;
    *) exit 2;;
   esac
   if [ "${APPS_TEST_UPGRADE:-0}" = 1 ]; then
@@ -297,7 +299,7 @@ fi
 for pin in "$@"; do
  name="${pin%%=*}"
  case "$repo:$name" in
-  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol|hub:new-signed-helper) ;;
+  hub:nlbwmon|hub:luci-app-nlbwmon|hub:luci-lib-chartjs|hub:smartsafehub-app-retro-arcade|hub:etherwake|hub:luci-app-wol|hub:new-signed-helper|hub:smartsafehub-app-arcdrop) ;;
   *) exit 2;;
  esac
  grep -qxF "$name" "$APPS_TEST_INSTALLED" 2>/dev/null || printf '%s\n' "$name" >> "$APPS_TEST_INSTALLED"
@@ -1095,9 +1097,8 @@ export APPS_TEST_WORLD="$TMP/world"
 printf 'smartsafehub-app-retro-arcade><Qlocal-test=\nother-app><Qunrelated=\n' > "$APPS_TEST_WORLD"
 cp "$APPS_TEST_WORLD" "$TMP/world-before"
 "$MANAGER" status
-grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0\t0\t1.3.0-r4')" "$TMP/runtime/apps-status.tsv" || fail 'manual app was adopted'
-"$MANAGER" start update retro-arcade || fail 'unmanaged update not queued'
-grep -Fqx "$(printf 'code\tE51')" "$TMP/runtime/apps-operation.state" || fail 'unmanaged update accepted'
+grep -Fqx "$(printf 'retro-arcade\t1\t1\t0\t0\t1\t1.3.0-r4')" "$TMP/runtime/apps-status.tsv" || fail 'manual app update not offered'
+[ ! -e "$TMP/owned/retro-arcade" ] || fail 'status adopted manual app'
 printf 'smartsafehub-app-retro-arcade\t1.2.0-r4\t%s\n' "$RETROSHA" > "$TMP/owned/retro-arcade"
 cp "$TMP/owned/retro-arcade" "$TMP/manifest-before"
 "$MANAGER" status
@@ -1228,3 +1229,94 @@ grep -Fxq 'other-app><Qunrelated=' "$APPS_TEST_WORLD" || fail 'unrelated pin rem
 grep -Fqx "$(printf 'jarbis\t0\t0\t0\t0\t0\t')" "$TMP/runtime/apps-status.tsv" || fail 'post-removal status stale'
 unset APPS_TEST_WORLD
 printf 'PASS: same-version manual Jarbis removal, ownership, solver and safe retry\n'
+
+# Real ArcDrop regression: a local test APK has no Apps receipt, and the
+# approved primary crosses from 0.1.0-r17 to 1.0.0-r1. The same generic
+# path supports multi-package apps with existing and new dependencies.
+rm -f "$TMP/owned/"*
+printf 'approved ArcDrop 1.0.0-r1 mock\n' > "$TMP/repo/smartsafehub-app-arcdrop-1.0.0-r1.apk"
+ARCSHA="$(sha256sum "$TMP/repo/smartsafehub-app-arcdrop-1.0.0-r1.apk" | cut -d ' ' -f 1)"
+cat > "$TMP/catalog.json" <<EOF_ARC_ADOPT
+{"schema":1,"device_code":"iptime-ax3000sm","firmware_build_id":"mock-build-1","channel":"stable","apps":[{"id":"arcdrop","version":"1.0.0-r1","runtime":"router","installer":"apk","package_arch":"aarch64_cortex-a53","repository_release_id":"20261027T123000","repository_index_sha256":"$INDEX_SHA","web_ui":{"type":"static","path":"/arcdrop/","package":"smartsafehub-app-arcdrop"},"packages":[{"name":"smartsafehub-app-arcdrop","version":"1.0.0-r1","sha256":"$ARCSHA"}],"requirements":{"min_memory_mb":1,"min_storage_mb":1}}]}
+EOF_ARC_ADOPT
+printf 'smartsafehub-app-arcdrop\n' > "$APPS_TEST_INSTALLED"
+printf 'smartsafehub-app-arcdrop 0.1.0-r17\n' > "$APPS_TEST_VERSION_DB"
+mkdir -p "$SMARTSAFEHUB_APPS_WEB_ROOT/arcdrop" "$SMARTSAFEHUB_APPS_WEB_ROOT/cgi-bin"
+: > "$SMARTSAFEHUB_APPS_WEB_ROOT/arcdrop/index.html"
+printf '#!/bin/sh\nexit 0\n' > "$SMARTSAFEHUB_APPS_WEB_ROOT/cgi-bin/arcdrop"
+chmod +x "$SMARTSAFEHUB_APPS_WEB_ROOT/cgi-bin/arcdrop"
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'arcdrop\t1\t1\t0\t1\t1\t0.1.0-r17')" "$TMP/runtime/apps-status.tsv" || fail 'ArcDrop adoption update not offered'
+[ ! -e "$TMP/owned/arcdrop" ] || fail 'status created receipt'
+"$MANAGER" start remove arcdrop || fail 'external remove not queued'
+grep -Fqx "$(printf 'code\tE41')" "$TMP/runtime/apps-operation.state" || fail 'external removal permitted'
+printf 'smartsafehub-app-arcdrop\t0.1.0-r17\t%s\n' "$ARCSHA" > "$TMP/owned/other-app"
+"$MANAGER" start update arcdrop || fail 'conflict not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'external app took other ownership'
+rm "$TMP/owned/other-app"
+# An empty/corrupt receipt is not a missing receipt.
+: > "$TMP/owned/arcdrop"
+"$MANAGER" start update arcdrop || fail 'empty receipt not queued'
+grep -Fqx "$(printf 'code\tE51')" "$TMP/runtime/apps-operation.state" || fail 'invalid receipt bypassed'
+rm "$TMP/owned/arcdrop"
+# Equal or newer local version must not be adopted.
+for v in 1.0.0-r1 1.1.0-r1; do
+ printf 'smartsafehub-app-arcdrop %s\n' "$v" > "$APPS_TEST_VERSION_DB"
+ "$MANAGER" start update arcdrop || fail 'equal/newer update not queued'
+ grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'equal/newer external app adopted'
+ [ ! -e "$TMP/owned/arcdrop" ] || fail 'invalid adoption created receipt'
+done
+printf 'smartsafehub-app-arcdrop 0.1.0-r17\n' > "$APPS_TEST_VERSION_DB"
+# Reject modified archives and unapproved solver actions without adoption.
+printf 'tampered\n' > "$TMP/repo/smartsafehub-app-arcdrop-1.0.0-r1.apk"
+"$MANAGER" start update arcdrop || fail 'tampered adoption not queued'
+grep -Fqx "$(printf 'code\tE33')" "$TMP/runtime/apps-operation.state" || fail 'tampered adoption accepted'
+printf 'approved ArcDrop 1.0.0-r1 mock\n' > "$TMP/repo/smartsafehub-app-arcdrop-1.0.0-r1.apk"
+export APPS_TEST_UPGRADE=1
+"$MANAGER" start update arcdrop || fail 'unsafe adoption not queued'
+grep -Fqx "$(printf 'code\tE53')" "$TMP/runtime/apps-operation.state" || fail 'unsafe adoption accepted'
+unset APPS_TEST_UPGRADE
+export APPS_TEST_INSTALL_FAIL=1
+"$MANAGER" start update arcdrop || fail 'failed adoption not queued'
+grep -Fqx "$(printf 'code\tE54')" "$TMP/runtime/apps-operation.state" || fail 'failed adoption not reported'
+unset APPS_TEST_INSTALL_FAIL
+[ ! -e "$TMP/owned/arcdrop" ] || fail 'failed adoption created receipt'
+# Add a pre-existing dependency and a missing approved app-specific helper.
+python3 - "$TMP/catalog.json" "$CHARTSHA" "$HELPERSHA" <<'PY_ARC_DEPS'
+import json, sys
+p, chart, helper = sys.argv[1:]
+with open(p) as f:
+    data = json.load(f)
+data['apps'][0]['packages'] += [
+    {'name': 'luci-lib-chartjs', 'version': '26.288.56989~75a306d', 'sha256': chart},
+    {'name': 'new-signed-helper', 'version': '1.0-r1', 'sha256': helper},
+]
+with open(p, 'w') as f:
+    json.dump(data, f)
+PY_ARC_DEPS
+printf 'luci-lib-chartjs\n' >> "$APPS_TEST_INSTALLED"
+printf 'luci-lib-chartjs 0.1-r1\n' >> "$APPS_TEST_VERSION_DB"
+"$TMP/bin/fetch-catalog"
+"$MANAGER" status
+grep -Fqx "$(printf 'arcdrop\t0\t1\t0\t1\t0\t0.1.0-r17\t0\treview_required')" "$TMP/runtime/apps-status.tsv" || fail 'external dependency conflict not reported'
+"$MANAGER" start update arcdrop || fail 'mismatched dependency not queued'
+grep -Fqx "$(printf 'code\tE52')" "$TMP/runtime/apps-operation.state" || fail 'existing dependency upgraded'
+printf 'smartsafehub-app-arcdrop 0.1.0-r17\nluci-lib-chartjs 26.288.56989~75a306d\n' > "$APPS_TEST_VERSION_DB"
+"$MANAGER" status
+grep -Fqx "$(printf 'arcdrop\t0\t1\t0\t1\t1\t0.1.0-r17')" "$TMP/runtime/apps-status.tsv" || fail 'missing approved dependency hides adoption'
+export APPS_TEST_INSTALL_FAIL=1
+"$MANAGER" start update arcdrop || fail 'failed multi-package adoption not queued'
+grep -Fqx "$(printf 'code\tE54')" "$TMP/runtime/apps-operation.state" || fail 'failed multi-package adoption not reported'
+unset APPS_TEST_INSTALL_FAIL
+[ ! -e "$TMP/owned/arcdrop" ] || fail 'dependency intent prematurely adopted app'
+"$MANAGER" start update arcdrop || fail 'ArcDrop adoption retry not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'ArcDrop adoption failed'
+printf 'smartsafehub-app-arcdrop\t1.0.0-r1\t%s\nnew-signed-helper\t1.0-r1\t%s\n' "$ARCSHA" "$HELPERSHA" > "$TMP/expected-adoption"
+cmp -s "$TMP/expected-adoption" "$TMP/owned/arcdrop" || fail 'adoption receipt incorrectly claims existing dependency'
+grep -Fqx "$(printf 'arcdrop\t1\t1\t1\t1\t0\t1.0.0-r1')" "$TMP/runtime/apps-status.tsv" || fail 'adoption status not refreshed'
+"$MANAGER" start remove arcdrop || fail 'adopted removal not queued'
+grep -Fqx "$(printf 'phase\tsuccess')" "$TMP/runtime/apps-operation.state" || fail 'adopted removal failed'
+[ ! -e "$TMP/owned/arcdrop" ] || fail 'adopted receipt not cleared'
+[ "$(cat "$APPS_TEST_INSTALLED")" = luci-lib-chartjs ] || fail 'external dependency removed or owned APK retained'
+printf 'PASS: external ArcDrop update, explicit adoption, dependency protection, failed retry and removal\n'

@@ -125,7 +125,7 @@ review_install_plan() {
  ' "$plan"
 }
 
-# Only explicitly approved, already-owned APKs may be upgraded. Never let
+# Only explicitly approved, selected APKs may be upgraded. Never let
 # apk upgrade the firmware, pull new dependencies, remove packages or downgrade.
 review_update_plan() {
  plan="$1"; upgrades="$2"; additions="${3:-}"
@@ -411,6 +411,38 @@ select_upgrades() {
  [ -s "$changed_pins" ]
  )
 }
+# Explicit user adoption is limited to the approved primary APK, which must
+# actually be replaced by a strictly newer signed version. Existing dependencies
+# are never adopted or upgraded; missing approved dependencies may be installed.
+# Both the read-only status scan and the privileged update use this selector.
+select_external_upgrades() {
+ (
+ external_manifest="$1"; approved_pins="$2"; changed_pins="$3"; primary="$4"
+ [ ! -e "$external_manifest" ] && [ ! -L "$external_manifest" ] || return 1
+ valid_package "$primary" || return 1
+ protected_package "$primary" && return 1
+ shared_runtime_package "$primary" && return 1
+ installed "$primary" || return 1
+ actual_version="$(installed_version "$primary")"
+ new_version="$(awk -F '\t' -v n="$primary" '$1 == n {print $2; exit}' "$approved_pins")"
+ version_is_newer "$actual_version" "$new_version" || return 1
+ : > "$changed_pins"
+ while IFS="$(printf '\t')" read -r name version hash; do
+  if [ "$name" != "$primary" ] && installed "$name"; then
+   [ "$(installed_version "$name")" = "$version" ] || return 1
+   continue
+  fi
+  firmware_prerequisite "$name" && return 1
+  protected_package "$name" && return 1
+  for other in "$OWNED"/*; do
+   [ -f "$other" ] || continue
+   if awk -F '\t' -v n="$name" '$1 == n {found=1} END {exit !found}' "$other"; then return 1; fi
+  done
+  printf '%s\t%s\t%s\n' "$name" "$version" "$hash" >> "$changed_pins"
+ done < "$approved_pins"
+ [ -s "$changed_pins" ]
+ )
+}
 # Prefer OpenWrt's configured apk architecture. Some package-manager builds
 # do not support --print-arch consistently. Never guess based on the CPU type,
 # device name, or the channel: the Hub approval must match an exact native arch.
@@ -529,14 +561,21 @@ status() {
     *) ui_ready=1 ;;
    esac
   fi
-  # Update availability requires a complete Apps-owned install and a newer
-  # Hub-approved exact package set; it never uses an untrusted URL or version.
+  # Updates require reviewed exact pins. An external primary may be adopted
+  # only by a user-requested, strictly newer approved replacement.
   update_ready=0; update_blocked=0
-  if [ "$managed" -eq 1 ] && [ "$total" -gt 0 ]; then
+  if [ "$total" -gt 0 ] && { [ "$managed" -eq 1 ] || { [ -n "$primary_package" ] && installed "$primary_package"; }; }; then
    status_pins="$(mktemp "$RUNTIME/apps-status-pins.XXXXXXXX")" || return 1
    status_changes="$(mktemp "$RUNTIME/apps-status-changes.XXXXXXXX")" || { rm -f "$status_pins"; return 1; }
-   if extract_pins "$idx" "$status_pins" && select_upgrades "$(owned_manifest "$id")" "$status_pins" "$status_changes"; then
-    update_ready=1
+   if extract_pins "$idx" "$status_pins"; then
+    if [ "$managed" -eq 1 ]; then
+     if select_upgrades "$(owned_manifest "$id")" "$status_pins" "$status_changes"; then update_ready=1; fi
+    else
+     # Resolve the same approved primary as preflight_install, without
+     # leaking the helper's shell variables into the outer status loop.
+     status_primary="$(pins="$status_pins"; approved_primary_package "$idx")" || status_primary=''
+     if select_external_upgrades "$(owned_manifest "$id")" "$status_pins" "$status_changes" "$status_primary"; then update_ready=1; fi
+    fi
    fi
    rm -f "$status_pins" "$status_changes"
   fi
@@ -550,7 +589,7 @@ status() {
    valid_version "$installed_release" || installed_release=''
    # Only a newer representative APK, not the app's display version,
    # can establish that an unavailable update needs an explanation.
-   if [ "$managed" -eq 1 ] && [ "$update_ready" -eq 0 ]; then
+   if [ "$update_ready" -eq 0 ]; then
     approved_release=''; p=0
     while [ "$p" -lt "$total" ]; do
      if [ "$(field "$CATALOG" "@.apps[$idx].packages[$p].name")" = "$primary_package" ]; then
@@ -823,15 +862,21 @@ install_app() {
  return 0
 }
 
-# Upgrade only packages already owned by this app, and only when the newly
-# approved version is strictly newer. Re-fetch approval at click time, use a
-# signed immutable repository, and reject any unrelated solver action.
+# Upgrade owned packages or explicitly adopt an external primary by replacing
+# it with a newer approved APK. Re-fetch approval at click time, use a signed
+# immutable repository, and reject any unrelated solver action.
 update_app() {
  preflight_install || return $?
  manifest="$(owned_manifest "$app")"
- [ -s "$manifest" ] && [ ! -L "$manifest" ] || return 51
  changes="$stage/changes"
- select_upgrades "$manifest" "$pins" "$changes" || return 52
+ adopting=0
+ if [ -e "$manifest" ] || [ -L "$manifest" ]; then
+  [ -f "$manifest" ] && [ -s "$manifest" ] && [ ! -L "$manifest" ] || return 51
+  select_upgrades "$manifest" "$pins" "$changes" || return 52
+ else
+  select_external_upgrades "$manifest" "$pins" "$changes" "$primary_package" || return 52
+  adopting=1
+ fi
  fetch_approved_archives || return $?
  prepare_signed_index || return $?
  set --; update_names=''; add_names=''
@@ -850,18 +895,36 @@ update_app() {
  [ "$#" -gt 0 ] || return 52
  "$APK" --repositories-file /dev/null -X "$local_index" add --upgrade --simulate "$@" > "$stage/plan.log" 2>&1 || return 53
  review_update_plan "$stage/plan.log" "$update_names" "$add_names" || return 53
- # Record newly installed dependency intent only AFTER signature, checksums
- # and the exact simulated plan pass. A partial APK update must not leave
- # unmanaged packages behind; retry can finish the same reviewed pin.
- while IFS="$(printf '\t')" read -r name version hash; do
-  if ! installed "$name" && ! shared_runtime_package "$name"; then
-   append_owned_pin "$name" "$version" "$hash" || return 55
-  fi
- done < "$changes"
+ # For already-owned apps, preserve dependency intent after verification
+ # so a partial update can retry. External adoption must wait for success.
+ if [ "$adopting" -eq 0 ]; then
+  while IFS="$(printf '\t')" read -r name version hash; do
+   if ! installed "$name" && ! shared_runtime_package "$name"; then
+    append_owned_pin "$name" "$version" "$hash" || return 55
+   fi
+  done < "$changes"
+ else
+  # Do not publish ownership for an external app before APK success.
+  mkdir -p "$OWNED" || return 55
+ fi
  "$APK" --repositories-file /dev/null -X "$local_index" add --upgrade "$@" > "$stage/install.log" 2>&1 || return 54
  while IFS="$(printf '\t')" read -r name version hash; do
   [ "$(installed_version "$name")" = "$version" ] || return 54
  done < "$pins"
+ # The first ownership receipt is published only after every pin is verified.
+ # The selected changes contain the replaced primary and newly installed
+ # dependencies, never pre-existing dependencies or shared runtime packages.
+ if [ "$adopting" -eq 1 ]; then
+  [ ! -e "$manifest" ] && [ ! -L "$manifest" ] || return 55
+  receipt="$(mktemp "$OWNED/.adopt.XXXXXXXX")" || return 55
+  while IFS="$(printf '\t')" read -r name version hash; do
+   if ! shared_runtime_package "$name"; then
+    printf '%s\t%s\t%s\n' "$name" "$version" "$hash" || { rm -f "$receipt"; return 55; }
+   fi
+  done < "$changes" > "$receipt"
+  if [ ! -s "$receipt" ] || ! mv -f "$receipt" "$manifest"; then rm -f "$receipt"; return 55; fi
+  return 0
+ fi
  # Retain prior ownership and add only dependencies introduced by this
  # transaction. Previously installed/firmware packages are not adopted.
  : > "$manifest.new"
